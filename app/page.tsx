@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { FURNITURE, FLOORS, HOUSE_SIZES, PET_BUFFS, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
+import { FURNITURE, FLOORS, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
 import { BAITS, FISH, STARTER_BAIT, rollFish, type Bait, type Fish, type Season } from "./fishing";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, readAvatarFile, type StoredAvatar } from "./avatar";
@@ -156,6 +156,7 @@ export default function Home() {
   const [waterFx, setWaterFx] = useState<{ id: number; plotIndex: number }[]>([]);
   const justWatered = useRef(new Map<number, number>());
   const pendingPours = useRef(0);
+  const [gachaResult, setGachaResult] = useState<{ item: Furniture; at: number } | null>(null);
   const [cheer, setCheer] = useState<{ id: string; at: number } | undefined>(undefined);
   const [fishState, setFishState] = useState<FishState>({ phase: "idle" });
   const [fishLog, setFishLog] = useState<Record<string, number>>({});
@@ -231,7 +232,7 @@ export default function Home() {
   useEffect(() => { pendingPours.current = 0; }, [canWater]);
 
   // 키우는 펫의 고유 효과
-  const pets = new Set(placed.filter(item => item.pet).map(item => item.id));
+  const pets = new Set(placed.filter(item => item.pet && item.rare).map(item => item.id));
   const canMax = CAN_CAPACITY + (pets.has("duck") ? 2 : 0);
   const bugPenalty = pets.has("weasel") ? BUG_PENALTY / 2 : BUG_PENALTY;
   const seedPrice = (crop: Crop) => Math.round(crop.seed * seedMul * (pets.has("rabbit") ? 0.95 : 1));
@@ -288,6 +289,20 @@ export default function Home() {
     }, 1000);
     return () => clearInterval(timer);
   }, [loaded]);
+
+  // 농사 도구 단축키: 1 맨손, 2 물뿌리개, 3 우물, 4~6 거름 (입력창에 쓰는 중이면 무시)
+  useEffect(() => {
+    if (tab !== "farm") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey || (event.target instanceof Element && event.target.closest("input, textarea, select"))) return;
+      if (event.key === "1") setTool("hand");
+      else if (event.key === "2") setTool("water");
+      else if (event.key === "3") refillCan();
+      else if (["4", "5", "6"].includes(event.key)) setTool(FERTILIZERS[Number(event.key) - 4].id);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   function switchTab(next: typeof tab) {
     if (next !== "fish" && (fishState.phase === "waiting" || fishState.phase === "bite")) { window.clearTimeout(fishTimer.current); setFishState({ phase: "idle" }); }
@@ -519,8 +534,27 @@ export default function Home() {
     return { x: free?.[0] ?? 0, z: free?.[1] ?? 0, rot: 0, story: viewStory };
   }
 
+  /** 펫 뽑기: 1,000원. 능력 펫 10%, 일반 펫 90%. 뽑은 펫은 지금 보는 층의 빈자리에 놓인다. */
+  function drawPet() {
+    if (money < GACHA_PRICE) return setNotice(`펫 뽑기는 ${GACHA_PRICE.toLocaleString()}원이에요.`);
+    const pet = rollPet(), instanceId = `${pet.id}-${Date.now()}`;
+    setMoney(m => m - GACHA_PRICE);
+    setPlaced(items => [...items, fitToRoom({ ...pet, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(pet, items.length) }, room, yardLevel)]);
+    setGachaResult({ item: pet, at: Date.now() });
+    playCoinSound(pet.rare ? [660, 880, 1100, 1320, 1760] : [740, 990]);
+    setNotice(pet.rare ? `✨ 대박! 능력 펫 ${pet.icon} ${pet.name}이(가) 나왔어요! ${PET_BUFFS[pet.id].title}: ${PET_BUFFS[pet.id].text}` : `${pet.icon} ${pet.name}이(가) 나왔어요. 집 안을 귀엽게 돌아다녀요.`);
+  }
+
+  function sellPet(item: PlacedItem) {
+    const refund = Math.round(item.price * 0.5);
+    setPlaced(items => items.filter(entry => entry.instanceId !== item.instanceId));
+    setWarehouse(items => items.filter(entry => entry.instanceId !== item.instanceId));
+    if (selectedFurniture === item.instanceId) setSelectedFurniture(null);
+    setMoney(value => value + refund);
+    setNotice(`${item.icon} ${item.name}을(를) 새 가족에게 보내고 ${refund.toLocaleString()}원을 받았어요.`);
+  }
+
   function buyFurniture(item: Furniture) {
-    if (item.pet && pets.has(item.id)) return setNotice(`${item.icon} ${item.name}은(는) 이미 함께 살고 있어요.`);
     if (money < item.price) return setNotice(`${item.name}을(를) 사려면 ${item.price.toLocaleString()}원이 필요해요.`);
     const instanceId = `${item.id}-${Date.now()}`;
     setMoney(m => m - item.price); setPlaced(p => [...p, fitToRoom({ ...item, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(item, placed.length) }, room, yardLevel)]);
@@ -611,7 +645,7 @@ export default function Home() {
   const currentBait = BAITS.find(item => item.id === selectedBait) ?? BAITS[0];
 
   return (
-    <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4}`}>
+    <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4} ${tab === "farm" ? "has-dock" : ""}`}>
       <header className="topbar">
         <div className="brand"><button className="avatar-button" onClick={() => setShowAvatar(true)} aria-label="내 아바타 바꾸기">{avatarImg}</button><div><h1>월루농가</h1><p>월급은 루팡, 농사는 진심</p></div></div>
         <div className="status-cluster">
@@ -642,16 +676,17 @@ export default function Home() {
         <button className={tab === "home" ? "active" : ""} onClick={() => switchTab("home")}>🏡 나의 집</button>
       </nav>
 
+      {tab === "farm" && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~6)">
+        <span className="dock-title">도구</span>
+        <button className={tool === "hand" ? "on" : ""} onClick={() => setTool("hand")} aria-pressed={tool === "hand"} title="빈 밭 심기 · 다 자란 작물 수확 (1)"><b>✋</b><span>맨손</span><kbd>1</kbd></button>
+        <button className={`can ${tool === "water" ? "on" : ""}`} onClick={() => setTool(current => (current === "water" ? "hand" : "water"))} aria-pressed={tool === "water"} title="목마른 밭에 물 주기. 누른 채로 쓸고 지나가도 돼요 (2)"><b>🚿</b><span>물뿌리개</span><small className="can-gauge" aria-label={`물 ${canWater}/${canMax}`}>{Array.from({ length: canMax }).map((_, k) => <i key={k} className={k < canWater ? "full" : ""} />)}</small><kbd>2</kbd></button>
+        <button className={`refill ${canWater === 0 ? "empty" : ""}`} onClick={refillCan} disabled={canWater >= canMax} title="물뿌리개 가득 채우기 (3)"><b>🚰</b><span>우물</span><kbd>3</kbd></button>
+        <span className="dock-sep" />
+        {FERTILIZERS.map((item, index) => <button key={item.id} className={`fert ${tool === item.id ? "on" : ""}`} onClick={() => setTool(current => (current === item.id ? "hand" : item.id))} aria-pressed={tool === item.id} title={`${item.name} ${item.price}원 · ${item.note} (${index + 4})`}><b>{item.icon}</b><span>{item.name}</span><small>{item.price}원</small><kbd>{index + 4}</kbd></button>)}
+      </div>}
       {tab === "farm" && <div className="game-grid">
         <section className="farm-panel panel">
           <div className="panel-heading"><div><span className="eyebrow">MY FIELD</span><h3>햇살 텃밭</h3></div><div className="farm-actions"><span className="plot-count">{plots.filter(Boolean).length}/{plotCount} 재배 중</span></div></div>
-          <div className="farm-tools" role="toolbar" aria-label="농사 도구">
-            <button className={tool === "hand" ? "on" : ""} onClick={() => setTool("hand")} aria-pressed={tool === "hand"}>✋ 맨손<small>심기·수확</small></button>
-            <button className={`can ${tool === "water" ? "on" : ""}`} onClick={() => setTool(current => (current === "water" ? "hand" : "water"))} aria-pressed={tool === "water"}>🚿 물뿌리개<small className="can-gauge" aria-label={`물 ${canWater}/${canMax}`}>{Array.from({ length: canMax }).map((_, k) => <i key={k} className={k < canWater ? "full" : ""} />)}</small></button>
-            <button className="refill" onClick={refillCan} disabled={canWater >= canMax}>🚰 우물<small>물 채우기</small></button>
-            {FERTILIZERS.some(item => item.id === tool) && <span className="tool-chip">{FERTILIZERS.find(item => item.id === tool)!.icon} {FERTILIZERS.find(item => item.id === tool)!.name} 주는 중 <button onClick={() => setTool("hand")} aria-label="거름 주기 끝내기">✕</button></span>}
-            <span className="tool-hint">{tool === "water" ? "목마른 밭을 누르거나, 누른 채로 쓸고 지나가세요" : FERTILIZERS.some(item => item.id === tool) ? "자라는 작물을 눌러 거름을 줘요" : "빈 밭: 심기 · 다 자란 작물: 수확"}</span>
-          </div>
           <div className={`plots plots-${plotCount} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
             {Array.from({ length: plotCount }).map((_, index) => {
               const plot = plots[index] || null; const crop = plot ? CROPS.find(c => c.id === plot.cropId)! : null;
@@ -680,8 +715,7 @@ export default function Home() {
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= 16 ? "최대 확장 완료" : `${(2400 + (ownedPlots - 8) * 700).toLocaleString()}원 · 최대 16칸`}</small></div><button onClick={expandField} disabled={ownedPlots >= 16}>구매</button></div>
-          <div className="fert-shop"><b>🧑‍🌾 거름 주기</b><small>고른 뒤 자라는 작물을 누르면 줘요(작물당 1번)</small><div>{FERTILIZERS.map(item => <button key={item.id} className={tool === item.id ? "on" : ""} onClick={() => setTool(current => (current === item.id ? "hand" : item.id))} aria-pressed={tool === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.price}원 · {item.note}</small></button>)}</div>{FERTILIZERS.some(item => item.id === tool) && <button className="fert-cancel" onClick={() => setTool("hand")}>거름 주기 끝내기</button>}</div>
-          <div className="tip">🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 눌러 잡으세요. 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
+          <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~6). 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 눌러 잡으세요. 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
         </aside>
       </div>}
 
@@ -741,8 +775,8 @@ export default function Home() {
               <button onClick={() => rotateSelected(15)}>↻15°</button><button onClick={() => rotateSelected(45)}>↻45°</button>
             </div>}
             {selectedItem && <div className="tint-row" role="group" aria-label="가구 색상">{TINTS.map(color => <button key={color} className={`tint ${(selectedItem.tint ?? selectedItem.color) === color ? "on" : ""}`} style={{ background: color }} onClick={() => updateItem(selectedItem.instanceId, { tint: color })} aria-label={`색상 ${color}`} />)}<button className="tint reset" onClick={() => updateItem(selectedItem.instanceId, { tint: undefined })} aria-label="기본 색상">↺</button></div>}
-            {selectedItem?.pet && <><span className="pet-info">{selectedItem.icon} <b>{PET_BUFFS[selectedItem.id].title}</b> {PET_BUFFS[selectedItem.id].text}</span><button onClick={() => { setCheer({ id: selectedItem.instanceId, at: performance.now() }); setNotice(`${selectedItem.icon} ${selectedItem.name}이(가) 기분이 좋아 폴짝 뛰었어요! 💕`); }}>💕 쓰다듬기</button></>}
-            {selectedItem && !selectedItem.pet && <><button onClick={storeFurniture}>📦 창고 보관</button><button className="sell-button" onClick={sellFurniture}>판매 (50%)</button></>}
+            {selectedItem?.pet && <>{selectedItem.rare ? <span className="pet-info">{selectedItem.icon} <b>{PET_BUFFS[selectedItem.id].title}</b> {PET_BUFFS[selectedItem.id].text}</span> : <span className="pet-info">{selectedItem.icon} 일반 펫 · 능력 없음</span>}<button onClick={() => { setCheer({ id: selectedItem.instanceId, at: performance.now() }); setNotice(`${selectedItem.icon} ${selectedItem.name}이(가) 기분이 좋아 폴짝 뛰었어요! 💕`); }}>💕 쓰다듬기</button></>}
+            {selectedItem && <><button onClick={storeFurniture}>📦 창고 보관</button><button className="sell-button" onClick={sellFurniture}>{selectedItem.pet ? "되팔기" : "판매"} (50%)</button></>}
             {selectedFurniture === AVATAR_ID && <><button onClick={() => setShowAvatar(true)}>🪞 아바타 이미지 바꾸기</button>{stories > 1 && avatarPos.story !== viewStory && <button onClick={() => setAvatarPos({ x: 0, z: 0, story: viewStory })}>🧍 아바타를 {viewStory + 1}층으로</button>}</>}
           </div>
           <p className="room-help">가구 끌기: 이동 · 빈 곳 끌기: 시점 회전 · 휠: 확대/축소 · 방향키: 미세 이동 · Q/E: 15° 회전. 카메라 쪽 벽은 자동으로 낮아져 안이 보여요.</p>
@@ -756,8 +790,22 @@ export default function Home() {
           </div> : <>
             {shopTab === "yard" && <div className="theme-shop structure-shop"><section><b>마당 넓히기</b><div>{YARD_SIZES.map(size => <button key={size.level} className={yardLevel === size.level ? "on" : ""} onClick={() => size.level === yardLevel + 1 ? expandYard() : undefined} disabled={size.level > yardLevel + 1}><i className="yard-icon" style={{ transform: `scale(${0.55 + size.level * 0.15})` }} /><span>{size.name}</span><small>{size.level <= yardLevel ? "보유" : `${size.price.toLocaleString()}원`}</small></button>)}</div></section><b>마당 소품 · 집 바깥 잔디 위에만 놓여요</b></div>}
             {shopTab === "structure" && <div className="theme-shop structure-shop"><section><b>2층 올리기 · {SECOND_FLOOR_PRICE.toLocaleString()}원</b><div><button className={stories > 1 ? "on" : ""} onClick={buildSecondFloor} disabled={houseLevel < 3 && stories < 2}><i className="shape-icon shape-two" /><span>{stories > 1 ? "2층 보기" : "2층 증축"}</span><small>{stories > 1 ? "완료 · 계단 포함" : houseLevel < 3 ? "18평부터 가능" : "계단·창문 포함"}</small></button></div></section><section><b>방 구조 리모델링 · {REMODEL_PRICE.toLocaleString()}원</b><div>{SHAPES.map(shape => <button key={shape.id} className={houseShape === shape.id ? "on" : ""} onClick={() => remodel(shape.id)}><i className={`shape-icon shape-${shape.id}`} /><span>{shape.name}</span><small>{houseShape === shape.id ? "현재 구조" : shape.note}</small></button>)}</div></section><b>문·창문·가벽</b></div>}
-            {shopTab === "pet" && <p className="hint">펫은 종류마다 한 마리씩 키울 수 있고, 함께 사는 동안 작은 고유 효과를 줘요. 집 안이나 마당을 돌아다녀요.</p>}
-            <div className={`furniture-list ${shopTab === "pet" ? "pet-list" : ""}`}>{shopItems.map(item => <button key={item.id} onClick={() => buyFurniture(item)} disabled={item.pet && pets.has(item.id)}><span className="furniture-thumb" style={{ "--c": item.color } as CSSProperties}><FurnitureArt id={item.id} /></span><span><b>{item.name}</b><small>{item.pet && pets.has(item.id) ? "함께 사는 중" : `${item.price.toLocaleString()}원`}</small>{item.pet && <em>{PET_BUFFS[item.id].title} · {PET_BUFFS[item.id].text}</em>}</span><i>＋</i></button>)}</div>
+            {shopTab === "pet" ? <div className="gacha">
+              <div key={gachaResult?.at ?? 0} className={`gacha-machine ${gachaResult ? (gachaResult.item.rare ? "rare" : "common") : ""}`}>
+                {gachaResult ? <><span className="furniture-thumb" style={{ "--c": gachaResult.item.color } as CSSProperties}><FurnitureArt id={gachaResult.item.id} /></span><strong>{gachaResult.item.name}</strong><em>{gachaResult.item.rare ? "✨ 능력 펫!" : "일반 펫"}</em>{gachaResult.item.rare && <small>{PET_BUFFS[gachaResult.item.id].title} · {PET_BUFFS[gachaResult.item.id].text}</small>}</> : <><b>🎰</b><small>어떤 친구가 나올까요?</small></>}
+              </div>
+              <button className="gacha-button" onClick={drawPet} disabled={money < GACHA_PRICE}>🎰 펫 뽑기 · {GACHA_PRICE.toLocaleString()}원</button>
+              <p className="hint">능력 펫 {Math.round(GACHA_RARE_CHANCE * 100)}% · 일반 펫 {100 - Math.round(GACHA_RARE_CHANCE * 100)}% · 중복 가능 · 되팔기는 가치의 50%</p>
+              <details className="gacha-odds"><summary>뽑을 수 있는 펫 보기</summary>
+                <b>✨ 능력 펫 (각 {(GACHA_RARE_CHANCE * 100 / FURNITURE.filter(item => item.rare).length).toFixed(1)}%)</b>
+                <ul>{FURNITURE.filter(item => item.rare).map(item => <li key={item.id}>{item.icon} {item.name} — {PET_BUFFS[item.id].text} <i>되팔기 {Math.round(item.price / 2).toLocaleString()}원</i></li>)}</ul>
+                <b>일반 펫 (각 {((1 - GACHA_RARE_CHANCE) * 100 / FURNITURE.filter(item => item.pet && !item.rare).length).toFixed(2)}%)</b>
+                <ul className="common">{FURNITURE.filter(item => item.pet && !item.rare).map(item => <li key={item.id}>{item.icon} {item.name}</li>)}</ul>
+              </details>
+              <b className="my-pets-title">우리 집 펫 <em>{[...placed, ...warehouse].filter(item => item.pet).length}</em></b>
+              <div className="my-pets">{[...placed, ...warehouse].filter(item => item.pet).map(item => <div key={item.instanceId} className={item.rare ? "rare" : ""}><span>{item.icon}</span><b>{item.name}</b><small>{warehouse.includes(item) ? "창고" : item.rare ? PET_BUFFS[item.id].title : "일반"}</small><button onClick={() => sellPet(item)}>{Math.round(item.price / 2).toLocaleString()}원에 되팔기</button></div>)}</div>
+            </div> :
+            <div className="furniture-list">{shopItems.map(item => <button key={item.id} onClick={() => buyFurniture(item)}><span className="furniture-thumb" style={{ "--c": item.color } as CSSProperties}><FurnitureArt id={item.id} /></span><span><b>{item.name}</b><small>{item.price.toLocaleString()}원</small></span><i>＋</i></button>)}</div>}
           </>}
           <section className="warehouse"><div className="warehouse-heading"><span>📦 MY STORAGE</span><b>가구 창고 <em>{warehouse.length}</em></b></div>{warehouse.length === 0 ? <p>보관한 가구가 없어요.</p> : <div className="warehouse-list">{warehouse.map(item => <div key={item.instanceId}><span className="furniture-thumb" style={{ "--c": item.tint ?? item.color } as CSSProperties}><FurnitureArt id={item.id} /></span><b>{item.name}</b><button onClick={() => restoreFurniture(item)}>꺼내기</button><button className="sell-mini" onClick={() => sellWarehouseFurniture(item)}>{Math.round(item.price * 0.5).toLocaleString()}원에 판매</button></div>)}</div>}</section>
         </aside>

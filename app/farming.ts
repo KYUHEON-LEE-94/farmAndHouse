@@ -8,24 +8,24 @@ export type Fertilizer = { id: string; name: string; icon: string; price: number
 export type Quality = { id: "normal" | "good" | "best"; name: string; stars: string; multiplier: number };
 
 export const CROPS: Crop[] = [
-  { id: "strawberry", name: "딸기", icon: "🍓", seasons: ["봄"], seed: 120, sell: 405, seconds: 110, difficulty: "보통" },
-  { id: "potato", name: "감자", icon: "🥔", seasons: ["봄"], seed: 70, sell: 215, seconds: 70, difficulty: "쉬움" },
-  { id: "cabbage", name: "양배추", icon: "🥬", seasons: ["봄", "가을"], seed: 95, sell: 300, seconds: 100, difficulty: "보통" },
-  { id: "tomato", name: "토마토", icon: "🍅", seasons: ["여름"], seed: 110, sell: 365, seconds: 100, difficulty: "보통" },
-  { id: "corn", name: "옥수수", icon: "🌽", seasons: ["여름"], seed: 145, sell: 505, seconds: 140, difficulty: "어려움" },
-  { id: "watermelon", name: "수박", icon: "🍉", seasons: ["여름"], seed: 220, sell: 805, seconds: 170, difficulty: "어려움" },
-  { id: "sweetpotato", name: "고구마", icon: "🍠", seasons: ["가을"], seed: 130, sell: 455, seconds: 130, difficulty: "보통" },
-  { id: "pumpkin", name: "호박", icon: "🎃", seasons: ["가을"], seed: 190, sell: 700, seconds: 160, difficulty: "어려움" },
-  { id: "radish", name: "무", icon: "🥕", seasons: ["가을", "겨울"], seed: 80, sell: 240, seconds: 80, difficulty: "쉬움" },
-  { id: "spinach", name: "시금치", icon: "🌿", seasons: ["겨울"], seed: 65, sell: 200, seconds: 60, difficulty: "쉬움" },
-  { id: "greenonion", name: "대파", icon: "🧅", seasons: ["겨울"], seed: 100, sell: 330, seconds: 110, difficulty: "보통" },
-  { id: "tangerine", name: "감귤", icon: "🍊", seasons: ["겨울"], seed: 240, sell: 895, seconds: 180, difficulty: "어려움" },
+  { id: "strawberry", name: "딸기", icon: "🍓", seasons: ["봄"], seed: 60, sell: 160, seconds: 36, difficulty: "보통" },
+  { id: "potato", name: "감자", icon: "🥔", seasons: ["봄"], seed: 35, sell: 85, seconds: 24, difficulty: "쉬움" },
+  { id: "cabbage", name: "양배추", icon: "🥬", seasons: ["봄", "가을"], seed: 45, sell: 120, seconds: 32, difficulty: "보통" },
+  { id: "tomato", name: "토마토", icon: "🍅", seasons: ["여름"], seed: 55, sell: 145, seconds: 32, difficulty: "보통" },
+  { id: "corn", name: "옥수수", icon: "🌽", seasons: ["여름"], seed: 70, sell: 200, seconds: 44, difficulty: "어려움" },
+  { id: "watermelon", name: "수박", icon: "🍉", seasons: ["여름"], seed: 110, sell: 320, seconds: 54, difficulty: "어려움" },
+  { id: "sweetpotato", name: "고구마", icon: "🍠", seasons: ["가을"], seed: 65, sell: 180, seconds: 40, difficulty: "보통" },
+  { id: "pumpkin", name: "호박", icon: "🎃", seasons: ["가을"], seed: 95, sell: 280, seconds: 50, difficulty: "어려움" },
+  { id: "radish", name: "무", icon: "🥕", seasons: ["가을", "겨울"], seed: 40, sell: 95, seconds: 26, difficulty: "쉬움" },
+  { id: "spinach", name: "시금치", icon: "🌿", seasons: ["겨울"], seed: 30, sell: 80, seconds: 20, difficulty: "쉬움" },
+  { id: "greenonion", name: "대파", icon: "🧅", seasons: ["겨울"], seed: 50, sell: 130, seconds: 36, difficulty: "보통" },
+  { id: "tangerine", name: "감귤", icon: "🍊", seasons: ["겨울"], seed: 120, sell: 360, seconds: 58, difficulty: "어려움" },
 ];
 
 export const FERTILIZERS: Fertilizer[] = [
-  { id: "compost", name: "퇴비", icon: "🍂", price: 40, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
-  { id: "premium", name: "고급 비료", icon: "🧪", price: 150, speed: 0.25, quality: 1, note: "남은 시간 -25% · 품질 +1" },
-  { id: "golden", name: "황금 비료", icon: "🌟", price: 400, speed: 0.3, quality: 2, note: "남은 시간 -30% · 품질 +2" },
+  { id: "compost", name: "퇴비", icon: "🍂", price: 15, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
+  { id: "premium", name: "고급 비료", icon: "🧪", price: 50, speed: 0.25, quality: 1, note: "남은 시간 -25% · 품질 +1" },
+  { id: "golden", name: "황금 비료", icon: "🌟", price: 120, speed: 0.3, quality: 2, note: "남은 시간 -30% · 품질 +2" },
 ];
 
 export const QUALITIES: Quality[] = [
@@ -34,16 +34,16 @@ export const QUALITIES: Quality[] = [
   { id: "best", name: "최상", stars: "★★", multiplier: 1.6 },
 ];
 
-/** 성장 시간이 150초 이상이면 물 줄 시점이 3번, 아니면 2번. */
-export const waterCheckpoints = (growSeconds: number) => (growSeconds >= 150 ? 3 : 2);
+/** 성장 시간이 40초 이상이면 물 줄 시점이 3번, 아니면 2번. */
+export const waterCheckpoints = (growSeconds: number) => (growSeconds >= 40 ? 3 : 2);
 
 /** 벌레가 앉아 있는 시간(초)과, 놓칠 때마다 깎이는 판매가 비율. */
 /** 물뿌리개 한 통으로 물을 줄 수 있는 횟수. 우물에서 무료로 다시 채운다. */
 export const CAN_CAPACITY = 5;
-export const BUG_SECONDS = 15;
+export const BUG_SECONDS = 8;
 export const BUG_PENALTY = 0.1;
-export const BUG_CHECK_SECONDS = 20;
-export const BUG_CHANCE = 0.35;
+export const BUG_CHECK_SECONDS = 8;
+export const BUG_CHANCE = 0.4;
 
 /**
  * 밭 한 칸의 현재 상태.

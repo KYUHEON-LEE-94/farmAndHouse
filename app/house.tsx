@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export type FurnitureKind = "floor" | "rug" | "wall";
 export type ShopGroup = "furniture" | "decor" | "structure" | "yard" | "pet";
 /** size는 [가로, 높이, 깊이] 미터. 벽 부착 가구는 mount 높이(바닥에서 중심까지)에 걸린다. */
-export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean };
+export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; rare?: boolean };
 /** 바닥 가구는 x·z(방 중심 기준 미터)와 rot(도), 벽 가구는 wall(벽 번호)·u(벽 위치 0~1)·h(높이 m). story는 층(0=1층, 1=2층), 마당 소품은 층이 없다. */
 export type PlacedItem = Furniture & { instanceId: string; x: number; z: number; rot: number; tint?: string; wall?: number; u?: number; h?: number; story?: number };
 export type Theme = { id: string; name: string; price: number; swatch: string };
@@ -55,17 +55,35 @@ export const FURNITURE: Furniture[] = [
   { id: "streetlamp", name: "정원 가로등", icon: "🏮", price: 900, color: "#3f4a44", kind: "floor", group: "yard", size: [0.4, 2.4, 0.4], yard: true },
   { id: "pond", name: "작은 연못", icon: "🪷", price: 1600, color: "#6fa8c4", kind: "rug", group: "yard", size: [2.6, 0.1, 1.8], yard: true },
   { id: "doghouse", name: "강아지 집", icon: "🐶", price: 1100, color: "#c46a4b", kind: "floor", group: "yard", size: [1, 1.1, 1.1], yard: true },
-  { id: "dog", name: "강아지", icon: "🐶", price: 3000, color: "#c08a52", kind: "floor", group: "pet", size: [0.45, 0.6, 0.8], pet: true },
-  { id: "cat", name: "고양이", icon: "🐱", price: 3000, color: "#e0a35a", kind: "floor", group: "pet", size: [0.35, 0.45, 0.65], pet: true },
-  { id: "rabbit", name: "토끼", icon: "🐰", price: 2500, color: "#f3efe7", kind: "floor", group: "pet", size: [0.3, 0.55, 0.45], pet: true },
-  { id: "duck", name: "오리", icon: "🦆", price: 2500, color: "#f6d16a", kind: "floor", group: "pet", size: [0.3, 0.45, 0.45], pet: true },
-  { id: "mole", name: "두더지", icon: "🐹", price: 3500, color: "#5c5350", kind: "floor", group: "pet", size: [0.3, 0.25, 0.42], pet: true },
-  { id: "weasel", name: "족제비", icon: "🦦", price: 4000, color: "#a8743e", kind: "floor", group: "pet", size: [0.22, 0.3, 0.75], pet: true },
-  { id: "tiger", name: "호랑이", icon: "🐯", price: 15000, color: "#e08a2e", kind: "floor", group: "pet", size: [0.7, 1, 1.7], pet: true },
+  { id: "dog", name: "강아지", icon: "🐶", price: 3000, color: "#c08a52", kind: "floor", group: "pet", size: [0.45, 0.6, 0.8], pet: true, rare: true },
+  { id: "cat", name: "고양이", icon: "🐱", price: 3000, color: "#e0a35a", kind: "floor", group: "pet", size: [0.35, 0.45, 0.65], pet: true, rare: true },
+  { id: "rabbit", name: "토끼", icon: "🐰", price: 2500, color: "#f3efe7", kind: "floor", group: "pet", size: [0.3, 0.55, 0.45], pet: true, rare: true },
+  { id: "duck", name: "오리", icon: "🦆", price: 2500, color: "#f6d16a", kind: "floor", group: "pet", size: [0.3, 0.45, 0.45], pet: true, rare: true },
+  { id: "mole", name: "두더지", icon: "🐹", price: 3500, color: "#5c5350", kind: "floor", group: "pet", size: [0.3, 0.25, 0.42], pet: true, rare: true },
+  { id: "weasel", name: "족제비", icon: "🦦", price: 4000, color: "#a8743e", kind: "floor", group: "pet", size: [0.22, 0.3, 0.75], pet: true, rare: true },
+  { id: "tiger", name: "호랑이", icon: "🐯", price: 8000, color: "#e08a2e", kind: "floor", group: "pet", size: [0.7, 1, 1.7], pet: true, rare: true },
+  { id: "chick", name: "병아리", icon: "🐥", price: 1000, color: "#f6d860", kind: "floor", group: "pet", size: [0.2, 0.25, 0.22], pet: true },
+  { id: "grasshopper", name: "메뚜기", icon: "🦗", price: 1000, color: "#7fb04f", kind: "floor", group: "pet", size: [0.12, 0.12, 0.3], pet: true },
+  { id: "snail", name: "달팽이", icon: "🐌", price: 1000, color: "#c98f58", kind: "floor", group: "pet", size: [0.15, 0.18, 0.28], pet: true },
+  { id: "frog", name: "개구리", icon: "🐸", price: 1000, color: "#6fb34f", kind: "floor", group: "pet", size: [0.22, 0.18, 0.25], pet: true },
+  { id: "squirrel", name: "다람쥐", icon: "🐿️", price: 1000, color: "#b5733d", kind: "floor", group: "pet", size: [0.18, 0.35, 0.45], pet: true },
+  { id: "hamster", name: "햄스터", icon: "🐹", price: 1000, color: "#e8b77a", kind: "floor", group: "pet", size: [0.18, 0.15, 0.22], pet: true },
+  { id: "turtle", name: "거북이", icon: "🐢", price: 1000, color: "#6f8f4f", kind: "floor", group: "pet", size: [0.35, 0.2, 0.45], pet: true },
+  { id: "sparrow", name: "참새", icon: "🐦", price: 1000, color: "#a8784a", kind: "floor", group: "pet", size: [0.15, 0.2, 0.22], pet: true },
   { id: "scarecrow", name: "허수아비", icon: "🧑‍🌾", price: 500, color: "#d6a64b", kind: "floor", group: "yard", size: [0.9, 1.8, 0.3], yard: true },
 ];
 
-/** 펫마다 하나씩, 키우는 동안 항상 적용되는 작은 고유 효과. */
+/** 펫 뽑기: 1회 비용과 능력 펫이 나올 확률. 능력 펫끼리, 일반 펫끼리는 균등. */
+export const GACHA_PRICE = 1000;
+export const GACHA_RARE_CHANCE = 0.1;
+
+export function rollPet(random = Math.random) {
+  const pets = FURNITURE.filter(item => item.pet), rare = random() < GACHA_RARE_CHANCE;
+  const pool = pets.filter(item => Boolean(item.rare) === rare);
+  return pool[Math.floor(random() * pool.length)];
+}
+
+/** 능력 펫마다 하나씩, 집에 있는 동안 항상 적용되는 작은 고유 효과. */
 export const PET_BUFFS: Record<string, { title: string; text: string }> = {
   dog: { title: "든든한 경비견", text: "벌레가 날아오면 25% 확률로 짖어서 쫓아내요" },
   cat: { title: "생선 냄새", text: "희귀 물고기 확률 ×1.2" },
@@ -199,6 +217,14 @@ const ART: Record<string, { viewBox: string; body: ReactNode }> = {
   mole: { viewBox: "0 0 100 70", body: <><ellipse className="m" cx="46" cy="42" rx="38" ry="24" /><ellipse cx="86" cy="44" rx="8" ry="6" fill="#f2899a" /><circle cx="74" cy="34" r="2.5" fill="#111" /><ellipse cx="62" cy="64" rx="9" ry="5" fill="#f2b5c4" /><ellipse cx="30" cy="64" rx="9" ry="5" fill="#f2b5c4" /></> },
   weasel: { viewBox: "0 0 120 70", body: <><path className="d" d="M14 44 Q4 40 2 26" stroke="#7a5236" strokeWidth="7" fill="none" /><rect className="m" x="14" y="34" width="72" height="20" rx="10" /><rect className="m" x="20" y="48" width="6" height="18" rx="3" /><rect className="m" x="72" y="48" width="6" height="18" rx="3" /><circle className="m" cx="94" cy="34" r="14" /><ellipse cx="100" cy="40" rx="9" ry="6" fill="#f3e3c4" /><circle cx="96" cy="30" r="2.5" fill="#222" /><circle cx="108" cy="38" r="2.5" fill="#222" /><circle className="m" cx="88" cy="22" r="5" /></> },
   tiger: { viewBox: "0 0 120 90", body: <><path className="m" d="M12 50 Q0 36 8 22" stroke="#e08a2e" strokeWidth="7" fill="none" /><ellipse className="m" cx="54" cy="54" rx="40" ry="22" /><g fill="#2a1d14">{[30, 44, 58, 72].map(x => <path key={x} d={`M${x} 34 l4 0 l-3 18 z`} />)}</g><rect className="m" x="24" y="64" width="10" height="24" rx="4" /><rect className="m" x="70" y="64" width="10" height="24" rx="4" /><circle className="m" cx="92" cy="34" r="20" /><circle className="m" cx="78" cy="16" r="6" /><circle className="m" cx="106" cy="16" r="6" /><ellipse cx="96" cy="44" rx="11" ry="8" fill="#f8efe0" /><circle cx="86" cy="30" r="3" fill="#222" /><circle cx="100" cy="30" r="3" fill="#222" /><path d="M86 22 l4 6 M98 22 l-2 6" stroke="#2a1d14" strokeWidth="2.5" /></> },
+  chick: { viewBox: "0 0 80 80", body: <><circle className="m" cx="40" cy="48" r="24" /><circle className="m" cx="40" cy="24" r="14" /><path d="M52 24 L62 27 L52 30 Z" fill="#f08a3a" /><circle cx="44" cy="20" r="2.5" fill="#222" /><path className="d" d="M14 46 Q22 40 26 50" /></> },
+  grasshopper: { viewBox: "0 0 110 60", body: <><ellipse className="m" cx="50" cy="30" rx="34" ry="11" /><circle className="m" cx="88" cy="26" r="11" /><circle cx="92" cy="22" r="3" fill="#222" /><path d="M40 30 L28 6 L18 48" stroke="#4f7a3e" strokeWidth="4" fill="none" /><path d="M94 18 Q104 4 108 8" stroke="#4f7a3e" strokeWidth="2" fill="none" /><path className="l" d="M24 24 Q50 10 76 24 Z" /></> },
+  snail: { viewBox: "0 0 100 70", body: <><path d="M8 62 H88 Q96 62 94 54 L80 50 Z" fill="#e8d3b0" /><circle className="m" cx="46" cy="36" r="26" /><circle className="l" cx="46" cy="36" r="16" /><circle className="m" cx="46" cy="36" r="7" /><path d="M86 52 L90 30 M80 52 L82 32" stroke="#e8d3b0" strokeWidth="3" /><circle cx="90" cy="29" r="3" fill="#222" /></> },
+  frog: { viewBox: "0 0 100 70", body: <><ellipse className="m" cx="50" cy="46" rx="38" ry="20" /><circle className="m" cx="32" cy="22" r="12" /><circle className="m" cx="68" cy="22" r="12" /><circle cx="32" cy="20" r="6" fill="#fff" /><circle cx="68" cy="20" r="6" fill="#fff" /><circle cx="33" cy="21" r="3" fill="#222" /><circle cx="69" cy="21" r="3" fill="#222" /><path d="M38 50 Q50 58 62 50" stroke="#2f5a2a" strokeWidth="3" fill="none" /></> },
+  squirrel: { viewBox: "0 0 100 90", body: <><path className="d" d="M22 78 Q0 50 18 18 Q30 0 40 20 Q24 44 40 70 Z" /><ellipse className="m" cx="54" cy="62" rx="20" ry="18" /><circle className="m" cx="68" cy="36" r="14" /><circle className="m" cx="62" cy="22" r="5" /><circle cx="73" cy="34" r="2.5" fill="#222" /><ellipse cx="80" cy="40" rx="5" ry="4" fill="#f3e3c4" /></> },
+  hamster: { viewBox: "0 0 90 70", body: <><ellipse className="m" cx="45" cy="42" rx="36" ry="24" /><ellipse cx="45" cy="50" rx="24" ry="14" fill="#fff6e8" /><circle className="m" cx="22" cy="20" r="7" /><circle className="m" cx="68" cy="20" r="7" /><circle cx="34" cy="34" r="3" fill="#222" /><circle cx="56" cy="34" r="3" fill="#222" /><circle cx="45" cy="42" r="3" fill="#f2899a" /></> },
+  turtle: { viewBox: "0 0 110 70", body: <><ellipse cx="88" cy="44" rx="14" ry="10" fill="#9cc57a" /><circle cx="94" cy="40" r="2.5" fill="#222" /><path className="m" d="M14 50 Q20 10 56 10 Q92 10 96 50 Z" /><g className="d" opacity=".5"><path d="M40 14 L36 50 M70 14 L74 50 M24 32 H88" stroke="#2f4a2a" strokeWidth="3" /></g><rect x="22" y="48" width="12" height="14" rx="5" fill="#9cc57a" /><rect x="74" y="48" width="12" height="14" rx="5" fill="#9cc57a" /></> },
+  sparrow: { viewBox: "0 0 90 70", body: <><ellipse className="m" cx="40" cy="40" rx="26" ry="18" /><path className="d" d="M14 36 L0 30 L10 44 Z" /><circle className="m" cx="62" cy="28" r="13" /><path d="M74 28 L84 31 L74 34 Z" fill="#e2b85a" /><circle cx="66" cy="25" r="2.5" fill="#222" /><ellipse cx="44" cy="48" rx="14" ry="8" fill="#efe2c8" /></> },
   stairs: { viewBox: "0 0 100 100", body: <>{[0, 1, 2, 3, 4].map(i => <rect key={i} className={i % 2 ? "m" : "l"} x={i * 18} y={80 - i * 18} width={100 - i * 18} height="20" />)}</> },
   fence: { viewBox: "0 0 140 70", body: <><rect className="d" x="0" y="22" width="140" height="8" /><rect className="d" x="0" y="46" width="140" height="8" />{[4, 34, 64, 94, 124].map(x => <path key={x} className="m" d={`M${x} 70 V12 L${x + 6} 2 L${x + 12} 12 V70 Z`} />)}</> },
   flowerbed: { viewBox: "0 0 120 60", body: <><rect className="d" x="0" y="34" width="120" height="26" rx="4" /><rect x="6" y="30" width="108" height="10" rx="4" fill="#6b4a32" />{[14, 34, 54, 74, 94, 108].map((x, i) => <g key={x}><rect x={x - 1} y="14" width="2" height="18" fill="#4f7a3e" /><circle cx={x} cy="12" r="7" className={i % 2 ? "m" : "l"} /></g>)}</> },
