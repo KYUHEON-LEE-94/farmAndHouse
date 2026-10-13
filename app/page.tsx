@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Season = "봄" | "여름" | "가을" | "겨울";
 type Crop = { id: string; name: string; icon: string; seasons: Season[]; seed: number; sell: number; seconds: number; difficulty: string };
 type Plot = { cropId: string; plantedAt: number } | null;
 type Furniture = { id: string; name: string; icon: string; price: number; color: string };
-type PlacedItem = Furniture & { instanceId: string; x: number; y: number };
+type PlacedItem = Furniture & { instanceId: string; x: number; y: number; rotation: number };
+type HarvestFx = { id: number; plotIndex: number; icon: string; amount: number };
 
 const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
 const SEASON_ICON: Record<Season, string> = { 봄: "🌸", 여름: "☀️", 가을: "🍂", 겨울: "❄️" };
@@ -36,6 +37,32 @@ const FURNITURE: Furniture[] = [
 
 const initialPlots: Plot[] = Array(8).fill(null);
 
+function marketPrice(crop: Crop, bucket: number) {
+  const seed = [...crop.id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const wave = ((seed * 97 + bucket * 53) % 201) / 1000;
+  return Math.round(crop.sell * (0.9 + wave));
+}
+
+function playCoinSound() {
+  const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return;
+  const context = new AudioCtx();
+  const gain = context.createGain();
+  gain.connect(context.destination);
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.42);
+  [880, 1320].forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, context.currentTime + index * 0.08);
+    oscillator.connect(gain);
+    oscillator.start(context.currentTime + index * 0.08);
+    oscillator.stop(context.currentTime + 0.42);
+  });
+  window.setTimeout(() => context.close(), 600);
+}
+
 function getYoutubeId(value: string) {
   try {
     const url = new URL(value.trim());
@@ -55,11 +82,15 @@ export default function Home() {
   const [endHour, setEndHour] = useState(18);
   const [houseLevel, setHouseLevel] = useState(1);
   const [placed, setPlaced] = useState<PlacedItem[]>([]);
+  const [ownedPlots, setOwnedPlots] = useState(8);
+  const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
+  const [harvestFx, setHarvestFx] = useState<HarvestFx[]>([]);
   const [notice, setNotice] = useState("오늘도 흙은 정직해요. 씨앗을 심어볼까요?");
   const [musicUrl, setMusicUrl] = useState("");
   const [musicId, setMusicId] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const roomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("four-seasons-farm");
@@ -67,7 +98,9 @@ export default function Home() {
       try {
         const data = JSON.parse(saved);
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
-        setEndHour(data.endHour ?? 18); setHouseLevel(data.houseLevel ?? 1); setPlaced(data.placed ?? []); setMusicId(data.musicId ?? "");
+        setEndHour(data.endHour ?? 18); setHouseLevel(data.houseLevel ?? 1); setOwnedPlots(data.ownedPlots ?? 8);
+        setPlaced((data.placed ?? []).map((item: PlacedItem) => ({ ...item, x: item.x > 10 ? item.x : 14 + item.x * 14, y: item.y > 10 ? item.y : 20 + item.y * 28, rotation: item.rotation ?? 0 })));
+        setMusicId(data.musicId ?? "");
       } catch { /* start fresh */ }
     }
     setLoaded(true);
@@ -77,8 +110,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ money, plots, startHour, endHour, houseLevel, placed, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, placed, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 2, money, plots, startHour, endHour, houseLevel, ownedPlots, placed, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, ownedPlots, placed, musicId, loaded]);
 
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
   const isWorkTime = currentHour >= startHour && currentHour < endHour;
@@ -88,8 +121,10 @@ export default function Home() {
   const seasonEnd = seasonIndex >= 0 ? seasonStart + (endHour - startHour) / 4 : endHour;
   const seasonProgress = isWorkTime ? Math.max(0, Math.min(100, ((currentHour - seasonStart) / (seasonEnd - seasonStart)) * 100)) : 0;
   const available = CROPS.filter(c => c.seasons.includes(season));
-  const plotCount = 8 + (houseLevel - 1) * 2;
+  const plotCount = ownedPlots;
   const roomCols = houseLevel === 1 ? 4 : houseLevel === 2 ? 5 : 6;
+  const marketBucket = Math.floor(now.getTime() / 300000);
+  const marketSecondsLeft = 300 - Math.floor((now.getTime() / 1000) % 300);
 
   useEffect(() => {
     if (!available.some(c => c.id === selectedCrop)) setSelectedCrop(available[0]?.id || "potato");
@@ -111,8 +146,21 @@ export default function Home() {
   function harvest(index: number, plot: NonNullable<Plot>, crop: Crop) {
     const progress = (Date.now() - plot.plantedAt) / 1000 / crop.seconds;
     if (progress < 1) return setNotice(`${crop.name}이(가) 아직 자라는 중이에요. 조금만 기다려주세요.`);
-    const next = [...plots]; next[index] = null; setPlots(next); setMoney(m => m + crop.sell);
-    setNotice(`${crop.icon} ${crop.name} 판매 완료! ${crop.sell.toLocaleString()}원을 벌었어요.`);
+    const salePrice = marketPrice(crop, marketBucket);
+    const fx = { id: Date.now(), plotIndex: index, icon: crop.icon, amount: salePrice };
+    const next = [...plots]; next[index] = null; setPlots(next); setMoney(m => m + salePrice);
+    setHarvestFx(items => [...items, fx]); window.setTimeout(() => setHarvestFx(items => items.filter(item => item.id !== fx.id)), 1100);
+    playCoinSound();
+    setNotice(`짤랑~ ${crop.icon} ${crop.name}을(를) 오늘 시세 ${salePrice.toLocaleString()}원에 팔았어요!`);
+  }
+
+  function expandField() {
+    const price = 2400 + (ownedPlots - 8) * 700;
+    if (ownedPlots >= 16) return setNotice("밭은 이미 최대 크기예요.");
+    if (money < price) return setNotice(`밭 두 칸을 넓히려면 ${price.toLocaleString()}원이 필요해요.`);
+    setMoney(value => value - price); setOwnedPlots(value => value + 2);
+    setPlots(current => [...current, null, null]);
+    setNotice(`🌱 밭 두 칸을 새로 샀어요! 이제 ${ownedPlots + 2}칸에서 농사지을 수 있어요.`);
   }
 
   function upgradeHouse() {
@@ -124,30 +172,54 @@ export default function Home() {
 
   function buyFurniture(item: Furniture) {
     if (money < item.price) return setNotice(`${item.name}을(를) 사려면 ${item.price.toLocaleString()}원이 필요해요.`);
-    const spot = placed.length % (roomCols * 3);
-    setMoney(m => m - item.price); setPlaced(p => [...p, { ...item, instanceId: `${item.id}-${Date.now()}`, x: spot % roomCols, y: Math.floor(spot / roomCols) }]);
+    const instanceId = `${item.id}-${Date.now()}`;
+    const offset = (placed.length * 11) % 52;
+    setMoney(m => m - item.price); setPlaced(p => [...p, { ...item, instanceId, x: 24 + offset, y: 42 + (placed.length % 2) * 22, rotation: 0 }]);
+    setSelectedFurniture(instanceId);
     setNotice(`${item.icon} ${item.name}을(를) 집에 배치했어요.`);
   }
 
-  function moveFurniture(instanceId: string, direction: number) {
-    setPlaced(items => items.map(item => item.instanceId === instanceId ? { ...item, x: (item.x + direction + roomCols) % roomCols } : item));
+  function dragFurniture(event: React.PointerEvent<HTMLButtonElement>, instanceId: string) {
+    const room = roomRef.current; if (!room) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const rect = room.getBoundingClientRect();
+    const x = Math.max(5, Math.min(95, ((event.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(10, Math.min(91, ((event.clientY - rect.top) / rect.height) * 100));
+    setSelectedFurniture(instanceId);
+    setPlaced(items => items.map(item => item.instanceId === instanceId ? { ...item, x, y } : item));
+  }
+
+  function rotateFurniture(direction: number) {
+    if (!selectedFurniture) return;
+    setPlaced(items => items.map(item => item.instanceId === selectedFurniture ? { ...item, rotation: (item.rotation + direction + 360) % 360 } : item));
+  }
+
+  function sellFurniture() {
+    if (!selectedFurniture) return;
+    const item = placed.find(furniture => furniture.instanceId === selectedFurniture);
+    if (!item) return;
+    const refund = Math.round(item.price * 0.5);
+    setPlaced(items => items.filter(item => item.instanceId !== selectedFurniture));
+    setMoney(value => value + refund); setSelectedFurniture(null);
+    setNotice(`${item.icon} ${item.name}을(를) 정리하고 ${refund.toLocaleString()}원을 돌려받았어요.`);
   }
 
   const cropCards = useMemo(() => available.map(crop => (
     <button key={crop.id} className={`crop-card ${selectedCrop === crop.id ? "selected" : ""}`} onClick={() => setSelectedCrop(crop.id)} aria-pressed={selectedCrop === crop.id}>
       <span className="crop-icon">{crop.icon}</span><span className="crop-name">{crop.name}</span>
       <span className="crop-meta">씨앗 {crop.seed}원 · {crop.seconds}초</span>
-      <span className="crop-price">판매 {crop.sell}원</span>
+      <span className="crop-price"><small>현재 시세</small>{marketPrice(crop, marketBucket).toLocaleString()}원</span>
     </button>
-  )), [available, selectedCrop]);
+  )), [available, selectedCrop, marketBucket]);
 
   return (
     <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4}`}>
       <header className="topbar">
         <div className="brand"><span className="brand-mark">田</span><div><h1>사계농가</h1><p>오늘 심고, 천천히 사는 집</p></div></div>
         <div className="status-cluster">
-          <div className="money"><span>보유 자금</span><strong>{money.toLocaleString()}원</strong></div>
-          <div className="clock"><span>{timeLabel}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} ${season}` : "🌙 농장 휴식"}</strong></div>
+          <div className="status-card money"><span>💰 보유 자금</span><strong>{money.toLocaleString()}원</strong></div>
+          <div className="status-card clock"><span>🕰 {timeLabel}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
+          <div className="status-card market-status"><span>📈 다음 시세</span><strong>{Math.floor(marketSecondsLeft / 60)}:{String(marketSecondsLeft % 60).padStart(2, "0")}</strong></div>
           <button className="icon-button" onClick={() => setShowSettings(true)} aria-label="시간 설정">⚙</button>
         </div>
       </header>
@@ -174,25 +246,28 @@ export default function Home() {
               const progress = plot && crop ? Math.min(100, ((now.getTime() - plot.plantedAt) / 1000 / crop.seconds) * 100) : 0;
               return <button key={index} className={`plot ${progress >= 100 ? "ready" : ""}`} onClick={() => plot && crop ? harvest(index, plot, crop) : plant(index)}>
                 {crop ? <><span className="plant">{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span><span className="plot-label">{progress >= 100 ? "수확하기" : `${Math.floor(progress)}%`}</span><span className="grow-bar"><i style={{ width: `${progress}%` }} /></span></> : <><span className="soil-lines">╱ ╱ ╱</span><span className="plot-label">심기</span></>}
+                {harvestFx.filter(fx => fx.plotIndex === index).map(fx => <span className="harvest-fx" key={fx.id}><b>{fx.icon}</b><i>＋{fx.amount.toLocaleString()}원</i><em>✦</em><em>✦</em><em>●</em></span>)}
               </button>;
             })}
           </div>
         </section>
         <aside className="seed-panel panel">
-          <div className="panel-heading"><div><span className="eyebrow">SEED BOX</span><h3>{season} 씨앗 상자</h3></div></div>
+          <div className="panel-heading"><div><span className="eyebrow">SEED BOX · 5분 시세</span><h3>{season} 씨앗 상자</h3></div><span className="market-timer">{Math.floor(marketSecondsLeft / 60)}:{String(marketSecondsLeft % 60).padStart(2, "0")}</span></div>
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
-          <div className="tip">💡 오래 걸리고 까다로운 작물일수록 더 비싸게 팔려요.</div>
+          <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= 16 ? "최대 확장 완료" : `${(2400 + (ownedPlots - 8) * 700).toLocaleString()}원 · 최대 16칸`}</small></div><button onClick={expandField} disabled={ownedPlots >= 16}>구매</button></div>
+          <div className="tip">💡 판매가는 기준가의 ±10% 범위에서 5분마다 바뀌어요.</div>
         </aside>
       </div> : <div className="home-grid">
         <section className="house-panel panel">
           <div className="panel-heading"><div><span className="eyebrow">MY COTTAGE</span><h3>{["", "작은 농가", "햇살 가득 농가", "꿈의 전원주택"][houseLevel]}</h3></div><button className="upgrade" onClick={upgradeHouse}>{houseLevel >= 3 ? "최대 증축" : `증축 ${houseLevel === 1 ? "4,500" : "9,000"}원`}</button></div>
-          <div className={`room level-${houseLevel}`} style={{ gridTemplateColumns: `repeat(${roomCols}, 1fr)` }}>
+          <div ref={roomRef} className={`room level-${houseLevel}`} style={{ gridTemplateColumns: `repeat(${roomCols}, 1fr)` }} onPointerDown={event => { if (event.target === event.currentTarget) setSelectedFurniture(null); }}>
             {Array.from({length: roomCols * 3}).map((_, i) => <div className="floor-tile" key={i} />)}
             <div className="window">☁️<span>☀️</span></div><div className="rug" />
-            {placed.map(item => <button key={item.instanceId} className="placed-item" style={{ gridColumn: item.x + 1, gridRow: item.y + 1, background: item.color }} onClick={() => moveFurniture(item.instanceId, 1)} title="눌러서 오른쪽으로 이동"><span>{item.icon}</span></button>)}
+            {placed.map(item => <button key={item.instanceId} className={`placed-item ${selectedFurniture === item.instanceId ? "selected" : ""}`} style={{ left: `${item.x}%`, top: `${item.y}%`, background: item.color, transform: `translate(-50%, -50%) rotate(${item.rotation}deg)` }} onPointerDown={event => dragFurniture(event, item.instanceId)} onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) dragFurniture(event, item.instanceId); }} aria-label={`${item.name} 이동`}><span>{item.icon}</span></button>)}
           </div>
-          <p className="room-help">가구를 누르면 오른쪽으로 옮길 수 있어요. 집을 키우면 방과 텃밭이 함께 넓어져요.</p>
+          <div className="decor-toolbar"><span>{selectedFurniture ? "선택한 가구 편집" : "가구를 선택해 보세요"}</span><button onClick={() => rotateFurniture(-45)} disabled={!selectedFurniture}>↶ 왼쪽 회전</button><button onClick={() => rotateFurniture(45)} disabled={!selectedFurniture}>↷ 오른쪽 회전</button><button className="store-button" onClick={sellFurniture} disabled={!selectedFurniture}>판매 (50%)</button></div>
+          <p className="room-help">가구를 마우스나 손가락으로 자유롭게 끌어 놓고, 선택 후 45°씩 회전할 수 있어요.</p>
         </section>
         <aside className="shop-panel panel"><div className="panel-heading"><div><span className="eyebrow">COUNTRY SHOP</span><h3>시골 가구점</h3></div></div><div className="furniture-list">{FURNITURE.map(item => <button key={item.id} onClick={() => buyFurniture(item)}><span className="furniture-icon">{item.icon}</span><span><b>{item.name}</b><small>{item.price.toLocaleString()}원</small></span><i>＋</i></button>)}</div></aside>
       </div>}
