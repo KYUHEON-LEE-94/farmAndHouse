@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { FURNITURE, FLOORS, FURNITURE_GACHA_ODDS, FURNITURE_GACHA_PRICE, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
+import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
 import { BAITS, FISH, RODS, SPOTS, STARTER_BAIT, rollFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
@@ -202,7 +202,8 @@ export default function Home() {
   const justWatered = useRef(new Map<number, number>());
   const pendingPours = useRef(0);
   const [gachaResult, setGachaResult] = useState<{ item: Furniture; at: number } | null>(null);
-  const [furnitureGachaResult, setFurnitureGachaResult] = useState<{ item: Furniture; at: number } | null>(null);
+  const [furnitureGachaResult, setFurnitureGachaResult] = useState<{ item: Furniture | null; at: number } | null>(null);
+  const [gachaCollected, setGachaCollected] = useState<string[]>([]);
   const [cheer, setCheer] = useState<{ id: string; at: number } | undefined>(undefined);
   const [fishState, setFishState] = useState<FishState>({ phase: "idle" });
   const [fishLog, setFishLog] = useState<Record<string, number>>({});
@@ -248,7 +249,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setDayStart(data.dayStart ?? null);
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null);
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(item => fitToRoom(item, room, yard)));
         setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
@@ -265,8 +266,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, casinoStats, notifyOffWork, dayStart, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, casinoStats, notifyOffWork, dayStart, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, casinoStats, notifyOffWork, dayStart, gachaCollected, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, casinoStats, notifyOffWork, dayStart, gachaCollected, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -849,10 +850,15 @@ export default function Home() {
   /** 가구 뽑기: 2,000원. 가챠샵 전용 가구가 일반 60% · 희귀 35% · 전설 5%로 나온다. */
   function drawFurniture() {
     if (money < FURNITURE_GACHA_PRICE) return setNotice(`가구 뽑기는 ${FURNITURE_GACHA_PRICE.toLocaleString()}원이에요.`);
-    const item = rollGachaFurniture(), instanceId = `${item.id}-${Date.now()}`;
+    const item = rollGachaFurniture(gachaCollected);
+    if (item === undefined) return setNotice("🏆 가챠 가구를 모두 모았어요! 더 뽑을 상품이 없어요.");
     setMoney(m => m - FURNITURE_GACHA_PRICE);
-    setPlaced(items => [...items, fitToRoom({ ...item, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(item, items.length) }, room, yardLevel)]);
     setFurnitureGachaResult({ item, at: Date.now() });
+    if (!item) { playSadTrombone(); return setNotice(dealerLine(["📭 꽝! 빈 상자예요… 상자 안에 먼지만 가득 ㅋㅋ", "📭 꽝! 상자를 열었더니 \"다음 기회에\" 쪽지만…", "📭 꽝!! 2,000원짜리 공기를 샀어요 ㅋㅋㅋ"])); }
+    const instanceId = `${item.id}-${Date.now()}`;
+    setGachaCollected(ids => [...ids, item.id]);
+    setPlaced(items => [...items, fitToRoom({ ...item, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(item, items.length) }, room, yardLevel)]);
+    if (item.tier === "junk") { playSadTrombone(); return setNotice(`🗑️ ${item.icon} ${item.name}… 쓸데없는 상품이에요. 일단 집에 놓아 두었어요. (되팔기 ${Math.round(item.price / 2)}원)`); }
     playCoinSound(item.tier === "legend" ? [523, 659, 784, 1047, 1319, 1568] : item.tier === "rare" ? [660, 880, 1100, 1320] : [740, 990]);
     setNotice(`${item.tier === "legend" ? "🌈 전설 가구!!" : item.tier === "rare" ? "✨ 희귀 가구!" : "🎁"} ${item.icon} ${item.name}이(가) 나왔어요. 나의 집에 놓아 두었어요.`);
   }
@@ -1108,13 +1114,17 @@ export default function Home() {
         </section>
         <section className="panel gacha">
           <div className="panel-heading"><div><span className="eyebrow">FURNITURE GACHA</span><h3>가구 뽑기</h3></div><span className="plot-count">가챠 전용</span></div>
-          <div key={furnitureGachaResult?.at ?? 0} className={`gacha-machine ${furnitureGachaResult ? furnitureGachaResult.item.tier ?? "" : ""}`}>
-            {furnitureGachaResult ? <><span className="furniture-thumb" style={{ "--c": furnitureGachaResult.item.color } as CSSProperties}><FurnitureArt id={furnitureGachaResult.item.id} /></span><strong>{furnitureGachaResult.item.name}</strong><em>{furnitureGachaResult.item.tier === "legend" ? "🌈 전설 가구!!" : furnitureGachaResult.item.tier === "rare" ? "✨ 희귀 가구!" : "일반 가구"}</em><small>나의 집에 놓아 두었어요 · 되팔기 {Math.round(furnitureGachaResult.item.price / 2).toLocaleString()}원</small></> : <><b>🎁</b><small>상점에는 없는 특별한 가구!</small></>}
-          </div>
-          <button className="gacha-button furniture" onClick={drawFurniture} disabled={money < FURNITURE_GACHA_PRICE}>🎁 가구 뽑기 · {FURNITURE_GACHA_PRICE.toLocaleString()}원</button>
-          <p className="hint">전설 {FURNITURE_GACHA_ODDS.legend * 100}% · 희귀 {FURNITURE_GACHA_ODDS.rare * 100}% · 일반 {FURNITURE_GACHA_ODDS.common * 100}% · 뽑은 가구는 집에서 옮기고 돌리고, 가치의 50%에 팔 수 있어요</p>
-          <div className="gacha-catalog">{(["legend", "rare", "common"] as const).map(tier => <div key={tier} className={`tier-${tier}`}><b>{TIER_NAME[tier]}</b>{FURNITURE.filter(item => item.group === "gacha" && item.tier === tier).map(item => { const owned = [...placed, ...warehouse].filter(entry => entry.id === item.id).length;
-            return <span key={item.id} className={owned ? "owned" : ""} title={item.name}><span className="furniture-thumb" style={{ "--c": item.color } as CSSProperties}><FurnitureArt id={item.id} /></span><small>{item.name}{owned ? ` ×${owned}` : ""}</small></span>; })}</div>)}</div>
+          {(() => { const result = furnitureGachaResult, odds = furnitureGachaOdds(gachaCollected), complete = gachaPool(gachaCollected).length === 0, total = FURNITURE.filter(item => item.group === "gacha").length;
+            return <>
+              <div key={result?.at ?? 0} className={`gacha-machine ${result ? (result.item ? result.item.tier ?? "" : "miss") : ""}`}>
+                {result ? result.item ? <><span className="furniture-thumb" style={{ "--c": result.item.color } as CSSProperties}><FurnitureArt id={result.item.id} /></span><strong>{result.item.name}</strong><em>{{ legend: "🌈 전설 가구!!", rare: "✨ 희귀 가구!", common: "일반 가구", junk: "🗑️ 쓸데없는 상품" }[result.item.tier ?? "common"]}</em><small>나의 집에 놓아 두었어요 · 되팔기 {Math.round(result.item.price / 2).toLocaleString()}원</small></> : <><b>📭</b><strong>꽝!</strong><em>빈 상자</em><small>상자 안에 먼지만 가득…</small></> : <><b>🎁</b><small>상점에는 없는 특별한 가구! (꽝도 있어요)</small></>}
+              </div>
+              <button className="gacha-button furniture" onClick={drawFurniture} disabled={money < FURNITURE_GACHA_PRICE || complete}>{complete ? "🏆 컴플리트! 모두 모았어요" : `🎁 가구 뽑기 · ${FURNITURE_GACHA_PRICE.toLocaleString()}원`}</button>
+              <p className="hint">한 번 뽑은 상품은 다시 나오지 않아요(팔아도 마찬가지). 수집 {gachaCollected.length}/{total}</p>
+              {!complete && <div className="gacha-odds-row">{odds.map(({ tier, chance, left }) => <span key={tier} className={`odds-${tier}`}>{tier === "miss" ? "📭 꽝" : TIER_NAME[tier]} <b>{(chance * 100).toFixed(1)}%</b>{tier !== "miss" && <small>남은 {left}</small>}</span>)}</div>}
+              <div className="gacha-catalog">{(["legend", "rare", "common", "junk"] as const).map(tier => <div key={tier} className={`tier-${tier}`}><b>{TIER_NAME[tier]}</b>{FURNITURE.filter(item => item.group === "gacha" && item.tier === tier).map(item => { const got = gachaCollected.includes(item.id);
+                return <span key={item.id} className={got ? "owned" : ""} title={got ? item.name : "???"}><span className="furniture-thumb" style={{ "--c": item.color } as CSSProperties}>{got ? <FurnitureArt id={item.id} /> : <b className="unknown">?</b>}</span><small>{got ? item.name : "???"}</small></span>; })}</div>)}</div>
+            </>; })()}
         </section>
       </div>}
 
@@ -1230,12 +1240,12 @@ export default function Home() {
               return <button key={theme.id} className={current === theme.id ? "on" : ""} onClick={() => buyTheme(kind, theme)}><i style={{ background: theme.swatch }} /><span>{theme.name}</span><small>{current === theme.id ? "사용 중" : owned ? "보유" : `${theme.price.toLocaleString()}원`}</small></button>; })}</div></section>)}
           </div> : <>
             {shopTab === "pet" && <div className="pet-manager">
-              <p className="hint">가챠샵에서 뽑은 펫이에요. 집에 둔 펫만 돌아다니고 능력 효과가 적용돼요. 새 펫은 <b>🎁 가챠샵</b>에서 뽑을 수 있어요.</p>
+              <p className="hint">가챠샵에서 뽑은 펫이에요. 집에 둔 펫만 돌아다니고 능력 효과가 적용돼요. 같은 종류는 몇 마리가 있어도 효과가 한 번만 적용돼요. 새 펫은 <b>🎁 가챠샵</b>에서 뽑을 수 있어요.</p>
               {[...placed, ...warehouse].filter(item => item.pet).length === 0 ? <p className="empty">아직 펫이 없어요. 가챠샵에서 첫 친구를 뽑아 보세요!</p> :
                 <div className="pet-manage-list">{[...placed.filter(item => item.pet), ...warehouse.filter(item => item.pet)].map(item => { const home = placed.includes(item);
                   return <div key={item.instanceId} className={`${item.legend ? "legend" : item.rare ? "rare" : ""} ${home ? "home" : "stored"}`}>
                     <span className="furniture-thumb" style={{ "--c": item.tint ?? item.color } as CSSProperties}><FurnitureArt id={item.id} /></span>
-                    <span><b>{item.name}</b>{item.legend && <em>전설</em>}{item.rare && <em>능력</em>}<small>{item.rare || item.legend ? `${PET_BUFFS[item.id].title} · ${PET_BUFFS[item.id].text}` : "일반 펫 · 능력 없음"}</small></span>
+                    <span><b>{item.name}</b>{item.legend && <em>전설</em>}{item.rare && <em>능력</em>}<small>{!(item.rare || item.legend) ? "일반 펫 · 능력 없음" : home && placed.find(entry => entry.id === item.id) !== item ? "중복 · 같은 펫 효과는 한 번만 적용돼요" : `${PET_BUFFS[item.id].title} · ${PET_BUFFS[item.id].text}`}</small></span>
                     <button className={home ? "out" : "in"} onClick={() => (home ? storePet(item) : restoreFurniture(item))}>{home ? "📦 보관하기" : "🏡 집에 두기"}</button>
                   </div>; })}</div>}
             </div>}

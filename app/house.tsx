@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export type FurnitureKind = "floor" | "rug" | "wall";
 export type ShopGroup = "furniture" | "decor" | "structure" | "yard" | "pet" | "gacha";
 /** size는 [가로, 높이, 깊이] 미터. 벽 부착 가구는 mount 높이(바닥에서 중심까지)에 걸린다. */
-export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; rare?: boolean; legend?: boolean; tier?: "common" | "rare" | "legend" };
+export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; rare?: boolean; legend?: boolean; tier?: "junk" | "common" | "rare" | "legend" };
 /** 바닥 가구는 x·z(방 중심 기준 미터)와 rot(도), 벽 가구는 wall(벽 번호)·u(벽 위치 0~1)·h(높이 m). story는 층(0=1층, 1=2층), 마당 소품은 층이 없다. */
 export type PlacedItem = Furniture & { instanceId: string; x: number; z: number; rot: number; tint?: string; wall?: number; u?: number; h?: number; story?: number };
 export type Theme = { id: string; name: string; price: number; swatch: string };
@@ -75,6 +75,13 @@ export const FURNITURE: Furniture[] = [
   { id: "whitetiger", name: "백호", icon: "🐅", price: 50000, color: "#f4f2ec", kind: "floor", group: "pet", size: [0.6, 0.8, 1.4], pet: true, legend: true },
   { id: "blacktortoise", name: "현무", icon: "🐢", price: 50000, color: "#3b4a44", kind: "floor", group: "pet", size: [0.7, 0.45, 0.9], pet: true, legend: true },
   { id: "gumiho", name: "구미호", icon: "🦊", price: 50000, color: "#f3e3c4", kind: "floor", group: "pet", size: [0.4, 0.6, 0.9], pet: true, legend: true },
+  { id: "sock", name: "짝 잃은 양말", icon: "🧦", price: 100, color: "#e7899a", kind: "floor", group: "gacha", size: [0.25, 0.08, 0.35], tier: "junk" },
+  { id: "emptycan", name: "빈 깡통", icon: "🥫", price: 100, color: "#b9c3c6", kind: "floor", group: "gacha", size: [0.15, 0.2, 0.15], tier: "junk" },
+  { id: "newspaper", name: "지난 신문", icon: "📰", price: 100, color: "#e8e2d0", kind: "floor", group: "gacha", size: [0.5, 0.12, 0.35], tier: "junk" },
+  { id: "pebble", name: "그냥 돌멩이", icon: "🪨", price: 100, color: "#8a8780", kind: "floor", group: "gacha", size: [0.3, 0.2, 0.25], tier: "junk" },
+  { id: "tissue", name: "휴지 한 칸", icon: "🧻", price: 100, color: "#fffdf8", kind: "floor", group: "gacha", size: [0.15, 0.02, 0.15], tier: "junk" },
+  { id: "beanbag", name: "빈백 소파", icon: "🫘", price: 1500, color: "#8ba5bc", kind: "floor", group: "gacha", size: [0.9, 0.6, 0.9], tier: "common" },
+  { id: "guitar", name: "기타 스탠드", icon: "🎸", price: 4000, color: "#c4573b", kind: "floor", group: "gacha", size: [0.45, 1.1, 0.35], tier: "rare" },
   { id: "teddy", name: "곰인형", icon: "🧸", price: 1500, color: "#c8925a", kind: "floor", group: "gacha", size: [0.45, 0.55, 0.4], tier: "common" },
   { id: "cactus", name: "선인장 화분", icon: "🌵", price: 1500, color: "#5f9e4f", kind: "floor", group: "gacha", size: [0.4, 0.9, 0.4], tier: "common" },
   { id: "pumpkinlamp", name: "호박 랜턴", icon: "🎃", price: 1500, color: "#e2883a", kind: "floor", group: "gacha", size: [0.5, 0.45, 0.5], tier: "common" },
@@ -98,15 +105,37 @@ export function rollPet(random = Math.random) {
   return pool[Math.floor(random() * pool.length)];
 }
 
-/** 가구 뽑기: 가챠샵에서만 나오는 가구. 일반 60% · 희귀 35% · 전설 5%. */
+/**
+ * 가구 뽑기: 가챠샵 전용 가구. 꽝(빈 상자)도 나오고, 한 번 뽑은 상품은 다시 나오지 않는다.
+ * 남은 상품이 있는 등급만 가중치로 고르고, 꽝은 항상 후보다. 모두 모으면 더 뽑을 수 없다.
+ */
 export const FURNITURE_GACHA_PRICE = 2000;
-export const FURNITURE_GACHA_ODDS = { common: 0.6, rare: 0.35, legend: 0.05 } as const;
-export const TIER_NAME = { common: "일반", rare: "희귀", legend: "전설" } as const;
+export const FURNITURE_GACHA_WEIGHTS = { miss: 30, junk: 25, common: 25, rare: 15, legend: 5 } as const;
+export const TIER_NAME = { junk: "쓸데없는 상품", common: "일반", rare: "희귀", legend: "전설" } as const;
+export type GachaTier = keyof typeof TIER_NAME;
 
-export function rollGachaFurniture(random = Math.random) {
-  const roll = random(), tier = roll < FURNITURE_GACHA_ODDS.legend ? "legend" : roll < FURNITURE_GACHA_ODDS.legend + FURNITURE_GACHA_ODDS.rare ? "rare" : "common";
-  const pool = FURNITURE.filter(item => item.group === "gacha" && item.tier === tier);
-  return pool[Math.floor(random() * pool.length)];
+export const gachaPool = (collected: string[]) => FURNITURE.filter(item => item.group === "gacha" && !collected.includes(item.id));
+
+/** 남은 상품 기준 실제 등급별 확률(꽝 포함). */
+export function furnitureGachaOdds(collected: string[]) {
+  const remaining = gachaPool(collected);
+  const weights = Object.entries(FURNITURE_GACHA_WEIGHTS).filter(([tier]) => tier === "miss" || remaining.some(item => item.tier === tier));
+  const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+  return weights.map(([tier, weight]) => ({ tier: tier as GachaTier | "miss", chance: weight / total, left: remaining.filter(item => item.tier === tier).length }));
+}
+
+/** 뽑기 결과: 상품 또는 꽝(null). 남은 상품이 없으면 undefined. */
+export function rollGachaFurniture(collected: string[], random = Math.random): Furniture | null | undefined {
+  if (!gachaPool(collected).length) return undefined;
+  let roll = random();
+  for (const { tier, chance } of furnitureGachaOdds(collected)) {
+    roll -= chance;
+    if (roll > 0) continue;
+    if (tier === "miss") return null;
+    const pool = gachaPool(collected).filter(item => item.tier === tier);
+    return pool[Math.floor(random() * pool.length)];
+  }
+  return null;
 }
 
 /** 능력 펫마다 하나씩, 집에 있는 동안 항상 적용되는 작은 고유 효과. */
@@ -270,6 +299,13 @@ const ART: Record<string, { viewBox: string; body: ReactNode }> = {
   throne: { viewBox: "0 0 90 120", body: <><path className="m" d="M14 120 V20 Q14 4 45 2 Q76 4 76 20 V120 Z" /><path d="M24 40 L32 24 L45 34 L58 24 L66 40 Z" fill="#e8c35a" /><rect className="l" x="22" y="48" width="46" height="34" rx="6" /><rect className="d" x="4" y="70" width="18" height="34" rx="5" /><rect className="d" x="68" y="70" width="18" height="34" rx="5" /><rect x="10" y="80" width="70" height="12" rx="4" fill="#e8c35a" /></> },
   goldtoilet: { viewBox: "0 0 80 100", body: <><rect className="m" x="44" y="0" width="30" height="54" rx="6" /><path className="m" d="M6 50 H66 Q66 80 44 84 L46 100 H24 L26 84 Q6 80 6 50 Z" /><ellipse className="l" cx="36" cy="50" rx="30" ry="9" /><circle cx="18" cy="20" r="3" fill="#fff6d8" /><circle cx="60" cy="14" r="3" fill="#fff6d8" /></> },
   unicorn: { viewBox: "0 0 120 110", body: <><path className="d" d="M6 100 Q60 120 114 100" stroke="#e7b8f2" strokeWidth="6" fill="none" /><ellipse className="m" cx="56" cy="62" rx="34" ry="20" /><rect className="m" x="30" y="70" width="8" height="28" rx="3" /><rect className="m" x="74" y="70" width="8" height="28" rx="3" /><path className="m" d="M80 52 L96 20 L110 26 L100 56 Z" /><path d="M100 20 L108 0 L104 22 Z" fill="#f3d675" /><path d="M84 30 Q70 40 74 56 M90 26 Q76 34 78 50" stroke="#f2899a" strokeWidth="6" fill="none" /><path d="M24 58 Q8 60 10 78" stroke="#9ac7f2" strokeWidth="7" fill="none" /><circle cx="102" cy="32" r="2.5" fill="#222" /></> },
+  sock: { viewBox: "0 0 80 80", body: <><path className="m" d="M30 6 H52 V44 Q52 50 58 54 L66 60 Q72 66 66 72 Q60 78 52 72 L32 58 Q26 54 28 46 Z" /><rect className="l" x="30" y="6" width="22" height="8" /><rect className="d" x="30" y="22" width="22" height="4" opacity=".5" /></> },
+  emptycan: { viewBox: "0 0 60 80", body: <><rect className="m" x="12" y="10" width="36" height="62" rx="4" /><ellipse cx="30" cy="10" rx="18" ry="5" fill="#d9e1e3" /><rect x="12" y="30" width="36" height="20" fill="#c4573b" opacity=".7" /><path d="M20 40 h20" stroke="#fff" strokeWidth="2" /></> },
+  newspaper: { viewBox: "0 0 90 70", body: <><rect className="m" x="6" y="10" width="78" height="54" rx="2" transform="rotate(-4 45 37)" /><g fill="#8a8780"><rect x="14" y="18" width="40" height="6" /><rect x="14" y="30" width="62" height="3" /><rect x="14" y="37" width="62" height="3" /><rect x="14" y="44" width="40" height="3" /><rect x="58" y="16" width="18" height="12" fill="#b9c3c6" /></g></> },
+  pebble: { viewBox: "0 0 80 60", body: <><path className="m" d="M10 44 Q6 22 28 14 Q50 6 66 18 Q78 30 70 44 Q60 54 36 52 Q16 52 10 44 Z" /><path className="l" d="M24 22 Q36 16 48 20" stroke="#b9b5ad" strokeWidth="4" fill="none" /></> },
+  tissue: { viewBox: "0 0 70 50", body: <><path className="m" d="M8 30 L34 14 L62 28 L36 44 Z" stroke="#ddd" /><path d="M20 28 L40 18" stroke="#e5e5e5" strokeDasharray="2 2" /></> },
+  beanbag: { viewBox: "0 0 100 80", body: <><path className="m" d="M10 70 Q4 40 30 24 Q50 12 70 24 Q96 40 90 70 Z" /><path className="d" d="M30 46 Q50 36 70 46" stroke="#5f7a90" strokeWidth="4" fill="none" opacity=".5" /><ellipse cx="50" cy="72" rx="42" ry="6" fill="#00000022" /></> },
+  guitar: { viewBox: "0 0 60 110", body: <><rect x="27" y="4" width="6" height="56" fill="#5b4a3a" /><rect x="24" y="0" width="12" height="10" rx="2" fill="#3b2a1e" /><ellipse className="m" cx="30" cy="72" rx="20" ry="16" /><ellipse className="m" cx="30" cy="92" rx="24" ry="16" /><circle cx="30" cy="80" r="6" fill="#3b2a1e" /><path d="M14 108 L30 96 L46 108" stroke="#2a2a2a" strokeWidth="3" fill="none" /></> },
   stairs: { viewBox: "0 0 100 100", body: <>{[0, 1, 2, 3, 4].map(i => <rect key={i} className={i % 2 ? "m" : "l"} x={i * 18} y={80 - i * 18} width={100 - i * 18} height="20" />)}</> },
   fence: { viewBox: "0 0 140 70", body: <><rect className="d" x="0" y="22" width="140" height="8" /><rect className="d" x="0" y="46" width="140" height="8" />{[4, 34, 64, 94, 124].map(x => <path key={x} className="m" d={`M${x} 70 V12 L${x + 6} 2 L${x + 12} 12 V70 Z`} />)}</> },
   flowerbed: { viewBox: "0 0 120 60", body: <><rect className="d" x="0" y="34" width="120" height="26" rx="4" /><rect x="6" y="30" width="108" height="10" rx="4" fill="#6b4a32" />{[14, 34, 54, 74, 94, 108].map((x, i) => <g key={x}><rect x={x - 1} y="14" width="2" height="18" fill="#4f7a3e" /><circle cx={x} cy="12" r="7" className={i % 2 ? "m" : "l"} /></g>)}</> },

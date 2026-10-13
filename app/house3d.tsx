@@ -92,7 +92,7 @@ const capsule = (r: number, length: number) => new THREE.CapsuleGeometry(r, Math
 /** 반짝이는 큰 눈 한 쌍 + 볼터치. */
 function face(g: THREE.Object3D, x: number, y: number, z: number, r: number, spread: number, cheeks = true) {
   [-1, 1].forEach(s => {
-    part(g, sphere(r), "#1d1410", x + s * spread, y, z, [1, 1.15, 0.7], false);
+    part(g, sphere(r), "#1d1410", x + s * spread, y, z, [1, 1.15, 0.7], false).userData.eye = true;
     const glint = new THREE.Mesh(sphere(r * 0.38), new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     glint.position.set(x + s * spread + r * 0.3, y + r * 0.4, z + r * 0.55); g.add(glint);
     if (cheeks) { const blush = new THREE.Mesh(sphere(r * 0.75), new THREE.MeshBasicMaterial({ color: "#f59aa8", transparent: true, opacity: 0.75 })); blush.position.set(x + s * spread * 1.55, y - r * 1.3, z - r * 0.15); blush.scale.set(1, 0.6, 0.4); g.add(blush); }
@@ -131,8 +131,8 @@ function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
     if (o.ears === "long") { part(g, capsule(o.head * 0.2, o.head * 1.1), c.main, s * o.head * 0.35, hy + o.head * 1.35, hz - o.head * 0.15, [1, 1, 0.55]).rotation.z = -s * 0.12; part(g, capsule(o.head * 0.1, o.head * 0.9), "#f6b0b8", s * o.head * 0.35, hy + o.head * 1.35, hz - o.head * 0.03, [1, 1, 0.3], false).rotation.z = -s * 0.12; }
   });
   // 꼬리
-  if (o.fluffyTail) { const tail = part(g, capsule(o.h * 0.42, o.h * 1.2), c.dark, 0, bodyY + o.h * 0.9, -o.len / 2 - o.h * 0.2); tail.rotation.x = -0.35; }
-  else if (o.tail > 0.06) { const tail = part(g, capsule(0.015 + o.w * 0.06, o.tail), c.main, 0, bodyY + (o.tailUp ? o.tail * 0.4 : 0), -o.len / 2 - o.tail * 0.3); tail.rotation.x = o.tailUp ? -0.4 : -1.1; }
+  if (o.fluffyTail) { const tail = part(g, capsule(o.h * 0.42, o.h * 1.2), c.dark, 0, bodyY + o.h * 0.9, -o.len / 2 - o.h * 0.2); tail.rotation.x = -0.35; tail.userData.wag = true; }
+  else if (o.tail > 0.06) { const tail = part(g, capsule(0.015 + o.w * 0.06, o.tail), c.main, 0, bodyY + (o.tailUp ? o.tail * 0.4 : 0), -o.len / 2 - o.tail * 0.3); tail.rotation.x = o.tailUp ? -0.4 : -1.1; tail.userData.wag = true; }
   else part(g, sphere(Math.max(o.tail, 0.04) * 1.3), "#ffffff", 0, bodyY + r * 0.2, -o.len / 2);
 }
 
@@ -221,6 +221,13 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
   throne: (g, c) => { box(g, 0.9, 1.7, 0.18, c.main, 0, 0, -0.3); box(g, 0.94, 0.12, 0.2, "#e8c35a", 0, 1.68, -0.3, { metalness: 0.7, roughness: 0.3 }); [-0.28, 0, 0.28].forEach(x => solid(g, new THREE.ConeGeometry(0.06, 0.2, 6), "#e8c35a", x, 1.88, -0.3, { metalness: 0.7, roughness: 0.3 })); box(g, 0.9, 0.5, 0.7, c.main, 0, 0, 0.05); box(g, 0.84, 0.1, 0.62, c.light, 0, 0.5, 0.07); [-1, 1].forEach(s => box(g, 0.1, 0.8, 0.72, "#e8c35a", s * 0.46, 0, 0.05, { metalness: 0.7, roughness: 0.3 })); },
   goldtoilet: (g, c) => { const gold = { metalness: 0.85, roughness: 0.22 }; box(g, 0.42, 0.45, 0.16, c.main, 0, 0.42, -0.26, gold); cyl(g, 0.16, 0.12, 0.38, c.main, 0, 0, 0.05, gold); solid(g, new THREE.TorusGeometry(0.17, 0.035, 10, 24), c.main, 0, 0.4, 0.05, gold).rotation.x = Math.PI / 2; box(g, 0.08, 0.03, 0.03, "#fff6d8", 0.12, 0.8, -0.18, gold); },
   unicorn: (g, c) => { [-1, 1].forEach(s => { const rocker = solid(g, new THREE.TorusGeometry(0.75, 0.03, 6, 24, 1.1), "#e7b8f2", s * 0.2, 0.8, 0); rocker.rotation.set(0, Math.PI / 2, Math.PI + 1.02); }); part(g, capsule(0.17, 0.4), c.main, 0, 0.55, 0).rotation.x = Math.PI / 2; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(g, capsule(0.05, 0.3), c.main, sx * 0.1, 0.3, sz * 0.2)); part(g, capsule(0.09, 0.2), c.main, 0, 0.8, 0.32).rotation.x = 0.5; part(g, sphere(0.13), c.main, 0, 0.95, 0.42, [0.9, 1, 1.2]); part(g, new THREE.ConeGeometry(0.03, 0.2, 10), "#f3d675", 0, 1.14, 0.48, [1, 1, 1], false).rotation.x = 0.4; ["#f2899a", "#9ac7f2", "#e7b8f2", "#f6d16a"].forEach((color, i) => part(g, sphere(0.06), color, 0, 0.98 - i * 0.07, 0.3 - i * 0.05, [0.6, 1, 1], false)); part(g, capsule(0.05, 0.25), "#9ac7f2", 0, 0.62, -0.4).rotation.x = -0.6; face(g, 0, 1.0, 0.56, 0.02, 0.06); },
+  sock: (g, c) => { const leg = part(g, capsule(0.05, 0.16), c.main, 0, 0.05, -0.05); leg.rotation.x = Math.PI / 2; part(g, capsule(0.05, 0.08), c.main, 0.05, 0.05, 0.08).rotation.set(Math.PI / 2, 0, 0.9); part(g, new THREE.CylinderGeometry(0.052, 0.052, 0.04, 12), c.light, 0, 0.05, -0.15, [1, 1, 1], false).rotation.x = Math.PI / 2; },
+  emptycan: (g, c) => { const can = solid(g, new THREE.CylinderGeometry(0.07, 0.07, 0.18, 16), c.main, 0, 0.07, 0, { metalness: 0.7, roughness: 0.35 }); can.rotation.z = Math.PI / 2; solid(g, new THREE.CylinderGeometry(0.071, 0.071, 0.07, 16), "#c4573b", 0, 0.07, 0).rotation.z = Math.PI / 2; },
+  newspaper: (g, c) => { box(g, 0.5, 0.03, 0.35, c.main).rotation.y = 0.15; box(g, 0.48, 0.03, 0.33, "#d9d2bd", 0.02, 0.03, 0.01).rotation.y = -0.1; box(g, 0.2, 0.005, 0.06, "#6b6b6b", -0.05, 0.062, -0.08).rotation.y = 0.15; },
+  pebble: (g, c) => { const rock = part(g, new THREE.DodecahedronGeometry(0.13, 0), c.main, 0, 0.1, 0, [1.2, 0.75, 1]); rock.rotation.set(0.3, 0.6, 0.2); },
+  tissue: (g, c) => { const sheet = part(g, new THREE.PlaneGeometry(0.15, 0.15, 3, 3), c.main, 0, 0.012, 0, [1, 1, 1], false); sheet.rotation.set(-Math.PI / 2, 0, 0.4); (sheet.material as THREE.Material).side = THREE.DoubleSide; },
+  beanbag: (g, c) => { part(g, sphere(0.45), c.main, 0, 0.28, 0, [1, 0.62, 1]); part(g, sphere(0.3), c.main, 0, 0.42, -0.2, [1.1, 0.8, 0.6]); part(g, sphere(0.22), c.light, 0, 0.44, 0.08, [1.2, 0.35, 1], false); },
+  guitar: (g, c) => { [-1, 1].forEach(s => { const leg = box(g, 0.03, 0.5, 0.03, "#2a2a2a", s * 0.12, 0, 0.05); leg.rotation.z = s * 0.25; }); const body = new THREE.Group(); body.position.set(0, 0.42, 0); body.rotation.x = -0.18; g.add(body); part(body, sphere(0.17), c.main, 0, 0.05, 0, [1, 1.05, 0.35]); part(body, sphere(0.13), c.main, 0, 0.3, 0, [1, 0.95, 0.35]); part(body, new THREE.CylinderGeometry(0.04, 0.04, 0.02, 16), "#3b2a1e", 0, 0.12, 0.06, [1, 1, 1], false).rotation.x = Math.PI / 2; box(body, 0.05, 0.45, 0.03, "#5b4a3a", 0, 0.35, 0.01); box(body, 0.08, 0.1, 0.03, "#3b2a1e", 0, 0.8, 0.01); },
   stairs: (g, c) => { for (let i = 0; i < 10; i++) { box(g, 1, (i + 1) * 0.28, 0.26, i % 2 ? c.main : c.light, 0, 0, 1.17 - i * 0.26); } [-1, 1].forEach(s => { const rail = box(g, 0.04, 0.04, 2.9, c.dark, s * 0.48, 1.85, 0); rail.rotation.x = Math.atan2(2.8, 2.6); }); },
   fence: (g, c) => { [-0.95, -0.475, 0, 0.475, 0.95].forEach(x => { box(g, 0.1, 0.85, 0.08, c.main, x); const tip = solid(g, new THREE.ConeGeometry(0.07, 0.12, 4), c.main, x, 0.91, 0); tip.rotation.y = Math.PI / 4; }); [0.28, 0.62].forEach(y => box(g, 2, 0.07, 0.05, c.dark, 0, y, 0.05)); },
   flowerbed: (g, c) => { box(g, 1.6, 0.25, 0.8, c.dark.clone().lerp(new THREE.Color("#8a6a4a"), 0.7)); box(g, 1.5, 0.04, 0.7, "#5f4330", 0, 0.24); for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { const x = -0.6 + i * 0.24, z = -0.22 + j * 0.22; box(g, 0.02, 0.2, 0.02, "#4f7a3e", x, 0.28, z); ball(g, 0.06, [c.main, c.light, "#f6d16a"][(i + j) % 3], x, 0.5, z); } },
@@ -241,9 +248,34 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
   },
 };
 
+/** 가구를 펫과 같은 만화풍(3단 음영 + 얇은 외곽선)으로 바꾼다. 금속·유리·발광 재질은 그대로 둔다. */
+function toonify(group: THREE.Group) {
+  const meshes: THREE.Mesh[] = [];
+  group.traverse(child => { const mesh = child as THREE.Mesh; if (mesh.isMesh && mesh.material instanceof THREE.MeshStandardMaterial) meshes.push(mesh); });
+  meshes.forEach(mesh => {
+    const old = mesh.material as THREE.MeshStandardMaterial;
+    if (old.metalness > 0.4 || old.transparent || old.emissiveIntensity > 0.3) return;
+    mesh.material = new THREE.MeshToonMaterial({ color: old.color, gradientMap: TOON_GRADIENT, side: old.side });
+    old.dispose();
+    mesh.geometry.computeBoundingSphere();
+    const radius = mesh.geometry.boundingSphere?.radius ?? 0;
+    if (radius < 0.04) return;
+    const line = new THREE.Mesh(mesh.geometry, new THREE.MeshBasicMaterial({ color: "#3b2a20", side: THREE.BackSide }));
+    line.scale.setScalar(1 + 0.012 / radius); mesh.add(line);
+  });
+}
+
 function buildItem(item: PlacedItem) {
   const group = new THREE.Group();
   MODELS[item.id]?.(group, shade(item.tint ?? item.color));
+  if (!item.pet && item.kind !== "rug") toonify(group);
+  if (item.pet) {
+    const blob = new THREE.Mesh(new THREE.CircleGeometry(Math.max(item.size[0], item.size[2]) * 0.45, 20), new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.16, depthWrite: false }));
+    blob.rotation.x = -Math.PI / 2; blob.position.y = 0.006; group.add(blob);
+    const tails: THREE.Object3D[] = [], eyes: THREE.Object3D[] = [];
+    group.traverse(child => { if (child.userData.wag) tails.push(child); if (child.userData.eye) eyes.push(child); });
+    group.userData.tails = tails; group.userData.eyes = eyes; group.userData.blinkOffset = Math.random() * 4000;
+  }
   // 전설 펫·전설 가구: 금빛 오라 고리와 은은한 빛
   if (item.legend || item.tier === "legend") {
     const radius = Math.max(item.size[0], item.size[2]) * 0.6 + 0.1;
@@ -418,7 +450,11 @@ export default function House3D(props: Props) {
       inner.position.set(0, WALL_HEIGHT / 2, 0); inner.receiveShadow = true; inner.userData.wallIndex = index;
       const baseboard = new THREE.Mesh(new THREE.BoxGeometry(info.length, 0.1, 0.02), new THREE.MeshStandardMaterial({ color: "#efe2c8" }));
       baseboard.position.set(0, 0.05, 0.01);
-      group.add(outer, inner, baseboard); level.add(group);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(info.length + WALL_THICK * 2, 0.08, WALL_THICK + 0.06), new THREE.MeshToonMaterial({ color: "#8a6a48", gradientMap: TOON_GRADIENT }));
+      trim.position.set(0, WALL_HEIGHT + 0.04, -WALL_THICK / 2); trim.castShadow = true;
+      const crown = new THREE.Mesh(new THREE.BoxGeometry(info.length, 0.06, 0.03), new THREE.MeshToonMaterial({ color: "#fffaf0", gradientMap: TOON_GRADIENT }));
+      crown.position.set(0, WALL_HEIGHT - 0.03, 0.015);
+      group.add(outer, inner, baseboard, trim, crown); level.add(group);
       ctx.walls.push({ group, inner, normal: info.normal, mid, full: true, story });
     });
     }
@@ -442,6 +478,16 @@ export default function House3D(props: Props) {
     lawn.rotation.x = -Math.PI / 2; lawn.position.set((yard.minX + yard.maxX) / 2, -0.01, (yard.minZ + yard.maxZ) / 2); lawn.receiveShadow = true; ctx.outdoor.add(lawn);
     const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(yardW, 0.02, yardD)), new THREE.LineBasicMaterial({ color: "#7d6a4a", transparent: true, opacity: 0.45 }));
     edge.position.copy(lawn.position); ctx.outdoor.add(edge);
+    // 마당에 풀숲과 들꽃을 흩어 놓는다(같은 마당이면 항상 같은 자리).
+    let seed = 7; const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    const flowerColors = ["#f2899a", "#f6d16a", "#ffffff", "#9ac7f2", "#c69cff"];
+    for (let i = 0; i < 70; i++) {
+      const x = yard.minX + rand() * yardW, z = yard.minZ + rand() * yardD;
+      if (fitsInRoom(room.points, x, z, -0.4) || Math.abs(x) < room.width / 2 + 0.3 && Math.abs(z) < room.depth / 2 + 0.3) continue;
+      const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 5), new THREE.MeshToonMaterial({ color: new THREE.Color(palette.grass).multiplyScalar(0.8), gradientMap: TOON_GRADIENT }));
+      tuft.position.set(x, 0.08, z); ctx.outdoor.add(tuft);
+      if (rand() < 0.45) { const flower = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshBasicMaterial({ color: flowerColors[Math.floor(rand() * flowerColors.length)] })); flower.position.set(x + 0.05, 0.16, z + 0.03); ctx.outdoor.add(flower); }
+    }
     const radius = Math.max(yardW, yardD) / 2 + 1.5;
     for (let i = 0; i < 9; i++) {
       const a = i * 0.71 + 0.4, r = radius + (i % 3) * 1.6, tree = new THREE.Group();
@@ -505,10 +551,13 @@ export default function House3D(props: Props) {
         if (!st) { st = { tx: node.position.x, tz: node.position.z, wait: Math.random() * 2, jump: 0 }; state.set(pet.instanceId, st); }
         if (cheerNow?.id === pet.instanceId && time - cheerNow.at < 50 && st.jump <= 0) st.jump = 0.8;
         const base = (pet.story ?? 0) * STORY_HEIGHT;
+        (node.userData.tails as THREE.Object3D[] | undefined)?.forEach(tail => { tail.rotation.z = Math.sin(time / 140 + pet.x) * 0.45; });
+        const blinking = (time + (node.userData.blinkOffset ?? 0)) % 3600 < 130;
+        (node.userData.eyes as THREE.Object3D[] | undefined)?.forEach(eye => { eye.scale.y = blinking ? 0.12 : 1.15; });
         if (st.jump > 0) { st.jump -= dt; node.position.y = base + Math.abs(Math.sin((0.8 - st.jump) * Math.PI * 2.5)) * 0.25; return; }
         const dx = st.tx - node.position.x, dz = st.tz - node.position.z, dist = Math.hypot(dx, dz);
         if (dist < 0.05) {
-          st.wait -= dt; node.position.y = base;
+          st.wait -= dt; node.position.y = base; node.scale.y = 1 + Math.sin(time / 380 + pet.z) * 0.025;
           if (st.wait <= 0) { const a = Math.random() * Math.PI * 2, r = 0.6 + Math.random() * 1.4, x = node.position.x + Math.cos(a) * r, z = node.position.z + Math.sin(a) * r; if (fits(x, z)) { st.tx = x; st.tz = z; } st.wait = 1.5 + Math.random() * 3; }
           return;
         }
@@ -569,8 +618,17 @@ function applyStoryView(ctx: Scene) {
   ctx.avatar.visible = avatarStory === -1 || avatarStory === ctx.viewStory; ctx.avatarShadow.visible = ctx.avatar.visible;
 }
 
+function skyTexture(sky: string, night: boolean) {
+  const canvas = document.createElement("canvas"); canvas.width = 4; canvas.height = 256;
+  const g = canvas.getContext("2d")!, top = new THREE.Color(sky).multiplyScalar(night ? 0.6 : 0.82), bottom = new THREE.Color(sky).lerp(new THREE.Color(night ? "#3b3060" : "#ffffff"), 0.45);
+  const gradient = g.createLinearGradient(0, 0, 0, 256); gradient.addColorStop(0, `#${top.getHexString()}`); gradient.addColorStop(1, `#${bottom.getHexString()}`);
+  g.fillStyle = gradient; g.fillRect(0, 0, 4, 256);
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; return texture;
+}
+
 function applyLighting(ctx: Scene, night: boolean, sky: string) {
-  ctx.scene.background = new THREE.Color(sky);
+  if (ctx.scene.background instanceof THREE.Texture) ctx.scene.background.dispose();
+  ctx.scene.background = skyTexture(sky, night);
   ctx.scene.fog = new THREE.Fog(sky, 25, 60);
   ctx.hemi.intensity = night ? 0.35 : 2.2; ctx.hemi.color.set(night ? "#7080b0" : "#ffffff");
   ctx.sun.intensity = night ? 0.12 : 2.4;
