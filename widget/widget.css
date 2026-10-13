@@ -1,0 +1,11 @@
+body { min-width: 420px; }
+.app { padding-top: 14px; }
+.topbar { -webkit-app-region: drag; }
+.topbar button, .topbar input { -webkit-app-region: no-drag; }
+@media (max-width: 760px) {
+  .season-strip { grid-template-columns: 1fr; }
+  .season-track { display: none; }
+  .game-grid, .home-grid { grid-template-columns: 1fr; }
+  .seed-panel { order: -1; }
+  .crop-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

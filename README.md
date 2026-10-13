@@ -27,3 +27,19 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Windows 데스크톱 위젯
+
+브라우저 없이 독립 창으로 실행할 수 있습니다. 기본적으로 다른 창보다 위에 표시되며 `Ctrl+Shift+T`로 항상 위 표시를 켜거나 끌 수 있습니다.
+
+```bash
+npm run desktop
+```
+
+배포 가능한 단일 실행 파일 생성:
+
+```bash
+npm run desktop:package
+```
+
+완성된 실행 파일은 `release/Sagyefarm-Widget-0.1.0.exe`에 생성됩니다. 게임 진행 상황은 위젯 전용 로컬 저장소에 자동 저장됩니다.
