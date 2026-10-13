@@ -1,0 +1,12 @@
+node_modules
+release
+dist
+widget-dist
+.git
+.openai
+.wrangler
+.vinext
+work
+outputs
+*.tsbuildinfo
+*.exe

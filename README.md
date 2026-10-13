@@ -19,7 +19,7 @@
 
 ### 1. 웹페이지
 
-Vercel에 배포된 주소를 브라우저에서 열어 바로 플레이합니다. `main` 브랜치의 최신 버전을 프로덕션에 배포합니다.
+Vercel 프로덕션 주소 [farm-and-house.vercel.app](https://farm-and-house.vercel.app)를 브라우저에서 열어 바로 플레이합니다. GitHub `main` 브랜치가 연결되어 이후 변경 사항도 자동으로 배포됩니다.
 
 로컬 웹 실행:
 
