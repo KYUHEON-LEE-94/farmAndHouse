@@ -5,6 +5,7 @@ import { FURNITURE, FLOORS, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUF
 import { BAITS, FISH, RODS, STARTER_BAIT, rollFish, type Bait, type Fish, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
+import { BET_PRESETS, CHERRY_PAIR, DICE_FACES, MAX_BET, MIN_BET, PARITY_NAME, PAYOUT, SLOT_SYMBOLS, parityOf, rollDice, slotMultiplier, slotReturnRate, spinReel, type Parity, type Roll } from "./casino";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
 import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, canArea, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
@@ -135,7 +136,16 @@ const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(M
 
 export default function Home() {
   const [now, setNow] = useState(new Date());
-  const [tab, setTab] = useState<"farm" | "fish" | "home">("farm");
+  const [tab, setTab] = useState<"farm" | "fish" | "home" | "casino">("farm");
+  const [bet, setBet] = useState(MIN_BET);
+  const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
+  const [lastRoll, setLastRoll] = useState<Roll | null>(null);
+  const [rollHistory, setRollHistory] = useState<Roll[]>([]);
+  const [casinoGame, setCasinoGame] = useState<"parity" | "slot">("parity");
+  const [slotReels, setSlotReels] = useState(["🍒", "⭐", "7️⃣"]);
+  const [slotSpinning, setSlotSpinning] = useState(0);
+  const [lastSlot, setLastSlot] = useState<{ bet: number; payout: number; multiplier: number } | null>(null);
+  const [casinoStats, setCasinoStats] = useState({ wins: 0, losses: 0, net: 0, streak: 0, best: 0 });
   const [money, setMoney] = useState(1500);
   const [plots, setPlots] = useState<Plot[]>(initialPlots);
   const [selectedCrop, setSelectedCrop] = useState("potato");
@@ -201,7 +211,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin");
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); if (data.casinoStats) setCasinoStats(data.casinoStats);
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(item => fitToRoom(item, room, yard)));
         setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
@@ -218,8 +228,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, casinoStats, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, casinoStats, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -256,7 +266,7 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || showSettings || showAvatar || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || showSettings || showAvatar || Boolean(rolling) || slotSpinning > 0 || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -494,6 +504,49 @@ export default function Home() {
     setFishState({ phase: "result", fish, bait, perfect: result.perfect, price, reward });
     playCoinSound(fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" || result.perfect ? [880, 1100, 1320] : [880, 1320]);
     setNotice(`${fish.rarity === "전설" ? `✨ 전설의 ${fish.name}을(를) 낚았어요!!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚았어요.`}${result.perfect ? " 퍼펙트! +25%" : ""} ${price.toLocaleString()}원${reward ? ` · 보물: ${reward}` : ""}`);
+  }
+
+  // ---------- 도박장(홀짝) ----------
+  function placeBet(pick: Parity) {
+    if (rolling) return;
+    const amount = Math.min(bet, MAX_BET);
+    if (amount < MIN_BET) return setNotice(`최소 ${MIN_BET.toLocaleString()}원부터 걸 수 있어요.`);
+    if (money < amount) return setNotice("판돈이 모자라요. 판돈을 줄여 주세요.");
+    setMoney(value => value - amount);
+    setRolling({ pick, bet: amount });
+    window.setTimeout(() => {
+      const dice = rollDice(), result = parityOf(dice), win = result === pick, payout = win ? Math.floor(amount * PAYOUT) : 0;
+      const roll: Roll = { dice, result, pick, bet: amount, payout, at: Date.now() };
+      if (win) setMoney(value => value + payout);
+      setLastRoll(roll); setRollHistory(items => [roll, ...items].slice(0, 12)); setRolling(null);
+      recordCasino(amount, payout);
+      if (win) playCoinSound([880, 1100, 1320]);
+      setNotice(`🎲 ${DICE_FACES[dice[0] - 1]} ${DICE_FACES[dice[1] - 1]} 합 ${dice[0] + dice[1]} → ${PARITY_NAME[result]}! ${win ? `적중! ${payout.toLocaleString()}원을 받았어요.` : `${amount.toLocaleString()}원을 잃었어요.`}`);
+    }, 1200);
+  }
+
+  function recordCasino(amount: number, payout: number) {
+    const win = payout > 0;
+    setCasinoStats(stats => { const streak = win ? Math.max(1, stats.streak + 1) : Math.min(-1, stats.streak - 1); return { wins: stats.wins + (win ? 1 : 0), losses: stats.losses + (win ? 0 : 1), net: stats.net + payout - amount, streak, best: Math.max(stats.best, streak) }; });
+  }
+
+  /** 슬롯머신: 결과를 먼저 정하고, 릴이 왼쪽부터 차례로 멈추는 연출을 보여준다. */
+  function pullLever() {
+    if (slotSpinning || rolling) return;
+    const amount = Math.min(bet, MAX_BET);
+    if (money < amount) return setNotice("판돈이 모자라요. 판돈을 줄여 주세요.");
+    const final = [spinReel(), spinReel(), spinReel()], multiplier = slotMultiplier(final), payout = Math.floor(amount * multiplier);
+    setMoney(value => value - amount); setSlotSpinning(3); setLastSlot(null);
+    let stopped = 0;
+    const shuffle = window.setInterval(() => setSlotReels(current => current.map((icon, i) => (i < stopped ? final[i] : SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)].icon))), 70);
+    [700, 1050, 1400].forEach((delay, i) => window.setTimeout(() => {
+      stopped = i + 1; setSlotReels(current => current.map((icon, k) => (k <= i ? final[k] : icon))); setSlotSpinning(3 - stopped);
+      if (stopped < 3) return;
+      window.clearInterval(shuffle);
+      if (payout) { setMoney(value => value + payout); playCoinSound(multiplier >= 30 ? [660, 880, 1100, 1320, 1760] : [880, 1100, 1320]); }
+      setLastSlot({ bet: amount, payout, multiplier }); recordCasino(amount, payout);
+      setNotice(`🎰 ${final.join(" ")} — ${payout ? `${multiplier}배! ${payout.toLocaleString()}원을 받았어요.` : `꽝! ${amount.toLocaleString()}원을 잃었어요.`}`);
+    }, delay));
   }
 
   // ---------- 이벤트 ----------
@@ -745,6 +798,7 @@ export default function Home() {
         <button className={tab === "farm" ? "active" : ""} onClick={() => switchTab("farm")}>🌱 텃밭</button>
         <button className={tab === "fish" ? "active" : ""} onClick={() => switchTab("fish")}>🎣 낚시터</button>
         <button className={tab === "home" ? "active" : ""} onClick={() => switchTab("home")}>🏡 나의 집</button>
+        <button className={tab === "casino" ? "active" : ""} onClick={() => switchTab("casino")}>🎲 도박장</button>
       </nav>
 
       {tab === "farm" && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~6)">
@@ -824,6 +878,50 @@ export default function Home() {
           <p className="hint">지금 {season}에 잡히는 물고기{fishMul > 1 ? ` · 희귀 확률 ×${fishMul.toFixed(1)}` : ""}</p>
           <div className="fish-list">{seasonFish.map(fish => <div key={fish.id} className={`fish-entry ${fishLog[fish.id] ? "caught" : ""} ${fish.rarity === "전설" ? "legend" : ""}`}><span>{fishLog[fish.id] ? fish.icon : "❔"}</span><b>{fishLog[fish.id] || fish.rarity !== "전설" ? fish.name : "???"}</b><small className={`rarity rarity-${fish.rarity}`}>{fish.rarity}</small><i>{fishLog[fish.id] ? `${fishLog[fish.id]}마리` : `${fish.price.toLocaleString()}원`}</i></div>)}</div>
           <div className="season-book">{SEASONS.map(s => { const total = FISH.filter(fish => fish.season === s).length; return <span key={s}>{SEASON_ICON[s]} {FISH.filter(fish => fish.season === s && fishLog[fish.id]).length}/{total}</span>; })}</div>
+        </aside>
+      </div>}
+
+      {tab === "casino" && <div className="game-grid">
+        <section className="panel casino-panel">
+          <div className="panel-heading"><div><span className="eyebrow">BACK ALLEY</span><h3>뒷골목 도박장</h3></div><div className="shop-tabs casino-tabs" role="tablist">{([["parity", "🎲 홀짝"], ["slot", "🎰 슬롯머신"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => setCasinoGame(id)} disabled={Boolean(rolling) || slotSpinning > 0}>{label}</button>)}</div></div>
+          {casinoGame === "slot" ? <>
+          <div className={`slot-machine ${slotSpinning ? "spinning" : lastSlot ? (lastSlot.payout ? "win" : "lose") : ""}`}>
+            <div className="slot-top">★ 월루 잭팟 ★</div>
+            <div className="slot-reels">{slotReels.map((icon, i) => <b key={i} className={i >= 3 - slotSpinning ? "blur" : ""}>{icon}</b>)}</div>
+            <p className="dice-result">{slotSpinning ? "드르르르…" : lastSlot ? (lastSlot.payout ? `${lastSlot.multiplier}배! +${lastSlot.payout.toLocaleString()}원` : `꽝! -${lastSlot.bet.toLocaleString()}원`) : "같은 그림 3개를 맞춰 보세요!"}</p>
+          </div>
+          </> : <>
+          <div className={`dice-table ${rolling ? "rolling" : lastRoll ? (lastRoll.payout ? "win" : "lose") : ""}`}>
+            <div className="dice-cup">{rolling ? <><b>🎲</b><b>🎲</b></> : lastRoll ? <><b>{DICE_FACES[lastRoll.dice[0] - 1]}</b><b>{DICE_FACES[lastRoll.dice[1] - 1]}</b></> : <><b>⚀</b><b>⚅</b></>}</div>
+            <p className="dice-result">{rolling ? `${PARITY_NAME[rolling.pick]}에 ${rolling.bet.toLocaleString()}원… 데구르르` : lastRoll ? `합 ${lastRoll.dice[0] + lastRoll.dice[1]} · ${PARITY_NAME[lastRoll.result]} — ${lastRoll.payout ? `적중! +${lastRoll.payout.toLocaleString()}원` : `꽝! -${lastRoll.bet.toLocaleString()}원`}` : "주사위 두 개의 합이 홀일까, 짝일까?"}</p>
+          </div>
+          <div className="bet-row">
+            <span>판돈</span>
+            {BET_PRESETS.map(amount => <button key={amount} className={bet === amount ? "on" : ""} onClick={() => setBet(amount)} disabled={Boolean(rolling) || slotSpinning > 0}>{amount.toLocaleString()}</button>)}
+            <button className={bet === Math.min(MAX_BET, Math.floor(money / 100) * 100) ? "on" : ""} onClick={() => setBet(Math.max(MIN_BET, Math.min(MAX_BET, Math.floor(money / 100) * 100)))} disabled={Boolean(rolling)}>최대</button>
+            <input type="number" min={MIN_BET} max={MAX_BET} step={100} value={bet} onChange={event => setBet(Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(event.target.value) / 100) * 100 || MIN_BET)))} aria-label="판돈" disabled={Boolean(rolling)} />
+          </div>
+          <div className="parity-buttons">
+            <button className="odd" onClick={() => placeBet("odd")} disabled={Boolean(rolling) || money < bet}><b>홀</b><small>{bet.toLocaleString()}원 → {Math.floor(bet * PAYOUT).toLocaleString()}원</small></button>
+            <button className="even" onClick={() => placeBet("even")} disabled={Boolean(rolling) || money < bet}><b>짝</b><small>{bet.toLocaleString()}원 → {Math.floor(bet * PAYOUT).toLocaleString()}원</small></button>
+          </div>
+          </>}
+          {casinoGame === "slot" && <>
+            <button className="lever-button" onClick={pullLever} disabled={slotSpinning > 0 || money < bet}>🎰 레버 당기기 · {bet.toLocaleString()}원</button>
+            <div className="slot-paytable">{SLOT_SYMBOLS.map(symbol => <span key={symbol.icon}>{symbol.icon}{symbol.icon}{symbol.icon}<b>×{symbol.triple}</b></span>)}<span>🍒🍒 + 아무거나<b>×{CHERRY_PAIR}</b></span></div>
+          </>}
+          <p className="hint">⚠ 게임 속 돈으로만 하는 놀이예요. {casinoGame === "slot" ? `슬롯의 기대 환수율은 약 ${Math.round(slotReturnRate() * 100)}%라` : `홀짝은 확률이 반반이지만 배당이 ×${PAYOUT}라`} 오래 하면 조금씩 잃게 돼요. 판돈 {MIN_BET.toLocaleString()}~{MAX_BET.toLocaleString()}원.</p>
+        </section>
+        <aside className="panel casino-side">
+          <div className="panel-heading"><div><span className="eyebrow">RECORD</span><h3>전적</h3></div></div>
+          <div className="casino-stats">
+            <span><small>적중</small><b>{casinoStats.wins}</b></span><span><small>꽝</small><b>{casinoStats.losses}</b></span>
+            <span className={casinoStats.net >= 0 ? "plus" : "minus"}><small>누적 손익</small><b>{casinoStats.net >= 0 ? "+" : ""}{casinoStats.net.toLocaleString()}원</b></span>
+            <span><small>현재</small><b>{casinoStats.streak > 0 ? `${casinoStats.streak}연승` : casinoStats.streak < 0 ? `${-casinoStats.streak}연패` : "-"}</b></span>
+            <span><small>최고 연승</small><b>{casinoStats.best}</b></span>
+          </div>
+          <b className="history-title">최근 결과</b>
+          <div className="roll-history">{rollHistory.length === 0 ? <p>아직 기록이 없어요.</p> : rollHistory.map(roll => <span key={roll.at} className={`${roll.result} ${roll.payout ? "hit" : ""}`} title={`${roll.dice[0]}+${roll.dice[1]} · ${roll.payout ? "적중" : "꽝"}`}>{PARITY_NAME[roll.result]}</span>)}</div>
         </aside>
       </div>}
 
