@@ -68,6 +68,62 @@ export const STORY_EVENTS: StoryEvent[] = [
     { label: "이장님께 돌려준다", outcome: { chance: 0.7, success: { text: "이장님이 고맙다며 사례금 300원을 주셨어요!", money: 300, buff: { kind: "price", label: "정직한 농부", multiplier: 1.1, minutes: 5 } }, fail: { text: "이장님이 고맙다며 활짝 웃으셨어요. 마음이 따뜻해요." } } },
     { label: "슬쩍 챙긴다", outcome: { text: "500원을 챙겼지만 소문이 퍼져 손님들이 값을 깎아요.", money: 500, buff: { kind: "price", label: "나쁜 소문", multiplier: 0.85, minutes: 6 } } },
   ] },
+  { id: "boss-patrol", title: "팀장님 순찰", icon: "👔", text: "등 뒤로 팀장님 발소리가 들려요! 화면에는 지금 농장이 떠 있는데…", choices: [
+    { label: "Alt+Tab! 엑셀을 띄운다", outcome: { text: "아슬아슬하게 엑셀로 전환했어요. 팀장님이 고개를 끄덕이며 지나갔어요. 휴~" } },
+    { label: "당당하게 계속 농사짓는다", outcome: { chance: 0.5, success: { text: "\"어? 이거 무슨 게임이야? 나도 해볼까\" 팀장님도 농부가 되었어요. 기분 좋게 작물이 팔려요!", buff: { kind: "price", label: "팀장님 공인", multiplier: 1.15, minutes: 5 } }, fail: { text: "\"자네, 보고서는?\" 업무 폭탄을 맞아 밭일할 틈이 없어요.", buff: { kind: "growth", label: "업무 폭탄", multiplier: 1.25, minutes: 4 } } } },
+  ] },
+  { id: "lunch", title: "점심시간", icon: "🍱", text: "꼬르륵… 점심시간이에요. 동료들이 새로 생긴 맛집에 가자고 해요.", choices: [
+    { label: "맛집에 간다 (-200원)", outcome: { text: "든든하게 먹고 오니 손님 응대도 척척!", money: -200, buff: { kind: "price", label: "든든한 점심", multiplier: 1.1, minutes: 5 } } },
+    { label: "도시락을 먹으며 농사짓는다", outcome: { text: "한 손엔 숟가락, 한 손엔 마우스. 작물이 조금 빨리 자라요.", buff: { kind: "growth", label: "점심 농사", multiplier: 0.9, minutes: 4 } } },
+  ] },
+  { id: "company-dinner", title: "회식 공지", icon: "🍻", text: "\"오늘 저녁 회식 있습니다~ 전원 참석!\" 단톡방이 울려요.", choices: [
+    { label: "회비를 낸다 (-300원)", outcome: { text: "회식에서 농장 자랑을 했더니 단골이 생겼어요!", money: -300, buff: { kind: "price", label: "회식 인맥", multiplier: 1.2, minutes: 5 } } },
+    { label: "몰래 빠진다", outcome: { chance: 0.5, success: { text: "아무도 눈치채지 못했어요. 남은 시간에 낚시를 즐겨요.", buff: { kind: "fish", label: "자유 시간", multiplier: 1.5, minutes: 4 } }, fail: { text: "\"어디 갔었어?\" 들켜 버렸어요. 마음이 무거워 일이 손에 안 잡혀요.", buff: { kind: "growth", label: "눈치 보기", multiplier: 1.2, minutes: 3 } } } },
+  ] },
+  { id: "messenger", title: "메신저 폭탄", icon: "💬", text: "업무 메신저 알림이 999+개 쌓였어요. 띠링띠링띠링…", choices: [
+    { label: "하나하나 답장한다", outcome: { text: "모두 답장하느라 진이 빠졌지만 동료들이 고마워해요.", buff: { kind: "price", label: "칼답 평판", multiplier: 1.1, minutes: 4 } } },
+    { label: "알림을 끈다", outcome: { chance: 0.5, success: { text: "고요한 평화… 농사에 집중할 수 있어요.", buff: { kind: "growth", label: "집중 모드", multiplier: 0.85, minutes: 4 } }, fail: { text: "급한 메시지가 있었네요. 뒤늦게 수습하느라 정신이 없어요.", buff: { kind: "growth", label: "뒷수습", multiplier: 1.2, minutes: 4 } } } },
+  ] },
+  { id: "coin-scam", title: "수상한 투자 권유", icon: "📈", text: "낯선 사람이 다가와요. \"농장 코인에 1,000원만 넣으면 세 배로 불려 드립니다!\"", choices: [
+    { label: "1,000원 투자한다", outcome: { chance: 0.25, success: { text: "떡상!!! 2,800원이 되어 돌아왔어요!", money: 1800 }, fail: { text: "다음 날 그 사람은 사라졌어요… 1,000원이 증발했어요.", money: -1000 } } },
+    { label: "단호하게 거절한다", outcome: { text: "현명한 선택! 마음이 편안해요." } },
+  ] },
+  { id: "parcel", title: "택배 도착", icon: "📦", text: "주문한 기억이 없는 택배가 회사로 왔어요. 보낸 사람: '고향 엄마'", choices: [
+    { label: "열어본다", outcome: { chance: 0.6, success: { text: "엄마표 반찬과 용돈 봉투! 500원이 들어 있어요.", money: 500 }, fail: { text: "직접 키운 퇴비가 가득! 밭이 쑥쑥 자라요.", buff: { kind: "growth", label: "엄마표 퇴비", multiplier: 0.8, minutes: 4 } } } },
+    { label: "동료와 나눈다", outcome: { text: "나눠 먹으니 인심이 좋아져 손님이 늘었어요.", buff: { kind: "price", label: "나눔 인심", multiplier: 1.12, minutes: 5 } } },
+  ] },
+  { id: "coffee", title: "커피 쿠폰", icon: "☕", text: "생일인 동료가 커피 쿠폰을 돌렸어요. 아이스 아메리카노 한 잔!", choices: [
+    { label: "원샷한다", outcome: { text: "카페인 충전! 손이 빨라져요.", buff: { kind: "growth", label: "카페인 부스트", multiplier: 0.85, minutes: 3 } } },
+    { label: "천천히 음미한다", outcome: { text: "여유가 생기니 물고기도 여유롭게 물어요.", buff: { kind: "fish", label: "여유로운 오후", multiplier: 1.4, minutes: 4 } } },
+  ] },
+  { id: "rainbow", title: "쌍무지개", icon: "🌈", seasons: ["봄", "여름"], text: "비가 그친 하늘에 쌍무지개가 떴어요! 소원을 빌면 이루어진대요.", choices: [
+    { label: "\"전설 물고기를 낚게 해주세요\"", outcome: { text: "강물이 반짝이기 시작했어요. 희귀 물고기가 잘 물어요!", buff: { kind: "fish", label: "무지개 소원", multiplier: 2, minutes: 5 } } },
+    { label: "\"부자 되게 해주세요\"", outcome: { text: "무지개 끝에서 동전 몇 닢을 주웠어요.", money: 400 } },
+  ] },
+  { id: "typhoon", title: "태풍 경보", icon: "🌀", seasons: ["여름"], text: "태풍이 북상 중이래요! 밭이 걱정돼요.", choices: [
+    { label: "밭에 덮개를 씌운다 (-250원)", outcome: { text: "튼튼한 덮개 덕분에 작물이 무사해요.", money: -250 } },
+    { label: "운에 맡긴다", outcome: { chance: 0.4, success: { text: "태풍이 비껴갔어요! 비 덕분에 오히려 촉촉해요.", buff: { kind: "growth", label: "태풍 뒤 단비", multiplier: 0.85, minutes: 4 } }, fail: { text: "바람에 작물이 쓰러졌어요. 다시 일으키느라 시간이 걸려요.", buff: { kind: "growth", label: "태풍 피해", multiplier: 1.35, minutes: 4 } } } },
+  ] },
+  { id: "harvest-moon", title: "한가위 보름달", icon: "🌕", seasons: ["가을"], text: "커다란 보름달이 떴어요. 마을 사람들이 강강술래를 하고 있어요.", choices: [
+    { label: "함께 춤을 춘다", outcome: { text: "신나게 놀았더니 종묘상 사장님이 씨앗을 깎아 줬어요.", buff: { kind: "seed", label: "한가위 인심", multiplier: 0.75, minutes: 5 } } },
+    { label: "달에게 소원을 빈다", outcome: { text: "풍년을 빌었더니 작물값이 올랐어요.", buff: { kind: "price", label: "풍년 기원", multiplier: 1.15, minutes: 5 } } },
+  ] },
+  { id: "first-snow", title: "첫눈", icon: "☃️", seasons: ["겨울"], text: "펑펑 첫눈이 내려요! 마을 아이들이 눈사람을 만들자고 졸라요.", choices: [
+    { label: "눈사람을 만든다", outcome: { text: "아이들 부모님들이 고맙다며 작물을 비싸게 사 줬어요.", buff: { kind: "price", label: "첫눈 추억", multiplier: 1.12, minutes: 5 } } },
+    { label: "얼음낚시를 간다", outcome: { text: "꽁꽁 언 강에서 물고기가 몰려 있는 구멍을 찾았어요!", buff: { kind: "fish", label: "얼음 구멍 명당", multiplier: 1.8, minutes: 4 } } },
+  ] },
+  { id: "fishing-contest", title: "마을 낚시대회", icon: "🏆", text: "이장님이 낚시대회를 연대요. 참가비 200원, 우승 상금 800원!", choices: [
+    { label: "참가한다 (-200원)", outcome: { chance: 0.45, success: { text: "월척을 낚아 우승했어요!! 상금 800원!", money: 600 }, fail: { text: "아쉽게 2등… 참가상으로 낚시 요령을 배웠어요.", money: -200, buff: { kind: "fish", label: "대회 경험", multiplier: 1.3, minutes: 4 } } } },
+    { label: "응원만 한다", outcome: { text: "응원하다 보니 목이 쉬었어요. 그래도 재밌었어요!" } },
+  ] },
+  { id: "blackout", title: "갑작스런 정전", icon: "🔌", text: "사무실 전기가 나갔어요! 모니터가 꺼지고 모두 웅성거려요.", choices: [
+    { label: "손전등을 산다 (-100원)", outcome: { text: "손전등을 비추며 밭을 돌봤어요. 꼼꼼해서 작물이 잘 자라요.", money: -100, buff: { kind: "growth", label: "손전등 농사", multiplier: 0.9, minutes: 3 } } },
+    { label: "이참에 낮잠을 잔다", outcome: { text: "푹 자고 일어났더니 개운해요! 물고기 입질도 잘 보여요.", buff: { kind: "fish", label: "꿀잠", multiplier: 1.4, minutes: 4 } } },
+  ] },
+  { id: "thief-cat", title: "생선 도둑", icon: "😼", text: "도둑고양이가 아이스박스에서 생선을 물고 달아나요!", choices: [
+    { label: "쫓아간다", outcome: { chance: 0.6, success: { text: "생선을 되찾고, 덤으로 고양이가 숨겨 둔 동전도 찾았어요!", money: 250 }, fail: { text: "놓쳤어요… 담장 위에서 고양이가 비웃어요." } } },
+    { label: "그냥 준다", outcome: { text: "배부른 고양이가 고맙다며 명당 자리를 알려 줬어요.", buff: { kind: "fish", label: "고양이의 보답", multiplier: 1.6, minutes: 5 } } },
+  ] },
 ];
 
 export function pickEvent(season: Season, random = Math.random) {

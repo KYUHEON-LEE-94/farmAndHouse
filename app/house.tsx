@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 export type FurnitureKind = "floor" | "rug" | "wall";
-export type ShopGroup = "furniture" | "decor" | "structure" | "yard" | "pet";
+export type ShopGroup = "furniture" | "decor" | "structure" | "yard" | "pet" | "gacha";
 /** size는 [가로, 높이, 깊이] 미터. 벽 부착 가구는 mount 높이(바닥에서 중심까지)에 걸린다. */
-export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; rare?: boolean };
+export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; rare?: boolean; legend?: boolean; tier?: "common" | "rare" | "legend" };
 /** 바닥 가구는 x·z(방 중심 기준 미터)와 rot(도), 벽 가구는 wall(벽 번호)·u(벽 위치 0~1)·h(높이 m). story는 층(0=1층, 1=2층), 마당 소품은 층이 없다. */
 export type PlacedItem = Furniture & { instanceId: string; x: number; z: number; rot: number; tint?: string; wall?: number; u?: number; h?: number; story?: number };
 export type Theme = { id: string; name: string; price: number; swatch: string };
@@ -70,16 +70,42 @@ export const FURNITURE: Furniture[] = [
   { id: "hamster", name: "햄스터", icon: "🐹", price: 1000, color: "#e8b77a", kind: "floor", group: "pet", size: [0.18, 0.15, 0.22], pet: true },
   { id: "turtle", name: "거북이", icon: "🐢", price: 1000, color: "#6f8f4f", kind: "floor", group: "pet", size: [0.35, 0.2, 0.45], pet: true },
   { id: "sparrow", name: "참새", icon: "🐦", price: 1000, color: "#a8784a", kind: "floor", group: "pet", size: [0.15, 0.2, 0.22], pet: true },
+  { id: "dragon", name: "청룡", icon: "🐉", price: 50000, color: "#3f8fbf", kind: "floor", group: "pet", size: [0.5, 0.7, 1.4], pet: true, legend: true },
+  { id: "phoenix", name: "주작", icon: "🐦‍🔥", price: 50000, color: "#e0533a", kind: "floor", group: "pet", size: [0.5, 0.6, 0.7], pet: true, legend: true },
+  { id: "whitetiger", name: "백호", icon: "🐅", price: 50000, color: "#f4f2ec", kind: "floor", group: "pet", size: [0.6, 0.8, 1.4], pet: true, legend: true },
+  { id: "blacktortoise", name: "현무", icon: "🐢", price: 50000, color: "#3b4a44", kind: "floor", group: "pet", size: [0.7, 0.45, 0.9], pet: true, legend: true },
+  { id: "gumiho", name: "구미호", icon: "🦊", price: 50000, color: "#f3e3c4", kind: "floor", group: "pet", size: [0.4, 0.6, 0.9], pet: true, legend: true },
+  { id: "teddy", name: "곰인형", icon: "🧸", price: 1500, color: "#c8925a", kind: "floor", group: "gacha", size: [0.45, 0.55, 0.4], tier: "common" },
+  { id: "cactus", name: "선인장 화분", icon: "🌵", price: 1500, color: "#5f9e4f", kind: "floor", group: "gacha", size: [0.4, 0.9, 0.4], tier: "common" },
+  { id: "pumpkinlamp", name: "호박 랜턴", icon: "🎃", price: 1500, color: "#e2883a", kind: "floor", group: "gacha", size: [0.5, 0.45, 0.5], tier: "common" },
+  { id: "arcade", name: "오락기", icon: "🕹️", price: 1500, color: "#5a4fa8", kind: "floor", group: "gacha", size: [0.7, 1.7, 0.7], tier: "common" },
+  { id: "moai", name: "모아이 석상", icon: "🗿", price: 4000, color: "#8a8780", kind: "floor", group: "gacha", size: [0.6, 1.5, 0.6], tier: "rare" },
+  { id: "discoball", name: "미러볼", icon: "🪩", price: 4000, color: "#c9d3dc", kind: "floor", group: "gacha", size: [0.6, 1.9, 0.6], tier: "rare" },
+  { id: "throne", name: "왕좌", icon: "🪑", price: 4000, color: "#a5302a", kind: "floor", group: "gacha", size: [1, 1.8, 0.8], tier: "rare" },
+  { id: "goldtoilet", name: "황금 변기", icon: "🚽", price: 15000, color: "#e8c35a", kind: "floor", group: "gacha", size: [0.5, 0.8, 0.7], tier: "legend" },
+  { id: "unicorn", name: "유니콘 흔들목마", icon: "🦄", price: 15000, color: "#f6f1fb", kind: "floor", group: "gacha", size: [0.5, 1.1, 1.2], tier: "legend" },
   { id: "scarecrow", name: "허수아비", icon: "🧑‍🌾", price: 500, color: "#d6a64b", kind: "floor", group: "yard", size: [0.9, 1.8, 0.3], yard: true },
 ];
 
-/** 펫 뽑기: 1회 비용과 능력 펫이 나올 확률. 능력 펫끼리, 일반 펫끼리는 균등. */
+/** 펫 뽑기: 1회 비용. 전설 펫 0.1%(5종 균등), 능력 펫 10%(7종 균등), 나머지는 일반 펫(8종 균등). */
 export const GACHA_PRICE = 1000;
+export const GACHA_LEGEND_CHANCE = 0.001;
 export const GACHA_RARE_CHANCE = 0.1;
 
 export function rollPet(random = Math.random) {
-  const pets = FURNITURE.filter(item => item.pet), rare = random() < GACHA_RARE_CHANCE;
-  const pool = pets.filter(item => Boolean(item.rare) === rare);
+  const roll = random(), pets = FURNITURE.filter(item => item.pet);
+  const pool = roll < GACHA_LEGEND_CHANCE ? pets.filter(item => item.legend) : roll < GACHA_LEGEND_CHANCE + GACHA_RARE_CHANCE ? pets.filter(item => item.rare) : pets.filter(item => !item.rare && !item.legend);
+  return pool[Math.floor(random() * pool.length)];
+}
+
+/** 가구 뽑기: 가챠샵에서만 나오는 가구. 일반 60% · 희귀 35% · 전설 5%. */
+export const FURNITURE_GACHA_PRICE = 2000;
+export const FURNITURE_GACHA_ODDS = { common: 0.6, rare: 0.35, legend: 0.05 } as const;
+export const TIER_NAME = { common: "일반", rare: "희귀", legend: "전설" } as const;
+
+export function rollGachaFurniture(random = Math.random) {
+  const roll = random(), tier = roll < FURNITURE_GACHA_ODDS.legend ? "legend" : roll < FURNITURE_GACHA_ODDS.legend + FURNITURE_GACHA_ODDS.rare ? "rare" : "common";
+  const pool = FURNITURE.filter(item => item.group === "gacha" && item.tier === tier);
   return pool[Math.floor(random() * pool.length)];
 }
 
@@ -92,6 +118,11 @@ export const PET_BUFFS: Record<string, { title: string; text: string }> = {
   mole: { title: "땅 고르기", text: "새로 심는 작물 성장 시간 -5%" },
   weasel: { title: "해충 사냥꾼", text: "벌레를 놓쳤을 때 판매가 피해 -10% → -5%" },
   tiger: { title: "산군의 위엄", text: "마을 이벤트 디버프 지속 시간 절반" },
+  dragon: { title: "청룡의 비", text: "새로 심는 작물 성장 시간 -15%" },
+  phoenix: { title: "주작의 불꽃", text: "낚시 미니게임 게이지가 25% 빨리 참" },
+  whitetiger: { title: "백호의 포효", text: "벌레를 놓쳐도 작물이 전혀 상하지 않음" },
+  blacktortoise: { title: "현무의 물줄기", text: "물뿌리개 용량 +8" },
+  gumiho: { title: "구미호의 홀림", text: "작물 판매가 +15%" },
 };
 
 export const TINTS = ["#c78979", "#e2b85a", "#81a96b", "#8ba5bc", "#9a7bb0", "#57514f", "#efe6d6"];
@@ -225,6 +256,20 @@ const ART: Record<string, { viewBox: string; body: ReactNode }> = {
   hamster: { viewBox: "0 0 90 70", body: <><ellipse className="m" cx="45" cy="42" rx="36" ry="24" /><ellipse cx="45" cy="50" rx="24" ry="14" fill="#fff6e8" /><circle className="m" cx="22" cy="20" r="7" /><circle className="m" cx="68" cy="20" r="7" /><circle cx="34" cy="34" r="3" fill="#222" /><circle cx="56" cy="34" r="3" fill="#222" /><circle cx="45" cy="42" r="3" fill="#f2899a" /></> },
   turtle: { viewBox: "0 0 110 70", body: <><ellipse cx="88" cy="44" rx="14" ry="10" fill="#9cc57a" /><circle cx="94" cy="40" r="2.5" fill="#222" /><path className="m" d="M14 50 Q20 10 56 10 Q92 10 96 50 Z" /><g className="d" opacity=".5"><path d="M40 14 L36 50 M70 14 L74 50 M24 32 H88" stroke="#2f4a2a" strokeWidth="3" /></g><rect x="22" y="48" width="12" height="14" rx="5" fill="#9cc57a" /><rect x="74" y="48" width="12" height="14" rx="5" fill="#9cc57a" /></> },
   sparrow: { viewBox: "0 0 90 70", body: <><ellipse className="m" cx="40" cy="40" rx="26" ry="18" /><path className="d" d="M14 36 L0 30 L10 44 Z" /><circle className="m" cx="62" cy="28" r="13" /><path d="M74 28 L84 31 L74 34 Z" fill="#e2b85a" /><circle cx="66" cy="25" r="2.5" fill="#222" /><ellipse cx="44" cy="48" rx="14" ry="8" fill="#efe2c8" /></> },
+  dragon: { viewBox: "0 0 120 80", body: <><path className="m" d="M10 60 Q30 30 50 50 T90 40 Q100 36 108 30" stroke="#3f8fbf" strokeWidth="14" fill="none" strokeLinecap="round" /><circle className="m" cx="104" cy="28" r="13" /><path d="M98 16 l-4 -12 M108 16 l2 -12" stroke="#e8c35a" strokeWidth="3" /><path d="M116 32 q8 4 2 10" stroke="#e8c35a" strokeWidth="2" fill="none" /><circle cx="108" cy="25" r="2.5" fill="#222" /><g fill="#e8c35a">{[24, 44, 64, 84].map(x => <path key={x} d={`M${x} 40 l4 -8 l4 8 z`} />)}</g></> },
+  phoenix: { viewBox: "0 0 100 90", body: <><path d="M20 60 Q0 40 10 10 Q24 34 30 44 Q30 20 42 6 Q44 36 48 46 Z" fill="#f6b03a" /><ellipse className="m" cx="54" cy="56" rx="24" ry="18" /><circle className="m" cx="74" cy="34" r="12" /><path d="M84 34 L96 38 L84 42 Z" fill="#e2b85a" /><circle cx="77" cy="31" r="2.5" fill="#222" /><path d="M70 22 Q74 10 82 16" stroke="#f6d16a" strokeWidth="3" fill="none" /></> },
+  whitetiger: { viewBox: "0 0 120 90", body: <><path d="M12 50 Q0 36 8 22" stroke="#d8d4cc" strokeWidth="7" fill="none" /><ellipse className="m" cx="54" cy="54" rx="40" ry="22" /><g fill="#2a2a32">{[30, 44, 58, 72].map(x => <path key={x} d={`M${x} 34 l4 0 l-3 18 z`} />)}</g><rect className="m" x="24" y="64" width="10" height="24" rx="4" /><rect className="m" x="70" y="64" width="10" height="24" rx="4" /><circle className="m" cx="92" cy="34" r="20" /><circle cx="86" cy="30" r="3.5" fill="#5fb0dc" /><circle cx="100" cy="30" r="3.5" fill="#5fb0dc" /><path d="M86 20 l4 6 M98 20 l-2 6" stroke="#2a2a32" strokeWidth="2.5" /></> },
+  blacktortoise: { viewBox: "0 0 120 80", body: <><path className="m" d="M14 56 Q20 14 60 14 Q100 14 104 56 Z" /><g opacity=".6" stroke="#8fd3c4" strokeWidth="3" fill="none"><path d="M40 18 L36 56 M80 18 L84 56 M22 36 H98" /></g><circle cx="108" cy="50" r="10" fill="#4f6b5c" /><circle cx="112" cy="47" r="2.5" fill="#f3d675" /><path d="M14 54 Q0 60 8 70 Q16 74 20 66" stroke="#5f9e4f" strokeWidth="6" fill="none" /></> },
+  gumiho: { viewBox: "0 0 120 90", body: <>{[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => <path key={i} d={`M30 56 Q${4 + i * 3} ${20 + i * 5} ${i * 4} ${4 + i * 6}`} stroke="#f3e3c4" strokeWidth="9" strokeLinecap="round" fill="none" />)}<ellipse className="m" cx="58" cy="58" rx="28" ry="16" /><circle className="m" cx="86" cy="40" r="16" /><path className="m" d="M76 30 L74 12 L86 26 Z M96 30 L98 12 L88 26 Z" /><circle cx="82" cy="40" r="2.5" fill="#c4302b" /><circle cx="94" cy="40" r="2.5" fill="#c4302b" /></> },
+  teddy: { viewBox: "0 0 80 90", body: <><circle className="m" cx="22" cy="18" r="10" /><circle className="m" cx="58" cy="18" r="10" /><circle className="m" cx="40" cy="32" r="22" /><ellipse className="m" cx="40" cy="68" rx="24" ry="20" /><ellipse cx="40" cy="40" rx="9" ry="7" fill="#f3e3c4" /><circle cx="32" cy="28" r="3" fill="#222" /><circle cx="48" cy="28" r="3" fill="#222" /><circle cx="40" cy="38" r="3" fill="#3b2a20" /><path d="M30 60 L50 60 L40 70 Z" fill="#c4302b" /></> },
+  cactus: { viewBox: "0 0 60 100", body: <><rect className="m" x="22" y="10" width="16" height="64" rx="8" /><path className="m" d="M22 44 H12 V26 a5 5 0 0 1 10 0 Z" /><path className="m" d="M38 36 H48 V20 a5 5 0 0 0 -10 0 Z" /><circle cx="30" cy="8" r="5" fill="#f2899a" /><path d="M14 74 H46 L42 98 H18 Z" fill="#c9784f" /></> },
+  pumpkinlamp: { viewBox: "0 0 90 80", body: <><ellipse className="m" cx="45" cy="46" rx="40" ry="30" /><g className="d" opacity=".35"><ellipse cx="30" cy="46" rx="10" ry="28" /><ellipse cx="60" cy="46" rx="10" ry="28" /></g><path d="M26 38 l8 -8 l8 8 z M48 38 l8 -8 l8 8 z M28 56 Q45 68 62 56 Q45 62 28 56" fill="#ffd25a" /><rect x="40" y="10" width="8" height="10" rx="2" fill="#5f7a3a" /></> },
+  arcade: { viewBox: "0 0 70 120", body: <><rect className="m" x="6" y="0" width="58" height="120" rx="4" /><rect x="12" y="10" width="46" height="34" rx="3" fill="#1d1d2e" /><path d="M16 36 h8 v-8 h8 v8 h8 v-14 h8" stroke="#5fe08a" strokeWidth="3" fill="none" /><rect className="d" x="4" y="50" width="62" height="16" /><circle cx="24" cy="58" r="5" fill="#e0533a" /><circle cx="44" cy="58" r="4" fill="#f6d16a" /><circle cx="54" cy="58" r="4" fill="#5fb0dc" /></> },
+  moai: { viewBox: "0 0 70 110", body: <><path className="m" d="M14 110 V40 Q14 8 36 6 Q58 8 56 40 V110 Z" /><rect className="d" x="16" y="30" width="38" height="8" rx="3" /><path className="d" d="M30 38 L28 70 H42 L40 38 Z" opacity=".5" /><rect className="d" x="24" y="78" width="22" height="6" rx="3" /><rect className="d" x="10" y="40" width="6" height="34" rx="3" /></> },
+  discoball: { viewBox: "0 0 70 120", body: <><rect x="33" y="40" width="4" height="70" fill="#5b4a3a" /><ellipse cx="35" cy="112" rx="18" ry="6" fill="#4a3b2e" /><circle className="m" cx="35" cy="26" r="24" /><g stroke="#fff" strokeWidth="1.2" opacity=".7"><path d="M11 26 H59 M15 14 H55 M15 38 H55 M35 2 V50 M23 4 Q18 26 23 48 M47 4 Q52 26 47 48" fill="none" /></g><circle cx="26" cy="16" r="4" fill="#fff" /></> },
+  throne: { viewBox: "0 0 90 120", body: <><path className="m" d="M14 120 V20 Q14 4 45 2 Q76 4 76 20 V120 Z" /><path d="M24 40 L32 24 L45 34 L58 24 L66 40 Z" fill="#e8c35a" /><rect className="l" x="22" y="48" width="46" height="34" rx="6" /><rect className="d" x="4" y="70" width="18" height="34" rx="5" /><rect className="d" x="68" y="70" width="18" height="34" rx="5" /><rect x="10" y="80" width="70" height="12" rx="4" fill="#e8c35a" /></> },
+  goldtoilet: { viewBox: "0 0 80 100", body: <><rect className="m" x="44" y="0" width="30" height="54" rx="6" /><path className="m" d="M6 50 H66 Q66 80 44 84 L46 100 H24 L26 84 Q6 80 6 50 Z" /><ellipse className="l" cx="36" cy="50" rx="30" ry="9" /><circle cx="18" cy="20" r="3" fill="#fff6d8" /><circle cx="60" cy="14" r="3" fill="#fff6d8" /></> },
+  unicorn: { viewBox: "0 0 120 110", body: <><path className="d" d="M6 100 Q60 120 114 100" stroke="#e7b8f2" strokeWidth="6" fill="none" /><ellipse className="m" cx="56" cy="62" rx="34" ry="20" /><rect className="m" x="30" y="70" width="8" height="28" rx="3" /><rect className="m" x="74" y="70" width="8" height="28" rx="3" /><path className="m" d="M80 52 L96 20 L110 26 L100 56 Z" /><path d="M100 20 L108 0 L104 22 Z" fill="#f3d675" /><path d="M84 30 Q70 40 74 56 M90 26 Q76 34 78 50" stroke="#f2899a" strokeWidth="6" fill="none" /><path d="M24 58 Q8 60 10 78" stroke="#9ac7f2" strokeWidth="7" fill="none" /><circle cx="102" cy="32" r="2.5" fill="#222" /></> },
   stairs: { viewBox: "0 0 100 100", body: <>{[0, 1, 2, 3, 4].map(i => <rect key={i} className={i % 2 ? "m" : "l"} x={i * 18} y={80 - i * 18} width={100 - i * 18} height="20" />)}</> },
   fence: { viewBox: "0 0 140 70", body: <><rect className="d" x="0" y="22" width="140" height="8" /><rect className="d" x="0" y="46" width="140" height="8" />{[4, 34, 64, 94, 124].map(x => <path key={x} className="m" d={`M${x} 70 V12 L${x + 6} 2 L${x + 12} 12 V70 Z`} />)}</> },
   flowerbed: { viewBox: "0 0 120 60", body: <><rect className="d" x="0" y="34" width="120" height="26" rx="4" /><rect x="6" y="30" width="108" height="10" rx="4" fill="#6b4a32" />{[14, 34, 54, 74, 94, 108].map((x, i) => <g key={x}><rect x={x - 1} y="14" width="2" height="18" fill="#4f7a3e" /><circle cx={x} cy="12" r="7" className={i % 2 ? "m" : "l"} /></g>)}</> },

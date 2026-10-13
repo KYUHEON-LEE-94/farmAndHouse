@@ -183,6 +183,44 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
   hamster: (g, c) => critter(g, c, { len: 0.18, w: 0.18, h: 0.15, leg: 0.02, head: 0.1, ears: "round", tail: 0.03, belly: "#fff6e8", nose: "#f2899a" }),
   turtle: (g, c) => { const shell = part(g, new THREE.SphereGeometry(0.17, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), c.main, 0, 0.05, 0, [1, 0.75, 1.2]); shell.castShadow = true; part(g, new THREE.CylinderGeometry(0.175, 0.175, 0.03, 20), c.dark, 0, 0.05, 0, [1, 1, 1.2]); for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; part(g, new THREE.CylinderGeometry(0.035, 0.035, 0.01, 6), c.light, Math.cos(a) * 0.08, 0.15, Math.sin(a) * 0.09, [1, 1, 1], false).rotation.z = Math.cos(a) * 0.5; } part(g, sphere(0.06), "#a7cf86", 0, 0.08, 0.24); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(g, sphere(0.04), "#a7cf86", sx * 0.13, 0.03, sz * 0.14, [1, 0.6, 1.1])); face(g, 0, 0.1, 0.285, 0.012, 0.025, false); },
   sparrow: (g, c) => { part(g, sphere(0.09), c.main, 0, 0.1, 0, [0.95, 0.85, 1.2]); part(g, sphere(0.065), c.main, 0, 0.19, 0.07); part(g, sphere(0.06), "#f3e6cf", 0, 0.08, 0.04, [0.8, 0.6, 1], false); part(g, new THREE.ConeGeometry(0.018, 0.04, 8), "#e2b85a", 0, 0.18, 0.14, [1, 1, 1], false).rotation.x = Math.PI / 2; const tail = part(g, new THREE.BoxGeometry(0.07, 0.015, 0.09), c.dark, 0, 0.13, -0.12); tail.rotation.x = 0.4; [-1, 1].forEach(s => part(g, sphere(0.05), c.dark, s * 0.08, 0.11, -0.01, [0.4, 0.7, 1.3])); face(g, 0, 0.205, 0.125, 0.014, 0.032); },
+  dragon: (g, c) => {
+    const pts = Array.from({ length: 9 }, (_, i) => [Math.sin(i * 0.9) * 0.16, 0.42 + Math.sin(i * 0.7) * 0.08, 0.5 - i * 0.13] as const);
+    pts.forEach(([x, y, z], i) => { part(g, sphere(0.13 - i * 0.008), c.main, x, y, z); if (i % 2 === 0 && i > 0) part(g, new THREE.ConeGeometry(0.035, 0.09, 6), "#e8c35a", x, y + 0.13, z, [1, 1, 1], false); });
+    [[0.1, 0.3, 0.38], [-0.1, 0.3, 0.38], [0.08, 0.32, -0.25], [-0.08, 0.32, -0.25]].forEach(([x, y, z]) => part(g, capsule(0.03, 0.22), c.dark, x, y - 0.12, z));
+    part(g, sphere(0.17), c.main, 0, 0.55, 0.68); part(g, sphere(0.1), c.light, 0, 0.5, 0.8, [1.2, 0.8, 1.1], false);
+    [-1, 1].forEach(s => { part(g, new THREE.ConeGeometry(0.03, 0.18, 8), "#e8c35a", s * 0.08, 0.74, 0.62, [1, 1, 1], false).rotation.set(-0.5, 0, -s * 0.3); part(g, capsule(0.008, 0.22), "#e8c35a", s * 0.1, 0.48, 0.86, [1, 1, 1], false).rotation.set(0.4, 0, s * 1.2); });
+    face(g, 0, 0.6, 0.8, 0.028, 0.07, false);
+  },
+  phoenix: (g, c) => {
+    part(g, sphere(0.16), c.main, 0, 0.28, 0, [0.9, 0.85, 1.2]); part(g, sphere(0.11), c.main, 0, 0.48, 0.12);
+    part(g, new THREE.ConeGeometry(0.03, 0.08, 8), "#e2b85a", 0, 0.46, 0.25, [1, 1, 1], false).rotation.x = Math.PI / 2;
+    part(g, new THREE.ConeGeometry(0.03, 0.14, 6), "#f6d16a", 0, 0.62, 0.1, [1, 1, 1], false).rotation.x = -0.4;
+    [-1, 1].forEach(s => { const wing = part(g, sphere(0.15), "#f08a3a", s * 0.17, 0.33, -0.02, [0.3, 0.7, 1.3]); wing.rotation.z = s * 0.6; });
+    [-0.3, 0, 0.3].forEach((a, i) => { const flame = solid(g, new THREE.ConeGeometry(0.06, 0.45, 8), i === 1 ? "#f6d16a" : "#f08a3a", Math.sin(a) * 0.15, 0.3, -0.3, { emissive: "#ff8a2a", emissiveIntensity: 0.8 }); flame.rotation.x = -1.9; flame.rotation.z = a; });
+    face(g, 0, 0.52, 0.21, 0.02, 0.05);
+  },
+  whitetiger: (g, c) => critter(g, c, { len: 1.15, w: 0.52, h: 0.46, leg: 0.32, head: 0.36, ears: "round", tail: 0.6, stripes: true, belly: "#ffffff", snout: true, nose: "#f2899a" }),
+  blacktortoise: (g, c) => {
+    part(g, new THREE.SphereGeometry(0.3, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), c.main, 0, 0.08, 0, [1, 0.7, 1.25]);
+    part(g, new THREE.CylinderGeometry(0.31, 0.31, 0.05, 24), c.dark, 0, 0.08, 0, [1, 1, 1.25]);
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; const tile = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.01, 6), new THREE.MeshBasicMaterial({ color: "#8fd3c4" })); tile.position.set(Math.cos(a) * 0.14, 0.27 - Math.abs(Math.cos(a)) * 0.04, Math.sin(a) * 0.17); tile.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); g.add(tile); }
+    part(g, sphere(0.1), "#4f6b5c", 0, 0.14, 0.42); face(g, 0, 0.17, 0.5, 0.018, 0.04, false);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(g, sphere(0.07), "#4f6b5c", sx * 0.24, 0.05, sz * 0.26, [1, 0.6, 1.1]));
+    [0, 1, 2, 3].forEach(i => part(g, sphere(0.05 - i * 0.008), "#5f9e4f", Math.sin(i) * 0.08, 0.1 + i * 0.05, -0.4 - i * 0.07));
+  },
+  gumiho: (g, c) => {
+    critter(g, c, { len: 0.46, w: 0.24, h: 0.24, leg: 0.15, head: 0.17, ears: "point", tail: 0.05, belly: "#ffffff", nose: "#2a1d14", snout: true });
+    for (let i = 0; i < 9; i++) { const a = (i - 4) * 0.22; const tail = part(g, capsule(0.045, 0.3), c.main, Math.sin(a) * 0.12, 0.42, -0.3 - Math.cos(a) * 0.05); tail.rotation.set(-0.7, 0, a); part(g, sphere(0.045), "#ffffff", Math.sin(a) * 0.24, 0.58, -0.42, [1, 1, 1], false); }
+  },
+  teddy: (g, c) => { part(g, sphere(0.2), c.main, 0, 0.2, 0, [1, 0.95, 0.9]); part(g, sphere(0.15), c.main, 0, 0.45, 0.02); part(g, sphere(0.06), "#f3e3c4", 0, 0.42, 0.15, [1.2, 0.9, 0.8], false); [-1, 1].forEach(s => { part(g, sphere(0.06), c.main, s * 0.12, 0.57, 0); part(g, sphere(0.07), c.main, s * 0.19, 0.24, 0.06, [0.8, 1.2, 0.8]); part(g, sphere(0.07), c.main, s * 0.11, 0.06, 0.12, [1, 0.8, 1.2]); }); face(g, 0, 0.48, 0.15, 0.022, 0.05); part(g, new THREE.TorusGeometry(0.05, 0.02, 6, 12), "#c4302b", 0, 0.33, 0.14, [1.4, 0.8, 1], false); },
+  cactus: (g, c) => { cyl(g, 0.17, 0.13, 0.25, "#c9784f"); part(g, capsule(0.1, 0.45), c.main, 0, 0.55, 0); [-1, 1].forEach(s => { part(g, capsule(0.055, 0.14), c.main, s * 0.15, 0.62 + s * 0.06, 0); part(g, capsule(0.05, 0.06), c.main, s * 0.1, 0.52 + s * 0.06, 0, [1, 1, 1], false).rotation.z = Math.PI / 2; }); part(g, sphere(0.05), "#f2899a", 0, 0.87, 0, [1, 0.6, 1]); },
+  pumpkinlamp: (g, c) => { [0, 1, 2, 3, 4, 5].forEach(i => { const a = (i / 6) * Math.PI * 2; part(g, sphere(0.16), c.main, Math.cos(a) * 0.08, 0.2, Math.sin(a) * 0.08, [0.75, 1, 0.75]); }); cyl(g, 0.03, 0.03, 0.08, "#5f7a3a", 0, 0.36); const glow = solid(g, new THREE.SphereGeometry(0.12, 12, 10), "#ffd25a", 0, 0.2, 0.17, { emissive: "#ffb02a", emissiveIntensity: 1.2 }); glow.scale.set(1, 0.6, 0.3); glow.castShadow = false; const light = new THREE.PointLight("#ffb05a", 0, 5, 1.6); light.position.set(0, 0.25, 0.25); light.userData.nightLight = true; g.add(light); },
+  arcade: (g, c) => { box(g, 0.7, 1.7, 0.7, c.main); box(g, 0.74, 0.12, 0.74, c.dark, 0, 1.6); const screen = box(g, 0.55, 0.45, 0.02, "#1d1d2e", 0, 1.05, 0.34, { emissive: "#5fe08a", emissiveIntensity: 0.35 }); screen.castShadow = false; const panel = box(g, 0.66, 0.08, 0.3, c.dark, 0, 0.82, 0.42); panel.rotation.x = 0.3; [["#e0533a", -0.15], ["#f6d16a", 0.08], ["#5fb0dc", 0.18]].forEach(([color, x]) => ball(g, 0.035, color as string, x as number, 0.9, 0.46)); },
+  moai: (g, c) => { box(g, 0.5, 1.45, 0.45, c.main); box(g, 0.56, 0.12, 0.5, c.dark, 0, 1.0); box(g, 0.12, 0.42, 0.14, c.dark, 0, 0.55, 0.26); box(g, 0.28, 0.06, 0.06, c.dark, 0, 0.32, 0.23); [-1, 1].forEach(s => box(g, 0.08, 0.4, 0.2, c.dark, s * 0.28, 0.7, 0)); },
+  discoball: (g, c) => { box(g, 0.32, 0.06, 0.32, "#4a3b2e"); cyl(g, 0.025, 0.025, 1.4, "#5b4a3a", 0, 0.06); const ball2 = solid(g, new THREE.IcosahedronGeometry(0.28, 2), c.main, 0, 1.68, 0, { metalness: 0.95, roughness: 0.08, flatShading: true }); ball2.castShadow = true; const light = new THREE.PointLight("#c9a8ff", 0, 6, 1.4); light.position.set(0, 1.7, 0); light.userData.nightLight = true; g.add(light); },
+  throne: (g, c) => { box(g, 0.9, 1.7, 0.18, c.main, 0, 0, -0.3); box(g, 0.94, 0.12, 0.2, "#e8c35a", 0, 1.68, -0.3, { metalness: 0.7, roughness: 0.3 }); [-0.28, 0, 0.28].forEach(x => solid(g, new THREE.ConeGeometry(0.06, 0.2, 6), "#e8c35a", x, 1.88, -0.3, { metalness: 0.7, roughness: 0.3 })); box(g, 0.9, 0.5, 0.7, c.main, 0, 0, 0.05); box(g, 0.84, 0.1, 0.62, c.light, 0, 0.5, 0.07); [-1, 1].forEach(s => box(g, 0.1, 0.8, 0.72, "#e8c35a", s * 0.46, 0, 0.05, { metalness: 0.7, roughness: 0.3 })); },
+  goldtoilet: (g, c) => { const gold = { metalness: 0.85, roughness: 0.22 }; box(g, 0.42, 0.45, 0.16, c.main, 0, 0.42, -0.26, gold); cyl(g, 0.16, 0.12, 0.38, c.main, 0, 0, 0.05, gold); solid(g, new THREE.TorusGeometry(0.17, 0.035, 10, 24), c.main, 0, 0.4, 0.05, gold).rotation.x = Math.PI / 2; box(g, 0.08, 0.03, 0.03, "#fff6d8", 0.12, 0.8, -0.18, gold); },
+  unicorn: (g, c) => { [-1, 1].forEach(s => { const rocker = solid(g, new THREE.TorusGeometry(0.75, 0.03, 6, 24, 1.1), "#e7b8f2", s * 0.2, 0.8, 0); rocker.rotation.set(0, Math.PI / 2, Math.PI + 1.02); }); part(g, capsule(0.17, 0.4), c.main, 0, 0.55, 0).rotation.x = Math.PI / 2; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(g, capsule(0.05, 0.3), c.main, sx * 0.1, 0.3, sz * 0.2)); part(g, capsule(0.09, 0.2), c.main, 0, 0.8, 0.32).rotation.x = 0.5; part(g, sphere(0.13), c.main, 0, 0.95, 0.42, [0.9, 1, 1.2]); part(g, new THREE.ConeGeometry(0.03, 0.2, 10), "#f3d675", 0, 1.14, 0.48, [1, 1, 1], false).rotation.x = 0.4; ["#f2899a", "#9ac7f2", "#e7b8f2", "#f6d16a"].forEach((color, i) => part(g, sphere(0.06), color, 0, 0.98 - i * 0.07, 0.3 - i * 0.05, [0.6, 1, 1], false)); part(g, capsule(0.05, 0.25), "#9ac7f2", 0, 0.62, -0.4).rotation.x = -0.6; face(g, 0, 1.0, 0.56, 0.02, 0.06); },
   stairs: (g, c) => { for (let i = 0; i < 10; i++) { box(g, 1, (i + 1) * 0.28, 0.26, i % 2 ? c.main : c.light, 0, 0, 1.17 - i * 0.26); } [-1, 1].forEach(s => { const rail = box(g, 0.04, 0.04, 2.9, c.dark, s * 0.48, 1.85, 0); rail.rotation.x = Math.atan2(2.8, 2.6); }); },
   fence: (g, c) => { [-0.95, -0.475, 0, 0.475, 0.95].forEach(x => { box(g, 0.1, 0.85, 0.08, c.main, x); const tip = solid(g, new THREE.ConeGeometry(0.07, 0.12, 4), c.main, x, 0.91, 0); tip.rotation.y = Math.PI / 4; }); [0.28, 0.62].forEach(y => box(g, 2, 0.07, 0.05, c.dark, 0, y, 0.05)); },
   flowerbed: (g, c) => { box(g, 1.6, 0.25, 0.8, c.dark.clone().lerp(new THREE.Color("#8a6a4a"), 0.7)); box(g, 1.5, 0.04, 0.7, "#5f4330", 0, 0.24); for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { const x = -0.6 + i * 0.24, z = -0.22 + j * 0.22; box(g, 0.02, 0.2, 0.02, "#4f7a3e", x, 0.28, z); ball(g, 0.06, [c.main, c.light, "#f6d16a"][(i + j) % 3], x, 0.5, z); } },
@@ -206,6 +244,15 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
 function buildItem(item: PlacedItem) {
   const group = new THREE.Group();
   MODELS[item.id]?.(group, shade(item.tint ?? item.color));
+  // 전설 펫·전설 가구: 금빛 오라 고리와 은은한 빛
+  if (item.legend || item.tier === "legend") {
+    const radius = Math.max(item.size[0], item.size[2]) * 0.6 + 0.1;
+    const aura = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.025, 8, 40), new THREE.MeshBasicMaterial({ color: "#ffd84a", transparent: true, opacity: 0.85 }));
+    aura.rotation.x = Math.PI / 2; aura.position.y = 0.03; group.add(aura);
+    const halo = new THREE.Mesh(new THREE.CircleGeometry(radius, 32), new THREE.MeshBasicMaterial({ color: "#ffe9a0", transparent: true, opacity: 0.25, depthWrite: false }));
+    halo.rotation.x = -Math.PI / 2; halo.position.y = 0.02; group.add(halo);
+    const glow = new THREE.PointLight("#ffd27a", 1.5, 3, 1.5); glow.position.y = item.size[1] + 0.2; group.add(glow);
+  }
   group.userData.instanceId = item.instanceId;
   return group;
 }
@@ -465,7 +512,7 @@ export default function House3D(props: Props) {
           if (st.wait <= 0) { const a = Math.random() * Math.PI * 2, r = 0.6 + Math.random() * 1.4, x = node.position.x + Math.cos(a) * r, z = node.position.z + Math.sin(a) * r; if (fits(x, z)) { st.tx = x; st.tz = z; } st.wait = 1.5 + Math.random() * 3; }
           return;
         }
-        const speed = pet.id === "tiger" ? 0.55 : pet.id === "snail" || pet.id === "turtle" ? 0.06 : pet.id === "mole" || pet.id === "duck" || pet.id === "hamster" ? 0.25 : 0.4, step = Math.min(dist, speed * dt);
+        const speed = pet.id === "tiger" || pet.id === "whitetiger" || pet.id === "dragon" ? 0.55 : pet.id === "snail" || pet.id === "turtle" ? 0.06 : pet.id === "mole" || pet.id === "duck" || pet.id === "hamster" ? 0.25 : 0.4, step = Math.min(dist, speed * dt);
         node.position.x += (dx / dist) * step; node.position.z += (dz / dist) * step;
         node.rotation.y = Math.atan2(dx, dz); node.position.y = base + Math.abs(Math.sin(time / 120)) * 0.03;
       });

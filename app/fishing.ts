@@ -81,3 +81,16 @@ export function rollFish(season: Season, boost: { normal?: number; rare?: number
   for (const item of weights) { roll -= item.weight; if (roll <= 0) return item.fish; }
   return weights[0].fish;
 }
+
+/**
+ * 낚시 장소. 유료 장소는 입장권(minutes분)을 사야 하고, 시간이 지나면 다시 사야 한다.
+ * normalBoost/rareBoost는 미끼·버프와 곱해진다. 전설 0.1%는 장소와 무관하게 고정.
+ */
+export type FishingSpot = { id: string; name: string; icon: string; price: number; minutes: number; normalBoost: number; rareBoost: number; treasureBonus: number; note: string };
+export const SPOTS: FishingSpot[] = [
+  { id: "river", name: "강가", icon: "🏞️", price: 0, minutes: 0, normalBoost: 1, rareBoost: 1, treasureBonus: 0, note: "무료 · 기본 낚시터" },
+  { id: "lake", name: "호숫가", icon: "⛰️", price: 0, minutes: 0, normalBoost: 1.3, rareBoost: 1, treasureBonus: 0, note: "무료 · 보통 등급 ×1.3" },
+  { id: "sea", name: "바다 방파제", icon: "🌊", price: 1500, minutes: 10, normalBoost: 1.2, rareBoost: 1.8, treasureBonus: 0.03, note: "희귀 ×1.8 · 보통 ×1.2" },
+  { id: "valley", name: "깊은 계곡", icon: "🏔️", price: 3000, minutes: 10, normalBoost: 1.5, rareBoost: 2.5, treasureBonus: 0.05, note: "희귀 ×2.5 · 보통 ×1.5" },
+  { id: "reservoir", name: "비밀 저수지", icon: "🌌", price: 8000, minutes: 10, normalBoost: 2, rareBoost: 4, treasureBonus: 0.1, note: "희귀 ×4 · 보통 ×2 · 보물상자 +10%" },
+];
