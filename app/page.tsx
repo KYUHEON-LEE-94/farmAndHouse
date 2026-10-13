@@ -82,6 +82,7 @@ export default function Home() {
   const [endHour, setEndHour] = useState(18);
   const [houseLevel, setHouseLevel] = useState(1);
   const [placed, setPlaced] = useState<PlacedItem[]>([]);
+  const [warehouse, setWarehouse] = useState<PlacedItem[]>([]);
   const [ownedPlots, setOwnedPlots] = useState(8);
   const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
   const [harvestFx, setHarvestFx] = useState<HarvestFx[]>([]);
@@ -100,6 +101,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(data.houseLevel ?? 1); setOwnedPlots(data.ownedPlots ?? 8);
         setPlaced((data.placed ?? []).map((item: PlacedItem) => ({ ...item, x: item.x > 10 ? item.x : 14 + item.x * 14, y: item.y > 10 ? item.y : 20 + item.y * 28, rotation: item.rotation ?? 0 })));
+        setWarehouse((data.warehouse ?? []).map((item: PlacedItem) => ({ ...item, rotation: item.rotation ?? 0 })));
         setMusicId(data.musicId ?? "");
       } catch { /* start fresh */ }
     }
@@ -110,8 +112,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 2, money, plots, startHour, endHour, houseLevel, ownedPlots, placed, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, ownedPlots, placed, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 3, money, plots, startHour, endHour, houseLevel, ownedPlots, placed, warehouse, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, ownedPlots, placed, warehouse, musicId, loaded]);
 
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
   const isWorkTime = currentHour >= startHour && currentHour < endHour;
@@ -204,6 +206,28 @@ export default function Home() {
     setNotice(`${item.icon} ${item.name}을(를) 정리하고 ${refund.toLocaleString()}원을 돌려받았어요.`);
   }
 
+  function storeFurniture() {
+    if (!selectedFurniture) return;
+    const item = placed.find(furniture => furniture.instanceId === selectedFurniture);
+    if (!item) return;
+    setPlaced(items => items.filter(furniture => furniture.instanceId !== selectedFurniture));
+    setWarehouse(items => [...items, item]); setSelectedFurniture(null);
+    setNotice(`📦 ${item.name}을(를) 창고에 안전하게 보관했어요.`);
+  }
+
+  function restoreFurniture(item: PlacedItem) {
+    setWarehouse(items => items.filter(furniture => furniture.instanceId !== item.instanceId));
+    setPlaced(items => [...items, { ...item, x: 50, y: 54 }]); setSelectedFurniture(item.instanceId);
+    setNotice(`${item.icon} ${item.name}을(를) 창고에서 꺼냈어요. 원하는 곳으로 옮겨주세요.`);
+  }
+
+  function sellWarehouseFurniture(item: PlacedItem) {
+    const refund = Math.round(item.price * 0.5);
+    setWarehouse(items => items.filter(furniture => furniture.instanceId !== item.instanceId));
+    setMoney(value => value + refund);
+    setNotice(`${item.icon} ${item.name}을(를) 창고에서 판매하고 ${refund.toLocaleString()}원을 받았어요.`);
+  }
+
   const cropCards = useMemo(() => available.map(crop => (
     <button key={crop.id} className={`crop-card ${selectedCrop === crop.id ? "selected" : ""}`} onClick={() => setSelectedCrop(crop.id)} aria-pressed={selectedCrop === crop.id}>
       <span className="crop-icon">{crop.icon}</span><span className="crop-name">{crop.name}</span>
@@ -266,10 +290,10 @@ export default function Home() {
             <div className="window">☁️<span>☀️</span></div><div className="rug" />
             {placed.map(item => <button key={item.instanceId} className={`placed-item ${selectedFurniture === item.instanceId ? "selected" : ""}`} style={{ left: `${item.x}%`, top: `${item.y}%`, background: item.color, transform: `translate(-50%, -50%) rotate(${item.rotation}deg)` }} onPointerDown={event => dragFurniture(event, item.instanceId)} onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) dragFurniture(event, item.instanceId); }} aria-label={`${item.name} 이동`}><span>{item.icon}</span></button>)}
           </div>
-          <div className="decor-toolbar"><span>{selectedFurniture ? "선택한 가구 편집" : "가구를 선택해 보세요"}</span><button onClick={() => rotateFurniture(-45)} disabled={!selectedFurniture}>↶ 왼쪽 회전</button><button onClick={() => rotateFurniture(45)} disabled={!selectedFurniture}>↷ 오른쪽 회전</button><button className="store-button" onClick={sellFurniture} disabled={!selectedFurniture}>판매 (50%)</button></div>
+          <div className="decor-toolbar"><span>{selectedFurniture ? "선택한 가구 편집" : "가구를 선택해 보세요"}</span><button onClick={() => rotateFurniture(-45)} disabled={!selectedFurniture}>↶ 왼쪽 회전</button><button onClick={() => rotateFurniture(45)} disabled={!selectedFurniture}>↷ 오른쪽 회전</button><button onClick={storeFurniture} disabled={!selectedFurniture}>📦 창고 보관</button><button className="sell-button" onClick={sellFurniture} disabled={!selectedFurniture}>판매 (50%)</button></div>
           <p className="room-help">가구를 마우스나 손가락으로 자유롭게 끌어 놓고, 선택 후 45°씩 회전할 수 있어요.</p>
         </section>
-        <aside className="shop-panel panel"><div className="panel-heading"><div><span className="eyebrow">COUNTRY SHOP</span><h3>시골 가구점</h3></div></div><div className="furniture-list">{FURNITURE.map(item => <button key={item.id} onClick={() => buyFurniture(item)}><span className="furniture-icon">{item.icon}</span><span><b>{item.name}</b><small>{item.price.toLocaleString()}원</small></span><i>＋</i></button>)}</div></aside>
+        <aside className="shop-panel panel"><div className="panel-heading"><div><span className="eyebrow">COUNTRY SHOP</span><h3>시골 가구점</h3></div></div><div className="furniture-list">{FURNITURE.map(item => <button key={item.id} onClick={() => buyFurniture(item)}><span className="furniture-icon">{item.icon}</span><span><b>{item.name}</b><small>{item.price.toLocaleString()}원</small></span><i>＋</i></button>)}</div><section className="warehouse"><div className="warehouse-heading"><span>📦 MY STORAGE</span><b>가구 창고 <em>{warehouse.length}</em></b></div>{warehouse.length === 0 ? <p>보관한 가구가 없어요.</p> : <div className="warehouse-list">{warehouse.map(item => <div key={item.instanceId}><span>{item.icon}</span><b>{item.name}</b><button onClick={() => restoreFurniture(item)}>꺼내기</button><button className="sell-mini" onClick={() => sellWarehouseFurniture(item)}>{Math.round(item.price * 0.5).toLocaleString()}원에 판매</button></div>)}</div>}</section></aside>
       </div>}
 
       <section className="bottom-dock">
