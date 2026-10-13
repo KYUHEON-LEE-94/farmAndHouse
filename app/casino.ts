@@ -47,15 +47,87 @@ export function slotReturnRate() {
 }
 
 // ---------- 너구리 딜러 대사 ----------
-export const DEALER_IDLE = ["어서 와~ 오늘 월급 좀 털어볼까? 🦝", "팀장님 몰래 한 판? 쉿~", "오늘은 왠지 될 것 같은 날이지?"];
-export const LOSE_TAUNTS = ["어이쿠~ 그걸 놓치네? ㅋㅋ", "고마워~ 이 돈으로 도토리 사 먹을게 🌰", "어허, 오늘 운이 영 아니네~", "에이~ 한 판만 더 하면 될 것 같은데?", "방금 거 진짜 아까웠다~ (아님)", "월급 루팡이 도박 루팡 당했네 ㅋㅋㅋ"];
-export const STREAK_TAUNTS = ["벌써 {n}연패? 내 지갑이 두둑해지네~ 🤑", "{n}판 연속 꽝! 이 정도면 재능 아니야? ㅋㅋ", "{n}연패라니… 오늘 퇴근 전에 본전은 찾을 수 있을까~?", "나 오늘 너 덕분에 칼퇴한다~ {n}연패 축하해!"];
-export const PARITY_TAUNTS = ["{result}이었는데 {pick}을 고르다니~ 쯧쯧", "{pick}? 나라면 {result} 골랐지~ ㅋㅋ"];
-export const NEAR_MISS_TAUNTS = ["아깝다아아!!! 하나만 더 맞았으면 ×{x}였는데~ ㅋㅋ", "{icon}{icon}까지 나왔는데!! 아이고 배야 ㅋㅋㅋ", "거의 다 왔었는데~ 다음엔 진짜 터질 것 같지 않아?"];
-export const WIN_GRUMBLES = ["쳇… 운이 좋았네. 한 판 더 해!", "어라? 이번엔 봐준 거야~", "흥, 다음 판은 내가 이긴다!"];
-export const JACKPOT_GRUMBLES = ["으아악!! 잭팟이라니!! 내 도토리…! 😭", "말도 안 돼!! 기계 고장 난 거 아니야?!"];
+export const DEALER_IDLE = ["어서 와~ 오늘 월급 좀 털어볼까? 🦝", "팀장님 몰래 한 판? 쉿~ ㅋㅋ", "오늘은 왠지 될 것 같은 날이지? (안 됨) ㅋㅋㅋ", "어이~ 호구… 아니 손님! 어서 오세요~ 😏"];
+export const LOSE_TAUNTS = [
+  "ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ~ 그걸 놓치네?",
+  "푸하하하핫ㅋㅋㅋㅋ 고마워~ 이 돈으로 도토리 사 먹을게 🌰",
+  "ㅋㅋㅋㅋㅋ 아 진짜 배 아파 ㅋㅋㅋㅋㅋ",
+  "에이~ 한 판만 더 하면 될 것 같은데? ㅋㅋㅋㅋ (아님)",
+  "어머어머 ㅋㅋㅋㅋ 방금 거 봤어? 나만 봤어? ㅋㅋㅋㅋㅋ",
+  "월급 루팡이 도박 루팡 당했네 ㅋㅋㅋㅋㅋㅋㅋ",
+  "잘 가라 내 돈… 아니 네 돈 ㅋㅋㅋㅋㅋㅋ 👋",
+  "와 진짜 예술이다 ㅋㅋㅋㅋ 일부러 틀리기도 힘든데 ㅋㅋㅋ",
+  "ㅋㅋㅋㅋ 표정 관리 좀 해~ 다 보여 ㅋㅋㅋㅋ",
+  "끄억~ 잘 먹었습니다 ㅋㅋㅋㅋㅋㅋ 🍽️",
+];
+export const STREAK_TAUNTS = [
+  "{n}연패 ㅋㅋㅋㅋㅋㅋㅋㅋ 이 정도면 재능 아니야? ㅋㅋㅋㅋ",
+  "벌써 {n}연패? ㅋㅋㅋㅋ 내 지갑 터지겠다 🤑🤑",
+  "{n}판 연속 꽝 ㅋㅋㅋㅋㅋㅋ 기록 세우는 중이야? 🏆",
+  "{n}연패라니 ㅋㅋㅋㅋ 오늘 퇴근 전에 본전 찾을 수 있을까~? 못 찾지 ㅋㅋㅋ",
+  "나 오늘 너 덕분에 칼퇴한다~ {n}연패 축하해 ㅋㅋㅋㅋㅋ 🎉",
+  "{n}연패 기념으로 사진 한 장 찍자 ㅋㅋㅋㅋ 찰칵📸",
+  "ㅋㅋㅋㅋㅋㅋ {n}연패면 그냥 나한테 월급 이체하는 게 빠르지 않아? ㅋㅋㅋ",
+];
+export const PARITY_TAUNTS = ["{result}이었는데 {pick}을 고르다니 ㅋㅋㅋㅋ 쯧쯧쯧", "{pick}? ㅋㅋㅋㅋㅋ 나라면 눈 감고도 {result} 골랐다 ㅋㅋㅋ", "반반 확률인데 그걸 틀려? ㅋㅋㅋㅋㅋㅋㅋ 대단하다 진짜"];
+export const NEAR_MISS_TAUNTS = [
+  "아깝다아아아ㅋㅋㅋㅋㅋ 하나만 더 맞았으면 ×{x}였는데~ ㅋㅋㅋㅋㅋ",
+  "{icon}{icon}까지 나왔는데!! 푸하하핫 ㅋㅋㅋㅋ 아이고 배야 ㅋㅋㅋㅋ",
+  "거의 다 왔었는데~ ㅋㅋㅋㅋ 다음엔 진짜 터질 것 같지 않아? (안 터짐) ㅋㅋㅋ",
+  "×{x} 놓친 표정 너무 웃기다 ㅋㅋㅋㅋㅋㅋㅋㅋ 한 번만 더 보여줘 ㅋㅋㅋ",
+];
+export const WIN_GRUMBLES = ["쳇… 운이 좋았네. 한 판 더 해! 😤", "어라? 이번엔 봐준 거야~ 진짜야!", "흥, 초심자의 행운이지 뭐. 다음 판은 내 거야", "…지금 웃었지? 다음 판에 두고 봐 😠"];
+export const JACKPOT_GRUMBLES = ["으아아악!! 잭팟이라니!! 내 도토리…! 😭😭", "말도 안 돼!! 기계 고장 난 거 아니야?! 사장님!! 😱"];
+
+/** 연패가 길수록 웃음이 길어진다. */
+export function laughter(streak: number) {
+  return "ㅋ".repeat(Math.min(40, 3 + Math.max(0, streak) * 4)) + "~";
+}
 
 export function dealerLine(lines: string[], vars: Record<string, string | number> = {}) {
   const line = lines[Math.floor(Math.random() * lines.length)];
   return line.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ""));
 }
+
+// ---------- 블랙잭 ----------
+/** 카드 덱은 무한 덱(매번 무작위)으로 단순화. 딜러는 17 이상에서 멈춘다(소프트 17 포함). 블랙잭은 3:2. */
+export type Card = { rank: number; suit: "♠" | "♥" | "♦" | "♣" };
+export const BLACKJACK_PAYOUT = 2.5;
+const SUITS: Card["suit"][] = ["♠", "♥", "♦", "♣"];
+
+export function drawCard(random = Math.random): Card {
+  return { rank: 1 + Math.floor(random() * 13), suit: SUITS[Math.floor(random() * 4)] };
+}
+
+export const cardLabel = (card: Card) => ({ 1: "A", 11: "J", 12: "Q", 13: "K" } as Record<number, string>)[card.rank] ?? String(card.rank);
+
+/** 손패 점수. A는 1 또는 11 중 버스트하지 않는 쪽. */
+export function handValue(cards: Card[]) {
+  let total = 0, aces = 0;
+  for (const card of cards) { total += Math.min(10, card.rank); if (card.rank === 1) aces++; }
+  const soft = aces > 0 && total + 10 <= 21;
+  return { total: soft ? total + 10 : total, soft };
+}
+
+export const isBlackjack = (cards: Card[]) => cards.length === 2 && handValue(cards).total === 21;
+export const dealerShouldHit = (cards: Card[]) => handValue(cards).total < 17;
+
+export type BlackjackOutcome = "blackjack" | "win" | "push" | "lose" | "bust";
+
+/** 판정과 돌려받는 금액(판돈 포함). */
+export function settleBlackjack(player: Card[], dealer: Card[], bet: number): { outcome: BlackjackOutcome; payout: number } {
+  const p = handValue(player).total, d = handValue(dealer).total;
+  if (p > 21) return { outcome: "bust", payout: 0 };
+  if (isBlackjack(player) && !isBlackjack(dealer)) return { outcome: "blackjack", payout: Math.floor(bet * BLACKJACK_PAYOUT) };
+  if (isBlackjack(dealer) && !isBlackjack(player)) return { outcome: "lose", payout: 0 };
+  if (d > 21 || p > d) return { outcome: "win", payout: bet * 2 };
+  if (p === d) return { outcome: "push", payout: bet };
+  return { outcome: "lose", payout: 0 };
+}
+
+export const BLACKJACK_TAUNTS = {
+  bust: ["버스트 ㅋㅋㅋㅋㅋㅋㅋㅋ 21 넘는 거 처음 봐? ㅋㅋㅋㅋ", "욕심이 화를 부른다~ ㅋㅋㅋㅋㅋ {n}점 축하해 ㅋㅋㅋ", "한 장만 더… 한 장만 더… 하다가 터졌네 ㅋㅋㅋㅋㅋㅋ 💥"],
+  lose: ["딜러 승 ㅋㅋㅋㅋㅋㅋ 내 카드 봤어? 봤지? ㅋㅋㅋㅋ", "{n}점으로 나를 이기려고? ㅋㅋㅋㅋㅋㅋㅋ 귀엽다", "스탠드 타이밍 완벽했어~ 나한테 지기에 딱 좋은 ㅋㅋㅋㅋ"],
+  dealerBlackjack: ["블랙잭~!! ㅋㅋㅋㅋㅋㅋㅋㅋ 미안 미안 (안 미안) ㅋㅋㅋ"],
+  push: ["무승부? 쳇… 다음 판은 꼭 털어 간다 ㅋㅋ"],
+};
