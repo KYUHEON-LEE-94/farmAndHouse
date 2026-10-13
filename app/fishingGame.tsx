@@ -33,9 +33,11 @@ export default function FishingGame({ fish, rod, barBonus, onFinish }: { fish: F
   const barRef = useRef<HTMLDivElement>(null), fishRef = useRef<HTMLSpanElement>(null), progressRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null), chestRef = useRef<HTMLSpanElement>(null), chestFillRef = useRef<HTMLElement>(null);
   const finishRef = useRef(onFinish);
+  const setupRef = useRef({ rod, barBonus });
   useEffect(() => { finishRef.current = onFinish; });
 
   useEffect(() => {
+    const { rod, barBonus } = setupRef.current;
     const difficulty = fishDifficulty(fish), behavior = fishBehavior(fish), barSize = Math.min(0.6, rod.bar + barBonus);
     // 물고기는 초록 막대 안에서 출발해 첫 반응 시간을 준다.
     let holding = false, barY = 0, barV = 0, fishY = Math.max(0, barSize / 2 - FISH_SIZE / 2), target = 0.45, progress = 0.35, perfect = true, done = false;
@@ -104,7 +106,7 @@ export default function FishingGame({ fish, rod, barBonus, onFinish }: { fish: F
       window.removeEventListener("pointerdown", down); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
       window.removeEventListener("keydown", key); window.removeEventListener("keyup", key);
     };
-  }, [fish, rod, barBonus]);
+  }, [fish]);
 
   return (
     <div className="fishing-game" role="application" aria-label="낚시 미니게임: 마우스 버튼이나 스페이스바를 누르고 있으면 초록 막대가 올라가요">

@@ -46,16 +46,18 @@ export type WateringCan = { id: string; name: string; icon: string; price: numbe
 export const CANS: WateringCan[] = [
   { id: "tin", name: "양철 물뿌리개", icon: "🪣", price: 0, capacity: CAN_CAPACITY, w: 1, h: 1, note: "1칸 · 물 5" },
   { id: "copper", name: "구리 물뿌리개", icon: "🟠", price: 1500, capacity: 8, w: 2, h: 1, note: "가로 2칸 · 물 8" },
-  { id: "steel", name: "강철 물뿌리개", icon: "⚙️", price: 4000, capacity: 12, w: 3, h: 1, note: "가로 3칸 · 물 12" },
-  { id: "gold", name: "황금 물뿌리개", icon: "🌟", price: 10000, capacity: 18, w: 3, h: 2, note: "3×2칸 · 물 18" },
+  { id: "steel", name: "강철 물뿌리개", icon: "⚙️", price: 4000, capacity: 12, w: 4, h: 1, note: "가로 4칸 · 물 12" },
+  { id: "gold", name: "황금 물뿌리개", icon: "🌟", price: 10000, capacity: 18, w: 4, h: 2, note: "4×2칸 · 물 18" },
 ];
 
 /** 밭 격자(columns열)에서 index를 기준으로 w×h 범위의 밭 번호들. 가장자리에서는 안쪽으로 밀어 넣는다. */
 export function canArea(index: number, columns: number, total: number, can: WateringCan) {
+  // 좁은 화면(2열)에서는 가로 범위를 열 수에 맞게 줄이고, 줄어든 만큼 세로로 늘려 같은 칸 수를 유지한다.
+  const w = Math.min(can.w, columns), h = Math.min(Math.ceil(total / columns), can.h * Math.ceil(can.w / w));
   const rows = Math.ceil(total / columns), col = index % columns, row = Math.floor(index / columns);
-  const c0 = Math.max(0, Math.min(col, columns - can.w)), r0 = Math.max(0, Math.min(row, rows - can.h));
+  const c0 = Math.max(0, Math.min(col, columns - w)), r0 = Math.max(0, Math.min(row, rows - h));
   const area: number[] = [];
-  for (let r = r0; r < r0 + can.h; r++) for (let c = c0; c < c0 + can.w; c++) { const i = r * columns + c; if (i < total) area.push(i); }
+  for (let r = r0; r < r0 + h; r++) for (let c = c0; c < c0 + w; c++) { const i = r * columns + c; if (i < total) area.push(i); }
   return area;
 }
 export const BUG_SECONDS = 8;

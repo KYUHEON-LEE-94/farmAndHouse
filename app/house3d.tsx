@@ -300,7 +300,19 @@ function disposeTree(object: THREE.Object3D) {
 
 const storyY = (item: PlacedItem) => (item.yard ? 0 : (item.story ?? 0) * STORY_HEIGHT);
 
-function placeItem(group: THREE.Group, item: PlacedItem, room: Room) {
+type Hosts = Map<string, PlacedItem>;
+const hostMap = (items: PlacedItem[]): Hosts => new Map(items.filter(item => item.id === "partition" || item.id === "arch").map(item => [item.instanceId, item]));
+
+function placeItem(group: THREE.Group, item: PlacedItem, room: Room, hosts?: Hosts) {
+  const host = item.host ? hosts?.get(item.host) : undefined;
+  if (item.kind === "wall" && host) {
+    // 가벽 한쪽 면(side)에 붙는다. 가벽의 회전·위치를 그대로 따라간다.
+    const theta = THREE.MathUtils.degToRad(host.rot), side = item.side ?? 1;
+    const lx = ((item.u ?? 0.5) - 0.5) * host.size[0], lz = side * (host.size[2] / 2 + item.size[2] / 2 + 0.01);
+    group.position.set(host.x + Math.cos(theta) * lx + Math.sin(theta) * lz, storyY(host) + (item.h ?? item.mount ?? 1.4), host.z - Math.sin(theta) * lx + Math.cos(theta) * lz);
+    group.rotation.set(0, theta + (side < 0 ? Math.PI : 0), 0);
+    return;
+  }
   if (item.kind !== "wall") { group.position.set(item.x, storyY(item), item.z); group.rotation.set(0, THREE.MathUtils.degToRad(item.rot), 0); return; }
   const wall = wallInfo(room.points, item.wall ?? 0), u = item.u ?? 0.5;
   group.position.set(wall.start[0] + wall.dir[0] * wall.length * u + wall.normal[0] * (item.size[2] / 2 + 0.01), storyY(item) + (item.h ?? item.mount ?? 1.4), wall.start[1] + wall.dir[1] * wall.length * u + wall.normal[1] * (item.size[2] / 2 + 0.01));
@@ -370,13 +382,27 @@ export default function House3D(props: Props) {
       if (!node) return;
       if (drag.wall) {
         const item = items.find(entry => entry.instanceId === drag!.id)!;
+        const hostGroups = items.filter(entry => (entry.id === "partition" || entry.id === "arch") && (entry.story ?? 0) === (item.story ?? 0)).map(entry => ctx.items.get(entry.instanceId)?.group).filter((group): group is THREE.Group => Boolean(group?.visible));
+        const hostHit = raycaster.intersectObjects(hostGroups, true)[0];
         const wallHit = raycaster.intersectObjects(ctx.walls.filter(wall => wall.full && wall.story === (item.story ?? 0)).map(wall => wall.inner))[0];
+        if (hostHit && (!wallHit || hostHit.distance < wallHit.distance)) {
+          let hostNode: THREE.Object3D | null = hostHit.object;
+          while (hostNode && !hostNode.userData.instanceId) hostNode = hostNode.parent;
+          const host = hostNode && items.find(entry => entry.instanceId === hostNode!.userData.instanceId);
+          if (!host || !hostNode) return;
+          const local = hostNode.worldToLocal(hostHit.point.clone()), half = (item.size[0] / 2 + 0.05) / host.size[0];
+          const u = THREE.MathUtils.clamp((local.x + host.size[0] / 2) / host.size[0], half, 1 - half);
+          const h = item.fixedMount ? item.mount! : THREE.MathUtils.clamp(hostHit.point.y - storyY(host), item.size[1] / 2 + 0.1, host.size[1] - item.size[1] / 2 - 0.05);
+          drag.patch = { host: host.instanceId, side: local.z >= 0 ? 1 : -1, u, h, story: host.story ?? 0 };
+          placeItem(node as THREE.Group, { ...item, ...drag.patch }, room, hostMap(items));
+          ctx.selection.update(); ctx.render(); return;
+        }
         if (!wallHit) return;
         const index = wallHit.object.userData.wallIndex as number, wall = wallInfo(room.points, index);
         const along = (wallHit.point.x - wall.start[0]) * wall.dir[0] + (wallHit.point.z - wall.start[1]) * wall.dir[1];
         const half = item.size[0] / 2 + 0.05, u = THREE.MathUtils.clamp(along, half, wall.length - half) / wall.length;
         const h = item.fixedMount ? item.mount! : THREE.MathUtils.clamp(wallHit.point.y - (item.story ?? 0) * STORY_HEIGHT, item.size[1] / 2 + 0.1, WALL_HEIGHT - item.size[1] / 2 - 0.05);
-        drag.patch = { wall: index, u, h }; placeItem(node as THREE.Group, { ...item, ...drag.patch }, room);
+        drag.patch = { wall: index, u, h, host: undefined, side: undefined }; placeItem(node as THREE.Group, { ...item, ...drag.patch }, room);
       } else if (raycaster.ray.intersectPlane(floorPlane, hit)) {
         const x = hit.x + drag.ox, z = hit.z + drag.oz;
         const isPet = items.find(entry => entry.instanceId === drag!.id)?.pet;
@@ -423,18 +449,33 @@ export default function House3D(props: Props) {
 
   // 방 구조·벽지·바닥 다시 짓기
   const { room, wallpaper, floor, palette, night, items, avatar, selectedId, stories, viewStory, yardLevel } = props;
+  const stairsKey = items.filter(item => item.id === "stairs").map(item => `${item.x.toFixed(2)},${item.z.toFixed(2)},${item.rot},${item.story ?? 0}`).join("|");
   useEffect(() => {
     const ctx = sceneRef.current; if (!ctx) return;
     disposeTree(ctx.shell); ctx.shell.clear(); ctx.walls = [];
     const wallTexture = wallpaperTexture(wallpaper), floorMap = floorTexture(floor);
-    const shape = new THREE.Shape(room.points.map(([x, z]) => new THREE.Vector2(x, -z)));
+    // 위층 바닥에는 아래층 계단 자리에 구멍을 뚫는다.
+    const stairsBelow = (story: number) => items.filter(item => item.id === "stairs" && (item.story ?? 0) === story - 1);
+    const footprint = (item: PlacedItem, pad = 0.05) => { const t = THREE.MathUtils.degToRad(item.rot), w = item.size[0] / 2 + pad, d = item.size[2] / 2 + pad;
+      return [[-w, -d], [w, -d], [w, d], [-w, d]].map(([lx, lz]) => [item.x + Math.cos(t) * lx + Math.sin(t) * lz, item.z - Math.sin(t) * lx + Math.cos(t) * lz] as [number, number]); };
     for (let story = 0; story < stories; story++) {
     const base = story * STORY_HEIGHT, level = new THREE.Group(); level.userData.story = story; ctx.shell.add(level);
-    const floorGeometry = new THREE.ShapeGeometry(shape); floorGeometry.rotateX(-Math.PI / 2);
+    const levelShape = new THREE.Shape(room.points.map(([x, z]) => new THREE.Vector2(x, -z)));
+    stairsBelow(story).forEach(item => levelShape.holes.push(new THREE.Path(footprint(item).map(([x, z]) => new THREE.Vector2(x, -z)))));
+    const floorGeometry = new THREE.ShapeGeometry(levelShape); floorGeometry.rotateX(-Math.PI / 2);
     const floorMesh = new THREE.Mesh(floorGeometry, new THREE.MeshStandardMaterial({ map: floorMap, roughness: 0.75, side: THREE.DoubleSide }));
     floorMesh.position.y = base + 0.001; floorMesh.receiveShadow = true; level.add(floorMesh);
     if (story > 0) {
-      const slab = new THREE.ExtrudeGeometry(shape, { depth: STORY_HEIGHT - WALL_HEIGHT, bevelEnabled: false }); slab.rotateX(-Math.PI / 2);
+      const slab = new THREE.ExtrudeGeometry(levelShape, { depth: STORY_HEIGHT - WALL_HEIGHT, bevelEnabled: false }); slab.rotateX(-Math.PI / 2);
+      // 계단 구멍 둘레 난간(계단 올라오는 쪽은 비워 둔다)
+      stairsBelow(story).forEach(item => {
+        const corners = footprint(item, 0.08), railMat = new THREE.MeshToonMaterial({ color: "#8a6a48", gradientMap: TOON_GRADIENT });
+        [[0, 1], [1, 2], [3, 0]].forEach(([a, b]) => {
+          const [ax, az] = corners[a], [bx, bz] = corners[b], length = Math.hypot(bx - ax, bz - az);
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(length, 0.05, 0.05), railMat); rail.position.set((ax + bx) / 2, base + 0.9, (az + bz) / 2); rail.rotation.y = -Math.atan2(bz - az, bx - ax); level.add(rail);
+          [0, 0.5, 1].forEach(t => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.04), railMat); post.position.set(ax + (bx - ax) * t, base + 0.45, az + (bz - az) * t); level.add(post); });
+        });
+      });
       const slabMesh = new THREE.Mesh(slab, new THREE.MeshStandardMaterial({ color: "#d9c8a8", roughness: 0.9 }));
       slabMesh.position.y = WALL_HEIGHT; slabMesh.castShadow = true; slabMesh.receiveShadow = true; level.add(slabMesh);
     }
@@ -495,11 +536,12 @@ export default function House3D(props: Props) {
       cyl(tree, 0.12, 0.16, 1, "#7a5236"); ball(tree, 0.75, palette.leaf, 0, 1.5, 0, [1, 1.15, 1]); ball(tree, 0.5, palette.leaf, 0.3, 2.1, 0.1);
       tree.scale.setScalar(0.8 + (i % 4) * 0.15); ctx.outdoor.add(tree);
     }
-    ctx.items.forEach(({ group }, id) => { const item = items.find(entry => entry.instanceId === id); if (item) placeItem(group, item, room); });
+    const hosts = hostMap(items);
+    ctx.items.forEach(({ group }, id) => { const item = items.find(entry => entry.instanceId === id); if (item) placeItem(group, item, room, hosts); });
     ctx.render();
     applyStoryView(ctx);
     ctx.render();
-  }, [room, wallpaper, floor, palette.grass, palette.leaf, stories, yardLevel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [room, wallpaper, floor, palette.grass, palette.leaf, stories, yardLevel, stairsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 보고 있는 층 전환: 카메라를 층 높이만큼 올리거나 내린다.
   useEffect(() => {
@@ -512,7 +554,7 @@ export default function House3D(props: Props) {
   // 가구 동기화
   useEffect(() => {
     const ctx = sceneRef.current; if (!ctx) return;
-    const alive = new Set(items.map(item => item.instanceId));
+    const alive = new Set(items.map(item => item.instanceId)), hosts = hostMap(items);
     ctx.items.forEach((entry, id) => { if (!alive.has(id)) { ctx.furniture.remove(entry.group); disposeTree(entry.group); ctx.items.delete(id); } });
     items.forEach(item => {
       const key = `${item.id}|${item.tint ?? ""}`;
@@ -522,10 +564,11 @@ export default function House3D(props: Props) {
         entry = { group: buildItem(item), key }; ctx.items.set(item.instanceId, entry); ctx.furniture.add(entry.group);
       }
       const posKey = `${item.x},${item.z},${item.rot},${item.story ?? 0},${item.wall},${item.u},${item.h}`;
-      if (!item.pet || entry.group.userData.posKey !== posKey) placeItem(entry.group, item, room);
+      if (!item.pet || entry.group.userData.posKey !== posKey) placeItem(entry.group, item, room, hosts);
       entry.group.userData.posKey = posKey;
-      entry.group.userData.wall = item.kind === "wall" ? item.wall ?? 0 : undefined;
-      entry.group.userData.story = item.yard ? -1 : item.story ?? 0;
+      entry.group.userData.wall = item.kind === "wall" && !(item.host && hosts.has(item.host)) ? item.wall ?? 0 : undefined;
+      entry.group.userData.stairs = item.id === "stairs";
+      entry.group.userData.story = item.yard || (item.pet && !fitsInRoom(room.points, item.x, item.z, 0)) ? -1 : item.story ?? 0;
     });
     applyStoryView(ctx);
     applyLighting(ctx, night, palette.sky);
@@ -649,7 +692,7 @@ function updateCutaway(ctx: Scene) {
   });
   ctx.furniture.children.forEach(child => {
     const story = child.userData.story ?? 0;
-    const onView = story === -1 || story === ctx.viewStory;
+    const onView = story === -1 || story === ctx.viewStory || (child.userData.stairs && story === ctx.viewStory - 1);
     const perStory = ctx.walls.filter(entry => entry.story === 0).length;
     const wall = child.userData.wall !== undefined ? ctx.walls[story * perStory + child.userData.wall] : undefined;
     child.visible = onView && (wall ? wall.full : true);

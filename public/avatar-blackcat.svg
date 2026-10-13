@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="420" viewBox="0 0 400 420">
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <!-- 말린 꼬리 -->
+    <path d="M150 360 C80 360 55 300 70 255 C82 220 125 215 140 240 C150 258 140 278 122 282" fill="none" stroke="#262626" stroke-width="58" />
+    <path d="M150 360 C80 360 55 300 70 255 C82 220 125 215 140 240 C150 258 140 278 122 282" fill="none" stroke="#4b4f4f" stroke-width="38" />
+    <!-- 몸 -->
+    <path d="M168 215 C140 270 132 360 158 398 Q166 408 182 408 L318 408 Q336 408 340 392 C352 330 340 262 300 215 Z" fill="#4b4f4f" stroke="#262626" stroke-width="12" />
+    <!-- 뒷다리 -->
+    <path d="M168 330 C200 318 228 350 222 404" fill="none" stroke="#262626" stroke-width="9" />
+    <!-- 앞발 -->
+    <path d="M262 352 L262 404 M300 350 L302 404" fill="none" stroke="#262626" stroke-width="8" />
+    <path d="M288 396 l0 -8 M296 396 l0 -8" fill="none" stroke="#262626" stroke-width="4" />
+    <!-- 머리와 귀 -->
+    <path d="M130 158 C120 110 124 58 150 30 Q158 24 166 30 L205 72 C232 64 262 64 286 72 L322 32 Q330 26 338 32 C356 64 360 112 352 160 C344 214 302 246 246 246 C186 246 140 214 130 158 Z" fill="#4b4f4f" stroke="#262626" stroke-width="12" />
+    <!-- 귀 안쪽 선 -->
+    <path d="M150 88 Q160 64 186 78" fill="none" stroke="#262626" stroke-width="6" />
+    <!-- 눈 -->
+    <ellipse cx="228" cy="160" rx="14" ry="17" fill="#141414" />
+    <ellipse cx="298" cy="152" rx="12" ry="15" fill="#141414" />
+    <circle cx="232" cy="154" r="4" fill="#ffffff" opacity=".85" />
+    <circle cx="301" cy="147" r="3.5" fill="#ffffff" opacity=".85" />
+    <!-- 코·입 -->
+    <path d="M268 178 q4 5 8 0" fill="none" stroke="#262626" stroke-width="4" />
+    <!-- 수염 -->
+    <path d="M188 182 l-24 -4 M190 192 l-22 6 M352 150 l24 -6 M352 162 l24 4" fill="none" stroke="#262626" stroke-width="5" />
+  </g>
+</svg>

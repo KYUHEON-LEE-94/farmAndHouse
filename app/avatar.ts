@@ -1,4 +1,6 @@
-export const DEFAULT_AVATAR = "avatar-cat.png";
+export const DEFAULT_AVATAR = "avatar-blackcat.svg";
+/** 예전 기본 아바타(픽셀 고양이). 아바타 고르기에서 계속 선택할 수 있다. */
+export const PIXEL_CAT_AVATAR = "avatar-cat.png";
 export const AVATAR_STORAGE_KEY = "wolru-farm-avatar";
 const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_SIDE = 256;

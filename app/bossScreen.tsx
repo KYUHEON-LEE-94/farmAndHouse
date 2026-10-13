@@ -16,7 +16,7 @@ function cellValue(row: number, col: number) {
  * 보스 키(ESC) 화면: 엑셀처럼 보이는 가짜 업무 화면.
  * 셀을 누르면 선택된 것처럼 보이고, 수식 입력줄에 그 셀 값이 나온다.
  */
-export default function BossScreen() {
+function ExcelScreen() {
   const [selected, setSelected] = useState<[number, number]>([12, 4]);
   const value = (row: number, col: number) => {
     if (col === 0) return ROWS[row];
@@ -47,4 +47,85 @@ export default function BossScreen() {
       <div className="xl-status"><span>준비</span><span>평균: 2,431 · 개수: 15 · 합계: 36,465</span><span>100%</span></div>
     </div>
   );
+}
+
+export type BossMode = "office" | "dev" | "design";
+export const BOSS_MODES: { id: BossMode; name: string; icon: string; title: string }[] = [
+  { id: "office", name: "사무직", icon: "📊", title: "3분기_실적보고_최종_진짜최종.xlsx - Excel" },
+  { id: "dev", name: "개발자", icon: "💻", title: "paymentService.ts — wolru-backend — Visual Studio Code" },
+  { id: "design", name: "디자이너", icon: "🎨", title: "Q4 캠페인 배너_v12_final – Figma" },
+];
+
+const CODE = [
+  ["k:import", " { ", "t:Injectable", " } ", "k:from", " ", "s:'@nestjs/common'", ";"],
+  ["k:import", " { ", "t:PaymentRepository", " } ", "k:from", " ", "s:'./payment.repository'", ";"],
+  [],
+  ["d:@Injectable", "()"],
+  ["k:export class", " ", "t:PaymentService", " {"],
+  ["  ", "k:constructor", "(", "k:private readonly", " repo: ", "t:PaymentRepository", ") {}"],
+  [],
+  ["  ", "c:/** 결제 승인 후 정산 대기열에 등록한다. */"],
+  ["  ", "k:async", " ", "f:approve", "(orderId: ", "t:string", ", amount: ", "t:number", "): ", "t:Promise", "<", "t:Receipt", "> {"],
+  ["    ", "k:if", " (amount <= ", "n:0", ") ", "k:throw new", " ", "t:BadRequestException", "(", "s:'INVALID_AMOUNT'", ");"],
+  ["    ", "k:const", " order = ", "k:await", " ", "k:this", ".repo.", "f:findOrder", "(orderId);"],
+  ["    ", "k:const", " fee = ", "t:Math", ".", "f:round", "(amount * ", "n:0.033", ");"],
+  ["    ", "k:const", " receipt = ", "k:await", " ", "k:this", ".repo.", "f:saveReceipt", "({ order, amount, fee });"],
+  ["    ", "k:await", " ", "k:this", ".", "f:enqueueSettlement", "(receipt.id);"],
+  ["    ", "k:return", " receipt;"],
+  ["  }"],
+  [],
+  ["  ", "k:private async", " ", "f:enqueueSettlement", "(receiptId: ", "t:string", ") {"],
+  ["    ", "c:// TODO: 재시도 정책 팀장님 리뷰 받기"],
+  ["    ", "k:return", " ", "k:this", ".repo.", "f:pushQueue", "(", "s:'settlement'", ", receiptId);"],
+  ["  }"],
+  ["}"],
+];
+
+const TERMINAL = ["$ npm run test -- payment", "", " PASS  src/payment/payment.spec.ts (3.21 s)", "  PaymentService", "    ✓ approves a valid order (41 ms)", "    ✓ rejects zero amount (6 ms)", "    ✓ enqueues settlement (12 ms)", "", "Tests:       3 passed, 3 total", "Time:        3.84 s", "$ █"];
+
+function DevScreen() {
+  const [line, setLine] = useState(12);
+  return (
+    <div className="boss-screen dev" role="presentation">
+      <div className="vs-title"><span>파일 편집 선택 보기 이동 실행 터미널 도움말</span><b>paymentService.ts — wolru-backend</b><i>— ☐ ✕</i></div>
+      <div className="vs-main">
+        <div className="vs-activity">{["📄", "🔍", "🔀", "🐞", "🧩"].map(icon => <span key={icon}>{icon}</span>)}</div>
+        <div className="vs-explorer"><b>탐색기</b>{["▾ src", "  ▾ payment", "    payment.module.ts", "    payment.repository.ts", "    paymentService.ts", "    payment.spec.ts", "  ▸ order", "  ▸ settlement", "  main.ts", "package.json", "tsconfig.json"].map(name => <span key={name} className={name.includes("paymentService") ? "on" : ""}>{name}</span>)}</div>
+        <div className="vs-editor">
+          <div className="vs-tabs"><span className="on">paymentService.ts</span><span>payment.spec.ts</span><span>README.md</span></div>
+          <div className="vs-code">{CODE.map((tokens, i) => <button type="button" tabIndex={-1} key={i} className={line === i ? "cur" : ""} onClick={() => setLine(i)}><em>{i + 1}</em>{tokens.map((token, k) => { const [kind, text] = token.includes(":") && /^[ktsdcfn]:/.test(token) ? [token[0], token.slice(2)] : ["", token]; return <span key={k} className={`tk-${kind}`}>{text}</span>; })}</button>)}</div>
+          <div className="vs-terminal"><div className="vs-term-tabs"><span className="on">터미널</span><span>문제</span><span>출력</span></div><pre>{TERMINAL.join(String.fromCharCode(10))}</pre></div>
+        </div>
+      </div>
+      <div className="vs-status"><span>⎇ feature/settlement-retry</span><span>⊗ 0 ⚠ 2</span><span>줄 {line + 1}, 열 18</span><span>UTF-8</span><span>TypeScript</span></div>
+    </div>
+  );
+}
+
+const LAYERS = ["▾ Banner / 1200×628", "  ▾ Header", "    Logo", "    Nav", "  ▾ Hero", "    Title", "    Subtitle", "    CTA Button", "    Illustration", "  Background"];
+
+function DesignScreen() {
+  const [selected, setSelected] = useState(7);
+  return (
+    <div className="boss-screen design" role="presentation">
+      <div className="fg-top"><span className="fg-logo">◆</span>{["▭", "◯", "✎", "T", "✋", "💬"].map(tool => <span key={tool} className="fg-tool">{tool}</span>)}<b>Q4 캠페인 배너_v12_final</b><span className="fg-users"><i>김</i><i>박</i><i>이</i></span><span className="fg-share">공유</span><span>100%</span></div>
+      <div className="fg-main">
+        <div className="fg-layers"><b>레이어</b>{LAYERS.map((name, i) => <button type="button" tabIndex={-1} key={name} className={selected === i ? "on" : ""} onClick={() => setSelected(i)}>{name.trimStart().startsWith("▾") ? "▣" : "▭"} {name}</button>)}</div>
+        <div className="fg-canvas">
+          <div className="fg-frame-label">Banner / 1200×628</div>
+          <div className="fg-artboard">
+            <div className="fg-nav"><b>WOLRU</b><span>제품 · 요금 · 고객사례</span></div>
+            <div className="fg-hero"><h4>일하는 시간,<br />더 똑똑하게</h4><p>팀의 생산성을 2배로 올리는 협업 툴</p><span className={`fg-cta ${selected === 7 ? "sel" : ""}`}>무료로 시작하기</span></div>
+            <div className="fg-illust"><i /><i /><i /></div>
+          </div>
+        </div>
+        <div className="fg-props"><b>디자인</b><span>프레임 · Auto layout</span><div className="fg-grid"><span>X 812</span><span>Y 436</span><span>W 220</span><span>H 56</span></div><b>채우기</b><span className="fg-fill"><i />#5A4FA8 · 100%</span><b>테두리 반경</b><span>12</span><b>효과</b><span>Drop shadow 0 8 24 #00000026</span><b>내보내기</b><span>PNG · 2x</span></div>
+      </div>
+    </div>
+  );
+}
+
+/** 보스 키(ESC) 화면: 직군에 맞는 가짜 업무 화면. */
+export default function BossScreen({ mode }: { mode: BossMode }) {
+  return mode === "dev" ? <DevScreen /> : mode === "design" ? <DesignScreen /> : <ExcelScreen />;
 }
