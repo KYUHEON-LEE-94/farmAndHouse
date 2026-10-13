@@ -3,6 +3,9 @@ const path = require("node:path");
 
 let mainWindow;
 
+// 이름을 사계농가 → 월루농가로 바꿔도 기존 저장 데이터(localStorage)가 유지되도록 예전 데이터 폴더를 계속 쓴다.
+app.setPath("userData", path.join(app.getPath("appData"), "사계농가 위젯"));
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1040,
@@ -10,7 +13,7 @@ function createWindow() {
     minWidth: 440,
     minHeight: 620,
     backgroundColor: "#f7f2e8",
-    title: "사계농가 위젯",
+    title: "월루농가 위젯",
     autoHideMenuBar: true,
     alwaysOnTop: true,
     webPreferences: {

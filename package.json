@@ -12,16 +12,17 @@
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
-    ,"widget:dev": "vite --config vite.widget.config.ts"
-    ,"widget:build": "vite build --config vite.widget.config.ts"
-    ,"desktop": "npm run widget:build && electron ."
-    ,"desktop:package": "npm run widget:build && electron-builder --win portable"
+    "db:generate": "drizzle-kit generate",
+    "widget:dev": "vite --config vite.widget.config.ts",
+    "widget:build": "vite build --config vite.widget.config.ts",
+    "desktop": "npm run widget:build && electron .",
+    "desktop:package": "npm run widget:build && electron-builder --win portable"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -31,6 +32,7 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
@@ -55,10 +57,21 @@
   "type": "module",
   "build": {
     "appId": "kr.sagyefarm.widget",
-    "productName": "사계농가 위젯",
+    "productName": "월루농가 위젯",
     "asar": true,
-    "directories": { "output": "release" },
-    "files": ["electron/**/*", "widget-dist/**/*", "package.json"],
-    "win": { "target": ["portable"], "artifactName": "Sagyefarm-Widget-${version}.exe" }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "widget-dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "artifactName": "Wolru-Farm-Widget-${version}.exe"
+    }
   }
 }

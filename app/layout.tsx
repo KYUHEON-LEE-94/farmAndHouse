@@ -3,15 +3,15 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://four-seasons-farm.solargecko4.chatgpt.site"),
-  title: "사계농가 | 현실 시간 농장 게임",
-  description: "현실의 하루 속 네 계절을 농사짓고, 번 돈으로 나만의 집을 꾸미는 힐링 웹게임",
+  title: "월루농가 | 일하다 몰래 하는 농장 게임",
+  description: "근무 시간을 네 계절로 나눠 농사짓고 낚시하고 3D 집을 꾸미는 월급루팡 힐링 웹게임",
   icons: { icon: "/favicon.svg" },
   openGraph: {
-    title: "사계농가",
-    description: "오늘 심고, 천천히 사는 집",
-    images: [{ url: "/og.png", width: 1536, height: 1024, alt: "사계절이 한 풍경에 담긴 사계농가" }],
+    title: "월루농가",
+    description: "월급은 루팡, 농사는 진심",
+    images: [{ url: "/og.png", width: 1536, height: 1024, alt: "사계절이 한 풍경에 담긴 월루농가" }],
   },
-  twitter: { card: "summary_large_image", title: "사계농가", description: "오늘 심고, 천천히 사는 집", images: ["/og.png"] },
+  twitter: { card: "summary_large_image", title: "월루농가", description: "월급은 루팡, 농사는 진심", images: ["/og.png"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

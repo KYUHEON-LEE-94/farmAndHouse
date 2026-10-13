@@ -1,27 +1,48 @@
 import type { ReactNode } from "react";
 
-export type FurnitureKind = "floor" | "wall" | "rug";
-export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; width: number };
-export type PlacedItem = Furniture & { instanceId: string; x: number; y: number; flip?: boolean; tint?: string };
+export type FurnitureKind = "floor" | "rug" | "wall";
+export type ShopGroup = "furniture" | "decor" | "structure" | "yard";
+/** size는 [가로, 높이, 깊이] 미터. 벽 부착 가구는 mount 높이(바닥에서 중심까지)에 걸린다. */
+export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean };
+/** 바닥 가구는 x·z(방 중심 기준 미터)와 rot(도), 벽 가구는 wall(벽 번호)·u(벽 위치 0~1)·h(높이 m). story는 층(0=1층, 1=2층), 마당 소품은 층이 없다. */
+export type PlacedItem = Furniture & { instanceId: string; x: number; z: number; rot: number; tint?: string; wall?: number; u?: number; h?: number; story?: number };
 export type Theme = { id: string; name: string; price: number; swatch: string };
+export type RoomShape = "rect" | "square" | "ell";
+export type Room = { points: [number, number][]; width: number; depth: number; area: number };
 
-// 방 단면 좌표(%) — 뒷벽 사각형을 기준으로 바닥·옆벽·천장이 원근으로 펼쳐진다.
-export const BACK = { l: 14, r: 86, t: 10, b: 60 };
-const VB_X = 1.6; // viewBox 160×100, 방 비율 16:10
+export const WALL_HEIGHT = 2.6;
+/** 한 층의 높이(벽 + 바닥 슬래브). 2층 바닥은 이 높이에 놓인다. */
+export const STORY_HEIGHT = 2.85;
+export const SECOND_FLOOR_PRICE = 20000;
 
 export const FURNITURE: Furniture[] = [
-  { id: "chair", name: "원목 의자", icon: "🪑", price: 500, color: "#c98f58", kind: "floor", width: 11 },
-  { id: "plant", name: "몬스테라", icon: "🪴", price: 750, color: "#6f9a5a", kind: "floor", width: 13 },
-  { id: "lamp", name: "스탠드 조명", icon: "💡", price: 900, color: "#e9c75d", kind: "floor", width: 8 },
-  { id: "table", name: "원목 테이블", icon: "🪵", price: 1100, color: "#c08a57", kind: "floor", width: 21 },
-  { id: "bookshelf", name: "책장", icon: "📚", price: 1400, color: "#a8744a", kind: "floor", width: 16 },
-  { id: "sofa", name: "폭신 소파", icon: "🛋️", price: 1600, color: "#c78979", kind: "floor", width: 34 },
-  { id: "bed", name: "포근한 침대", icon: "🛏️", price: 2200, color: "#8ba5bc", kind: "floor", width: 36 },
-  { id: "piano", name: "업라이트 피아노", icon: "🎹", price: 3800, color: "#57514f", kind: "floor", width: 26 },
-  { id: "rug", name: "둥근 러그", icon: "🟠", price: 600, color: "#b96555", kind: "rug", width: 40 },
-  { id: "frame", name: "풍경 액자", icon: "🖼️", price: 450, color: "#d6b56d", kind: "wall", width: 13 },
-  { id: "clock", name: "벽시계", icon: "🕰️", price: 650, color: "#7b8f7e", kind: "wall", width: 9 },
-  { id: "shelf", name: "벽 선반", icon: "🪜", price: 550, color: "#b8875a", kind: "wall", width: 20 },
+  { id: "chair", name: "원목 의자", icon: "🪑", price: 500, color: "#c98f58", kind: "floor", group: "furniture", size: [0.5, 0.95, 0.5] },
+  { id: "plant", name: "몬스테라", icon: "🪴", price: 750, color: "#6f9a5a", kind: "floor", group: "furniture", size: [0.7, 1.15, 0.7] },
+  { id: "lamp", name: "스탠드 조명", icon: "💡", price: 900, color: "#e9c75d", kind: "floor", group: "furniture", size: [0.45, 1.6, 0.45] },
+  { id: "table", name: "원목 테이블", icon: "🪵", price: 1100, color: "#c08a57", kind: "floor", group: "furniture", size: [1.3, 0.78, 0.75] },
+  { id: "bookshelf", name: "책장", icon: "📚", price: 1400, color: "#a8744a", kind: "floor", group: "furniture", size: [0.95, 1.85, 0.38] },
+  { id: "sofa", name: "폭신 소파", icon: "🛋️", price: 1600, color: "#c78979", kind: "floor", group: "furniture", size: [2, 0.85, 0.9] },
+  { id: "bed", name: "포근한 침대", icon: "🛏️", price: 2200, color: "#8ba5bc", kind: "floor", group: "furniture", size: [1.6, 1, 2.1] },
+  { id: "piano", name: "업라이트 피아노", icon: "🎹", price: 3800, color: "#57514f", kind: "floor", group: "furniture", size: [1.5, 1.3, 0.62] },
+  { id: "rug", name: "둥근 러그", icon: "🟠", price: 600, color: "#b96555", kind: "rug", group: "furniture", size: [2.2, 0.02, 1.5] },
+  { id: "frame", name: "풍경 액자", icon: "🖼️", price: 450, color: "#d6b56d", kind: "wall", group: "decor", size: [0.75, 0.6, 0.05], mount: 1.6 },
+  { id: "clock", name: "벽시계", icon: "🕰️", price: 650, color: "#7b8f7e", kind: "wall", group: "decor", size: [0.45, 0.45, 0.06], mount: 1.9 },
+  { id: "shelf", name: "벽 선반", icon: "🪜", price: 550, color: "#b8875a", kind: "wall", group: "decor", size: [1, 0.45, 0.26], mount: 1.4 },
+  { id: "window", name: "창문", icon: "🪟", price: 300, color: "#fffaf0", kind: "wall", group: "structure", size: [1.2, 1.1, 0.12], mount: 1.45 },
+  { id: "door", name: "나무 문", icon: "🚪", price: 400, color: "#b98352", kind: "wall", group: "structure", size: [0.95, 2.1, 0.12], mount: 1.05, fixedMount: true },
+  { id: "partition", name: "가벽", icon: "🧱", price: 800, color: "#efe4cf", kind: "floor", group: "structure", size: [2, 2.4, 0.14] },
+  { id: "arch", name: "아치 가벽", icon: "🏛️", price: 1200, color: "#efe4cf", kind: "floor", group: "structure", size: [2.2, 2.4, 0.14] },
+  { id: "stairs", name: "원목 계단", icon: "🪜", price: 1500, color: "#b98352", kind: "floor", group: "structure", size: [1, 2.8, 2.6] },
+  { id: "fence", name: "나무 울타리", icon: "🪵", price: 300, color: "#d9b98a", kind: "floor", group: "yard", size: [2, 0.9, 0.12], yard: true },
+  { id: "flowerbed", name: "꽃밭", icon: "🌷", price: 450, color: "#e7899a", kind: "floor", group: "yard", size: [1.6, 0.5, 0.8], yard: true },
+  { id: "stonepath", name: "징검돌 길", icon: "🪨", price: 250, color: "#b8b3a8", kind: "rug", group: "yard", size: [0.9, 0.05, 2.4], yard: true },
+  { id: "appletree", name: "사과나무", icon: "🍎", price: 1300, color: "#6f9a5a", kind: "floor", group: "yard", size: [2, 3.2, 2], yard: true },
+  { id: "bench", name: "정원 벤치", icon: "🪑", price: 700, color: "#9b7350", kind: "floor", group: "yard", size: [1.5, 0.85, 0.6], yard: true },
+  { id: "mailbox", name: "빨간 우체통", icon: "📮", price: 350, color: "#c4574b", kind: "floor", group: "yard", size: [0.4, 1.2, 0.4], yard: true },
+  { id: "streetlamp", name: "정원 가로등", icon: "🏮", price: 900, color: "#3f4a44", kind: "floor", group: "yard", size: [0.4, 2.4, 0.4], yard: true },
+  { id: "pond", name: "작은 연못", icon: "🪷", price: 1600, color: "#6fa8c4", kind: "rug", group: "yard", size: [2.6, 0.1, 1.8], yard: true },
+  { id: "doghouse", name: "강아지 집", icon: "🐶", price: 1100, color: "#c46a4b", kind: "floor", group: "yard", size: [1, 1.1, 1.1], yard: true },
+  { id: "scarecrow", name: "허수아비", icon: "🧑‍🌾", price: 500, color: "#d6a64b", kind: "floor", group: "yard", size: [0.9, 1.8, 0.3], yard: true },
 ];
 
 export const TINTS = ["#c78979", "#e2b85a", "#81a96b", "#8ba5bc", "#9a7bb0", "#57514f", "#efe6d6"];
@@ -39,89 +60,74 @@ export const FLOORS: Theme[] = [
   { id: "tile", name: "체크 타일", price: 700, swatch: "conic-gradient(#efe4cf 25%,#c97b5d 0 50%,#efe4cf 0 75%,#c97b5d 0) 0 0/12px 12px" },
 ];
 
-const FLOOR_COLORS: Record<string, [string, string]> = { oak: ["#c9965f", "#a97a48"], walnut: ["#7a5236", "#5a3b26"], tile: ["#efe4cf", "#c97b5d"] };
+/** 집 단계별 평수. price는 그 단계로 증축하는 비용. */
+export const HOUSE_SIZES = [
+  { level: 1, name: "작은 농막", pyeong: 8, price: 0 },
+  { level: 2, name: "아담한 농가", pyeong: 12, price: 4500 },
+  { level: 3, name: "햇살 농가", pyeong: 18, price: 9000 },
+  { level: 4, name: "넓은 전원주택", pyeong: 25, price: 15000 },
+  { level: 5, name: "꿈의 전원주택", pyeong: 34, price: 24000 },
+  { level: 6, name: "언덕 위 대저택", pyeong: 45, price: 36000 },
+];
+/** 마당 단계: 집 둘레로 확보되는 여유 폭(m). */
+export const YARD_SIZES = [
+  { level: 1, name: "작은 앞마당", margin: 3, price: 0 },
+  { level: 2, name: "넓은 마당", margin: 5, price: 3000 },
+  { level: 3, name: "정원 딸린 마당", margin: 7.5, price: 8000 },
+];
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-export function itemLayout(item: PlacedItem) {
-  if (item.kind === "wall") return { left: BACK.l + (item.x / 100) * (BACK.r - BACK.l), top: BACK.t + (item.y / 100) * (BACK.b - BACK.t), width: item.width * 0.72, z: 20 };
-  const depth = item.y / 100, inset = BACK.l * (1 - depth), scale = (100 - inset * 2) / 100;
-  return { left: inset + (item.x / 100) * (100 - inset * 2), top: BACK.b + (100 - BACK.b) * depth, width: item.width * scale, z: item.kind === "rug" ? 10 : 100 + Math.round(item.y * 10) };
+export function yardBounds(room: Room, yardLevel: number) {
+  const margin = (YARD_SIZES.find(size => size.level === yardLevel) ?? YARD_SIZES[0]).margin;
+  return { minX: -room.width / 2 - margin, maxX: room.width / 2 + margin, minZ: -room.depth / 2 - margin * 0.6, maxZ: room.depth / 2 + margin * 1.3 };
 }
 
-export function pointToItem(kind: FurnitureKind, left: number, top: number) {
-  if (kind === "wall") return { x: clamp(((left - BACK.l) / (BACK.r - BACK.l)) * 100, 5, 95), y: clamp(((top - BACK.t) / (BACK.b - BACK.t)) * 100, 10, 85) };
-  const depth = clamp((top - BACK.b) / (100 - BACK.b), kind === "rug" ? 0.12 : 0.03, kind === "rug" ? 0.9 : 1);
-  const inset = BACK.l * (1 - depth);
-  return { x: clamp(((left - inset) / (100 - inset * 2)) * 100, 4, 96), y: depth * 100 };
+/** 마당 소품은 마당 경계 안, 집 벽 바깥에만 둘 수 있다. */
+export function fitsInYard(room: Room, yardLevel: number, x: number, z: number, margin = 0.35) {
+  const b = yardBounds(room, yardLevel);
+  if (x < b.minX + margin || x > b.maxX - margin || z < b.minZ + margin || z > b.maxZ - margin) return false;
+  return ![[0, 0], [margin, 0], [-margin, 0], [0, margin], [0, -margin]].some(([dx, dz]) => pointInRoom(room.points, x + dx, z + dz));
 }
+export const SHAPES: { id: RoomShape; name: string; note: string }[] = [
+  { id: "rect", name: "직사각형", note: "가로로 긴 기본 구조" },
+  { id: "square", name: "정사각형", note: "어느 방향이든 균형 잡힌 구조" },
+  { id: "ell", name: "ㄱ자", note: "한쪽 모서리가 꺾인 구조" },
+];
+export const REMODEL_PRICE = 800;
+const PYEONG_M2 = 3.3058;
 
-const floorPoint = (u: number, depth: number) => {
-  const inset = BACK.l * (1 - depth);
-  return `${((inset + u * (100 - inset * 2)) * VB_X).toFixed(2)},${(BACK.b + (100 - BACK.b) * depth).toFixed(2)}`;
-};
-
-function FloorPattern({ floor }: { floor: string }) {
-  const [base, seam] = FLOOR_COLORS[floor] ?? FLOOR_COLORS.oak;
-  const rows = 6, cols = floor === "tile" ? 8 : 11;
-  const depthAt = (row: number) => Math.pow(row / rows, 1.35);
-  const shapes: ReactNode[] = [<polygon key="base" points={`${floorPoint(0, 0)} ${floorPoint(1, 0)} ${floorPoint(1, 1)} ${floorPoint(0, 1)}`} fill={base} />];
-  if (floor === "tile") {
-    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) if ((row + col) % 2) {
-      const [d0, d1, u0, u1] = [depthAt(row), depthAt(row + 1), col / cols, (col + 1) / cols];
-      shapes.push(<polygon key={`t${row}-${col}`} points={`${floorPoint(u0, d0)} ${floorPoint(u1, d0)} ${floorPoint(u1, d1)} ${floorPoint(u0, d1)}`} fill={seam} />);
-    }
-  } else {
-    for (let col = 1; col < cols; col++) shapes.push(<polyline key={`c${col}`} points={`${floorPoint(col / cols, 0)} ${floorPoint(col / cols, 1)}`} stroke={seam} strokeWidth=".45" />);
-    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) if ((row * 2 + col) % 3 === 0) {
-      const depth = (depthAt(row) + depthAt(row + 1)) / 2;
-      shapes.push(<polyline key={`j${row}-${col}`} points={`${floorPoint(col / cols, depth)} ${floorPoint((col + 1) / cols, depth)}`} stroke={seam} strokeWidth=".4" />);
-    }
+/** 평수와 구조로 방 바닥 다각형을 만든다. 0번 벽은 항상 뒷벽(-z)이다. */
+export function roomFor(level: number, shape: RoomShape): Room {
+  const area = (HOUSE_SIZES.find(size => size.level === level) ?? HOUSE_SIZES[0]).pyeong * PYEONG_M2;
+  if (shape === "ell") {
+    const cut = 0.42, depth = Math.sqrt(area / (1 - cut * cut) / 1.25), width = depth * 1.25;
+    const [w, d, cw, cd] = [width / 2, depth / 2, width * cut, depth * cut];
+    return { width, depth, area, points: [[-w, -d], [w, -d], [w, d - cd], [w - cw, d - cd], [w - cw, d], [-w, d]] };
   }
-  return <>{shapes}</>;
+  const aspect = shape === "square" ? 1 : 1.45, depth = Math.sqrt(area / aspect), width = depth * aspect;
+  return { width, depth, area, points: [[-width / 2, -depth / 2], [width / 2, -depth / 2], [width / 2, depth / 2], [-width / 2, depth / 2]] };
 }
 
-function WallpaperDef({ wallpaper }: { wallpaper: string }) {
-  if (wallpaper === "flower") return <pattern id="wallpaper" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#f7e7e2" /><circle cx="2" cy="2" r=".9" fill="#e7aeb0" /><circle cx="6" cy="6" r=".9" fill="#b6cd9b" /></pattern>;
-  if (wallpaper === "mint") return <pattern id="wallpaper" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#e4f0e7" /><rect width="8" height="1" fill="#cfe3d5" /><rect width="1" height="8" fill="#cfe3d5" /></pattern>;
-  if (wallpaper === "panel") return <pattern id="wallpaper" width="7" height="10" patternUnits="userSpaceOnUse"><rect width="7" height="10" fill="#c99d6e" /><rect width=".6" height="10" fill="#a87a4c" /></pattern>;
-  return <pattern id="wallpaper" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#f4e9d4" /><rect width="3" height="8" fill="#ecdcbf" /></pattern>;
+export function pointInRoom(points: [number, number][], x: number, z: number) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, zi] = points[i], [xj, zj] = points[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
-export function RoomShell({ wallpaper, floor }: { wallpaper: string; floor: string }) {
-  const [bl, br, bt, bb] = [BACK.l * VB_X, BACK.r * VB_X, BACK.t, BACK.b];
-  return (
-    <svg className="room-shell" viewBox="0 0 160 100" aria-hidden="true">
-      <defs>
-        <WallpaperDef wallpaper={wallpaper} />
-        <linearGradient id="floorShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2b1a0e" stopOpacity=".28" /><stop offset=".55" stopColor="#2b1a0e" stopOpacity="0" /></linearGradient>
-      </defs>
-      <rect x={bl} y={bt} width={br - bl} height={bb - bt} fill="url(#wallpaper)" />
-      <rect x={bl} y={bb - 15} width={br - bl} height="15" fill="#5a3b1e" opacity=".09" />
-      <rect x={bl} y={bb - 15.6} width={br - bl} height=".9" fill="#fffaf0" opacity=".8" />
-      <polygon points={`0,0 ${bl},${bt} ${bl},${bb} 0,100`} fill="url(#wallpaper)" /><polygon points={`0,0 ${bl},${bt} ${bl},${bb} 0,100`} fill="#3c2814" opacity=".16" />
-      <polygon points={`160,0 ${br},${bt} ${br},${bb} 160,100`} fill="url(#wallpaper)" /><polygon points={`160,0 ${br},${bt} ${br},${bb} 160,100`} fill="#3c2814" opacity=".1" />
-      <polygon points={`0,0 160,0 ${br},${bt} ${bl},${bt}`} fill="#fbf5ea" /><polygon points={`0,0 160,0 ${br},${bt} ${bl},${bt}`} fill="#7a5a30" opacity=".06" />
-      <FloorPattern floor={floor} />
-      <polygon points={`${bl},${bb} ${br},${bb} 160,100 0,100`} fill="url(#floorShade)" />
-      <rect x={bl} y={bb - 1.6} width={br - bl} height="1.6" fill="#efe2c8" />
-      <polygon points={`0,98.4 ${bl},${bb - 1.6} ${bl},${bb} 0,100`} fill="#d9c8a8" /><polygon points={`160,98.4 ${br},${bb - 1.6} ${br},${bb} 160,100`} fill="#e3d3b4" />
-      <g stroke="#5a3b1e" strokeOpacity=".2" strokeWidth=".35" fill="none"><polyline points={`0,0 ${bl},${bt} ${bl},${bb} 0,100`} /><polyline points={`160,0 ${br},${bt} ${br},${bb} 160,100`} /><line x1={bl} y1={bt} x2={br} y2={bt} /></g>
-      <g className="door"><rect x="33" y="25" width="17" height="35" fill="#efe2c8" /><rect x="34.6" y="26.6" width="13.8" height="33.4" fill="#b98352" /><rect x="36.4" y="29" width="10.2" height="11" fill="none" stroke="#9a6a3e" strokeWidth=".6" /><rect x="36.4" y="43" width="10.2" height="13" fill="none" stroke="#9a6a3e" strokeWidth=".6" /><circle cx="46.4" cy="43" r=".9" fill="#e2b85a" /></g>
-      <g className="window-scene">
-        <rect x="88" y="16.5" width="34" height="25" rx="1" fill="#fffaf0" />
-        <rect className="win-sky" x="90" y="18.5" width="30" height="21" />
-        <circle className="win-sun" cx="114" cy="23.5" r="2.6" />
-        <path className="win-hill" d="M90 35 Q100 29 108 33 T120 31 V39.5 H90 Z" />
-        <rect x="98" y="29" width="1.2" height="6" fill="#7a5236" /><circle className="win-leaf" cx="98.6" cy="28" r="3.6" />
-        <rect x="104.6" y="18.5" width=".9" height="21" fill="#fffaf0" /><rect x="90" y="28.6" width="30" height=".9" fill="#fffaf0" />
-        <path d="M86.5 15.5 H94 Q92 28 95 42 H86.5 Z" fill="#ecd3c1" /><path d="M123.5 15.5 H116 Q118 28 115 42 H123.5 Z" fill="#ecd3c1" />
-        <rect x="85.5" y="14.6" width="39" height="1.2" rx=".6" fill="#8a6a48" />
-        <rect x="87" y="41.5" width="36" height="1.8" rx=".5" fill="#fffaf0" />
-      </g>
-      <g className="pendant"><line x1="80" y1="0" x2="80" y2="7" stroke="#3a3027" strokeWidth=".35" /><path d="M75.5 11 L84.5 11 L82.2 7 L77.8 7 Z" fill="#2f3d33" /><ellipse cx="80" cy="11.2" rx="2" ry=".9" fill="#ffe9a8" /></g>
-    </svg>
-  );
+/** 중심점과 주변 네 점이 모두 방 안이면 둘 수 있다. */
+export function fitsInRoom(points: [number, number][], x: number, z: number, margin = 0.2) {
+  return [[0, 0], [margin, 0], [-margin, 0], [0, margin], [0, -margin]].every(([dx, dz]) => pointInRoom(points, x + dx, z + dz));
+}
+
+/** 벽 번호의 시작점, 방향, 길이, 안쪽 법선. */
+export function wallInfo(points: [number, number][], index: number) {
+  const [ax, az] = points[index % points.length], [bx, bz] = points[(index + 1) % points.length];
+  const length = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / length, dz = (bz - az) / length;
+  const [mx, mz] = [(ax + bx) / 2, (az + bz) / 2];
+  const normal: [number, number] = pointInRoom(points, mx - dz * 0.05, mz + dx * 0.05) ? [-dz, dx] : [dz, -dx];
+  return { start: [ax, az] as [number, number], dir: [dx, dz] as [number, number], length, normal };
 }
 
 function PianoKeys() {
@@ -142,15 +148,25 @@ const ART: Record<string, { viewBox: string; body: ReactNode }> = {
   frame: { viewBox: "0 0 80 64", body: <><rect className="m" x="0" y="0" width="80" height="64" rx="3" /><rect className="d" x="5" y="5" width="70" height="54" /><rect x="8" y="8" width="64" height="48" fill="#bfe0e6" /><circle cx="56" cy="20" r="6" fill="#f6d16a" /><path d="M8 46 Q24 30 40 42 T72 36 V56 H8 Z" fill="#8bb46f" /><path d="M8 50 Q30 42 50 50 T72 48 V56 H8 Z" fill="#6f9a5a" /></> },
   clock: { viewBox: "0 0 64 64", body: <><circle className="d" cx="32" cy="32" r="31" /><circle className="m" cx="32" cy="32" r="28" /><circle cx="32" cy="32" r="23" fill="#fffaf0" />{[0, 90, 180, 270].map(angle => <rect key={angle} x="31" y="11" width="2" height="5" fill="#57514f" transform={`rotate(${angle} 32 32)`} />)}<rect x="31" y="18" width="2" height="15" rx="1" fill="#2f3d33" transform="rotate(35 32 32)" /><rect x="31" y="22" width="2" height="11" rx="1" fill="#2f3d33" transform="rotate(-70 32 32)" /><circle cx="32" cy="32" r="2.2" fill="#c4574b" /></> },
   shelf: { viewBox: "0 0 140 70", body: <><rect x="10" y="20" width="9" height="30" rx="2" fill="#c4574b" /><rect x="20" y="16" width="8" height="34" rx="2" fill="#4f7a6a" /><rect x="29" y="24" width="9" height="26" rx="2" fill="#e2b85a" transform="rotate(12 33 50)" /><path d="M58 30 H78 L76 50 H60 Z" fill="#c9784f" /><ellipse cx="62" cy="24" rx="8" ry="5" fill="#81a96b" transform="rotate(-30 62 24)" /><ellipse cx="74" cy="22" rx="8" ry="5" fill="#6f9a5a" transform="rotate(30 74 22)" /><rect x="96" y="30" width="16" height="20" rx="4" fill="#cfe3e8" opacity=".9" /><rect x="94" y="27" width="20" height="4" rx="2" fill="#b98352" /><rect x="118" y="36" width="12" height="14" rx="6" fill="#efe6d6" /><rect className="m" x="0" y="50" width="140" height="7" rx="2" /><path className="d" d="M14 57 h8 l-8 12 Z" /><path className="d" d="M118 57 h8 v12 Z" /></> },
+  stairs: { viewBox: "0 0 100 100", body: <>{[0, 1, 2, 3, 4].map(i => <rect key={i} className={i % 2 ? "m" : "l"} x={i * 18} y={80 - i * 18} width={100 - i * 18} height="20" />)}</> },
+  fence: { viewBox: "0 0 140 70", body: <><rect className="d" x="0" y="22" width="140" height="8" /><rect className="d" x="0" y="46" width="140" height="8" />{[4, 34, 64, 94, 124].map(x => <path key={x} className="m" d={`M${x} 70 V12 L${x + 6} 2 L${x + 12} 12 V70 Z`} />)}</> },
+  flowerbed: { viewBox: "0 0 120 60", body: <><rect className="d" x="0" y="34" width="120" height="26" rx="4" /><rect x="6" y="30" width="108" height="10" rx="4" fill="#6b4a32" />{[14, 34, 54, 74, 94, 108].map((x, i) => <g key={x}><rect x={x - 1} y="14" width="2" height="18" fill="#4f7a3e" /><circle cx={x} cy="12" r="7" className={i % 2 ? "m" : "l"} /></g>)}</> },
+  stonepath: { viewBox: "0 0 60 120", body: <>{[[18, 14], [40, 40], [20, 66], [40, 94]].map(([x, y]) => <ellipse key={y} className="m" cx={x} cy={y} rx="14" ry="10" />)}</> },
+  appletree: { viewBox: "0 0 100 130", body: <><rect x="44" y="70" width="12" height="60" fill="#7a5236" /><circle className="m" cx="50" cy="48" r="40" /><circle className="l" cx="36" cy="36" r="16" opacity=".5" />{[[30, 52], [60, 34], [68, 62], [44, 70], [52, 20]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="5" fill="#d8453a" />)}</> },
+  bench: { viewBox: "0 0 140 80", body: <><rect className="m" x="0" y="8" width="140" height="10" rx="3" /><rect className="m" x="0" y="22" width="140" height="10" rx="3" /><rect className="l" x="0" y="42" width="140" height="12" rx="3" /><rect x="10" y="54" width="8" height="26" fill="#3f4a44" /><rect x="122" y="54" width="8" height="26" fill="#3f4a44" /><rect x="10" y="8" width="6" height="46" fill="#3f4a44" /><rect x="124" y="8" width="6" height="46" fill="#3f4a44" /></> },
+  mailbox: { viewBox: "0 0 50 120", body: <><rect x="21" y="44" width="8" height="76" fill="#5b4a3a" /><path className="m" d="M4 22 A21 18 0 0 1 46 22 V50 H4 Z" /><rect className="d" x="4" y="30" width="42" height="4" /><rect x="40" y="10" width="4" height="22" fill="#e2b85a" /></> },
+  streetlamp: { viewBox: "0 0 50 150", body: <><rect className="m" x="22" y="30" width="6" height="114" /><rect className="d" x="12" y="140" width="26" height="10" rx="2" /><path className="m" d="M10 30 L18 8 H32 L40 30 Z" /><rect x="16" y="16" width="18" height="12" fill="#fff1b8" /></> },
+  pond: { viewBox: "0 0 200 120", body: <><ellipse cx="100" cy="62" rx="98" ry="56" fill="#a9a398" /><ellipse className="m" cx="100" cy="60" rx="86" ry="46" /><ellipse className="l" cx="76" cy="46" rx="26" ry="10" opacity=".6" /><circle cx="130" cy="70" r="9" fill="#6f9a5a" /><circle cx="133" cy="66" r="4" fill="#f2b5c4" /></> },
+  doghouse: { viewBox: "0 0 100 100", body: <><path className="d" d="M0 44 L50 4 L100 44 Z" /><rect className="m" x="10" y="40" width="80" height="60" /><path d="M36 100 V70 A14 14 0 0 1 64 70 V100 Z" fill="#3b2a1e" /><rect x="40" y="48" width="20" height="8" rx="2" fill="#efe6d6" /></> },
+  scarecrow: { viewBox: "0 0 90 150", body: <><rect x="42" y="30" width="6" height="120" fill="#7a5236" /><rect x="6" y="58" width="78" height="6" fill="#7a5236" /><circle cx="45" cy="30" r="15" fill="#efd9a8" /><path className="m" d="M22 18 H68 L58 4 H32 Z" /><rect className="m" x="16" y="14" width="58" height="6" rx="3" /><path d="M24 58 H66 L60 104 H30 Z" fill="#6f8fb5" /><rect x="26" y="66" width="38" height="6" fill="#c4574b" /></> },
+  window: { viewBox: "0 0 100 92", body: <><rect className="m" x="0" y="0" width="100" height="92" rx="3" /><rect x="7" y="7" width="86" height="78" fill="#bfe0ec" /><path d="M7 62 Q30 48 52 58 T93 54 V85 H7 Z" fill="#9cc57a" /><rect className="m" x="47" y="7" width="6" height="78" /><rect className="m" x="7" y="42" width="86" height="6" /><rect className="d" x="-4" y="86" width="108" height="6" rx="2" /></> },
+  door: { viewBox: "0 0 90 180", body: <><rect x="0" y="0" width="90" height="180" fill="#efe2c8" /><rect className="m" x="8" y="8" width="74" height="172" rx="2" /><rect className="d" x="18" y="20" width="54" height="56" rx="3" opacity=".55" /><rect className="d" x="18" y="92" width="54" height="74" rx="3" opacity=".55" /><circle cx="70" cy="98" r="5" fill="#e2b85a" /></> },
+  partition: { viewBox: "0 0 160 120", body: <><rect className="m" x="0" y="0" width="160" height="120" /><rect className="d" x="0" y="108" width="160" height="12" opacity=".6" /><rect className="l" x="0" y="0" width="160" height="6" /></> },
+  arch: { viewBox: "0 0 160 120", body: <><path className="m" d="M0 0 H160 V120 H112 V58 A32 32 0 0 0 48 58 V120 H0 Z" /><rect className="d" x="0" y="108" width="48" height="12" opacity=".6" /><rect className="d" x="112" y="108" width="48" height="12" opacity=".6" /><rect className="l" x="0" y="0" width="160" height="6" /></> },
 };
 
 export function FurnitureArt({ id, flip }: { id: string; flip?: boolean }) {
   const art = ART[id];
   if (!art) return null;
   return <svg className="art" viewBox={art.viewBox} style={flip ? { transform: "scaleX(-1)" } : undefined} aria-hidden="true">{art.body}</svg>;
-}
-
-export function artAspect(id: string) {
-  const [, , width, height] = (ART[id]?.viewBox ?? "0 0 1 1").split(" ").map(Number);
-  return height / width;
 }

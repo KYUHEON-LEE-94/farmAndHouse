@@ -1,31 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { FURNITURE, FLOORS, TINTS, WALLPAPERS, FurnitureArt, RoomShell, artAspect, itemLayout, pointToItem, type Furniture, type PlacedItem, type Theme } from "./house";
-import { FISH, rollFish, type Fish, type Season } from "./fishing";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { FURNITURE, FLOORS, HOUSE_SIZES, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
+import { BAITS, FISH, STARTER_BAIT, rollFish, type Bait, type Fish, type Season } from "./fishing";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
+import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, readAvatarFile, type StoredAvatar } from "./avatar";
+import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CROPS, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
-type Crop = { id: string; name: string; icon: string; seasons: Season[]; seed: number; sell: number; seconds: number; difficulty: string };
-type Plot = { cropId: string; plantedAt: number; growSeconds?: number } | null;
-type HarvestFx = { id: number; plotIndex: number; icon: string; amount: number };
-type FishState = { phase: "idle" | "waiting" | "bite" | "result"; fish?: Fish; text?: string };
+const House3D = lazy(() => import("./house3d"));
+const AVATAR_ID = "avatar";
+
+type HarvestFx = { id: number; plotIndex: number; icon: string; amount: number; stars: string };
+type FishState = { phase: "idle" | "waiting" | "bite" | "result"; fish?: Fish; bait?: Bait; text?: string };
 type ActiveEvent = { event: StoryEvent; result?: Effect };
 
 const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
 const SEASON_ICON: Record<Season, string> = { 봄: "🌸", 여름: "☀️", 가을: "🍂", 겨울: "❄️" };
-const CROPS: Crop[] = [
-  { id: "strawberry", name: "딸기", icon: "🍓", seasons: ["봄"], seed: 120, sell: 310, seconds: 55, difficulty: "보통" },
-  { id: "potato", name: "감자", icon: "🥔", seasons: ["봄"], seed: 70, sell: 165, seconds: 35, difficulty: "쉬움" },
-  { id: "cabbage", name: "양배추", icon: "🥬", seasons: ["봄", "가을"], seed: 95, sell: 230, seconds: 50, difficulty: "보통" },
-  { id: "tomato", name: "토마토", icon: "🍅", seasons: ["여름"], seed: 110, sell: 280, seconds: 50, difficulty: "보통" },
-  { id: "corn", name: "옥수수", icon: "🌽", seasons: ["여름"], seed: 145, sell: 390, seconds: 75, difficulty: "어려움" },
-  { id: "watermelon", name: "수박", icon: "🍉", seasons: ["여름"], seed: 220, sell: 620, seconds: 110, difficulty: "어려움" },
-  { id: "sweetpotato", name: "고구마", icon: "🍠", seasons: ["가을"], seed: 130, sell: 350, seconds: 70, difficulty: "보통" },
-  { id: "pumpkin", name: "호박", icon: "🎃", seasons: ["가을"], seed: 190, sell: 540, seconds: 100, difficulty: "어려움" },
-  { id: "radish", name: "무", icon: "🥕", seasons: ["가을", "겨울"], seed: 80, sell: 185, seconds: 40, difficulty: "쉬움" },
-  { id: "spinach", name: "시금치", icon: "🌿", seasons: ["겨울"], seed: 65, sell: 155, seconds: 32, difficulty: "쉬움" },
-  { id: "greenonion", name: "대파", icon: "🧅", seasons: ["겨울"], seed: 100, sell: 255, seconds: 58, difficulty: "보통" },
-  { id: "tangerine", name: "감귤", icon: "🍊", seasons: ["겨울"], seed: 240, sell: 690, seconds: 120, difficulty: "어려움" },
+// 3D 집 바깥 풍경 색. 마지막은 운영 시간 밖(밤).
+const PALETTES = [
+  { sky: "#cfe7f2", grass: "#9cc57a", leaf: "#f4b8c8" },
+  { sky: "#a9d8f0", grass: "#86b65e", leaf: "#5f9e4f" },
+  { sky: "#f2dcc0", grass: "#b9a35c", leaf: "#e0883e" },
+  { sky: "#dce8ef", grass: "#e9f0f2", leaf: "#f4f8fa" },
+  { sky: "#1f2a40", grass: "#33443a", leaf: "#2f4538" },
 ];
 
 const initialPlots: Plot[] = Array(8).fill(null);
@@ -66,6 +63,17 @@ function playCoinSound(notes = [880, 1320]) {
   window.setTimeout(() => context.close(), 400 + notes.length * 150);
 }
 
+function playBuzz() {
+  const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return;
+  const context = new AudioCtx(), gain = context.createGain(), oscillator = context.createOscillator();
+  oscillator.type = "sawtooth"; oscillator.frequency.setValueAtTime(190, context.currentTime);
+  oscillator.frequency.linearRampToValueAtTime(240, context.currentTime + 0.25); oscillator.frequency.linearRampToValueAtTime(180, context.currentTime + 0.5);
+  gain.gain.setValueAtTime(0.0001, context.currentTime); gain.gain.exponentialRampToValueAtTime(0.05, context.currentTime + 0.05); gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.55);
+  oscillator.connect(gain); gain.connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.6);
+  window.setTimeout(() => context.close(), 800);
+}
+
 function getYoutubeId(value: string) {
   try {
     const url = new URL(value.trim());
@@ -75,14 +83,39 @@ function getYoutubeId(value: string) {
   return "";
 }
 
-/** 저장된 가구를 최신 카탈로그와 합친다. 버전 4 미만은 위에서 본 방 좌표를 원근 바닥 깊이로 바꾼다. */
-function hydrateItem(raw: PlacedItem & { rotation?: number }, version: number): PlacedItem | null {
+type LegacyItem = { id: string; instanceId: string; x: number; y?: number; z?: number; rot?: number; tint?: string; wall?: number; u?: number; h?: number; story?: number };
+
+/** 저장된 가구를 최신 카탈로그와 합친다. 버전 5 미만의 2D 좌표(%)는 3D 방 좌표(m)로 옮긴다. */
+function hydrateItem(raw: LegacyItem, version: number, room: Room): PlacedItem | null {
   const base = FURNITURE.find(item => item.id === raw.id);
   if (!base) return null;
-  let x = raw.x > 10 || version >= 3 ? raw.x : 14 + raw.x * 14;
-  let y = raw.y > 10 || version >= 3 ? raw.y : 20 + raw.y * 28;
-  if (version < 4) { x = Math.max(4, Math.min(96, x)); y = Math.max(3, Math.min(100, ((y - 10) / 81) * 100)); }
-  return { ...base, instanceId: raw.instanceId, x, y, flip: raw.flip ?? false, tint: raw.tint };
+  if (version >= 5) return { ...base, instanceId: raw.instanceId, x: raw.x, z: raw.z ?? 0, rot: raw.rot ?? 0, tint: raw.tint, wall: raw.wall, u: raw.u, h: raw.h, story: raw.story };
+  let x = raw.x, y = raw.y ?? 50;
+  if (version < 3 && x <= 10) { x = 14 + x * 14; y = 20 + y * 28; }
+  if (version < 4) y = ((y - 10) / 81) * 100;
+  if (base.kind === "wall") return { ...base, instanceId: raw.instanceId, x: 0, z: 0, rot: 0, tint: raw.tint, wall: 0, u: Math.min(0.9, Math.max(0.1, x / 100)), h: base.fixedMount ? base.mount : Math.min(2.2, Math.max(0.6, WALL_HEIGHT * (1 - y / 100))) };
+  return { ...base, instanceId: raw.instanceId, x: (x / 100 - 0.5) * room.width * 0.85, z: (Math.min(100, Math.max(0, y)) / 100 - 0.5) * room.depth * 0.85, rot: 0, tint: raw.tint };
+}
+
+/** 방이 줄거나 구조가 바뀌어 밖으로 나간 가구를 안쪽으로 당긴다. 마당 소품은 마당 안으로 옮긴다. */
+function fitToRoom(item: PlacedItem, room: Room, yardLevel = 1): PlacedItem {
+  if (item.yard) {
+    if (fitsInYard(room, yardLevel, item.x, item.z)) return item;
+    const front = room.depth / 2 + 1.4;
+    for (let step = 0; step < 12; step++) { const x = ((step % 2 ? 1 : -1) * Math.ceil(step / 2)) * 1.2; if (fitsInYard(room, yardLevel, x, front)) return { ...item, x, z: front }; }
+    return { ...item, x: 0, z: front };
+  }
+  if (item.kind === "wall") {
+    const wall = (item.wall ?? 0) < room.points.length ? item.wall ?? 0 : 0, length = wallInfo(room.points, wall).length, half = (item.size[0] / 2 + 0.05) / length;
+    return { ...item, wall, u: Math.min(1 - half, Math.max(half, item.u ?? 0.5)) };
+  }
+  for (let t = 1; t >= 0; t -= 0.1) if (fitsInRoom(room.points, item.x * t, item.z * t, 0.25)) return { ...item, x: item.x * t, z: item.z * t };
+  return { ...item, x: 0, z: 0 };
+}
+
+function starterItems(room: Room): PlacedItem[] {
+  const make = (id: string, extra: Partial<PlacedItem>) => ({ ...FURNITURE.find(item => item.id === id)!, instanceId: `${id}-starter`, x: 0, z: 0, rot: 0, ...extra });
+  return [make("window", { wall: 0, u: 0.65, h: 1.45 }), make("door", { wall: room.points.length - 1, u: 0.5, h: 1.05 })];
 }
 
 const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.max(0, seconds % 60)).padStart(2, "0")}`;
@@ -96,29 +129,40 @@ export default function Home() {
   const [startHour, setStartHour] = useState(9);
   const [endHour, setEndHour] = useState(18);
   const [houseLevel, setHouseLevel] = useState(1);
-  const [placed, setPlaced] = useState<PlacedItem[]>([]);
+  const [houseShape, setHouseShape] = useState<RoomShape>("rect");
+  const [placed, setPlaced] = useState<PlacedItem[]>(() => starterItems(roomFor(1, "rect")));
   const [warehouse, setWarehouse] = useState<PlacedItem[]>([]);
   const [wallpaper, setWallpaper] = useState("stripe");
   const [floor, setFloor] = useState("oak");
   const [ownedThemes, setOwnedThemes] = useState<string[]>(["wall:stripe", "floor:oak"]);
-  const [shopTab, setShopTab] = useState<"floor" | "wall" | "interior">("floor");
+  const [shopTab, setShopTab] = useState<ShopGroup | "interior">("furniture");
   const [ownedPlots, setOwnedPlots] = useState(8);
   const [selectedFurniture, setSelectedFurniture] = useState<string | null>(null);
   const [harvestFx, setHarvestFx] = useState<HarvestFx[]>([]);
+  const [fertMode, setFertMode] = useState<string | null>(null);
   const [fishState, setFishState] = useState<FishState>({ phase: "idle" });
   const [fishLog, setFishLog] = useState<Record<string, number>>({});
+  const [baits, setBaits] = useState<Record<string, number>>(STARTER_BAIT);
+  const [selectedBait, setSelectedBait] = useState("worm");
   const [buffs, setBuffs] = useState<Buff[]>([]);
   const [activeEvent, setActiveEvent] = useState<ActiveEvent | null>(null);
   const [lastEventAt, setLastEventAt] = useState(0);
-  const [notice, setNotice] = useState("오늘도 흙은 정직해요. 씨앗을 심어볼까요?");
+  const [avatar, setAvatar] = useState<StoredAvatar>({ src: DEFAULT_AVATAR, pixelated: true });
+  const [avatarPos, setAvatarPos] = useState({ x: 0.6, z: 0.6, story: 0 });
+  const [stories, setStories] = useState(1);
+  const [viewStory, setViewStory] = useState(0);
+  const [yardLevel, setYardLevel] = useState(1);
+  const [showAvatar, setShowAvatar] = useState(false);
+  const [notice, setNotice] = useState("오늘도 월급은 들어오고, 흙은 정직해요. 씨앗을 심어볼까요?");
   const [musicUrl, setMusicUrl] = useState("");
   const [musicId, setMusicId] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const roomRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
   const fishTimer = useRef<number | undefined>(undefined);
+  const castBait = useRef<Bait | null>(null);
+  const avatarInput = useRef<HTMLInputElement>(null);
   const eventGate = useRef({ ready: false, season: "봄" as Season, lastEventAt: 0, busy: false });
+  const bugGate = useRef<{ ready: boolean; plots: Plot[] }>({ ready: false, plots: [] });
 
   useEffect(() => {
     const saved = localStorage.getItem("four-seasons-farm");
@@ -126,15 +170,21 @@ export default function Home() {
       try {
         const data = JSON.parse(saved);
         const version = data.version ?? 1;
+        const level = data.houseLevel ?? 1, shape: RoomShape = data.houseShape ?? "rect", room = roomFor(level, shape);
+        const hydrate = (list: LegacyItem[]) => (list ?? []).map(item => hydrateItem(item, version, room)).filter((item): item is PlacedItem => Boolean(item));
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
-        setEndHour(data.endHour ?? 18); setHouseLevel(data.houseLevel ?? 1); setOwnedPlots(data.ownedPlots ?? 8);
-        setPlaced((data.placed ?? []).map((item: PlacedItem) => hydrateItem(item, version)).filter(Boolean));
-        setWarehouse((data.warehouse ?? []).map((item: PlacedItem) => hydrateItem(item, version)).filter(Boolean));
+        setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
+        const yard = data.yardLevel ?? 1;
+        setStories(data.stories ?? 1); setYardLevel(yard);
+        setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(item => fitToRoom(item, room, yard)));
+        setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
-        setFishLog(data.fishLog ?? {}); setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
-        setMusicId(data.musicId ?? "");
+        setFishLog(data.fishLog ?? {}); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm");
+        setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
+        setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? "");
       } catch { /* start fresh */ }
     }
+    try { const stored = localStorage.getItem(AVATAR_STORAGE_KEY); if (stored) setAvatar(JSON.parse(stored)); } catch { /* keep default */ }
     setLoaded(true);
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => { clearInterval(timer); window.clearTimeout(fishTimer.current); };
@@ -142,8 +192,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 4, money, plots, startHour, endHour, houseLevel, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, buffs, lastEventAt, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, buffs, lastEventAt, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, buffs, lastEventAt, avatarPos, stories, yardLevel, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, buffs, lastEventAt, avatarPos, stories, yardLevel, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -164,13 +214,16 @@ export default function Home() {
   const seedPrice = (crop: Crop) => Math.round(crop.seed * seedMul);
   const salePrice = (crop: Crop) => Math.round(marketPrice(crop, marketBucket) * priceMul);
   const selectedItem = placed.find(item => item.instanceId === selectedFurniture) ?? null;
+  const room = useMemo(() => roomFor(houseLevel, houseShape), [houseLevel, houseShape]);
+  const houseInfo = HOUSE_SIZES[houseLevel - 1], nextHouse = HOUSE_SIZES[houseLevel];
+  const palette = PALETTES[seasonIndex >= 0 ? seasonIndex : 4];
 
   useEffect(() => {
     if (!available.some(c => c.id === selectedCrop)) setSelectedCrop(available[0]?.id || "potato");
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || showSettings || fishState.phase === "waiting" || fishState.phase === "bite" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || showSettings || showAvatar || fishState.phase === "waiting" || fishState.phase === "bite" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -180,6 +233,33 @@ export default function Home() {
       if (!gate.ready || gate.busy || Date.now() - gate.lastEventAt < EVENT_COOLDOWN_MINUTES * 60000) return;
       if (Math.random() < EVENT_CHANCE) trigger();
     }, EVENT_CHECK_SECONDS * 1000);
+    return () => clearInterval(timer);
+  }, [loaded]);
+
+  // 벌레: 운영 시간 중 주기적으로 자라는 작물 하나에 날아온다. 제때 못 잡으면 그 작물 판매가가 깎인다.
+  useEffect(() => { bugGate.current = { ready: loaded && isWorkTime, plots }; });
+  useEffect(() => {
+    if (!loaded) return;
+    let lastSpawn = Date.now();
+    const timer = setInterval(() => {
+      const nowTime = Date.now(), current = bugGate.current.plots;
+      const missed = current.map((plot, index) => (plot?.bug && nowTime - plot.bug >= BUG_SECONDS * 1000 ? index : -1)).filter(index => index >= 0);
+      let target = -1;
+      if (bugGate.current.ready && nowTime - lastSpawn >= BUG_CHECK_SECONDS * 1000 && !current.some(plot => plot?.bug && nowTime - plot.bug < BUG_SECONDS * 1000)) {
+        lastSpawn = nowTime;
+        const growing = current.map((plot, index) => { const crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined; return plot && crop && !plotStatus(plot, crop, nowTime).ready ? index : -1; }).filter(index => index >= 0);
+        if (growing.length && Math.random() < BUG_CHANCE) target = growing[Math.floor(Math.random() * growing.length)];
+      }
+      if (!missed.length && target < 0) return;
+      setPlots(plots => plots.map((plot, index) => {
+        if (!plot) return plot;
+        if (missed.includes(index) && plot.bug) return { ...plot, bug: undefined, bugHits: (plot.bugHits ?? 0) + 1 };
+        if (index === target && !plot.bug) return { ...plot, bug: nowTime };
+        return plot;
+      }));
+      if (target >= 0) { playBuzz(); setNotice(`🐛 벌레가 날아왔어요! ${BUG_SECONDS}초 안에 잡아 주세요.`); }
+      else setNotice(`🐛 벌레를 놓쳐 작물이 상했어요. 해당 작물 판매가 -${Math.round(BUG_PENALTY * 100)}%`);
+    }, 1000);
     return () => clearInterval(timer);
   }, [loaded]);
 
@@ -200,8 +280,40 @@ export default function Home() {
     if (growSeconds > seasonSecondsLeft) return setNotice(`${season}이 ${formatClock(seasonSecondsLeft)} 뒤 끝나요. ${crop.name}은(는) 그 전에 다 자라지 못해요.`);
     const price = seedPrice(crop);
     if (money < price) return setNotice("씨앗을 살 돈이 부족해요. 익은 작물을 수확해 보세요.");
-    const next = [...plots]; next[index] = { cropId: crop.id, plantedAt: Date.now(), growSeconds };
-    setPlots(next); setMoney(m => m - price); setNotice(`${crop.icon} ${crop.name}을(를) 심었어요. ${growSeconds}초 뒤 수확해요!`);
+    const next = [...plots]; next[index] = { cropId: crop.id, plantedAt: Date.now(), growSeconds, water: [] };
+    setPlots(next); setMoney(m => m - price); setNotice(`${crop.icon} ${crop.name}을(를) 심었어요. ${growSeconds}초 뒤 수확해요! 중간에 목말라하면 물을 주세요.`);
+  }
+
+  function waterPlots(indexes: number[]) {
+    const time = Date.now();
+    setPlots(current => current.map((plot, index) => (plot && indexes.includes(index) ? { ...plot, water: [...(plot.water ?? []), time] } : plot)));
+    setNotice(indexes.length > 1 ? `💧 목마른 밭 ${indexes.length}칸에 물을 줬어요.` : "💧 촉촉하게 물을 줬어요. 품질이 좋아져요!");
+  }
+
+  function fertilize(index: number, plot: NonNullable<Plot>, crop: Crop, fertilizer: Fertilizer) {
+    if (plot.fert) return setNotice(`${crop.name}에는 이미 거름을 줬어요. 한 작물에 한 번만 줄 수 있어요.`);
+    if (money < fertilizer.price) return setNotice(`${fertilizer.name}은(는) ${fertilizer.price.toLocaleString()}원이에요.`);
+    setMoney(m => m - fertilizer.price);
+    setPlots(current => current.map((item, i) => (i === index && item ? applyFertilizer(item, crop, fertilizer, Date.now()) : item)));
+    setNotice(`${fertilizer.icon} ${crop.name}에 ${fertilizer.name}을(를) 줬어요. (${fertilizer.note})`);
+  }
+
+  function catchBug(event: React.MouseEvent, index: number) {
+    event.stopPropagation();
+    setPlots(current => current.map((plot, i) => (i === index && plot ? { ...plot, bug: undefined } : plot)));
+    playCoinSound([1320, 1760]); setNotice("👏 벌레를 잡았어요! 작물이 무사해요.");
+  }
+
+  function clickPlot(index: number) {
+    const plot = plots[index], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
+    if (!plot || !crop) return plant(index);
+    if (seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod) return clearWithered(index, crop);
+    const status = plotStatus(plot, crop, Date.now());
+    if (status.ready) return harvest(index, plot, crop);
+    const fertilizer = FERTILIZERS.find(item => item.id === fertMode);
+    if (fertilizer) return fertilize(index, plot, crop, fertilizer);
+    if (status.thirsty) return waterPlots([index]);
+    setNotice(`${crop.icon} ${crop.name} ${Math.floor(status.progress)}% · ${status.remaining}초 남음 · 물 ${status.satisfied}/${status.total}${status.fert ? ` · ${status.fert.name}` : ""}`);
   }
 
   function clearWithered(index: number, crop: Crop) {
@@ -210,14 +322,14 @@ export default function Home() {
   }
 
   function harvest(index: number, plot: NonNullable<Plot>, crop: Crop) {
-    const progress = (Date.now() - plot.plantedAt) / 1000 / (plot.growSeconds ?? crop.seconds);
-    if (progress < 1) return setNotice(`${crop.name}이(가) 아직 자라는 중이에요. 조금만 기다려주세요.`);
-    const amount = salePrice(crop);
-    const fx = { id: Date.now(), plotIndex: index, icon: crop.icon, amount };
+    const status = plotStatus(plot, crop, Date.now());
+    if (!status.ready) return setNotice(`${crop.name}이(가) 아직 자라는 중이에요. 조금만 기다려주세요.`);
+    const amount = Math.round(salePrice(crop) * status.quality.multiplier * status.bugMultiplier);
+    const fx = { id: Date.now(), plotIndex: index, icon: crop.icon, amount, stars: status.quality.stars };
     const next = [...plots]; next[index] = null; setPlots(next); setMoney(m => m + amount);
     setHarvestFx(items => [...items, fx]); window.setTimeout(() => setHarvestFx(items => items.filter(item => item.id !== fx.id)), 1100);
     playCoinSound();
-    setNotice(`짤랑~ ${crop.icon} ${crop.name}을(를) 오늘 시세 ${amount.toLocaleString()}원에 팔았어요!`);
+    setNotice(`짤랑~ ${crop.icon} ${crop.name}(${status.quality.name}${status.bugMultiplier < 1 ? ` · 벌레 피해 -${Math.round((1 - status.bugMultiplier) * 100)}%` : ""})을(를) ${amount.toLocaleString()}원에 팔았어요!`);
   }
 
   function expandField() {
@@ -229,8 +341,18 @@ export default function Home() {
     setNotice(`🌱 밭 두 칸을 새로 샀어요! 이제 ${ownedPlots + 2}칸에서 농사지을 수 있어요.`);
   }
 
+  // ---------- 낚시 ----------
+  function buyBait(bait: Bait) {
+    if (money < bait.price) return setNotice(`${bait.name} ${bait.pack}개는 ${bait.price.toLocaleString()}원이에요.`);
+    setMoney(value => value - bait.price); setBaits(stock => ({ ...stock, [bait.id]: (stock[bait.id] ?? 0) + bait.pack })); setSelectedBait(bait.id);
+    setNotice(`${bait.icon} ${bait.name} ${bait.pack}개를 샀어요.`);
+  }
+
   function castLine() {
     if (!isWorkTime) return setNotice("밤에는 강물이 차가워 낚시터가 쉬어요.");
+    const bait = BAITS.find(item => item.id === selectedBait) ?? BAITS[0];
+    if (!baits[bait.id]) return setNotice(`${bait.icon} ${bait.name}이(가) 없어요. 미끼 가방에서 사 주세요.`);
+    setBaits(stock => ({ ...stock, [bait.id]: stock[bait.id] - 1 })); castBait.current = bait;
     window.clearTimeout(fishTimer.current);
     setFishState({ phase: "waiting" });
     fishTimer.current = window.setTimeout(() => {
@@ -241,15 +363,17 @@ export default function Home() {
 
   function reelIn() {
     window.clearTimeout(fishTimer.current);
-    if (fishState.phase === "waiting") return setFishState({ phase: "result", text: "너무 일찍 챘어요! 물고기가 놀라 도망갔어요." });
-    const fish = rollFish(season, fishMul);
+    if (fishState.phase === "waiting") return setFishState({ phase: "result", text: "너무 일찍 챘어요! 미끼만 날리고 물고기는 도망갔어요." });
+    const bait = castBait.current ?? BAITS[0];
+    const fish = rollFish(season, { normal: bait.normalBoost, rare: bait.rareBoost * fishMul });
     setMoney(value => value + fish.price);
     setFishLog(log => ({ ...log, [fish.id]: (log[fish.id] ?? 0) + 1 }));
-    setFishState({ phase: "result", fish });
+    setFishState({ phase: "result", fish, bait });
     playCoinSound(fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" ? [880, 1100, 1320] : [880, 1320]);
     setNotice(fish.rarity === "전설" ? `✨ 전설의 ${fish.name}을(를) 낚았어요!! ${fish.price.toLocaleString()}원에 박물관이 사 갔어요!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚아 ${fish.price.toLocaleString()}원에 팔았어요.`);
   }
 
+  // ---------- 이벤트 ----------
   function chooseEventOption(index: number) {
     if (!activeEvent) return;
     const result = resolveChoice(activeEvent.event.choices[index]);
@@ -267,25 +391,90 @@ export default function Home() {
     return Math.max(0, -Math.min(...costs));
   }
 
-  function upgradeHouse() {
-    const price = houseLevel === 1 ? 4500 : 9000;
-    if (houseLevel >= 3) return setNotice("집은 이미 가장 넓어요!");
-    if (money < price) return setNotice(`증축하려면 ${price.toLocaleString()}원이 필요해요.`);
-    setMoney(m => m - price); setHouseLevel(l => l + 1); setNotice("🔨 증축 완료! 집이 넓어지고 지붕도 새로 올렸어요.");
+  // ---------- 아바타 ----------
+  async function uploadAvatar(file: File | undefined) {
+    if (!file) return;
+    try {
+      const { src, transparent } = await readAvatarFile(file);
+      const next = { src, pixelated: false };
+      setAvatar(next);
+      try { localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(next)); } catch { setNotice("이미지가 너무 커서 저장하지 못했어요. 이번 접속에서만 사용돼요."); return; }
+      setNotice(transparent ? "🪞 새 아바타로 바꿨어요!" : "🪞 아바타를 바꿨어요. 배경이 투명하지 않아 네모 테두리가 보일 수 있어요.");
+    } catch (error) {
+      setNotice(`🚫 ${(error as Error).message}`);
+    } finally {
+      if (avatarInput.current) avatarInput.current.value = "";
+    }
   }
 
-  function defaultSpot(item: Furniture, count: number) {
-    if (item.kind === "wall") return { x: 25 + (count * 17) % 55, y: 35 };
-    if (item.kind === "rug") return { x: 50, y: 60 };
-    return { x: 22 + (count * 13) % 58, y: 45 + (count % 3) * 18 };
+  function resetAvatar() {
+    setAvatar({ src: DEFAULT_AVATAR, pixelated: true });
+    try { localStorage.removeItem(AVATAR_STORAGE_KEY); } catch { /* ignore */ }
+    setNotice("🐱 기본 아바타로 돌아왔어요.");
+  }
+
+  // ---------- 집 ----------
+  function applyRoom(level: number, shape: RoomShape) {
+    const next = roomFor(level, shape);
+    setPlaced(items => items.map(item => fitToRoom(item, next, yardLevel)));
+    setAvatarPos(pos => (fitsInRoom(next.points, pos.x, pos.z, 0.25) || (pos.story === 0 && fitsInYard(next, yardLevel, pos.x, pos.z, 0.3)) ? pos : { ...pos, x: 0, z: 0 }));
+  }
+
+  function upgradeHouse() {
+    if (!nextHouse) return setNotice("집은 이미 가장 넓어요!");
+    if (money < nextHouse.price) return setNotice(`${nextHouse.pyeong}평으로 증축하려면 ${nextHouse.price.toLocaleString()}원이 필요해요.`);
+    setMoney(m => m - nextHouse.price); setHouseLevel(nextHouse.level); applyRoom(nextHouse.level, houseShape);
+    setNotice(`🔨 증축 완료! ${nextHouse.name}(${nextHouse.pyeong}평)이 되었어요.`);
+  }
+
+  function remodel(shape: RoomShape) {
+    if (shape === houseShape) return;
+    if (money < REMODEL_PRICE) return setNotice(`구조를 바꾸려면 ${REMODEL_PRICE.toLocaleString()}원이 필요해요.`);
+    setMoney(m => m - REMODEL_PRICE); setHouseShape(shape); applyRoom(houseLevel, shape);
+    setNotice(`📐 ${SHAPES.find(item => item.id === shape)!.name} 구조로 리모델링했어요. 밖으로 밀려난 가구는 안쪽으로 옮겼어요.`);
+  }
+
+  function buildSecondFloor() {
+    if (stories >= 2) { setSelectedFurniture(null); return setViewStory(1); }
+    if (houseLevel < 3) return setNotice("2층은 18평(햇살 농가) 이상부터 올릴 수 있어요.");
+    if (money < SECOND_FLOOR_PRICE) return setNotice(`2층을 올리려면 ${SECOND_FLOOR_PRICE.toLocaleString()}원이 필요해요.`);
+    const stairs = FURNITURE.find(item => item.id === "stairs")!;
+    const corner = room.points[0], spot = { x: corner[0] + 0.8, z: corner[1] + 1.6 };
+    setMoney(m => m - SECOND_FLOOR_PRICE); setStories(2); setViewStory(1); setSelectedFurniture(null);
+    setPlaced(items => [...items, fitToRoom({ ...stairs, instanceId: `stairs-${Date.now()}`, ...spot, rot: 0, story: 0 }, room, yardLevel), { ...FURNITURE.find(item => item.id === "window")!, instanceId: `window-up-${Date.now()}`, x: 0, z: 0, rot: 0, wall: 0, u: 0.5, h: 1.45, story: 1 }]);
+    setNotice("🏠 2층을 올렸어요! 계단을 놓아 두었고, 지금은 2층을 보고 있어요.");
+  }
+
+  function expandYard() {
+    const next = YARD_SIZES[yardLevel];
+    if (!next) return setNotice("마당은 이미 가장 넓어요!");
+    if (money < next.price) return setNotice(`${next.name}(으)로 넓히려면 ${next.price.toLocaleString()}원이 필요해요.`);
+    setMoney(m => m - next.price); setYardLevel(next.level);
+    setNotice(`🌳 마당을 ${next.name}(으)로 넓혔어요!`);
+  }
+
+  function defaultSpot(item: Furniture, count: number): Partial<PlacedItem> {
+    if (item.yard) {
+      // 앞마당부터 가운데→바깥 순으로 훑어 다른 마당 소품과 겹치지 않는 첫 자리를 고른다.
+      const others = placed.filter(other => other.yard), need = Math.max(item.size[0], item.size[2]) / 2 + 0.5;
+      for (let z = room.depth / 2 + 1.2; z < room.depth / 2 + 12; z += 1.1) for (let step = 0; step < 16; step++) {
+        const x = (step % 2 ? 1 : -1) * Math.ceil(step / 2) * 1.1;
+        if (fitsInYard(room, yardLevel, x, z, need * 0.7) && others.every(other => Math.hypot(other.x - x, other.z - z) > need + Math.max(other.size[0], other.size[2]) / 2)) return { x, z, rot: 0 };
+      }
+      return { x: 0, z: room.depth / 2 + 1.4, rot: 0 };
+    }
+    if (item.kind === "wall") return { wall: 0, u: 0.25 + ((count * 0.17) % 0.5), h: item.mount ?? 1.5, x: 0, z: 0, rot: 0, story: viewStory };
+    const angle = count * 2.1, radius = (count % 3) * 0.5;
+    const spot = { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius };
+    return fitsInRoom(room.points, spot.x, spot.z, 0.25) ? { ...spot, rot: 0, story: viewStory } : { x: 0, z: 0, rot: 0, story: viewStory };
   }
 
   function buyFurniture(item: Furniture) {
     if (money < item.price) return setNotice(`${item.name}을(를) 사려면 ${item.price.toLocaleString()}원이 필요해요.`);
     const instanceId = `${item.id}-${Date.now()}`;
-    setMoney(m => m - item.price); setPlaced(p => [...p, { ...item, instanceId, ...defaultSpot(item, placed.length), flip: false }]);
+    setMoney(m => m - item.price); setPlaced(p => [...p, fitToRoom({ ...item, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(item, placed.length) }, room, yardLevel)]);
     setSelectedFurniture(instanceId);
-    setNotice(`${item.icon} ${item.name}을(를) 집에 들였어요. 끌어서 자리를 잡아주세요.`);
+    setNotice(`${item.icon} ${item.name}을(를) 집에 들였어요. 끌어서 자리를 잡고 원하는 각도로 돌려 보세요.`);
   }
 
   function buyTheme(kind: "wall" | "floor", theme: Theme) {
@@ -296,40 +485,36 @@ export default function Home() {
     setNotice(`🎨 ${theme.name}을(를) 시공했어요! 이제 언제든 무료로 바꿀 수 있어요.`);
   }
 
-  function roomPoint(event: React.PointerEvent) {
-    const rect = roomRef.current!.getBoundingClientRect();
-    return { left: ((event.clientX - rect.left) / rect.width) * 100, top: ((event.clientY - rect.top) / rect.height) * 100 };
+  function updateItem(id: string, patch: Partial<PlacedItem>) {
+    setPlaced(items => items.map(item => item.instanceId === id ? { ...item, ...patch } : item));
   }
 
-  function startDrag(event: React.PointerEvent<HTMLButtonElement>, item: PlacedItem) {
-    if (!roomRef.current) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const point = roomPoint(event), layout = itemLayout(item);
-    dragRef.current = { id: item.instanceId, dx: point.left - layout.left, dy: point.top - layout.top };
-    setSelectedFurniture(item.instanceId);
+  function rotateSelected(delta: number | null, absolute?: number) {
+    if (!selectedItem || selectedItem.kind === "wall") return;
+    updateItem(selectedItem.instanceId, { rot: ((absolute ?? selectedItem.rot + (delta ?? 0)) % 360 + 360) % 360 });
   }
 
-  function moveDrag(event: React.PointerEvent<HTMLButtonElement>) {
-    const drag = dragRef.current;
-    if (!drag || !roomRef.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const point = roomPoint(event);
-    setPlaced(items => items.map(item => item.instanceId === drag.id ? { ...item, ...pointToItem(item.kind, point.left - drag.dx, point.top - drag.dy) } : item));
-  }
-
-  function updateSelected(patch: (item: PlacedItem) => Partial<PlacedItem>) {
+  function houseKeys(event: React.KeyboardEvent) {
     if (!selectedFurniture) return;
-    setPlaced(items => items.map(item => item.instanceId === selectedFurniture ? { ...item, ...patch(item) } : item));
-  }
-
-  function nudge(event: React.KeyboardEvent, item: PlacedItem) {
-    const step = event.shiftKey ? 6 : 2;
+    const step = event.shiftKey ? 0.5 : 0.1;
     const moves: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
-    if (event.key === "f" || event.key === "F") { setSelectedFurniture(item.instanceId); return setPlaced(items => items.map(it => it.instanceId === item.instanceId ? { ...it, flip: !it.flip } : it)); }
+    if (event.key === "q" || event.key === "Q") { event.preventDefault(); return rotateSelected(-15); }
+    if (event.key === "e" || event.key === "E") { event.preventDefault(); return rotateSelected(15); }
     const move = moves[event.key]; if (!move) return;
-    event.preventDefault(); setSelectedFurniture(item.instanceId);
-    const layout = itemLayout(item);
-    const next = item.kind === "wall" ? pointToItem(item.kind, layout.left + move[0] * 0.72, layout.top + move[1] * 0.5) : pointToItem(item.kind, layout.left + move[0] * 0.8, layout.top + move[1] * 0.4);
-    setPlaced(items => items.map(it => it.instanceId === item.instanceId ? { ...it, ...next } : it));
+    event.preventDefault();
+    if (selectedFurniture === AVATAR_ID) {
+      const next = { ...avatarPos, x: avatarPos.x + move[0], z: avatarPos.z + move[1] };
+      if (fitsInRoom(room.points, next.x, next.z, 0.25) || (next.story === 0 && fitsInYard(room, yardLevel, next.x, next.z, 0.3))) setAvatarPos(next);
+      return;
+    }
+    if (!selectedItem) return;
+    if (selectedItem.kind === "wall") {
+      const length = wallInfo(room.points, selectedItem.wall ?? 0).length;
+      const h = selectedItem.fixedMount ? selectedItem.h : Math.min(WALL_HEIGHT - selectedItem.size[1] / 2 - 0.05, Math.max(selectedItem.size[1] / 2 + 0.1, (selectedItem.h ?? 1.4) - move[1]));
+      return updateItem(selectedItem.instanceId, fitToRoom({ ...selectedItem, u: (selectedItem.u ?? 0.5) + move[0] / length, h }, room, yardLevel));
+    }
+    const next = { x: selectedItem.x + move[0], z: selectedItem.z + move[1] };
+    if (selectedItem.yard ? fitsInYard(room, yardLevel, next.x, next.z) : fitsInRoom(room.points, next.x, next.z, 0.25)) updateItem(selectedItem.instanceId, next);
   }
 
   function sellFurniture() {
@@ -349,7 +534,7 @@ export default function Home() {
 
   function restoreFurniture(item: PlacedItem) {
     setWarehouse(items => items.filter(furniture => furniture.instanceId !== item.instanceId));
-    setPlaced(items => [...items, { ...item, ...defaultSpot(item, 2) }]); setSelectedFurniture(item.instanceId);
+    setPlaced(items => [...items, fitToRoom({ ...item, ...defaultSpot(item, 2) }, room, yardLevel)]); setSelectedFurniture(item.instanceId);
     setNotice(`${item.icon} ${item.name}을(를) 창고에서 꺼냈어요. 원하는 곳으로 옮겨주세요.`);
   }
 
@@ -369,14 +554,15 @@ export default function Home() {
     </button>;
   });
 
-  const lamps = placed.filter(item => item.id === "lamp");
-  const shopItems = FURNITURE.filter(item => shopTab === "wall" ? item.kind === "wall" : item.kind !== "wall");
+  const shopItems = FURNITURE.filter(item => item.group === shopTab);
   const seasonFish = FISH.filter(fish => fish.season === season);
+  const avatarImg = <img src={avatar.src} alt="" className={avatar.pixelated ? "pixelated" : ""} draggable={false} />;
+  const currentBait = BAITS.find(item => item.id === selectedBait) ?? BAITS[0];
 
   return (
     <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4}`}>
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">田</span><div><h1>사계농가</h1><p>오늘 심고, 천천히 사는 집</p></div></div>
+        <div className="brand"><button className="avatar-button" onClick={() => setShowAvatar(true)} aria-label="내 아바타 바꾸기">{avatarImg}</button><div><h1>월루농가</h1><p>월급은 루팡, 농사는 진심</p></div></div>
         <div className="status-cluster">
           <div className="status-card money"><span>💰 보유 자금</span><strong>{money.toLocaleString()}원</strong></div>
           <div className="status-card clock"><span>🕰 {timeLabel}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
@@ -406,16 +592,22 @@ export default function Home() {
 
       {tab === "farm" && <div className="game-grid">
         <section className="farm-panel panel">
-          <div className="panel-heading"><div><span className="eyebrow">MY FIELD</span><h3>햇살 텃밭</h3></div><span className="plot-count">{plots.filter(Boolean).length}/{plotCount} 재배 중</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">MY FIELD</span><h3>햇살 텃밭</h3></div><div className="farm-actions">{(() => { const thirsty = plots.map((plot, index) => { const crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined; return plot && crop && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod && plotStatus(plot, crop, nowMs).thirsty ? index : -1; }).filter(index => index >= 0); return <button className="water-all" onClick={() => waterPlots(thirsty)} disabled={!thirsty.length}>💧 모두 물주기{thirsty.length ? ` (${thirsty.length})` : ""}</button>; })()}<span className="plot-count">{plots.filter(Boolean).length}/{plotCount} 재배 중</span></div></div>
           <div className={`plots plots-${plotCount}`}>
             {Array.from({ length: plotCount }).map((_, index) => {
               const plot = plots[index] || null; const crop = plot ? CROPS.find(c => c.id === plot.cropId)! : null;
               const withered = Boolean(plot && seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod);
-              const progress = plot && crop ? Math.min(100, ((nowMs - plot.plantedAt) / 1000 / (plot.growSeconds ?? crop.seconds)) * 100) : 0;
-              return <button key={index} className={`plot ${withered ? "withered" : progress >= 100 ? "ready" : ""}`} onClick={() => plot && crop ? (withered ? clearWithered(index, crop) : harvest(index, plot, crop)) : plant(index)}>
-                {crop && withered ? <><span className="plant">🥀</span><span className="plot-label">시듦 · 치우기</span></> : crop ? <><span className="plant">{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span><span className="plot-label">{progress >= 100 ? "수확하기" : `${Math.floor(progress)}%`}</span><span className="grow-bar"><i style={{ width: `${progress}%` }} /></span></> : <><span className="soil-lines">╱ ╱ ╱</span><span className="plot-label">심기</span></>}
-                {harvestFx.filter(fx => fx.plotIndex === index).map(fx => <span className="harvest-fx" key={fx.id}><b>{fx.icon}</b><i>＋{fx.amount.toLocaleString()}원</i><em>✦</em><em>✦</em><em>●</em></span>)}
-              </button>;
+              const status = plot && crop ? plotStatus(plot, crop, nowMs) : null;
+              const progress = status?.progress ?? 0, bugLeft = plot?.bug ? Math.max(0, BUG_SECONDS - Math.floor((nowMs - plot.bug) / 1000)) : 0;
+              return <div key={index} className="plot-cell"><button className={`plot ${withered ? "withered" : status?.ready ? "ready" : status?.thirsty ? "thirsty" : ""} ${fertMode && status && !status.ready && !withered ? "fert-target" : ""}`} onClick={() => clickPlot(index)}>
+                {crop && withered ? <><span className="plant">🥀</span><span className="plot-label">시듦 · 치우기</span></> : crop && status ? <>
+                  <span className="plant">{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span>
+                  <span className="plot-label">{status.ready ? `수확하기 ${status.quality.stars}` : status.thirsty ? "💧 목말라요" : `${Math.floor(progress)}%`}</span>
+                  <span className="grow-bar"><i style={{ width: `${progress}%` }} /></span>
+                  <span className="plot-badges">{Array.from({ length: status.total }).map((_, k) => <i key={k} className={k < status.satisfied ? "on" : ""}>💧</i>)}{status.fert && <i className="on">{status.fert.icon}</i>}{plot?.bugHits ? <i className="hurt">🐛-{Math.round((1 - status.bugMultiplier) * 100)}%</i> : null}</span>
+                </> : <><span className="soil-lines">╱ ╱ ╱</span><span className="plot-label">심기</span></>}
+                {harvestFx.filter(fx => fx.plotIndex === index).map(fx => <span className="harvest-fx" key={fx.id}><b>{fx.icon}</b><i>＋{fx.amount.toLocaleString()}원 {fx.stars}</i><em>✦</em><em>✦</em><em>●</em></span>)}
+              </button>{plot?.bug && !withered && <button className="bug" aria-label={`벌레 잡기, ${bugLeft}초 남음`} onClick={event => catchBug(event, index)}>🐛<b>{bugLeft}</b></button>}</div>;
             })}
           </div>
         </section>
@@ -424,7 +616,8 @@ export default function Home() {
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= 16 ? "최대 확장 완료" : `${(2400 + (ownedPlots - 8) * 700).toLocaleString()}원 · 최대 16칸`}</small></div><button onClick={expandField} disabled={ownedPlots >= 16}>구매</button></div>
-          <div className="tip">🥀 계절이 바뀌면 지난 계절에 심은 작물은 모두 시들어요. 남은 시간을 확인하고 심으세요.</div>
+          <div className="fert-shop"><b>🧑‍🌾 거름 주기</b><small>고른 뒤 자라는 작물을 누르면 줘요(작물당 1번)</small><div>{FERTILIZERS.map(item => <button key={item.id} className={fertMode === item.id ? "on" : ""} onClick={() => setFertMode(mode => (mode === item.id ? null : item.id))} aria-pressed={fertMode === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.price}원 · {item.note}</small></button>)}</div>{fertMode && <button className="fert-cancel" onClick={() => setFertMode(null)}>거름 주기 끝내기</button>}</div>
+          <div className="tip">💧 자라는 동안 2~3번 목말라해요. 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 눌러 잡으세요. 놓치면 그 작물 판매가 -{Math.round(BUG_PENALTY * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
         </aside>
       </div>}
 
@@ -432,63 +625,74 @@ export default function Home() {
         <section className="panel fish-panel">
           <div className="panel-heading"><div><span className="eyebrow">RIVERSIDE</span><h3>{season} 강가 낚시터</h3></div><span className="plot-count">전설 출현 0.1%</span></div>
           <div className={`pond phase-${fishState.phase}`}>
-            <div className="pond-bank"><span className="angler">🧑‍🌾</span></div>
-            <div className="pond-water"><span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}</div>
+            <div className="pond-bank" />
+            <svg className="rod" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="21" y1="58" x2="40" y2="36" />{(fishState.phase === "waiting" || fishState.phase === "bite") && <line className="line" x1="40" y1="36" x2="60" y2={fishState.phase === "bite" ? 70 : 64} />}</svg>
+            <div className="angler">{avatarImg}</div>
+            <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
             {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : ""}`}>
               {fishState.fish ? <><b>{fishState.fish.icon}</b><strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span><small>{fishState.fish.note}</small><em>＋{fishState.fish.price.toLocaleString()}원</em></> : <><b>💨</b><small>{fishState.text}</small></>}
             </div>}
           </div>
           <div className="fish-controls">
-            <p>{fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : "낚싯대를 던지고, 찌가 쑥 들어가면 재빨리 당기세요."}</p>
-            {fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime}>{fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
+            <p>{fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : `${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
+            {fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime || !baits[currentBait.id]}>{fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
           </div>
         </section>
         <aside className="panel fish-book">
-          <div className="panel-heading"><div><span className="eyebrow">FISH BOOK</span><h3>물고기 도감</h3></div><span className="plot-count">{FISH.filter(fish => fishLog[fish.id]).length}/{FISH.length}</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">BAIT BAG</span><h3>미끼 가방</h3></div></div>
+          <div className="bait-list">{BAITS.map(bait => <div key={bait.id} className={`bait ${selectedBait === bait.id ? "on" : ""}`}>
+            <button className="bait-pick" onClick={() => setSelectedBait(bait.id)} aria-pressed={selectedBait === bait.id}><span>{bait.icon}</span><b>{bait.name}</b><small>{bait.note}</small><em>{baits[bait.id] ?? 0}개</em></button>
+            <button className="bait-buy" onClick={() => buyBait(bait)}>{bait.pack}개 {bait.price.toLocaleString()}원</button>
+          </div>)}</div>
+          <div className="panel-heading fish-book-heading"><div><span className="eyebrow">FISH BOOK</span><h3>물고기 도감</h3></div><span className="plot-count">{FISH.filter(fish => fishLog[fish.id]).length}/{FISH.length}</span></div>
           <p className="hint">지금 {season}에 잡히는 물고기{fishMul > 1 ? ` · 희귀 확률 ×${fishMul.toFixed(1)}` : ""}</p>
           <div className="fish-list">{seasonFish.map(fish => <div key={fish.id} className={`fish-entry ${fishLog[fish.id] ? "caught" : ""} ${fish.rarity === "전설" ? "legend" : ""}`}><span>{fishLog[fish.id] ? fish.icon : "❔"}</span><b>{fishLog[fish.id] || fish.rarity !== "전설" ? fish.name : "???"}</b><small className={`rarity rarity-${fish.rarity}`}>{fish.rarity}</small><i>{fishLog[fish.id] ? `${fishLog[fish.id]}마리` : `${fish.price.toLocaleString()}원`}</i></div>)}</div>
-          <div className="season-book">{SEASONS.map(s => <span key={s}>{SEASON_ICON[s]} {FISH.filter(fish => fish.season === s && fishLog[fish.id]).length}/4</span>)}</div>
+          <div className="season-book">{SEASONS.map(s => { const total = FISH.filter(fish => fish.season === s).length; return <span key={s}>{SEASON_ICON[s]} {FISH.filter(fish => fish.season === s && fishLog[fish.id]).length}/{total}</span>; })}</div>
         </aside>
       </div>}
 
       {tab === "home" && <div className="home-grid">
         <section className="house-panel panel">
-          <div className="panel-heading"><div><span className="eyebrow">MY COTTAGE</span><h3>{["", "작은 농가", "햇살 가득 농가", "꿈의 전원주택"][houseLevel]}</h3></div><button className="upgrade" onClick={upgradeHouse}>{houseLevel >= 3 ? "최대 증축" : `증축 ${houseLevel === 1 ? "4,500" : "9,000"}원`}</button></div>
-          <div className={`house-scene level-${houseLevel}`}>
-            <span className="sky-sun" /><span className="cloud c1" /><span className="cloud c2" />
-            <div className="house">
-              <div className="roof"><i className="chimney"><b /><b /><b /></i>{houseLevel >= 2 && <i className="roof-window" />}{houseLevel >= 3 && <i className="roof-window second" />}</div>
-              <div className="house-body">
-                <div ref={roomRef} className="room" onPointerDown={event => { if (event.target === event.currentTarget || (event.target as Element).closest(".room-shell")) setSelectedFurniture(null); }}>
-                  <RoomShell wallpaper={wallpaper} floor={floor} />
-                  {placed.map(item => { const layout = itemLayout(item);
-                    return <button key={item.instanceId} className={`placed-item kind-${item.kind} ${selectedFurniture === item.instanceId ? "selected" : ""}`} style={{ left: `${layout.left}%`, top: `${layout.top}%`, width: `${layout.width}%`, zIndex: layout.z, "--c": item.tint ?? item.color } as CSSProperties} onPointerDown={event => startDrag(event, item)} onPointerMove={moveDrag} onPointerUp={() => { dragRef.current = null; }} onKeyDown={event => nudge(event, item)} aria-label={`${item.name} — 끌거나 방향키로 이동, F로 뒤집기`}><FurnitureArt id={item.id} flip={item.flip} /></button>; })}
-                  <div className="room-dim" />
-                  <span className="pendant-glow" />
-                  {lamps.map(item => { const layout = itemLayout(item); const height = layout.width * artAspect(item.id) * 1.6;
-                    return <span key={`glow-${item.instanceId}`} className="lamp-glow" style={{ left: `${layout.left}%`, top: `${layout.top - height * 0.86}%`, width: `${layout.width * 5}%` }} />; })}
-                </div>
-              </div>
-              <div className="foundation" />
-            </div>
-            <div className="ground"><span>🌼</span><span>🌿</span><span>🌷</span><span>🌿</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">MY COTTAGE · {houseInfo.pyeong}평 · {room.width.toFixed(1)}×{room.depth.toFixed(1)}m</span><h3>{houseInfo.name}</h3></div><button className="upgrade" onClick={upgradeHouse} disabled={!nextHouse}>{nextHouse ? `${nextHouse.pyeong}평 증축 ${nextHouse.price.toLocaleString()}원` : "최대 증축"}</button></div>
+          <div className="story-bar">
+            <div className="story-tabs" role="tablist" aria-label="층 선택">{Array.from({ length: stories }).map((_, story) => <button key={story} role="tab" aria-selected={viewStory === story} className={viewStory === story ? "active" : ""} onClick={() => { setViewStory(story); setSelectedFurniture(null); }}>{story + 1}층</button>)}</div>
+            <span>🌳 {YARD_SIZES[yardLevel - 1].name}{stories > 1 ? " · 2층집" : ""}</span>
+          </div>
+          {/* 3D 캔버스 위에서 방향키·Q/E로 가구를 움직이기 위한 포커스 영역 */}
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
+          <div className="house3d-wrap" role="application" tabIndex={0} onKeyDown={houseKeys} aria-label="3D 집. 가구를 선택한 뒤 방향키로 이동, Q·E로 회전">
+            {loaded && <Suspense fallback={<div className="house3d house3d-loading">3D 집을 짓는 중…</div>}>
+              <House3D items={placed} room={room} wallpaper={wallpaper} floor={floor} night={seasonIndex < 0} palette={palette} avatar={{ ...avatar, ...avatarPos }} stories={stories} viewStory={viewStory} yardLevel={yardLevel} selectedId={selectedFurniture} onSelect={setSelectedFurniture} onMove={updateItem} onAvatarMove={(x, z) => setAvatarPos(pos => ({ ...pos, x, z, story: fitsInRoom(room.points, x, z, 0) ? viewStory : 0 }))} />
+            </Suspense>}
           </div>
           <div className="decor-toolbar">
-            <span>{selectedItem ? `${selectedItem.name} 편집 중` : "가구를 눌러 선택하세요"}</span>
-            <button onClick={() => updateSelected(item => ({ flip: !item.flip }))} disabled={!selectedItem}>⇋ 좌우 반전</button>
-            <div className="tint-row" role="group" aria-label="가구 색상">{TINTS.map(color => <button key={color} className={`tint ${(selectedItem?.tint ?? selectedItem?.color) === color ? "on" : ""}`} style={{ background: color }} onClick={() => updateSelected(() => ({ tint: color }))} disabled={!selectedItem} aria-label={`색상 ${color}`} />)}<button className="tint reset" onClick={() => updateSelected(() => ({ tint: undefined }))} disabled={!selectedItem} aria-label="기본 색상">↺</button></div>
-            <button onClick={storeFurniture} disabled={!selectedItem}>📦 창고 보관</button>
-            <button className="sell-button" onClick={sellFurniture} disabled={!selectedItem}>판매 (50%)</button>
+            <select value={selectedFurniture ?? ""} onChange={event => setSelectedFurniture(event.target.value || null)} aria-label="편집할 가구 선택">
+              <option value="">가구 선택…</option><option value={AVATAR_ID}>🧍 내 아바타</option>
+              {placed.filter(item => item.yard || (item.story ?? 0) === viewStory).map(item => <option key={item.instanceId} value={item.instanceId}>{item.yard ? "🌳" : `${(item.story ?? 0) + 1}층`} {item.icon} {item.name}</option>)}
+            </select>
+            {selectedItem && selectedItem.kind !== "wall" && <div className="rotate-row" role="group" aria-label="회전">
+              <button onClick={() => rotateSelected(-45)}>↺45°</button><button onClick={() => rotateSelected(-15)}>↺15°</button>
+              <input type="range" min="0" max="355" step="5" value={Math.round(selectedItem.rot)} onChange={event => rotateSelected(null, Number(event.target.value))} aria-label="회전 각도" />
+              <b>{Math.round(selectedItem.rot)}°</b>
+              <button onClick={() => rotateSelected(15)}>↻15°</button><button onClick={() => rotateSelected(45)}>↻45°</button>
+            </div>}
+            {selectedItem && <div className="tint-row" role="group" aria-label="가구 색상">{TINTS.map(color => <button key={color} className={`tint ${(selectedItem.tint ?? selectedItem.color) === color ? "on" : ""}`} style={{ background: color }} onClick={() => updateItem(selectedItem.instanceId, { tint: color })} aria-label={`색상 ${color}`} />)}<button className="tint reset" onClick={() => updateItem(selectedItem.instanceId, { tint: undefined })} aria-label="기본 색상">↺</button></div>}
+            {selectedItem && <><button onClick={storeFurniture}>📦 창고 보관</button><button className="sell-button" onClick={sellFurniture}>판매 (50%)</button></>}
+            {selectedFurniture === AVATAR_ID && <><button onClick={() => setShowAvatar(true)}>🪞 아바타 이미지 바꾸기</button>{stories > 1 && avatarPos.story !== viewStory && <button onClick={() => setAvatarPos({ x: 0, z: 0, story: viewStory })}>🧍 아바타를 {viewStory + 1}층으로</button>}</>}
           </div>
-          <p className="room-help">가구는 바닥 깊이에 따라 크기가 바뀌고, 앞에 둔 가구가 뒤의 가구를 가려요. 벽 장식은 벽에만 걸 수 있어요. 방향키로 미세 이동, F로 좌우 반전.</p>
+          <p className="room-help">가구 끌기: 이동 · 빈 곳 끌기: 시점 회전 · 휠: 확대/축소 · 방향키: 미세 이동 · Q/E: 15° 회전. 카메라 쪽 벽은 자동으로 낮아져 안이 보여요.</p>
         </section>
         <aside className="shop-panel panel">
           <div className="panel-heading"><div><span className="eyebrow">COUNTRY SHOP</span><h3>시골 가구점</h3></div></div>
-          <div className="shop-tabs" role="tablist">{([["floor", "가구"], ["wall", "벽 장식"], ["interior", "인테리어"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={shopTab === id} className={shopTab === id ? "active" : ""} onClick={() => setShopTab(id)}>{label}</button>)}</div>
+          <div className="shop-tabs" role="tablist">{([["furniture", "가구"], ["decor", "벽 장식"], ["structure", "구조"], ["yard", "마당"], ["interior", "인테리어"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={shopTab === id} className={shopTab === id ? "active" : ""} onClick={() => setShopTab(id)}>{label}</button>)}</div>
           {shopTab === "interior" ? <div className="theme-shop">
             {([["wall", "벽지", WALLPAPERS, wallpaper], ["floor", "바닥재", FLOORS, floor]] as const).map(([kind, title, themes, current]) => <section key={kind}><b>{title}</b><div>{themes.map(theme => { const owned = ownedThemes.includes(`${kind}:${theme.id}`);
               return <button key={theme.id} className={current === theme.id ? "on" : ""} onClick={() => buyTheme(kind, theme)}><i style={{ background: theme.swatch }} /><span>{theme.name}</span><small>{current === theme.id ? "사용 중" : owned ? "보유" : `${theme.price.toLocaleString()}원`}</small></button>; })}</div></section>)}
-          </div> : <div className="furniture-list">{shopItems.map(item => <button key={item.id} onClick={() => buyFurniture(item)}><span className="furniture-thumb" style={{ "--c": item.color } as CSSProperties}><FurnitureArt id={item.id} /></span><span><b>{item.name}</b><small>{item.price.toLocaleString()}원</small></span><i>＋</i></button>)}</div>}
+          </div> : <>
+            {shopTab === "yard" && <div className="theme-shop structure-shop"><section><b>마당 넓히기</b><div>{YARD_SIZES.map(size => <button key={size.level} className={yardLevel === size.level ? "on" : ""} onClick={() => size.level === yardLevel + 1 ? expandYard() : undefined} disabled={size.level > yardLevel + 1}><i className="yard-icon" style={{ transform: `scale(${0.55 + size.level * 0.15})` }} /><span>{size.name}</span><small>{size.level <= yardLevel ? "보유" : `${size.price.toLocaleString()}원`}</small></button>)}</div></section><b>마당 소품 · 집 바깥 잔디 위에만 놓여요</b></div>}
+            {shopTab === "structure" && <div className="theme-shop structure-shop"><section><b>2층 올리기 · {SECOND_FLOOR_PRICE.toLocaleString()}원</b><div><button className={stories > 1 ? "on" : ""} onClick={buildSecondFloor} disabled={houseLevel < 3 && stories < 2}><i className="shape-icon shape-two" /><span>{stories > 1 ? "2층 보기" : "2층 증축"}</span><small>{stories > 1 ? "완료 · 계단 포함" : houseLevel < 3 ? "18평부터 가능" : "계단·창문 포함"}</small></button></div></section><section><b>방 구조 리모델링 · {REMODEL_PRICE.toLocaleString()}원</b><div>{SHAPES.map(shape => <button key={shape.id} className={houseShape === shape.id ? "on" : ""} onClick={() => remodel(shape.id)}><i className={`shape-icon shape-${shape.id}`} /><span>{shape.name}</span><small>{houseShape === shape.id ? "현재 구조" : shape.note}</small></button>)}</div></section><b>문·창문·가벽</b></div>}
+            <div className="furniture-list">{shopItems.map(item => <button key={item.id} onClick={() => buyFurniture(item)}><span className="furniture-thumb" style={{ "--c": item.color } as CSSProperties}><FurnitureArt id={item.id} /></span><span><b>{item.name}</b><small>{item.price.toLocaleString()}원</small></span><i>＋</i></button>)}</div>
+          </>}
           <section className="warehouse"><div className="warehouse-heading"><span>📦 MY STORAGE</span><b>가구 창고 <em>{warehouse.length}</em></b></div>{warehouse.length === 0 ? <p>보관한 가구가 없어요.</p> : <div className="warehouse-list">{warehouse.map(item => <div key={item.instanceId}><span className="furniture-thumb" style={{ "--c": item.tint ?? item.color } as CSSProperties}><FurnitureArt id={item.id} /></span><b>{item.name}</b><button onClick={() => restoreFurniture(item)}>꺼내기</button><button className="sell-mini" onClick={() => sellWarehouseFurniture(item)}>{Math.round(item.price * 0.5).toLocaleString()}원에 판매</button></div>)}</div>}</section>
         </aside>
       </div>}
@@ -516,6 +720,15 @@ export default function Home() {
           <div className="story-choices">{activeEvent.event.choices.map((choice, index) => { const cost = choiceCost(index);
             return <button key={choice.label} onClick={() => chooseEventOption(index)} disabled={cost > money}><b>{index + 1}</b>{choice.label}{"chance" in choice.outcome && <small>운에 맡기기</small>}{cost > money && <small>돈이 부족해요</small>}</button>; })}</div>
         </>}
+      </section></div>}
+
+      {showAvatar && <div className="modal-backdrop" onClick={() => setShowAvatar(false)}><section className="modal avatar-modal" onClick={e => e.stopPropagation()}>
+        <button className="modal-close" onClick={() => setShowAvatar(false)}>×</button>
+        <span className="eyebrow">MY AVATAR</span><h3>내 아바타</h3>
+        <p>상단 프로필, 낚시터, 3D 집에 나오는 내 캐릭터예요. 배경이 투명한 <b>PNG 파일만</b> 올릴 수 있어요(최대 5MB, 256px로 줄여 저장).</p>
+        <div className="avatar-preview">{avatarImg}</div>
+        <input ref={avatarInput} type="file" accept="image/png,.png" hidden onChange={event => uploadAvatar(event.target.files?.[0])} />
+        <div className="avatar-actions"><button className="save-button" onClick={() => avatarInput.current?.click()}>PNG 이미지 올리기</button><button className="ghost-button" onClick={resetAvatar} disabled={avatar.src === DEFAULT_AVATAR}>기본 고양이로</button></div>
       </section></div>}
 
       {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setShowSettings(false)}>×</button><span className="eyebrow">TIME SETTINGS</span><h3>농장 운영 시간</h3><p>운영 시간을 네 구간으로 나눠 봄·여름·가을·겨울이 흘러가요. 시간을 바꾸면 계절 구간이 달라져 심어 둔 작물이 시들 수 있어요.</p><label>시작 시간 <strong>{startHour}:00</strong><input type="range" min="0" max="20" value={startHour} onChange={e => { const v = Number(e.target.value); setStartHour(v); if (endHour <= v + 4) setEndHour(Math.min(24, v + 4)); }} /></label><label>종료 시간 <strong>{endHour}:00</strong><input type="range" min="4" max="24" value={endHour} onChange={e => setEndHour(Math.max(startHour + 4, Number(e.target.value)))} /></label><div className="time-preview">{SEASONS.map((s, i) => <span key={s}>{SEASON_ICON[s]} {s}<b>{toClock(startHour + (endHour-startHour)/4*i)}—{toClock(startHour + (endHour-startHour)/4*(i+1))}</b></span>)}</div><button className="save-button" onClick={() => setShowSettings(false)}>이 시간으로 농사짓기</button></section></div>}
