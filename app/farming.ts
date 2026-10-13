@@ -50,8 +50,17 @@ export const CANS: WateringCan[] = [
   { id: "gold", name: "황금 물뿌리개", icon: "🌟", price: 10000, capacity: 18, w: 4, h: 2, note: "4×2칸 · 물 18" },
 ];
 
+/** 수확 도구(맨손 상위 단계): w×h 범위의 다 자란 작물을 한 번에 수확한다. */
+export type HarvestTool = { id: string; name: string; icon: string; price: number; w: number; h: number; note: string };
+export const HARVEST_TOOLS: HarvestTool[] = [
+  { id: "hand", name: "맨손", icon: "✋", price: 0, w: 1, h: 1, note: "1칸" },
+  { id: "hoe", name: "호미", icon: "⛏️", price: 2000, w: 2, h: 1, note: "가로 2칸" },
+  { id: "sickle", name: "낫", icon: "🌾", price: 6000, w: 4, h: 1, note: "가로 4칸" },
+  { id: "rake", name: "황금 갈퀴", icon: "🔱", price: 15000, w: 4, h: 2, note: "4×2칸" },
+];
+
 /** 밭 격자(columns열)에서 index를 기준으로 w×h 범위의 밭 번호들. 가장자리에서는 안쪽으로 밀어 넣는다. */
-export function canArea(index: number, columns: number, total: number, can: WateringCan) {
+export function canArea(index: number, columns: number, total: number, can: { w: number; h: number }) {
   // 좁은 화면(2열)에서는 가로 범위를 열 수에 맞게 줄이고, 줄어든 만큼 세로로 늘려 같은 칸 수를 유지한다.
   const w = Math.min(can.w, columns), h = Math.min(Math.ceil(total / columns), can.h * Math.ceil(can.w / w));
   const rows = Math.ceil(total / columns), col = index % columns, row = Math.floor(index / columns);
