@@ -4,7 +4,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_SIDE = 256;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-export type StoredAvatar = { src: string; pixelated: boolean };
+export type StoredAvatar = { src: string; pixelated: boolean; preset?: string };
 
 /**
  * 업로드한 아바타를 검사하고 저장용 데이터 URL로 만든다.
@@ -33,4 +33,30 @@ export async function readAvatarFile(file: File): Promise<{ src: string; transpa
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/** 바로 고를 수 있는 기본 캐릭터. 이모지를 투명 배경 PNG로 그려서 쓴다. */
+export const PRESET_AVATARS = [
+  { id: "farmer", name: "농부", emoji: "🧑‍🌾" },
+  { id: "office", name: "직장인", emoji: "🧑‍💼" },
+  { id: "coder", name: "개발자", emoji: "🧑‍💻" },
+  { id: "dog", name: "강아지", emoji: "🐶" },
+  { id: "rabbit", name: "토끼", emoji: "🐰" },
+  { id: "bear", name: "곰", emoji: "🐻" },
+  { id: "fox", name: "여우", emoji: "🦊" },
+  { id: "panda", name: "판다", emoji: "🐼" },
+  { id: "frog", name: "개구리", emoji: "🐸" },
+  { id: "penguin", name: "펭귄", emoji: "🐧" },
+  { id: "ghost", name: "유령", emoji: "👻" },
+  { id: "robot", name: "로봇", emoji: "🤖" },
+];
+
+export function emojiAvatar(emoji: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = '200px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(emoji, 128, 140);
+  return canvas.toDataURL("image/png");
 }

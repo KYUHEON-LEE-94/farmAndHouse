@@ -279,6 +279,17 @@ export default function House3D(props: Props) {
     renderer.domElement.addEventListener("pointermove", onMove);
     renderer.domElement.addEventListener("pointerup", onUp);
 
+    // 가구를 선택한 상태에서 휠: 회전(15°, Shift는 5°). OrbitControls보다 먼저 등록해 확대/축소를 가로챈다.
+    const onWheel = (event: WheelEvent) => {
+      const { selectedId: id, items } = propsRef.current;
+      const item = id ? items.find(entry => entry.instanceId === id) : undefined;
+      if (!item || item.kind === "wall") return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      const step = (event.shiftKey ? 5 : 15) * Math.sign(event.deltaY || event.deltaX);
+      propsRef.current.onMove(item.instanceId, { rot: (((item.rot + step) % 360) + 360) % 360 });
+    };
+    renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = false; controls.minPolarAngle = 0.25; controls.maxPolarAngle = 1.38; controls.minDistance = 3; controls.maxDistance = 30;
     controls.addEventListener("change", ctx.render);

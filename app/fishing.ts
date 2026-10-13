@@ -1,17 +1,18 @@
 export type Season = "봄" | "여름" | "가을" | "겨울";
 export type FishRarity = "흔함" | "보통" | "희귀" | "전설";
 export type Fish = { id: string; name: string; icon: string; season: Season; rarity: FishRarity; price: number; note: string };
-export type Bait = { id: string; name: string; icon: string; pack: number; price: number; normalBoost: number; rareBoost: number; note: string };
+/** barBonus: 낚시 미니게임 초록 막대 길이 보너스(트랙 비율). */
+export type Bait = { id: string; name: string; icon: string; pack: number; price: number; normalBoost: number; rareBoost: number; barBonus: number; note: string };
 
 // 등급별 기본 확률. 전설은 기획상 0.1% 고정이며 미끼·버프로도 바뀌지 않는다.
 export const LEGEND_CHANCE = 0.001;
 export const RARITY_WEIGHT: Record<Exclude<FishRarity, "전설">, number> = { 흔함: 0.6, 보통: 0.3, 희귀: 0.1 };
 
 export const BAITS: Bait[] = [
-  { id: "worm", name: "지렁이", icon: "🪱", pack: 10, price: 100, normalBoost: 1, rareBoost: 1, note: "가장 기본적인 미끼" },
-  { id: "paste", name: "떡밥", icon: "🍙", pack: 10, price: 250, normalBoost: 1.6, rareBoost: 1, note: "보통 등급이 잘 물어요" },
-  { id: "shrimp", name: "민물새우", icon: "🦐", pack: 10, price: 600, normalBoost: 1.2, rareBoost: 2, note: "희귀 등급 ×2" },
-  { id: "golden", name: "황금 미끼", icon: "✨", pack: 3, price: 1500, normalBoost: 1.5, rareBoost: 3.5, note: "희귀 등급 ×3.5" },
+  { id: "worm", name: "지렁이", icon: "🪱", pack: 10, price: 100, normalBoost: 1, rareBoost: 1, barBonus: 0, note: "가장 기본적인 미끼" },
+  { id: "paste", name: "떡밥", icon: "🍙", pack: 10, price: 250, normalBoost: 1.6, rareBoost: 1, barBonus: 0.02, note: "보통 등급이 잘 물어요 · 막대 조금 길게" },
+  { id: "shrimp", name: "민물새우", icon: "🦐", pack: 10, price: 600, normalBoost: 1.2, rareBoost: 2, barBonus: 0.03, note: "희귀 등급 ×2 · 막대 길게" },
+  { id: "golden", name: "황금 미끼", icon: "✨", pack: 3, price: 1500, normalBoost: 1.5, rareBoost: 3.5, barBonus: 0.06, note: "희귀 등급 ×3.5 · 막대 아주 길게" },
 ];
 export const STARTER_BAIT: Record<string, number> = { worm: 10 };
 

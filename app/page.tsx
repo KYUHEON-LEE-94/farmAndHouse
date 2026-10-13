@@ -3,15 +3,17 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FURNITURE, FLOORS, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
 import { BAITS, FISH, STARTER_BAIT, rollFish, type Bait, type Fish, type Season } from "./fishing";
+import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
-import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, readAvatarFile, type StoredAvatar } from "./avatar";
+import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
 import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CROPS, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 const House3D = lazy(() => import("./house3d"));
+const FishingGame = lazy(() => import("./fishingGame"));
 const AVATAR_ID = "avatar";
 
 type HarvestFx = { id: number; plotIndex: number; icon: string; amount: number; stars: string };
-type FishState = { phase: "idle" | "waiting" | "bite" | "result"; fish?: Fish; bait?: Bait; text?: string };
+type FishState = { phase: "idle" | "waiting" | "bite" | "game" | "result"; fish?: Fish; bait?: Bait; text?: string; perfect?: boolean; price?: number; reward?: string };
 type ActiveEvent = { event: StoryEvent; result?: Effect };
 
 const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
@@ -247,7 +249,7 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || showSettings || showAvatar || fishState.phase === "waiting" || fishState.phase === "bite" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || showSettings || showAvatar || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -305,7 +307,7 @@ export default function Home() {
   });
 
   function switchTab(next: typeof tab) {
-    if (next !== "fish" && (fishState.phase === "waiting" || fishState.phase === "bite")) { window.clearTimeout(fishTimer.current); setFishState({ phase: "idle" }); }
+    if (next !== "fish" && (fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game")) { window.clearTimeout(fishTimer.current); setFishState({ phase: "idle" }); }
     setTab(next);
   }
 
@@ -424,13 +426,33 @@ export default function Home() {
   function reelIn() {
     window.clearTimeout(fishTimer.current);
     if (fishState.phase === "waiting") return setFishState({ phase: "result", text: "너무 일찍 챘어요! 미끼만 날리고 물고기는 도망갔어요." });
+    // 입질에 맞춰 챘다면 어떤 물고기인지 정해지고, 스타듀밸리식 미니게임이 시작된다.
     const bait = castBait.current ?? BAITS[0];
     const fish = rollFish(season, { normal: bait.normalBoost, rare: bait.rareBoost * fishMul * (pets.has("cat") ? 1.2 : 1) });
-    setMoney(value => value + fish.price);
+    setFishState({ phase: "game", fish, bait });
+    setNotice(`🎣 걸렸다! ${fish.rarity === "전설" ? "엄청난 힘이 느껴져요…!" : "초록 막대 안에 물고기를 가둬요!"}`);
+  }
+
+  function finishFishing(result: FishingResult) {
+    const { fish, bait } = fishState;
+    if (!fish) return;
+    let reward: string | undefined;
+    if (result.treasure) {
+      if (Math.random() < 0.5) {
+        const prize = [BAITS[1], BAITS[2], BAITS[3]][Math.random() < 0.6 ? 0 : Math.random() < 0.8 ? 1 : 2], count = prize.id === "golden" ? 1 : 3;
+        setBaits(stock => ({ ...stock, [prize.id]: (stock[prize.id] ?? 0) + count })); reward = `${prize.icon} ${prize.name} ${count}개`;
+      } else { const coins = 150 + Math.floor(Math.random() * 10) * 50; setMoney(value => value + coins); reward = `💰 ${coins.toLocaleString()}원`; }
+    }
+    if (!result.caught) {
+      setFishState({ phase: "result", text: `줄이 풀려 ${fish.rarity === "전설" ? "전설의 그림자" : `${fish.rarity} 등급 물고기`}가 달아났어요.`, reward });
+      return setNotice(`💨 놓쳤어요…${reward ? ` 그래도 보물상자에서 ${reward}을(를) 얻었어요!` : ""}`);
+    }
+    const price = Math.round(fish.price * (result.perfect ? 1.25 : 1));
+    setMoney(value => value + price);
     setFishLog(log => ({ ...log, [fish.id]: (log[fish.id] ?? 0) + 1 }));
-    setFishState({ phase: "result", fish, bait });
-    playCoinSound(fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" ? [880, 1100, 1320] : [880, 1320]);
-    setNotice(fish.rarity === "전설" ? `✨ 전설의 ${fish.name}을(를) 낚았어요!! ${fish.price.toLocaleString()}원에 박물관이 사 갔어요!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚아 ${fish.price.toLocaleString()}원에 팔았어요.`);
+    setFishState({ phase: "result", fish, bait, perfect: result.perfect, price, reward });
+    playCoinSound(fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" || result.perfect ? [880, 1100, 1320] : [880, 1320]);
+    setNotice(`${fish.rarity === "전설" ? `✨ 전설의 ${fish.name}을(를) 낚았어요!!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚았어요.`}${result.perfect ? " 퍼펙트! +25%" : ""} ${price.toLocaleString()}원${reward ? ` · 보물: ${reward}` : ""}`);
   }
 
   // ---------- 이벤트 ----------
@@ -465,6 +487,13 @@ export default function Home() {
     } finally {
       if (avatarInput.current) avatarInput.current.value = "";
     }
+  }
+
+  function pickPresetAvatar(preset: typeof PRESET_AVATARS[number]) {
+    const next = { src: emojiAvatar(preset.emoji), pixelated: false, preset: preset.id };
+    setAvatar(next);
+    try { localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(next)); } catch { /* 이번 접속에서만 사용 */ }
+    setNotice(`${preset.emoji} ${preset.name} 캐릭터로 바꿨어요!`);
   }
 
   function resetAvatar() {
@@ -721,19 +750,21 @@ export default function Home() {
 
       {tab === "fish" && <div className="game-grid">
         <section className="panel fish-panel">
-          <div className="panel-heading"><div><span className="eyebrow">RIVERSIDE</span><h3>{season} 강가 낚시터</h3></div><span className="plot-count">전설 출현 0.1%</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">RIVERSIDE</span><h3>{season} 강가 낚시터</h3></div><div className="farm-actions"><button className="ghost-button small" onClick={() => setShowAvatar(true)}>🪞 캐릭터 바꾸기</button><span className="plot-count">전설 출현 0.1%</span></div></div>
           <div className={`pond phase-${fishState.phase}`}>
             <div className="pond-bank" />
             <svg className="rod" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="21" y1="58" x2="40" y2="36" />{(fishState.phase === "waiting" || fishState.phase === "bite") && <line className="line" x1="40" y1="36" x2="60" y2={fishState.phase === "bite" ? 70 : 64} />}</svg>
             <div className="angler">{avatarImg}</div>
             <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
+            {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} barSize={0.26 + (fishState.bait?.barBonus ?? 0)} onFinish={finishFishing} /></Suspense>}
             {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : ""}`}>
-              {fishState.fish ? <><b>{fishState.fish.icon}</b><strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span><small>{fishState.fish.note}</small><em>＋{fishState.fish.price.toLocaleString()}원</em></> : <><b>💨</b><small>{fishState.text}</small></>}
+              {fishState.fish ? <><b>{fishState.fish.icon}</b><strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트! +25%</span>}<small>{fishState.fish.note}</small><em>＋{(fishState.price ?? fishState.fish.price).toLocaleString()}원</em></> : <><b>💨</b><small>{fishState.text}</small></>}
+              {fishState.reward && <span className="treasure">🎁 보물상자: {fishState.reward}</span>}
             </div>}
           </div>
           <div className="fish-controls">
-            <p>{fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : `${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
-            {fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime || !baits[currentBait.id]}>{fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
+            <p>{fishState.phase === "game" ? "🐟 물고기를 초록 막대 안에! 누르고 있으면 올라가고, 떼면 내려가요. 🎁가 보이면 막대에 함께 담아 보세요." : fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : `${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
+            {fishState.phase === "game" ? null : fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime || !baits[currentBait.id]}>{fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
           </div>
         </section>
         <aside className="panel fish-book">
@@ -779,7 +810,7 @@ export default function Home() {
             {selectedItem && <><button onClick={storeFurniture}>📦 창고 보관</button><button className="sell-button" onClick={sellFurniture}>{selectedItem.pet ? "되팔기" : "판매"} (50%)</button></>}
             {selectedFurniture === AVATAR_ID && <><button onClick={() => setShowAvatar(true)}>🪞 아바타 이미지 바꾸기</button>{stories > 1 && avatarPos.story !== viewStory && <button onClick={() => setAvatarPos({ x: 0, z: 0, story: viewStory })}>🧍 아바타를 {viewStory + 1}층으로</button>}</>}
           </div>
-          <p className="room-help">가구 끌기: 이동 · 빈 곳 끌기: 시점 회전 · 휠: 확대/축소 · 방향키: 미세 이동 · Q/E: 15° 회전. 카메라 쪽 벽은 자동으로 낮아져 안이 보여요.</p>
+          <p className="room-help">가구 끌기: 이동 · 가구 선택 후 휠: 회전(Shift+휠 5°) · 빈 곳 끌기: 시점 회전 · 선택 없이 휠: 확대/축소 · 방향키: 미세 이동 · Q/E: 15° 회전. 카메라 쪽 벽은 자동으로 낮아져 안이 보여요.</p>
         </section>
         <aside className="shop-panel panel">
           <div className="panel-heading"><div><span className="eyebrow">COUNTRY SHOP</span><h3>시골 가구점</h3></div></div>
@@ -839,10 +870,14 @@ export default function Home() {
       {showAvatar && <div className="modal-backdrop" onClick={() => setShowAvatar(false)}><section className="modal avatar-modal" onClick={e => e.stopPropagation()}>
         <button className="modal-close" onClick={() => setShowAvatar(false)}>×</button>
         <span className="eyebrow">MY AVATAR</span><h3>내 아바타</h3>
-        <p>상단 프로필, 낚시터, 3D 집에 나오는 내 캐릭터예요. 배경이 투명한 <b>PNG 파일만</b> 올릴 수 있어요(최대 5MB, 256px로 줄여 저장).</p>
+        <p>상단 프로필, 낚시터, 3D 집에 나오는 내 캐릭터예요. 아래에서 고르거나, 좋아하는 캐릭터 이미지를 <b>PNG(배경 투명)</b>로 올려 주세요(최대 5MB, 256px로 줄여 저장).</p>
         <div className="avatar-preview">{avatarImg}</div>
+        <div className="avatar-presets" role="group" aria-label="기본 캐릭터">
+          <button className={avatar.src === DEFAULT_AVATAR ? "on" : ""} onClick={resetAvatar} aria-label="픽셀 고양이"><img src={DEFAULT_AVATAR} alt="" className="pixelated" /></button>
+          {PRESET_AVATARS.map(preset => <button key={preset.id} className={avatar.preset === preset.id ? "on" : ""} onClick={() => pickPresetAvatar(preset)} aria-label={preset.name} title={preset.name}>{preset.emoji}</button>)}
+        </div>
         <input ref={avatarInput} type="file" accept="image/png,.png" hidden onChange={event => uploadAvatar(event.target.files?.[0])} />
-        <div className="avatar-actions"><button className="save-button" onClick={() => avatarInput.current?.click()}>PNG 이미지 올리기</button><button className="ghost-button" onClick={resetAvatar} disabled={avatar.src === DEFAULT_AVATAR}>기본 고양이로</button></div>
+        <div className="avatar-actions"><button className="save-button" onClick={() => avatarInput.current?.click()}>🖼️ 내 캐릭터 PNG 올리기</button><button className="ghost-button" onClick={resetAvatar} disabled={avatar.src === DEFAULT_AVATAR}>기본 고양이로</button></div>
       </section></div>}
 
       {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setShowSettings(false)}>×</button><span className="eyebrow">TIME SETTINGS</span><h3>농장 운영 시간</h3><p>운영 시간을 네 구간으로 나눠 봄·여름·가을·겨울이 흘러가요. 시간을 바꾸면 계절 구간이 달라져 심어 둔 작물이 시들 수 있어요.</p><label>시작 시간 <strong>{startHour}:00</strong><input type="range" min="0" max="20" value={startHour} onChange={e => { const v = Number(e.target.value); setStartHour(v); if (endHour <= v + 4) setEndHour(Math.min(24, v + 4)); }} /></label><label>종료 시간 <strong>{endHour}:00</strong><input type="range" min="4" max="24" value={endHour} onChange={e => setEndHour(Math.max(startHour + 4, Number(e.target.value)))} /></label><div className="time-preview">{SEASONS.map((s, i) => <span key={s}>{SEASON_ICON[s]} {s}<b>{toClock(startHour + (endHour-startHour)/4*i)}—{toClock(startHour + (endHour-startHour)/4*(i+1))}</b></span>)}</div><button className="save-button" onClick={() => setShowSettings(false)}>이 시간으로 농사짓기</button></section></div>}
