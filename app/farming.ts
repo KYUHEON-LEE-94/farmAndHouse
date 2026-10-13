@@ -38,8 +38,26 @@ export const QUALITIES: Quality[] = [
 export const waterCheckpoints = (growSeconds: number) => (growSeconds >= 40 ? 3 : 2);
 
 /** 벌레가 앉아 있는 시간(초)과, 놓칠 때마다 깎이는 판매가 비율. */
-/** 물뿌리개 한 통으로 물을 줄 수 있는 횟수. 우물에서 무료로 다시 채운다. */
+/** 기본 물뿌리개 용량. 우물에서 무료로 다시 채운다. */
 export const CAN_CAPACITY = 5;
+
+/** 물뿌리개: capacity는 한 통 물양, w×h는 한 번 부을 때 물이 들어가는 밭 범위(가로×세로). 한 번 부을 때 물 1을 쓴다. */
+export type WateringCan = { id: string; name: string; icon: string; price: number; capacity: number; w: number; h: number; note: string };
+export const CANS: WateringCan[] = [
+  { id: "tin", name: "양철 물뿌리개", icon: "🪣", price: 0, capacity: CAN_CAPACITY, w: 1, h: 1, note: "1칸 · 물 5" },
+  { id: "copper", name: "구리 물뿌리개", icon: "🟠", price: 1500, capacity: 8, w: 2, h: 1, note: "가로 2칸 · 물 8" },
+  { id: "steel", name: "강철 물뿌리개", icon: "⚙️", price: 4000, capacity: 12, w: 3, h: 1, note: "가로 3칸 · 물 12" },
+  { id: "gold", name: "황금 물뿌리개", icon: "🌟", price: 10000, capacity: 18, w: 3, h: 2, note: "3×2칸 · 물 18" },
+];
+
+/** 밭 격자(columns열)에서 index를 기준으로 w×h 범위의 밭 번호들. 가장자리에서는 안쪽으로 밀어 넣는다. */
+export function canArea(index: number, columns: number, total: number, can: WateringCan) {
+  const rows = Math.ceil(total / columns), col = index % columns, row = Math.floor(index / columns);
+  const c0 = Math.max(0, Math.min(col, columns - can.w)), r0 = Math.max(0, Math.min(row, rows - can.h));
+  const area: number[] = [];
+  for (let r = r0; r < r0 + can.h; r++) for (let c = c0; c < c0 + can.w; c++) { const i = r * columns + c; if (i < total) area.push(i); }
+  return area;
+}
 export const BUG_SECONDS = 8;
 export const BUG_PENALTY = 0.1;
 export const BUG_CHECK_SECONDS = 8;

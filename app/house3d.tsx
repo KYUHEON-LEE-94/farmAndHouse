@@ -72,30 +72,68 @@ const ball = (g: THREE.Object3D, r: number, c: THREE.ColorRepresentation, x: num
 const BOOK_COLORS = ["#c4574b", "#e2b85a", "#4f7a6a", "#8ba5bc", "#9a7bb0", "#efe6d6", "#57514f"];
 
 
-type CritterShape = { len: number; w: number; h: number; leg: number; head: number; ears: "flop" | "point" | "round" | "long" | "none"; tail: number; tailUp?: boolean; snout?: boolean; stripes?: boolean; belly?: string; nose?: string };
+// ---------- 펫: 만화풍(3단 음영 + 외곽선) ----------
+const TOON_GRADIENT = (() => {
+  const texture = new THREE.DataTexture(new Uint8Array([110, 190, 255]), 3, 1, THREE.RedFormat);
+  texture.minFilter = texture.magFilter = THREE.NearestFilter; texture.needsUpdate = true;
+  return texture;
+})();
 
-/** 네 발 동물 공통 모델. 앞이 +z. */
-function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
-  const bodyY = o.leg + o.h / 2, headZ = o.len / 2 + o.head * 0.4, headY = bodyY + o.h * 0.35;
-  ball(g, 0.5, c.main, 0, bodyY, 0, [o.w, o.h, o.len]);
-  if (o.belly) ball(g, 0.5, o.belly, 0, bodyY - o.h * 0.12, 0.02, [o.w * 0.8, o.h * 0.8, o.len * 0.85]);
-  if (o.stripes) for (let i = -2; i <= 2; i++) box(g, o.w * 1.02, 0.03, 0.05, "#2a1d14", 0, bodyY + o.h * 0.3, i * o.len * 0.16).rotation.x = 0.2;
-  if (o.leg > 0.05) [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => cyl(g, o.w * 0.14, o.w * 0.12, o.leg + o.h * 0.2, c.main, sx * o.w * 0.3, 0, sz * o.len * 0.32));
-  else [-1, 1].forEach(sx => ball(g, o.w * 0.18, o.nose ?? c.light, sx * o.w * 0.35, 0.03, o.len * 0.35, [1.2, 0.6, 1]));
-  ball(g, o.head, c.main, 0, headY, headZ);
-  if (o.snout) ball(g, o.head * 0.5, c.light, 0, headY - o.head * 0.25, headZ + o.head * 0.8, [1, 0.8, 1.1]);
-  if (o.stripes) [-1, 1].forEach(s => box(g, 0.02, o.head * 0.6, 0.02, "#2a1d14", s * o.head * 0.35, headY + o.head * 0.35, headZ + o.head * 0.75).rotation.z = s * 0.3);
-  ball(g, o.head * 0.16, o.nose ?? "#2a1d14", 0, headY - o.head * 0.1, headZ + o.head * (o.snout ? 1.25 : 0.98));
+/** 만화풍 부품: 3단 음영 재질 + 뒷면을 키운 외곽선. */
+function part(g: THREE.Object3D, geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation, x: number, y: number, z: number, scale: [number, number, number] = [1, 1, 1], outline = true) {
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshToonMaterial({ color, gradientMap: TOON_GRADIENT }));
+  mesh.position.set(x, y, z); mesh.scale.set(...scale); mesh.castShadow = true;
+  if (outline) { const line = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: "#3b2a20", side: THREE.BackSide })); line.scale.setScalar(1.08); mesh.add(line); }
+  g.add(mesh); return mesh;
+}
+const sphere = (r: number) => new THREE.SphereGeometry(r, 20, 16);
+const capsule = (r: number, length: number) => new THREE.CapsuleGeometry(r, Math.max(0.001, length), 6, 14);
+
+/** 반짝이는 큰 눈 한 쌍 + 볼터치. */
+function face(g: THREE.Object3D, x: number, y: number, z: number, r: number, spread: number, cheeks = true) {
   [-1, 1].forEach(s => {
-    ball(g, o.head * 0.11, "#111111", s * o.head * 0.4, headY + o.head * 0.2, headZ + o.head * 0.85);
-    const ex = s * o.head * 0.6, ey = headY + o.head * 0.75;
-    if (o.ears === "point") solid(g, new THREE.ConeGeometry(o.head * 0.35, o.head * 0.7, 4), c.main, ex, ey + o.head * 0.15, headZ);
-    if (o.ears === "round") ball(g, o.head * 0.3, c.main, ex, ey, headZ - o.head * 0.1, [1, 1, 0.5]);
-    if (o.ears === "flop") ball(g, o.head * 0.35, c.dark, s * o.head * 0.95, headY + o.head * 0.1, headZ - o.head * 0.1, [0.5, 1.3, 0.8]);
-    if (o.ears === "long") ball(g, o.head * 0.3, c.main, s * o.head * 0.35, headY + o.head * 1.4, headZ - o.head * 0.2, [0.7, 2.6, 0.5]);
+    part(g, sphere(r), "#1d1410", x + s * spread, y, z, [1, 1.15, 0.7], false);
+    const glint = new THREE.Mesh(sphere(r * 0.38), new THREE.MeshBasicMaterial({ color: "#ffffff" }));
+    glint.position.set(x + s * spread + r * 0.3, y + r * 0.4, z + r * 0.55); g.add(glint);
+    if (cheeks) { const blush = new THREE.Mesh(sphere(r * 0.75), new THREE.MeshBasicMaterial({ color: "#f59aa8", transparent: true, opacity: 0.75 })); blush.position.set(x + s * spread * 1.55, y - r * 1.3, z - r * 0.15); blush.scale.set(1, 0.6, 0.4); g.add(blush); }
   });
-  if (o.tail > 0.06) { const tail = cyl(g, 0.025 + o.w * 0.05, 0.02 + o.w * 0.08, o.tail, c.main, 0, bodyY, -o.len / 2); tail.rotation.x = o.tailUp ? -0.35 : -1.1; tail.position.z -= o.tail * 0.3; }
-  else ball(g, Math.max(o.tail, 0.04) * 1.2, "#ffffff", 0, bodyY, -o.len / 2);
+}
+
+type CritterShape = { len: number; w: number; h: number; leg: number; head: number; ears: "flop" | "point" | "round" | "long" | "none"; tail: number; tailUp?: boolean; fluffyTail?: boolean; snout?: boolean; stripes?: boolean; belly?: string; nose?: string; spot?: string };
+
+/** 네 발 동물 공통 모델(머리가 큰 귀여운 비율). 앞이 +z. */
+function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
+  const r = o.h / 2, bodyY = o.leg + r;
+  const body = part(g, capsule(r, o.len - o.h), c.main, 0, bodyY, 0, [o.w / o.h, 1, 1]); body.rotation.x = Math.PI / 2;
+  if (o.belly) { const belly = part(g, capsule(r * 0.8, o.len - o.h), o.belly, 0, bodyY - r * 0.2, 0.01, [o.w / o.h * 0.85, 1, 1], false); belly.rotation.x = Math.PI / 2; }
+  if (o.spot) part(g, sphere(r * 0.55), o.spot, o.w * 0.25, bodyY + r * 0.6, -o.len * 0.1, [1, 0.35, 1.3], false);
+  if (o.stripes) for (let i = -2; i <= 2; i++) { const stripe = new THREE.Mesh(new THREE.TorusGeometry(r * 1.02, r * 0.07, 6, 16, Math.PI), new THREE.MeshBasicMaterial({ color: "#2a1d14" })); stripe.position.set(0, bodyY, i * o.len * 0.15); stripe.scale.set(o.w / o.h, 1, 1); g.add(stripe); }
+  // 다리와 밝은 발
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+    const lx = sx * o.w * 0.3, lz = sz * (o.len / 2 - r * 0.6);
+    if (o.leg > 0.04) part(g, capsule(o.w * 0.13, o.leg), c.main, lx, o.leg / 2 + o.w * 0.06, lz);
+    part(g, sphere(o.w * 0.15), o.belly ?? c.light, lx, o.w * 0.06, lz + o.w * 0.04, [1, 0.6, 1.25], false);
+  });
+  // 머리(크게)와 얼굴
+  const hy = bodyY + r * 0.75 + o.head * 0.35, hz = o.len / 2 - r * 0.2 + o.head * 0.35;
+  part(g, sphere(o.head), c.main, 0, hy, hz);
+  if (o.snout) part(g, sphere(o.head * 0.45), o.belly ?? c.light, 0, hy - o.head * 0.3, hz + o.head * 0.75, [1.15, 0.85, 1], false);
+  else if (o.belly) part(g, sphere(o.head * 0.55), o.belly, 0, hy - o.head * 0.35, hz + o.head * 0.55, [1.3, 0.8, 0.8], false);
+  part(g, sphere(o.head * 0.13), o.nose ?? "#2a1d14", 0, hy - o.head * (o.snout ? 0.22 : 0.18), hz + o.head * (o.snout ? 1.15 : 0.98), [1.3, 1, 1], false);
+  face(g, 0, hy + o.head * 0.12, hz + o.head * 0.82, o.head * 0.16, o.head * 0.42);
+  if (o.stripes) [-1, 1].forEach(s => { const mark = new THREE.Mesh(new THREE.BoxGeometry(o.head * 0.08, o.head * 0.45, 0.01), new THREE.MeshBasicMaterial({ color: "#2a1d14" })); mark.position.set(s * o.head * 0.25, hy + o.head * 0.6, hz + o.head * 0.78); mark.rotation.set(-0.5, 0, s * 0.35); g.add(mark); });
+  // 귀
+  [-1, 1].forEach(s => {
+    const ex = s * o.head * 0.62, ey = hy + o.head * 0.72;
+    if (o.ears === "point") { part(g, new THREE.ConeGeometry(o.head * 0.36, o.head * 0.7, 12), c.main, ex, ey + o.head * 0.12, hz - o.head * 0.05).rotation.z = -s * 0.25; part(g, new THREE.ConeGeometry(o.head * 0.2, o.head * 0.45, 10), "#f6b0b8", ex, ey + o.head * 0.08, hz + o.head * 0.12, [1, 1, 0.5], false).rotation.z = -s * 0.25; }
+    if (o.ears === "round") { part(g, sphere(o.head * 0.32), c.main, ex, ey, hz - o.head * 0.1, [1, 1, 0.55]); part(g, sphere(o.head * 0.18), "#f6b0b8", ex, ey, hz + o.head * 0.04, [1, 1, 0.4], false); }
+    if (o.ears === "flop") part(g, sphere(o.head * 0.38), c.dark, s * o.head * 0.95, hy + o.head * 0.15, hz - o.head * 0.05, [0.45, 1.25, 0.8]).rotation.z = s * 0.35;
+    if (o.ears === "long") { part(g, capsule(o.head * 0.2, o.head * 1.1), c.main, s * o.head * 0.35, hy + o.head * 1.35, hz - o.head * 0.15, [1, 1, 0.55]).rotation.z = -s * 0.12; part(g, capsule(o.head * 0.1, o.head * 0.9), "#f6b0b8", s * o.head * 0.35, hy + o.head * 1.35, hz - o.head * 0.03, [1, 1, 0.3], false).rotation.z = -s * 0.12; }
+  });
+  // 꼬리
+  if (o.fluffyTail) { const tail = part(g, capsule(o.h * 0.42, o.h * 1.2), c.dark, 0, bodyY + o.h * 0.9, -o.len / 2 - o.h * 0.2); tail.rotation.x = -0.35; }
+  else if (o.tail > 0.06) { const tail = part(g, capsule(0.015 + o.w * 0.06, o.tail), c.main, 0, bodyY + (o.tailUp ? o.tail * 0.4 : 0), -o.len / 2 - o.tail * 0.3); tail.rotation.x = o.tailUp ? -0.4 : -1.1; }
+  else part(g, sphere(Math.max(o.tail, 0.04) * 1.3), "#ffffff", 0, bodyY + r * 0.2, -o.len / 2);
 }
 
 const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => void> = {
@@ -130,21 +168,21 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
   curtain: (g, c) => { box(g, 1.5, 0.03, 0.03, "#8a6a48", 0, 0.78); [-1, 1].forEach(s => { for (let i = 0; i < 4; i++) box(g, 0.14, 1.5, 0.05, i % 2 ? c.main : c.dark.clone().lerp(c.main, 0.6), s * (0.32 + i * 0.13), -0.75, (i % 2) * 0.02); }); },
   mirror: (g, c) => { box(g, 0.6, 1, 0.04, c.main, 0, -0.5, -0.01); box(g, 0.5, 0.9, 0.01, "#dfeef3", 0, -0.45, 0.012, { metalness: 0.9, roughness: 0.05 }); },
   walltv: (g, c) => { box(g, 1.3, 0.75, 0.05, c.main, 0, -0.375, -0.01); const screen = box(g, 1.22, 0.67, 0.01, "#5a8fb5", 0, -0.335, 0.016, { emissive: "#5a8fb5", emissiveIntensity: 0.5 }); screen.castShadow = false; },
-  dog: (g, c) => critter(g, c, { len: 0.62, w: 0.32, h: 0.3, leg: 0.24, head: 0.17, ears: "flop", tail: 0.22, snout: true }),
-  cat: (g, c) => critter(g, c, { len: 0.5, w: 0.24, h: 0.24, leg: 0.18, head: 0.14, ears: "point", tail: 0.38, tailUp: true }),
-  rabbit: (g, c) => critter(g, c, { len: 0.34, w: 0.28, h: 0.28, leg: 0.06, head: 0.13, ears: "long", tail: 0.04 }),
-  mole: (g, c) => critter(g, c, { len: 0.38, w: 0.28, h: 0.2, leg: 0.03, head: 0.1, ears: "none", tail: 0.05, nose: "#f2899a" }),
-  weasel: (g, c) => critter(g, c, { len: 0.62, w: 0.15, h: 0.15, leg: 0.1, head: 0.09, ears: "round", tail: 0.3, belly: "#f3e3c4" }),
-  tiger: (g, c) => critter(g, c, { len: 1.35, w: 0.55, h: 0.48, leg: 0.42, head: 0.3, ears: "round", tail: 0.75, stripes: true, belly: "#f8efe0" }),
-  duck: (g, c) => { ball(g, 0.18, c.main, 0, 0.2, 0, [0.9, 0.8, 1.2]); ball(g, 0.11, c.main, 0, 0.42, 0.14); box(g, 0.08, 0.03, 0.1, "#f08a3a", 0, 0.38, 0.27); [-1, 1].forEach(s => { ball(g, 0.018, "#111111", s * 0.06, 0.45, 0.22); box(g, 0.03, 0.06, 0.05, "#f08a3a", s * 0.06, 0, 0.02); }); ball(g, 0.07, c.dark, 0, 0.26, -0.2, [0.8, 0.6, 1.2]); },
-  chick: (g, c) => { ball(g, 0.1, c.main, 0, 0.1, 0, [1, 0.95, 1.1]); ball(g, 0.065, c.main, 0, 0.2, 0.06); box(g, 0.04, 0.02, 0.04, "#f08a3a", 0, 0.19, 0.12); [-1, 1].forEach(s => { ball(g, 0.012, "#111111", s * 0.03, 0.22, 0.11); ball(g, 0.04, c.dark, s * 0.09, 0.11, -0.01, [0.4, 0.8, 1]); }); },
-  grasshopper: (g, c) => { ball(g, 0.5, c.main, 0, 0.07, 0, [0.07, 0.07, 0.24]); ball(g, 0.04, c.main, 0, 0.09, 0.14); [-1, 1].forEach(s => { ball(g, 0.012, "#111111", s * 0.025, 0.11, 0.16); const leg = box(g, 0.012, 0.012, 0.16, c.dark, s * 0.045, 0.1, -0.06); leg.rotation.x = 0.6; const ant = box(g, 0.006, 0.006, 0.1, c.dark, s * 0.015, 0.12, 0.2); ant.rotation.x = -0.6; }); ball(g, 0.5, c.light, 0, 0.1, -0.02, [0.06, 0.02, 0.2]); },
-  snail: (g, c) => { ball(g, 0.5, "#e8d3b0", 0, 0.03, 0.02, [0.09, 0.05, 0.28]); const shell = solid(g, new THREE.TorusGeometry(0.06, 0.035, 10, 20), c.main, 0, 0.1, -0.02); shell.rotation.y = Math.PI / 2; ball(g, 0.035, c.light, 0, 0.1, -0.02); [-1, 1].forEach(s => { box(g, 0.008, 0.07, 0.008, "#e8d3b0", s * 0.015, 0.04, 0.14); ball(g, 0.012, "#111111", s * 0.015, 0.115, 0.14); }); },
-  frog: (g, c) => { ball(g, 0.5, c.main, 0, 0.07, 0, [0.22, 0.13, 0.22]); [-1, 1].forEach(s => { ball(g, 0.035, c.main, s * 0.05, 0.14, 0.07); ball(g, 0.022, "#ffffff", s * 0.05, 0.15, 0.09); ball(g, 0.012, "#111111", s * 0.05, 0.15, 0.11); ball(g, 0.04, c.dark, s * 0.1, 0.02, -0.06, [1, 0.5, 1.4]); }); },
-  squirrel: (g, c) => { critter(g, c, { len: 0.26, w: 0.14, h: 0.14, leg: 0.06, head: 0.08, ears: "point", tail: 0.05 }); const tail = ball(g, 0.5, c.dark, 0, 0.22, -0.16, [0.1, 0.3, 0.12]); tail.rotation.x = -0.3; },
-  hamster: (g, c) => { critter(g, c, { len: 0.2, w: 0.17, h: 0.13, leg: 0.02, head: 0.075, ears: "round", tail: 0.03, belly: "#fff6e8", nose: "#f2899a" }); },
-  turtle: (g, c) => { const shell = solid(g, new THREE.SphereGeometry(0.17, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), c.main, 0, 0.04, 0); shell.scale.set(1, 0.8, 1.25); box(g, 0.32, 0.03, 0.4, c.dark, 0, 0.03); ball(g, 0.06, "#9cc57a", 0, 0.08, 0.25); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => ball(g, 0.04, "#9cc57a", sx * 0.13, 0.03, sz * 0.14, [1, 0.6, 1])); [-1, 1].forEach(s => ball(g, 0.01, "#111111", s * 0.025, 0.1, 0.3)); },
-  sparrow: (g, c) => { ball(g, 0.09, c.main, 0, 0.1, 0, [0.9, 0.8, 1.2]); ball(g, 0.06, c.main, 0, 0.19, 0.07); ball(g, 0.06, "#efe2c8", 0, 0.08, 0.03, [0.8, 0.6, 1]); box(g, 0.025, 0.02, 0.04, "#e2b85a", 0, 0.18, 0.13); ball(g, 0.05, c.dark, 0, 0.13, -0.11, [0.6, 0.4, 1.4]); [-1, 1].forEach(s => ball(g, 0.01, "#111111", s * 0.028, 0.2, 0.11)); },
+  dog: (g, c) => critter(g, c, { len: 0.5, w: 0.3, h: 0.28, leg: 0.16, head: 0.2, ears: "flop", tail: 0.2, tailUp: true, snout: true, belly: "#f3e3c4", spot: c.dark.getStyle() }),
+  cat: (g, c) => critter(g, c, { len: 0.44, w: 0.24, h: 0.22, leg: 0.13, head: 0.17, ears: "point", tail: 0.36, tailUp: true, belly: "#fff3e0", nose: "#f2899a" }),
+  rabbit: (g, c) => critter(g, c, { len: 0.3, w: 0.26, h: 0.26, leg: 0.05, head: 0.15, ears: "long", tail: 0.04, belly: "#ffffff", nose: "#f2899a" }),
+  mole: (g, c) => critter(g, c, { len: 0.34, w: 0.28, h: 0.22, leg: 0.03, head: 0.12, ears: "none", tail: 0.05, nose: "#f2899a", belly: "#f2b5c4" }),
+  weasel: (g, c) => critter(g, c, { len: 0.58, w: 0.15, h: 0.15, leg: 0.08, head: 0.11, ears: "round", tail: 0.28, belly: "#f3e3c4" }),
+  tiger: (g, c) => critter(g, c, { len: 1.15, w: 0.52, h: 0.46, leg: 0.32, head: 0.36, ears: "round", tail: 0.6, stripes: true, belly: "#fff6e8", snout: true }),
+  duck: (g, c) => { part(g, sphere(0.17), c.main, 0, 0.18, 0, [0.95, 0.8, 1.2]); part(g, sphere(0.12), c.main, 0, 0.38, 0.13); part(g, new THREE.BoxGeometry(0.11, 0.035, 0.1), "#f08a3a", 0, 0.35, 0.26); [-1, 1].forEach(s => { part(g, sphere(0.09), c.dark, s * 0.14, 0.2, -0.02, [0.35, 0.7, 1.2]); part(g, new THREE.BoxGeometry(0.06, 0.02, 0.08), "#f08a3a", s * 0.06, 0.01, 0.03, [1, 1, 1], false); }); face(g, 0, 0.41, 0.22, 0.022, 0.055); },
+  chick: (g, c) => { part(g, sphere(0.11), c.main, 0, 0.11, 0, [1, 0.95, 1.05]); part(g, sphere(0.075), c.main, 0, 0.22, 0.05); part(g, new THREE.ConeGeometry(0.025, 0.05, 8), "#f08a3a", 0, 0.21, 0.13, [1, 1, 1], false).rotation.x = Math.PI / 2; part(g, new THREE.ConeGeometry(0.02, 0.06, 6), c.main, 0, 0.31, 0.04, [1, 1, 1], false); [-1, 1].forEach(s => part(g, sphere(0.045), c.dark, s * 0.1, 0.12, 0, [0.4, 0.8, 1])); face(g, 0, 0.235, 0.115, 0.016, 0.035); },
+  grasshopper: (g, c) => { const body = part(g, capsule(0.035, 0.18), c.main, 0, 0.07, 0); body.rotation.x = Math.PI / 2; part(g, sphere(0.045), c.main, 0, 0.1, 0.13); part(g, sphere(0.03), c.light, 0, 0.1, -0.02, [1.1, 0.5, 3], false); [-1, 1].forEach(s => { const leg = part(g, capsule(0.012, 0.13), c.dark, s * 0.05, 0.11, -0.05); leg.rotation.x = 0.9; const ant = part(g, capsule(0.004, 0.08), c.dark, s * 0.015, 0.16, 0.18, [1, 1, 1], false); ant.rotation.x = -0.7; }); face(g, 0, 0.115, 0.165, 0.012, 0.025, false); },
+  snail: (g, c) => { const foot = part(g, capsule(0.04, 0.2), "#efdcb8", 0, 0.035, 0.02); foot.rotation.x = Math.PI / 2; foot.scale.set(1.3, 1, 0.8); [0.07, 0.05, 0.032].forEach((r, k) => { const ring = part(g, new THREE.TorusGeometry(r, 0.03 - k * 0.006, 10, 20), k % 2 ? c.light : c.main, 0, 0.11 + k * 0.012, -0.02 + k * 0.01); ring.rotation.y = Math.PI / 2; }); [-1, 1].forEach(s => { part(g, capsule(0.008, 0.06), "#efdcb8", s * 0.018, 0.08, 0.13, [1, 1, 1], false).rotation.x = 0.3; part(g, sphere(0.014), "#1d1410", s * 0.018, 0.12, 0.14, [1, 1, 1], false); }); },
+  frog: (g, c) => { part(g, sphere(0.12), c.main, 0, 0.08, 0, [1.05, 0.65, 0.95]); part(g, sphere(0.09), c.light, 0, 0.06, 0.04, [1, 0.5, 0.9], false); [-1, 1].forEach(s => { part(g, sphere(0.042), c.main, s * 0.06, 0.15, 0.05); part(g, sphere(0.04), c.dark, s * 0.11, 0.02, -0.07, [1.2, 0.5, 1.5]); }); face(g, 0, 0.165, 0.085, 0.02, 0.06); const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.006, 6, 16, Math.PI), new THREE.MeshBasicMaterial({ color: "#2f5a2a" })); mouth.position.set(0, 0.1, 0.11); mouth.rotation.z = Math.PI; g.add(mouth); },
+  squirrel: (g, c) => critter(g, c, { len: 0.22, w: 0.14, h: 0.14, leg: 0.05, head: 0.1, ears: "point", tail: 0.05, fluffyTail: true, belly: "#f6e6c8" }),
+  hamster: (g, c) => critter(g, c, { len: 0.18, w: 0.18, h: 0.15, leg: 0.02, head: 0.1, ears: "round", tail: 0.03, belly: "#fff6e8", nose: "#f2899a" }),
+  turtle: (g, c) => { const shell = part(g, new THREE.SphereGeometry(0.17, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), c.main, 0, 0.05, 0, [1, 0.75, 1.2]); shell.castShadow = true; part(g, new THREE.CylinderGeometry(0.175, 0.175, 0.03, 20), c.dark, 0, 0.05, 0, [1, 1, 1.2]); for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; part(g, new THREE.CylinderGeometry(0.035, 0.035, 0.01, 6), c.light, Math.cos(a) * 0.08, 0.15, Math.sin(a) * 0.09, [1, 1, 1], false).rotation.z = Math.cos(a) * 0.5; } part(g, sphere(0.06), "#a7cf86", 0, 0.08, 0.24); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(g, sphere(0.04), "#a7cf86", sx * 0.13, 0.03, sz * 0.14, [1, 0.6, 1.1])); face(g, 0, 0.1, 0.285, 0.012, 0.025, false); },
+  sparrow: (g, c) => { part(g, sphere(0.09), c.main, 0, 0.1, 0, [0.95, 0.85, 1.2]); part(g, sphere(0.065), c.main, 0, 0.19, 0.07); part(g, sphere(0.06), "#f3e6cf", 0, 0.08, 0.04, [0.8, 0.6, 1], false); part(g, new THREE.ConeGeometry(0.018, 0.04, 8), "#e2b85a", 0, 0.18, 0.14, [1, 1, 1], false).rotation.x = Math.PI / 2; const tail = part(g, new THREE.BoxGeometry(0.07, 0.015, 0.09), c.dark, 0, 0.13, -0.12); tail.rotation.x = 0.4; [-1, 1].forEach(s => part(g, sphere(0.05), c.dark, s * 0.08, 0.11, -0.01, [0.4, 0.7, 1.3])); face(g, 0, 0.205, 0.125, 0.014, 0.032); },
   stairs: (g, c) => { for (let i = 0; i < 10; i++) { box(g, 1, (i + 1) * 0.28, 0.26, i % 2 ? c.main : c.light, 0, 0, 1.17 - i * 0.26); } [-1, 1].forEach(s => { const rail = box(g, 0.04, 0.04, 2.9, c.dark, s * 0.48, 1.85, 0); rail.rotation.x = Math.atan2(2.8, 2.6); }); },
   fence: (g, c) => { [-0.95, -0.475, 0, 0.475, 0.95].forEach(x => { box(g, 0.1, 0.85, 0.08, c.main, x); const tip = solid(g, new THREE.ConeGeometry(0.07, 0.12, 4), c.main, x, 0.91, 0); tip.rotation.y = Math.PI / 4; }); [0.28, 0.62].forEach(y => box(g, 2, 0.07, 0.05, c.dark, 0, y, 0.05)); },
   flowerbed: (g, c) => { box(g, 1.6, 0.25, 0.8, c.dark.clone().lerp(new THREE.Color("#8a6a4a"), 0.7)); box(g, 1.5, 0.04, 0.7, "#5f4330", 0, 0.24); for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { const x = -0.6 + i * 0.24, z = -0.22 + j * 0.22; box(g, 0.02, 0.2, 0.02, "#4f7a3e", x, 0.28, z); ball(g, 0.06, [c.main, c.light, "#f6d16a"][(i + j) % 3], x, 0.5, z); } },
@@ -437,7 +475,7 @@ export default function House3D(props: Props) {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items]);
 
   // 낮/밤, 하늘
   useEffect(() => { const ctx = sceneRef.current; if (!ctx) return; applyLighting(ctx, night, palette.sky); ctx.render(); }, [night, palette.sky]);

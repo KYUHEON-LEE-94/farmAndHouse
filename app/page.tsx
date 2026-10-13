@@ -2,11 +2,11 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FURNITURE, FLOORS, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
-import { BAITS, FISH, STARTER_BAIT, rollFish, type Bait, type Fish, type Season } from "./fishing";
+import { BAITS, FISH, RODS, STARTER_BAIT, rollFish, type Bait, type Fish, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CROPS, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, canArea, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 const House3D = lazy(() => import("./house3d"));
 const FishingGame = lazy(() => import("./fishingGame"));
@@ -155,6 +155,10 @@ export default function Home() {
   // 손에 든 도구: 맨손(심기·수확), 물뿌리개, 또는 거름 id
   const [tool, setTool] = useState("hand");
   const [canWater, setCanWater] = useState(CAN_CAPACITY);
+  const [ownedCans, setOwnedCans] = useState<string[]>(["tin"]);
+  const [canId, setCanId] = useState("tin");
+  const [hoverArea, setHoverArea] = useState<number[]>([]);
+  const plotsRef = useRef<HTMLDivElement>(null);
   const [waterFx, setWaterFx] = useState<{ id: number; plotIndex: number }[]>([]);
   const justWatered = useRef(new Map<number, number>());
   const pendingPours = useRef(0);
@@ -164,6 +168,8 @@ export default function Home() {
   const [fishLog, setFishLog] = useState<Record<string, number>>({});
   const [baits, setBaits] = useState<Record<string, number>>(STARTER_BAIT);
   const [selectedBait, setSelectedBait] = useState("worm");
+  const [ownedRods, setOwnedRods] = useState<string[]>(["bamboo"]);
+  const [rodId, setRodId] = useState("bamboo");
   const [buffs, setBuffs] = useState<Buff[]>([]);
   const [activeEvent, setActiveEvent] = useState<ActiveEvent | null>(null);
   const [lastEventAt, setLastEventAt] = useState(0);
@@ -195,11 +201,11 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY);
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin");
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(item => fitToRoom(item, room, yard)));
         setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
-        setFishLog(data.fishLog ?? {}); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm");
+        setFishLog(data.fishLog ?? {}); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo");
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
         setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? "");
       } catch { /* start fresh */ }
@@ -212,8 +218,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -235,7 +241,8 @@ export default function Home() {
 
   // 키우는 펫의 고유 효과
   const pets = new Set(placed.filter(item => item.pet && item.rare).map(item => item.id));
-  const canMax = CAN_CAPACITY + (pets.has("duck") ? 2 : 0);
+  const currentCan = CANS.find(item => item.id === canId) ?? CANS[0];
+  const canMax = currentCan.capacity + (pets.has("duck") ? 2 : 0);
   const bugPenalty = pets.has("weasel") ? BUG_PENALTY / 2 : BUG_PENALTY;
   const seedPrice = (crop: Crop) => Math.round(crop.seed * seedMul * (pets.has("rabbit") ? 0.95 : 1));
   const salePrice = (crop: Crop) => Math.round(marketPrice(crop, marketBucket) * priceMul);
@@ -327,22 +334,47 @@ export default function Home() {
     setPlots(next); setMoney(m => m - price); setNotice(`${crop.icon} ${crop.name}을(를) 심었어요. ${growSeconds}초 뒤 수확해요! 중간에 목말라하면 물을 주세요.`);
   }
 
-  /** 물뿌리개로 밭 한 칸에 물을 준다. 목마른 작물에만 물이 쓰인다. */
-  function waterPlot(index: number) {
-    const plot = plots[index], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
-    if (!plot || !crop || seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod) return;
-    const status = plotStatus(plot, crop, Date.now(), bugPenalty);
-    if (status.ready || !status.thirsty) return setNotice(status.ready ? `${crop.name}은(는) 다 자랐어요. 맨손으로 수확하세요.` : `${crop.name}은(는) 아직 목마르지 않아요.`);
+  /** 밭 격자의 열 수(화면 너비에 따라 4열 또는 2열). */
+  function plotColumns() {
+    const grid = plotsRef.current;
+    return grid ? Math.max(1, getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length) : 4;
+  }
+
+  /** 물뿌리개 범위 안의 목마른 밭 번호. */
+  function thirstyInArea(index: number) {
     const time = Date.now();
-    // 쓸고 지나갈 때 같은 칸에 이벤트가 연달아 와도 한 번만 붓는다(상태 반영 전 중복 방지).
-    if (time - (justWatered.current.get(index) ?? 0) < 1500) return;
+    return canArea(index, plotColumns(), plotCount, currentCan).filter(i => {
+      const plot = plots[i], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
+      return plot && crop && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod && plotStatus(plot, crop, time, bugPenalty).thirsty && time - (justWatered.current.get(i) ?? 0) >= 1500;
+    });
+  }
+
+  /** 물뿌리개로 한 번 붓는다. 범위 안의 목마른 작물 모두에 물이 들어가고, 물은 1만 쓴다. */
+  function waterPlot(index: number) {
+    const targets = thirstyInArea(index);
+    if (!targets.length) {
+      const plot = plots[index], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
+      if (crop && plot && currentCan.w * currentCan.h === 1 && !justWatered.current.has(index)) setNotice(plotStatus(plot, crop, Date.now(), bugPenalty).ready ? `${crop.name}은(는) 다 자랐어요. 맨손으로 수확하세요.` : `${crop.name}은(는) 아직 목마르지 않아요.`);
+      return;
+    }
     if (canWater - pendingPours.current <= 0) return setNotice("🚿 물뿌리개가 비었어요. 🚰 우물에서 물을 채워 주세요.");
-    justWatered.current.set(index, time); pendingPours.current++;
+    const time = Date.now();
+    targets.forEach(i => justWatered.current.set(i, time)); pendingPours.current++;
     setCanWater(value => Math.max(0, value - 1));
-    setPlots(current => current.map((item, i) => (i === index && item ? { ...item, water: [...(item.water ?? []), time] } : item)));
-    setWaterFx(items => [...items, { id: time + index, plotIndex: index }]); window.setTimeout(() => setWaterFx(items => items.filter(item => item.id !== time + index)), 900);
+    setPlots(current => current.map((item, i) => (targets.includes(i) && item ? { ...item, water: [...(item.water ?? []), time] } : item)));
+    setWaterFx(items => [...items, ...targets.map(i => ({ id: time + i, plotIndex: i }))]);
+    window.setTimeout(() => setWaterFx(items => items.filter(item => item.id < time || item.id > time + plotCount)), 900);
     playSplash();
-    setNotice(`💧 ${crop.name}에 촉촉하게 물을 줬어요. (물뿌리개 ${canWater - 1}/${canMax})`);
+    setNotice(`💧 ${targets.length > 1 ? `밭 ${targets.length}칸에 한꺼번에` : "촉촉하게"} 물을 줬어요. (물뿌리개 ${canWater - 1}/${canMax})`);
+  }
+
+  function chooseCan(can: WateringCan) {
+    if (ownedCans.includes(can.id)) { setCanId(can.id); setTool("water"); setCanWater(value => Math.min(value, can.capacity + (pets.has("duck") ? 2 : 0))); return setNotice(`${can.icon} ${can.name}을(를) 들었어요. (${can.note})`); }
+    if (money < can.price) return setNotice(`${can.name}은(는) ${can.price.toLocaleString()}원이에요.`);
+    setMoney(value => value - can.price); setOwnedCans(items => [...items, can.id]); setCanId(can.id); setTool("water");
+    setCanWater(can.capacity + (pets.has("duck") ? 2 : 0));
+    playCoinSound([660, 990, 1320]);
+    setNotice(`${can.icon} ${can.name}을(를) 샀어요! 물을 가득 채워 드렸어요. (${can.note})`);
   }
 
   function refillCan() {
@@ -408,6 +440,15 @@ export default function Home() {
     if (money < bait.price) return setNotice(`${bait.name} ${bait.pack}개는 ${bait.price.toLocaleString()}원이에요.`);
     setMoney(value => value - bait.price); setBaits(stock => ({ ...stock, [bait.id]: (stock[bait.id] ?? 0) + bait.pack })); setSelectedBait(bait.id);
     setNotice(`${bait.icon} ${bait.name} ${bait.pack}개를 샀어요.`);
+  }
+
+  function chooseRod(rod: Rod) {
+    if (fishState.phase === "game") return;
+    if (ownedRods.includes(rod.id)) { setRodId(rod.id); return setNotice(`${rod.icon} ${rod.name}을(를) 들었어요.`); }
+    if (money < rod.price) return setNotice(`${rod.name}은(는) ${rod.price.toLocaleString()}원이에요.`);
+    setMoney(value => value - rod.price); setOwnedRods(items => [...items, rod.id]); setRodId(rod.id);
+    playCoinSound([660, 990, 1320]);
+    setNotice(`${rod.icon} ${rod.name}을(를) 샀어요! ${rod.note}`);
   }
 
   function castLine() {
@@ -672,6 +713,7 @@ export default function Home() {
   const seasonFish = FISH.filter(fish => fish.season === season);
   const avatarImg = <img src={avatar.src} alt="" className={avatar.pixelated ? "pixelated" : ""} draggable={false} />;
   const currentBait = BAITS.find(item => item.id === selectedBait) ?? BAITS[0];
+  const currentRod = RODS.find(item => item.id === rodId) ?? RODS[0];
 
   return (
     <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4} ${tab === "farm" ? "has-dock" : ""}`}>
@@ -708,7 +750,7 @@ export default function Home() {
       {tab === "farm" && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~6)">
         <span className="dock-title">도구</span>
         <button className={tool === "hand" ? "on" : ""} onClick={() => setTool("hand")} aria-pressed={tool === "hand"} title="빈 밭 심기 · 다 자란 작물 수확 (1)"><b>✋</b><span>맨손</span><kbd>1</kbd></button>
-        <button className={`can ${tool === "water" ? "on" : ""}`} onClick={() => setTool(current => (current === "water" ? "hand" : "water"))} aria-pressed={tool === "water"} title="목마른 밭에 물 주기. 누른 채로 쓸고 지나가도 돼요 (2)"><b>🚿</b><span>물뿌리개</span><small className="can-gauge" aria-label={`물 ${canWater}/${canMax}`}>{Array.from({ length: canMax }).map((_, k) => <i key={k} className={k < canWater ? "full" : ""} />)}</small><kbd>2</kbd></button>
+        <button className={`can ${tool === "water" ? "on" : ""}`} onClick={() => setTool(current => (current === "water" ? "hand" : "water"))} aria-pressed={tool === "water"} title={`${currentCan.name} · ${currentCan.note}. 누른 채로 쓸고 지나가도 돼요 (2)`}><b>🚿</b><span>{currentCan.w * currentCan.h > 1 ? `${currentCan.w}×${currentCan.h}칸` : "물뿌리개"}</span><small className="can-gauge" aria-label={`물 ${canWater}/${canMax}`}>{Array.from({ length: canMax }).map((_, k) => <i key={k} className={k < canWater ? "full" : ""} />)}</small><kbd>2</kbd></button>
         <button className={`refill ${canWater === 0 ? "empty" : ""}`} onClick={refillCan} disabled={canWater >= canMax} title="물뿌리개 가득 채우기 (3)"><b>🚰</b><span>우물</span><kbd>3</kbd></button>
         <span className="dock-sep" />
         {FERTILIZERS.map((item, index) => <button key={item.id} className={`fert ${tool === item.id ? "on" : ""}`} onClick={() => setTool(current => (current === item.id ? "hand" : item.id))} aria-pressed={tool === item.id} title={`${item.name} ${item.price}원 · ${item.note} (${index + 4})`}><b>{item.icon}</b><span>{item.name}</span><small>{item.price}원</small><kbd>{index + 4}</kbd></button>)}
@@ -716,16 +758,16 @@ export default function Home() {
       {tab === "farm" && <div className="game-grid">
         <section className="farm-panel panel">
           <div className="panel-heading"><div><span className="eyebrow">MY FIELD</span><h3>햇살 텃밭</h3></div><div className="farm-actions"><span className="plot-count">{plots.filter(Boolean).length}/{plotCount} 재배 중</span></div></div>
-          <div className={`plots plots-${plotCount} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
+          <div ref={plotsRef} onPointerLeave={() => setHoverArea([])} className={`plots plots-${plotCount} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
             {Array.from({ length: plotCount }).map((_, index) => {
               const plot = plots[index] || null; const crop = plot ? CROPS.find(c => c.id === plot.cropId)! : null;
               const withered = Boolean(plot && seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod);
               const status = plot && crop ? plotStatus(plot, crop, nowMs, bugPenalty) : null;
               const progress = status?.progress ?? 0, bugLeft = plot?.bug ? Math.max(0, BUG_SECONDS - Math.floor((nowMs - plot.bug) / 1000)) : 0;
-              return <div key={index} className="plot-cell"><button className={`plot ${withered ? "withered" : status?.ready ? "ready" : status?.thirsty ? "thirsty" : ""} ${FERTILIZERS.some(item => item.id === tool) && status && !status.ready && !status.fert && !withered ? "fert-target" : ""} ${status?.fert && !withered ? `fert-${status.fert.id}` : ""}`}
+              return <div key={index} className={`plot-cell ${tool === "water" && hoverArea.includes(index) ? "can-area" : ""}`}><button className={`plot ${withered ? "withered" : status?.ready ? "ready" : status?.thirsty ? "thirsty" : ""} ${FERTILIZERS.some(item => item.id === tool) && status && !status.ready && !status.fert && !withered ? "fert-target" : ""} ${status?.fert && !withered ? `fert-${status.fert.id}` : ""}`}
                 onClick={event => { if (tool === "water" && event.detail > 0) return; clickPlot(index); }}
                 onPointerDown={event => { if (tool !== "water") return; event.currentTarget.releasePointerCapture?.(event.pointerId); waterPlot(index); }}
-                onPointerEnter={event => { if (tool === "water" && event.buttons & 1) waterPlot(index); }}>
+                onPointerEnter={event => { if (tool === "water") setHoverArea(canArea(index, plotColumns(), plotCount, currentCan)); if (tool === "water" && event.buttons & 1) waterPlot(index); }}>
                 {status?.fert && !withered && <span className={`fert-tag fert-tag-${status.fert.id}`}>{status.fert.icon} {status.fert.name}</span>}
                 {crop && withered ? <><span className="plant">🥀</span><span className="plot-label">시듦 · 치우기</span></> : crop && status ? <>
                   <span className="plant">{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span>
@@ -744,6 +786,8 @@ export default function Home() {
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= 16 ? "최대 확장 완료" : `${(2400 + (ownedPlots - 8) * 700).toLocaleString()}원 · 최대 16칸`}</small></div><button onClick={expandField} disabled={ownedPlots >= 16}>구매</button></div>
+          <div className="can-shop"><b>🚿 물뿌리개 상점</b><small>좋을수록 물을 많이 담고, 한 번에 여러 칸에 물을 줘요</small><div>{CANS.map(can => { const owned = ownedCans.includes(can.id);
+            return <button key={can.id} className={canId === can.id ? "on" : ""} onClick={() => chooseCan(can)} aria-pressed={canId === can.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${can.w}, 1fr)` }}>{Array.from({ length: can.w * can.h }).map((_, k) => <i key={k} />)}</span><b>{can.name}</b><small>{can.note}</small><em>{canId === can.id ? "사용 중" : owned ? "들기" : `${can.price.toLocaleString()}원`}</em></button>; })}</div></div>
           <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~6). 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 눌러 잡으세요. 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
         </aside>
       </div>}
@@ -756,18 +800,21 @@ export default function Home() {
             <svg className="rod" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="21" y1="58" x2="40" y2="36" />{(fishState.phase === "waiting" || fishState.phase === "bite") && <line className="line" x1="40" y1="36" x2="60" y2={fishState.phase === "bite" ? 70 : 64} />}</svg>
             <div className="angler">{avatarImg}</div>
             <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
-            {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} barSize={0.26 + (fishState.bait?.barBonus ?? 0)} onFinish={finishFishing} /></Suspense>}
+            {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} rod={currentRod} barBonus={fishState.bait?.barBonus ?? 0} onFinish={finishFishing} /></Suspense>}
             {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : ""}`}>
               {fishState.fish ? <><b>{fishState.fish.icon}</b><strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트! +25%</span>}<small>{fishState.fish.note}</small><em>＋{(fishState.price ?? fishState.fish.price).toLocaleString()}원</em></> : <><b>💨</b><small>{fishState.text}</small></>}
               {fishState.reward && <span className="treasure">🎁 보물상자: {fishState.reward}</span>}
             </div>}
           </div>
           <div className="fish-controls">
-            <p>{fishState.phase === "game" ? "🐟 물고기를 초록 막대 안에! 누르고 있으면 올라가고, 떼면 내려가요. 🎁가 보이면 막대에 함께 담아 보세요." : fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : `${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
+            <p>{fishState.phase === "game" ? "🐟 물고기를 초록 막대 안에! 누르고 있으면 올라가고, 떼면 내려가요. 🎁가 보이면 막대에 함께 담아 보세요." : fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : `${currentRod.icon} ${currentRod.name} · ${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
             {fishState.phase === "game" ? null : fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime || !baits[currentBait.id]}>{fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
           </div>
         </section>
         <aside className="panel fish-book">
+          <div className="panel-heading"><div><span className="eyebrow">FISHING ROD</span><h3>낚싯대</h3></div></div>
+          <div className="rod-list">{RODS.map(rod => { const owned = ownedRods.includes(rod.id);
+            return <button key={rod.id} className={rodId === rod.id ? "on" : ""} onClick={() => chooseRod(rod)} disabled={fishState.phase === "game"} aria-pressed={rodId === rod.id}><span>{rod.icon}</span><b>{rod.name}</b><small>{rod.note}</small><em>{rodId === rod.id ? "사용 중" : owned ? "들기" : `${rod.price.toLocaleString()}원`}</em><i className="rod-bar" style={{ width: `${rod.bar * 220}%` }} /></button>; })}</div>
           <div className="panel-heading"><div><span className="eyebrow">BAIT BAG</span><h3>미끼 가방</h3></div></div>
           <div className="bait-list">{BAITS.map(bait => <div key={bait.id} className={`bait ${selectedBait === bait.id ? "on" : ""}`}>
             <button className="bait-pick" onClick={() => setSelectedBait(bait.id)} aria-pressed={selectedBait === bait.id}><span>{bait.icon}</span><b>{bait.name}</b><small>{bait.note}</small><em>{baits[bait.id] ?? 0}개</em></button>

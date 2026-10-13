@@ -16,6 +16,19 @@ export const BAITS: Bait[] = [
 ];
 export const STARTER_BAIT: Record<string, number> = { worm: 10 };
 
+/**
+ * 낚싯대: 미니게임 난이도를 낮춰 준다.
+ * bar: 초록 막대 길이(트랙 비율), gain/drain: 게이지가 차고 줄어드는 속도 배수, treasure: 보물상자 확률.
+ */
+export type Rod = { id: string; name: string; icon: string; price: number; bar: number; gain: number; drain: number; treasure: number; note: string };
+export const RODS: Rod[] = [
+  { id: "bamboo", name: "대나무 낚싯대", icon: "🎋", price: 0, bar: 0.22, gain: 1, drain: 1, treasure: 0.18, note: "기본 낚싯대" },
+  { id: "fiberglass", name: "유리섬유 낚싯대", icon: "🎣", price: 2500, bar: 0.26, gain: 1.1, drain: 0.9, treasure: 0.2, note: "막대 조금 길게 · 게이지 +10%" },
+  { id: "carbon", name: "카본 낚싯대", icon: "🪝", price: 7000, bar: 0.3, gain: 1.2, drain: 0.8, treasure: 0.22, note: "막대 길게 · 게이지 +20% · 손실 -20%" },
+  { id: "iridium", name: "이리듐 낚싯대", icon: "💎", price: 18000, bar: 0.35, gain: 1.32, drain: 0.7, treasure: 0.25, note: "막대 아주 길게 · 게이지 +32% · 손실 -30%" },
+  { id: "golden", name: "전설의 황금 낚싯대", icon: "👑", price: 40000, bar: 0.4, gain: 1.45, drain: 0.6, treasure: 0.35, note: "최고의 낚싯대 · 보물상자 자주" },
+];
+
 export const FISH: Fish[] = [
   { id: "minnow", name: "피라미", icon: "🐟", season: "봄", rarity: "흔함", price: 35, note: "봄 개울에서 떼 지어 다녀요." },
   { id: "chub", name: "버들치", icon: "🐟", season: "봄", rarity: "흔함", price: 40, note: "맑은 계곡 상류의 터줏대감." },
