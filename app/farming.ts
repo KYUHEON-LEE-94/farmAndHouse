@@ -23,7 +23,7 @@ export const CROPS: Crop[] = [
 ];
 
 export const FERTILIZERS: Fertilizer[] = [
-  { id: "compost", name: "퇴비", icon: "🟫", price: 40, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
+  { id: "compost", name: "퇴비", icon: "🍂", price: 40, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
   { id: "premium", name: "고급 비료", icon: "🧪", price: 150, speed: 0.25, quality: 1, note: "남은 시간 -25% · 품질 +1" },
   { id: "golden", name: "황금 비료", icon: "🌟", price: 400, speed: 0.3, quality: 2, note: "남은 시간 -30% · 품질 +2" },
 ];
@@ -38,6 +38,8 @@ export const QUALITIES: Quality[] = [
 export const waterCheckpoints = (growSeconds: number) => (growSeconds >= 150 ? 3 : 2);
 
 /** 벌레가 앉아 있는 시간(초)과, 놓칠 때마다 깎이는 판매가 비율. */
+/** 물뿌리개 한 통으로 물을 줄 수 있는 횟수. 우물에서 무료로 다시 채운다. */
+export const CAN_CAPACITY = 5;
 export const BUG_SECONDS = 15;
 export const BUG_PENALTY = 0.1;
 export const BUG_CHECK_SECONDS = 20;
@@ -48,7 +50,7 @@ export const BUG_CHANCE = 0.35;
  * 물 줄 시점 k는 성장 구간을 (n+1)등분한 지점이고, 그 시점부터 다음 시점(마지막은 수확 가능 시각) 전까지
  * 한 번이라도 물을 주면 그 시점은 "충족"된다. 아직 충족되지 않은 구간에 있으면 목마른 상태다.
  */
-export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number) {
+export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number, bugPenalty = BUG_PENALTY) {
   const grow = (plot.growSeconds ?? crop.seconds) * 1000, ready = plot.plantedAt + grow;
   const progress = Math.min(100, ((now - plot.plantedAt) / grow) * 100);
   const n = waterCheckpoints(grow / 1000), water = plot.water ?? [];
@@ -60,7 +62,7 @@ export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number) {
   const fert = FERTILIZERS.find(item => item.id === plot.fert);
   const score = (satisfied === n ? 2 : satisfied >= n - 1 ? 1 : 0) + (fert?.quality ?? 0);
   const quality = QUALITIES[score >= 4 ? 2 : score >= 2 ? 1 : 0];
-  const bugMultiplier = Math.max(0.5, 1 - BUG_PENALTY * (plot.bugHits ?? 0));
+  const bugMultiplier = Math.max(0.5, 1 - bugPenalty * (plot.bugHits ?? 0));
   return { progress, ready: now >= ready, thirsty, satisfied, total: n, fert, quality, bugMultiplier, remaining: Math.max(0, Math.ceil((ready - now) / 1000)) };
 }
 

@@ -9,7 +9,7 @@ export type AvatarState = { src: string; pixelated: boolean; x: number; z: numbe
 type Palette = { sky: string; grass: string; leaf: string };
 type Props = {
   items: PlacedItem[]; room: Room; wallpaper: string; floor: string; night: boolean; palette: Palette; avatar: AvatarState;
-  stories: number; viewStory: number; yardLevel: number;
+  stories: number; viewStory: number; yardLevel: number; cheer?: { id: string; at: number };
   selectedId: string | null; onSelect: (id: string | null) => void; onMove: (id: string, patch: Partial<PlacedItem>) => void; onAvatarMove: (x: number, z: number) => void;
 };
 type Wall = { group: THREE.Group; inner: THREE.Mesh; normal: [number, number]; mid: [number, number]; full: boolean; story: number };
@@ -17,7 +17,7 @@ type Scene = {
   renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls;
   hemi: THREE.HemisphereLight; sun: THREE.DirectionalLight; shell: THREE.Group; outdoor: THREE.Group; furniture: THREE.Group;
   walls: Wall[]; items: Map<string, { group: THREE.Group; key: string }>; avatar: THREE.Sprite; avatarShadow: THREE.Mesh;
-  selection: THREE.BoxHelper; render: () => void; roomKey: string; viewStory: number;
+  selection: THREE.BoxHelper; render: () => void; roomKey: string; viewStory: number; dragging: string | null;
 };
 
 export const AVATAR_ID = "avatar";
@@ -71,6 +71,33 @@ const cyl = (g: THREE.Object3D, rt: number, rb: number, h: number, c: THREE.Colo
 const ball = (g: THREE.Object3D, r: number, c: THREE.ColorRepresentation, x: number, y: number, z: number, s: [number, number, number] = [1, 1, 1], extra?: Partial<THREE.MeshStandardMaterialParameters>) => { const m = solid(g, new THREE.SphereGeometry(r, 16, 12), c, x, y, z, extra); m.scale.set(...s); return m; };
 const BOOK_COLORS = ["#c4574b", "#e2b85a", "#4f7a6a", "#8ba5bc", "#9a7bb0", "#efe6d6", "#57514f"];
 
+
+type CritterShape = { len: number; w: number; h: number; leg: number; head: number; ears: "flop" | "point" | "round" | "long" | "none"; tail: number; tailUp?: boolean; snout?: boolean; stripes?: boolean; belly?: string; nose?: string };
+
+/** 네 발 동물 공통 모델. 앞이 +z. */
+function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
+  const bodyY = o.leg + o.h / 2, headZ = o.len / 2 + o.head * 0.4, headY = bodyY + o.h * 0.35;
+  ball(g, 0.5, c.main, 0, bodyY, 0, [o.w, o.h, o.len]);
+  if (o.belly) ball(g, 0.5, o.belly, 0, bodyY - o.h * 0.12, 0.02, [o.w * 0.8, o.h * 0.8, o.len * 0.85]);
+  if (o.stripes) for (let i = -2; i <= 2; i++) box(g, o.w * 1.02, 0.03, 0.05, "#2a1d14", 0, bodyY + o.h * 0.3, i * o.len * 0.16).rotation.x = 0.2;
+  if (o.leg > 0.05) [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => cyl(g, o.w * 0.14, o.w * 0.12, o.leg + o.h * 0.2, c.main, sx * o.w * 0.3, 0, sz * o.len * 0.32));
+  else [-1, 1].forEach(sx => ball(g, o.w * 0.18, o.nose ?? c.light, sx * o.w * 0.35, 0.03, o.len * 0.35, [1.2, 0.6, 1]));
+  ball(g, o.head, c.main, 0, headY, headZ);
+  if (o.snout) ball(g, o.head * 0.5, c.light, 0, headY - o.head * 0.25, headZ + o.head * 0.8, [1, 0.8, 1.1]);
+  if (o.stripes) [-1, 1].forEach(s => box(g, 0.02, o.head * 0.6, 0.02, "#2a1d14", s * o.head * 0.35, headY + o.head * 0.35, headZ + o.head * 0.75).rotation.z = s * 0.3);
+  ball(g, o.head * 0.16, o.nose ?? "#2a1d14", 0, headY - o.head * 0.1, headZ + o.head * (o.snout ? 1.25 : 0.98));
+  [-1, 1].forEach(s => {
+    ball(g, o.head * 0.11, "#111111", s * o.head * 0.4, headY + o.head * 0.2, headZ + o.head * 0.85);
+    const ex = s * o.head * 0.6, ey = headY + o.head * 0.75;
+    if (o.ears === "point") solid(g, new THREE.ConeGeometry(o.head * 0.35, o.head * 0.7, 4), c.main, ex, ey + o.head * 0.15, headZ);
+    if (o.ears === "round") ball(g, o.head * 0.3, c.main, ex, ey, headZ - o.head * 0.1, [1, 1, 0.5]);
+    if (o.ears === "flop") ball(g, o.head * 0.35, c.dark, s * o.head * 0.95, headY + o.head * 0.1, headZ - o.head * 0.1, [0.5, 1.3, 0.8]);
+    if (o.ears === "long") ball(g, o.head * 0.3, c.main, s * o.head * 0.35, headY + o.head * 1.4, headZ - o.head * 0.2, [0.7, 2.6, 0.5]);
+  });
+  if (o.tail > 0.06) { const tail = cyl(g, 0.025 + o.w * 0.05, 0.02 + o.w * 0.08, o.tail, c.main, 0, bodyY, -o.len / 2); tail.rotation.x = o.tailUp ? -0.35 : -1.1; tail.position.z -= o.tail * 0.3; }
+  else ball(g, Math.max(o.tail, 0.04) * 1.2, "#ffffff", 0, bodyY, -o.len / 2);
+}
+
 const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => void> = {
   chair: (g, c) => { box(g, 0.46, 0.06, 0.46, c.light, 0, 0.44); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => box(g, 0.05, 0.44, 0.05, c.dark, sx * 0.19, 0, sz * 0.19)); box(g, 0.46, 0.46, 0.05, c.main, 0, 0.5, -0.205); box(g, 0.36, 0.06, 0.06, c.light, 0, 0.78, -0.2); },
   plant: (g, c) => { cyl(g, 0.21, 0.15, 0.38, "#c9784f"); cyl(g, 0.23, 0.23, 0.05, "#b0623f", 0, 0.35); for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; ball(g, 0.2, i % 2 ? c.main : c.dark, Math.cos(a) * 0.2, 0.62 + (i % 3) * 0.12, Math.sin(a) * 0.2, [1.25, 0.45, 0.85]).rotation.y = -a; } ball(g, 0.17, c.light, 0, 0.98, 0, [0.8, 1.35, 0.8]); },
@@ -90,6 +117,26 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
   shelf: (g, c) => { box(g, 1, 0.05, 0.26, c.main, 0, -0.12); [-1, 1].forEach(s => box(g, 0.04, 0.16, 0.2, c.dark, s * 0.38, -0.28, -0.02)); [0, 1, 2].forEach(i => box(g, 0.06, 0.24 - i * 0.03, 0.18, BOOK_COLORS[i], -0.4 + i * 0.07, -0.07)); cyl(g, 0.07, 0.06, 0.13, "#c9784f", 0.05, -0.07); ball(g, 0.09, "#81a96b", 0.05, 0.12, 0, [1.3, 0.8, 1]); cyl(g, 0.06, 0.06, 0.16, "#cfe3e8", 0.32, -0.07, 0, { transparent: true, opacity: 0.8 }); },
   window: (g, c) => { box(g, 1.2, 0.08, 0.12, c.main, 0, 0.47); box(g, 1.2, 0.08, 0.12, c.main, 0, -0.55); [-1, 1].forEach(s => box(g, 0.08, 1.1, 0.12, c.main, s * 0.56, -0.55)); const glass = box(g, 1.04, 0.94, 0.02, "#bfe0ec", 0, -0.47, -0.03, { emissive: "#bfe0ec", emissiveIntensity: 0.35, roughness: 0.2 }); glass.userData.glass = true; glass.castShadow = false; box(g, 0.04, 0.94, 0.05, c.main, 0, -0.47); box(g, 1.04, 0.04, 0.05, c.main, 0, -0.02); box(g, 1.32, 0.05, 0.2, c.main, 0, -0.6, 0.04); },
   door: (g, c) => { box(g, 0.95, 2.1, 0.05, "#efe2c8", 0, -1.05, -0.03); box(g, 0.82, 2.02, 0.07, c.main, 0, -1.05, 0.01); box(g, 0.6, 0.62, 0.02, c.dark, 0, 0.17, 0.05); box(g, 0.6, 0.82, 0.02, c.dark, 0, -0.85, 0.05); ball(g, 0.035, "#e2b85a", 0.3, -0.05, 0.07); },
+  armchair: (g, c) => { box(g, 0.95, 0.4, 0.9, c.main, 0, 0.08); box(g, 0.7, 0.14, 0.68, c.light, 0, 0.48, 0.06); box(g, 0.95, 0.55, 0.2, c.main, 0, 0.42, -0.35); [-1, 1].forEach(s => box(g, 0.14, 0.58, 0.9, c.dark, s * 0.4, 0.08)); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => cyl(g, 0.03, 0.03, 0.08, "#5b3d26", sx * 0.4, 0, sz * 0.38)); },
+  rocker: (g, c) => { box(g, 0.5, 0.06, 0.5, c.light, 0, 0.46); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => box(g, 0.04, 0.4, 0.04, c.dark, sx * 0.21, 0.08, sz * 0.2)); box(g, 0.5, 0.55, 0.05, c.main, 0, 0.52, -0.23); [-1, 1].forEach(s => { const rocker = solid(g, new THREE.TorusGeometry(0.75, 0.02, 6, 24, 0.9), c.dark, s * 0.21, 0.82, 0); rocker.rotation.set(0, Math.PI / 2, Math.PI + 0.35 + 0.8); }); },
+  desk: (g, c) => { box(g, 1.3, 0.05, 0.65, c.main, 0, 0.72); [-1, 1].forEach(s => box(g, 0.06, 0.72, 0.6, c.dark, s * 0.6)); box(g, 0.4, 0.5, 0.55, c.dark, 0.4, 0.2); box(g, 0.08, 0.15, 0.08, "#333", 0, 0.77, -0.15); box(g, 0.62, 0.38, 0.04, "#222", 0, 0.9, -0.17); const screen = box(g, 0.56, 0.32, 0.01, "#cfe8c8", 0, 0.93, -0.145, { emissive: "#cfe8c8", emissiveIntensity: 0.6 }); screen.castShadow = false; box(g, 0.45, 0.02, 0.15, "#dddddd", 0, 0.77, 0.12); cyl(g, 0.04, 0.035, 0.1, "#efe6d6", 0.45, 0.77, 0.1); },
+  wardrobe: (g, c) => { box(g, 1.2, 1.95, 0.6, c.main); box(g, 1.26, 0.06, 0.64, c.dark, 0, 1.95); box(g, 0.02, 1.85, 0.01, c.dark, 0, 0.05, 0.3); [-1, 1].forEach(s => box(g, 0.03, 0.2, 0.03, "#e2b85a", s * 0.06, 0.95, 0.31)); },
+  fishtank: (g, c) => { box(g, 1.1, 0.7, 0.45, c.main); const glass = box(g, 1.05, 0.45, 0.4, "#9fd3e6", 0, 0.7, 0, { transparent: true, opacity: 0.45, roughness: 0.1 }); glass.castShadow = false; box(g, 1.02, 0.06, 0.37, "#e8d6a8", 0, 0.71); [[-0.25, 0.92, 0.05, "#f08a3a"], [0.2, 0.86, -0.06, "#e2483a"], [0.05, 1.0, 0.08, "#f6d16a"]].forEach(([x, y, z, color]) => ball(g, 0.04, color as string, x as number, y as number, z as number, [1.6, 1, 0.6])); box(g, 0.02, 0.25, 0.02, "#4f7a3e", 0.4, 0.75, 0); },
+  fridge: (g, c) => { box(g, 0.75, 1.8, 0.7, c.main, 0, 0, 0, { roughness: 0.35 }); box(g, 0.76, 0.02, 0.71, c.dark, 0, 1.15); [[1.32, 0.3], [0.6, 0.5]].forEach(([y, h]) => box(g, 0.03, h, 0.04, "#8a9598", 0.3, y, 0.37)); box(g, 0.12, 0.08, 0.01, "#f2b5c4", -0.2, 1.55, 0.355); },
+  tvstand: (g, c) => { box(g, 1.6, 0.45, 0.45, c.main); [-1, 1].forEach(s => box(g, 0.74, 0.35, 0.01, c.dark, s * 0.39, 0.05, 0.226)); box(g, 0.25, 0.04, 0.15, "#222", 0, 0.45, -0.05); box(g, 0.03, 0.08, 0.03, "#222", 0, 0.48, -0.05); box(g, 1.1, 0.62, 0.05, "#1d1d1d", 0, 0.52, -0.05); const screen = box(g, 1.04, 0.56, 0.01, "#5a8fb5", 0, 0.55, -0.02, { emissive: "#5a8fb5", emissiveIntensity: 0.5 }); screen.castShadow = false; },
+  kitchen: (g, c) => { box(g, 1.8, 0.86, 0.6, c.main); box(g, 1.85, 0.06, 0.65, "#7d7a74", 0, 0.86); box(g, 0.5, 0.02, 0.35, "#b9c3c6", -0.45, 0.92); cyl(g, 0.02, 0.02, 0.25, "#8a9598", -0.45, 0.92, -0.2); [-1, 1].forEach(s => cyl(g, 0.11, 0.11, 0.01, "#222", 0.5, 0.92, s * 0.13)); [-0.6, 0, 0.6].forEach(x => box(g, 0.56, 0.7, 0.01, c.dark, x, 0.08, 0.301)); },
+  bathtub: (g, c) => { box(g, 1.7, 0.55, 0.8, c.main, 0, 0.05, 0, { roughness: 0.3 }); const water = box(g, 1.5, 0.02, 0.6, "#a9d8f0", 0, 0.56, 0, { roughness: 0.1, emissive: "#a9d8f0", emissiveIntensity: 0.15 }); water.castShadow = false; [[-0.3, 0.06], [-0.18, -0.1], [0.4, 0.12]].forEach(([x, z]) => ball(g, 0.07, "#ffffff", x, 0.6, z)); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => ball(g, 0.05, "#d6b56d", sx * 0.75, 0.04, sz * 0.32)); },
+  fireplace: (g, c) => { box(g, 1.4, 1.1, 0.5, c.main); box(g, 1.55, 0.08, 0.6, "#efe2c8", 0, 1.1); box(g, 0.8, 0.62, 0.02, "#2a1a10", 0, 0.12, 0.25); [-0.15, 0.15].forEach(x => cyl(g, 0.04, 0.04, 0.5, "#6b4a32", x, 0.13, 0.12).rotation.set(0, 0, Math.PI / 2)); const fire = solid(g, new THREE.ConeGeometry(0.16, 0.35, 8), "#f08a3a", 0, 0.32, 0.15, { emissive: "#ff8a2a", emissiveIntensity: 1.2 }); fire.castShadow = false; const light = new THREE.PointLight("#ff9a4a", 0, 6, 1.6); light.position.set(0, 0.5, 0.5); light.userData.nightLight = true; g.add(light); },
+  curtain: (g, c) => { box(g, 1.5, 0.03, 0.03, "#8a6a48", 0, 0.78); [-1, 1].forEach(s => { for (let i = 0; i < 4; i++) box(g, 0.14, 1.5, 0.05, i % 2 ? c.main : c.dark.clone().lerp(c.main, 0.6), s * (0.32 + i * 0.13), -0.75, (i % 2) * 0.02); }); },
+  mirror: (g, c) => { box(g, 0.6, 1, 0.04, c.main, 0, -0.5, -0.01); box(g, 0.5, 0.9, 0.01, "#dfeef3", 0, -0.45, 0.012, { metalness: 0.9, roughness: 0.05 }); },
+  walltv: (g, c) => { box(g, 1.3, 0.75, 0.05, c.main, 0, -0.375, -0.01); const screen = box(g, 1.22, 0.67, 0.01, "#5a8fb5", 0, -0.335, 0.016, { emissive: "#5a8fb5", emissiveIntensity: 0.5 }); screen.castShadow = false; },
+  dog: (g, c) => critter(g, c, { len: 0.62, w: 0.32, h: 0.3, leg: 0.24, head: 0.17, ears: "flop", tail: 0.22, snout: true }),
+  cat: (g, c) => critter(g, c, { len: 0.5, w: 0.24, h: 0.24, leg: 0.18, head: 0.14, ears: "point", tail: 0.38, tailUp: true }),
+  rabbit: (g, c) => critter(g, c, { len: 0.34, w: 0.28, h: 0.28, leg: 0.06, head: 0.13, ears: "long", tail: 0.04 }),
+  mole: (g, c) => critter(g, c, { len: 0.38, w: 0.28, h: 0.2, leg: 0.03, head: 0.1, ears: "none", tail: 0.05, nose: "#f2899a" }),
+  weasel: (g, c) => critter(g, c, { len: 0.62, w: 0.15, h: 0.15, leg: 0.1, head: 0.09, ears: "round", tail: 0.3, belly: "#f3e3c4" }),
+  tiger: (g, c) => critter(g, c, { len: 1.35, w: 0.55, h: 0.48, leg: 0.42, head: 0.3, ears: "round", tail: 0.75, stripes: true, belly: "#f8efe0" }),
+  duck: (g, c) => { ball(g, 0.18, c.main, 0, 0.2, 0, [0.9, 0.8, 1.2]); ball(g, 0.11, c.main, 0, 0.42, 0.14); box(g, 0.08, 0.03, 0.1, "#f08a3a", 0, 0.38, 0.27); [-1, 1].forEach(s => { ball(g, 0.018, "#111111", s * 0.06, 0.45, 0.22); box(g, 0.03, 0.06, 0.05, "#f08a3a", s * 0.06, 0, 0.02); }); ball(g, 0.07, c.dark, 0, 0.26, -0.2, [0.8, 0.6, 1.2]); },
   stairs: (g, c) => { for (let i = 0; i < 10; i++) { box(g, 1, (i + 1) * 0.28, 0.26, i % 2 ? c.main : c.light, 0, 0, 1.17 - i * 0.26); } [-1, 1].forEach(s => { const rail = box(g, 0.04, 0.04, 2.9, c.dark, s * 0.48, 1.85, 0); rail.rotation.x = Math.atan2(2.8, 2.6); }); },
   fence: (g, c) => { [-0.95, -0.475, 0, 0.475, 0.95].forEach(x => { box(g, 0.1, 0.85, 0.08, c.main, x); const tip = solid(g, new THREE.ConeGeometry(0.07, 0.12, 4), c.main, x, 0.91, 0); tip.rotation.y = Math.PI / 4; }); [0.28, 0.62].forEach(y => box(g, 2, 0.07, 0.05, c.dark, 0, y, 0.05)); },
   flowerbed: (g, c) => { box(g, 1.6, 0.25, 0.8, c.dark.clone().lerp(new THREE.Color("#8a6a4a"), 0.7)); box(g, 1.5, 0.04, 0.7, "#5f4330", 0, 0.24); for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) { const x = -0.6 + i * 0.24, z = -0.22 + j * 0.22; box(g, 0.02, 0.2, 0.02, "#4f7a3e", x, 0.28, z); ball(g, 0.06, [c.main, c.light, "#f6d16a"][(i + j) % 3], x, 0.5, z); } },
@@ -167,7 +214,7 @@ export default function House3D(props: Props) {
     selection.visible = false; scene.add(selection);
 
     let frame = 0;
-    const ctx: Scene = { renderer, scene, camera, controls: null!, hemi, sun, shell, outdoor, furniture, walls: [], items: new Map(), avatar, avatarShadow, selection, roomKey: "", viewStory: 0,
+    const ctx: Scene = { renderer, scene, camera, controls: null!, hemi, sun, shell, outdoor, furniture, walls: [], items: new Map(), avatar, avatarShadow, selection, roomKey: "", viewStory: 0, dragging: null,
       render: () => { if (frame) return; frame = requestAnimationFrame(() => { frame = 0; updateCutaway(ctx); renderer.render(scene, camera); }); } };
     sceneRef.current = ctx;
 
@@ -189,6 +236,7 @@ export default function House3D(props: Props) {
       floorPlane.constant = -node.position.y * (item?.kind === "wall" ? 0 : 1);
       raycaster.ray.intersectPlane(floorPlane, hit);
       drag = { id, wall: item?.kind === "wall", yard: Boolean(item?.yard), ox: node.position.x - hit.x, oz: node.position.z - hit.z, patch: null };
+      ctx.dragging = id;
     };
     const onMove = (event: PointerEvent) => {
       if (!drag) return;
@@ -206,7 +254,8 @@ export default function House3D(props: Props) {
         drag.patch = { wall: index, u, h }; placeItem(node as THREE.Group, { ...item, ...drag.patch }, room);
       } else if (raycaster.ray.intersectPlane(floorPlane, hit)) {
         const x = hit.x + drag.ox, z = hit.z + drag.oz;
-        const ok = drag.yard ? fitsInYard(room, yardLevel, x, z) : drag.id === AVATAR_ID ? fitsInRoom(room.points, x, z, 0.25) || fitsInYard(room, yardLevel, x, z, 0.3) : fitsInRoom(room.points, x, z, 0.25);
+        const isPet = items.find(entry => entry.instanceId === drag!.id)?.pet;
+        const ok = drag.yard ? fitsInYard(room, yardLevel, x, z) : drag.id === AVATAR_ID || isPet ? fitsInRoom(room.points, x, z, 0.25) || fitsInYard(room, yardLevel, x, z, 0.3) : fitsInRoom(room.points, x, z, 0.25);
         if (!ok) return;
         node.position.x = x; node.position.z = z; drag.patch = { x, z };
         if (drag.id === AVATAR_ID) avatarShadow.position.set(x, avatar.position.y + 0.01, z);
@@ -216,7 +265,7 @@ export default function House3D(props: Props) {
     const onUp = (event: PointerEvent) => {
       if (drag?.patch) { if (drag.id === AVATAR_ID) propsRef.current.onAvatarMove(drag.patch.x!, drag.patch.z!); else propsRef.current.onMove(drag.id, drag.patch); }
       else if (!drag && downAt && Math.hypot(event.clientX - downAt[0], event.clientY - downAt[1]) < 5) propsRef.current.onSelect(null);
-      drag = null; downAt = null; ctx.controls.enabled = true;
+      drag = null; downAt = null; ctx.controls.enabled = true; ctx.dragging = null;
     };
     renderer.domElement.addEventListener("pointerdown", onDown);
     renderer.domElement.addEventListener("pointermove", onMove);
@@ -322,7 +371,9 @@ export default function House3D(props: Props) {
         if (entry) { ctx.furniture.remove(entry.group); disposeTree(entry.group); }
         entry = { group: buildItem(item), key }; ctx.items.set(item.instanceId, entry); ctx.furniture.add(entry.group);
       }
-      placeItem(entry.group, item, room);
+      const posKey = `${item.x},${item.z},${item.rot},${item.story ?? 0},${item.wall},${item.u},${item.h}`;
+      if (!item.pet || entry.group.userData.posKey !== posKey) placeItem(entry.group, item, room);
+      entry.group.userData.posKey = posKey;
       entry.group.userData.wall = item.kind === "wall" ? item.wall ?? 0 : undefined;
       entry.group.userData.story = item.yard ? -1 : item.story ?? 0;
     });
@@ -330,6 +381,44 @@ export default function House3D(props: Props) {
     applyLighting(ctx, night, palette.sky);
     ctx.render();
   }, [items, room]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+  // 펫: 지금 있는 공간(방 또는 마당) 안에서 천천히 돌아다닌다. 돌아다닌 위치는 저장하지 않는다.
+  useEffect(() => {
+    const ctx = sceneRef.current; if (!ctx) return;
+    const pets = items.filter(item => item.pet);
+    if (!pets.length) return;
+    const state = new Map<string, { tx: number; tz: number; wait: number; jump: number }>();
+    let frame = 0, last = performance.now();
+    const tick = (time: number) => {
+      const dt = Math.min(0.1, (time - last) / 1000); last = time;
+      const { room, yardLevel: yl, cheer: cheerNow } = propsRef.current;
+      pets.forEach(pet => {
+        const node = ctx.items.get(pet.instanceId)?.group; if (!node || ctx.dragging === pet.instanceId) return;
+        const indoor = fitsInRoom(room.points, node.position.x, node.position.z, 0);
+        const fits = (x: number, z: number) => (indoor ? fitsInRoom(room.points, x, z, 0.3) : fitsInYard(room, yl, x, z, 0.3));
+        let st = state.get(pet.instanceId);
+        if (!st) { st = { tx: node.position.x, tz: node.position.z, wait: Math.random() * 2, jump: 0 }; state.set(pet.instanceId, st); }
+        if (cheerNow?.id === pet.instanceId && time - cheerNow.at < 50 && st.jump <= 0) st.jump = 0.8;
+        const base = (pet.story ?? 0) * STORY_HEIGHT;
+        if (st.jump > 0) { st.jump -= dt; node.position.y = base + Math.abs(Math.sin((0.8 - st.jump) * Math.PI * 2.5)) * 0.25; return; }
+        const dx = st.tx - node.position.x, dz = st.tz - node.position.z, dist = Math.hypot(dx, dz);
+        if (dist < 0.05) {
+          st.wait -= dt; node.position.y = base;
+          if (st.wait <= 0) { const a = Math.random() * Math.PI * 2, r = 0.6 + Math.random() * 1.4, x = node.position.x + Math.cos(a) * r, z = node.position.z + Math.sin(a) * r; if (fits(x, z)) { st.tx = x; st.tz = z; } st.wait = 1.5 + Math.random() * 3; }
+          return;
+        }
+        const speed = pet.id === "tiger" ? 0.55 : pet.id === "mole" || pet.id === "duck" ? 0.25 : 0.4, step = Math.min(dist, speed * dt);
+        node.position.x += (dx / dist) * step; node.position.z += (dz / dist) * step;
+        node.rotation.y = Math.atan2(dx, dz); node.position.y = base + Math.abs(Math.sin(time / 120)) * 0.03;
+      });
+      if (ctx.selection.visible) ctx.selection.update();
+      ctx.renderer.render(ctx.scene, ctx.camera);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 낮/밤, 하늘
   useEffect(() => { const ctx = sceneRef.current; if (!ctx) return; applyLighting(ctx, night, palette.sky); ctx.render(); }, [night, palette.sky]);

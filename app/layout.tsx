@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "월루농가",
     description: "월급은 루팡, 농사는 진심",
-    images: [{ url: "/og.png", width: 1536, height: 1024, alt: "사계절이 한 풍경에 담긴 월루농가" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "엑셀 화면 구석에 몰래 띄운 월루농가 — 월급은 루팡, 농사는 진심" }],
   },
   twitter: { card: "summary_large_image", title: "월루농가", description: "월급은 루팡, 농사는 진심", images: ["/og.png"] },
 };
