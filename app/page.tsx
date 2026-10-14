@@ -57,11 +57,18 @@ function cycleRoll(crop: Crop, bucket: number, salt: number) {
   return ((hash ^ (hash >>> 16)) >>> 0) / 4294967295;
 }
 
-/** 5분마다 작물의 기존 가격·난이도와 무관하게 거래가와 재배 시간을 다시 배정한다. */
+/**
+ * 5분마다 작물의 기존 가격·난이도와 무관하게 거래가·재배 시간·씨앗값을 다시 배정한다.
+ * 씨앗값은 그 시세 거래가의 20~32%로 함께 움직인다. 씨앗값이 고정이던 때는 씨앗이 싼 작물이
+ * 장기적으로 늘 유리했다(양배추·오이 쏠림). 연동하면 어떤 작물이든 평균 이익이 같아지고,
+ * 선택은 "지금 이 5분 동안 무엇이 좋은가"로만 정해진다.
+ */
 function cycleCrop(crop: Crop, bucket: number) {
+  const price = Math.round((70 + cycleRoll(crop, bucket, 17) * 350) * CROP_PRICE_SCALE);
   return {
-    price: Math.round((70 + cycleRoll(crop, bucket, 17) * 350) * CROP_PRICE_SCALE),
+    price,
     seconds: Math.round(20 + cycleRoll(crop, bucket, 41) * 45),
+    seed: Math.max(10, Math.round(price * (0.2 + cycleRoll(crop, bucket, 73) * 0.12))),
   };
 }
 
@@ -479,7 +486,7 @@ export default function Home() {
   const noBait = Object.values(baits).every(count => !count);
   const today = now.toDateString();
   // 파산: 가장 싼 제철 씨앗도 못 사고, 밭에 이번 계절 작물이 없고, 미끼도 없을 때.
-  const broke = loaded && money < Math.min(...available.map(crop => Math.round(crop.seed * seedMul * (1 - 0.05 * pw("rabbit"))))) && noBait && !plots.some(plot => plot && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod);
+  const broke = loaded && money < Math.min(...available.map(crop => Math.round(cycleCrop(crop, marketBucket).seed * seedMul * (1 - 0.05 * pw("rabbit"))))) && noBait && !plots.some(plot => plot && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod);
   const showBailout = broke && isWorkTime && lastBailout !== today && !activeEvent && !offWork && !spotConfirm && !bossMode && !showSettings && !showAvatar && !showAccount && !showStorage && !showMissions && guideStep === null && (fishState.phase === "idle" || fishState.phase === "result");
   function takeBailout() {
     setMoney(value => value + BAILOUT_AMOUNT); setLastBailout(today); playCoinSound([523, 659, 784]);
@@ -489,7 +496,8 @@ export default function Home() {
     if (currentSpot.price > 0) setSpotId("river");
     switchTab("fish");
   }
-  const seedPrice = (crop: Crop) => Math.round(crop.seed * seedMul * (1 - 0.05 * pw("rabbit")));
+  /** 이번 5분 씨앗값(시세 거래가에 연동) × 버프·토끼. */
+  const seedPrice = (crop: Crop) => Math.round(cycleCrop(crop, marketBucket).seed * seedMul * (1 - 0.05 * pw("rabbit")));
   /** 포화 전 판매가(시세 × 버프·펫 효과). */
   const basePrice = (crop: Crop) => marketPrice(crop, marketBucket) * priceMul * (1 + 0.15 * pw("gumiho")) * friendBonus;
   // 시장 포화 슬롯: 지난 시세 주기만큼 정리한 지금 상태
@@ -1807,7 +1815,7 @@ export default function Home() {
     const tooLate = isWorkTime && Math.round(cycleSeconds * growthMul) > seasonSecondsLeft;
     return <button key={crop.id} className={`crop-card ${selectedCrop === crop.id ? "selected" : ""} ${tooLate ? "too-late" : ""}`} onClick={() => { setSelectedCrop(crop.id); setTool("seed"); }} aria-pressed={selectedCrop === crop.id}>
       <span className="crop-icon">{crop.icon}</span><span className="crop-name">{crop.name}</span>
-      <span className="crop-meta">{tooLate ? "이번 계절엔 시간 부족" : `씨앗 ${Math.round(crop.seed * seedMul)}원 · 이번 재배 ${Math.round(cycleSeconds * growthMul)}초`}</span>
+      <span className="crop-meta">{tooLate ? "이번 계절엔 시간 부족" : `씨앗 ${seedPrice(crop)}원 · 이번 재배 ${Math.round(cycleSeconds * growthMul)}초`}</span>
       {saturationOf(market, crop.id) > 0 ? <span className="sat-chip" title="많이 팔아서 값이 내려갔어요. 다른 작물을 팔거나 5분 시세가 바뀌면 풀려요.">📉 포화 -{Math.round(saturationOf(market, crop.id) * 100)}%</span> : freeLeft(market, crop.id) < FREE_PER_CYCLE ? <span className="sat-chip free" title="이번 5분 동안 이 개수까지는 정상가로 팔려요.">정상가 {freeLeft(market, crop.id)}개 남음</span> : null}
       {(() => { const base = marketPrice(crop, marketBucket), final = salePrice(crop), boost = Math.round((final / base - 1) * 100);
         return <span className={`crop-price ${boost ? (boost > 0 ? "up" : "down") : ""}`}><small>{boost ? <>시세 <s>{base.toLocaleString()}</s> {boost > 0 ? "▲" : "▼"}{Math.abs(boost)}%</> : "현재 시세"}</small>{final.toLocaleString()}원</span>; })()}
