@@ -629,7 +629,7 @@ export default function Home() {
 
   // 보스 키: ESC로 엑셀 위장 화면을 켜고 끈다. 위장 중에는 소리와 BGM을 멈추고 탭 제목도 바꾼다.
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); setBossMode(on => !on); } };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); setFertMenu(false); setBossMode(on => !on); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -910,6 +910,13 @@ export default function Home() {
     setNotice(`🚰 우물에서 물뿌리개를 가득 채웠어요. (${canMax}번 줄 수 있어요)`);
   }
 
+  // 비료 메뉴: 바깥을 누르면 닫는다.
+  useEffect(() => {
+    if (!fertMenu) return;
+    const onDown = (event: PointerEvent) => { if (!(event.target instanceof Element && event.target.closest(".fert-slot"))) setFertMenu(false); };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [fertMenu]);
   /** 5번 비료: 고른 비료가 없으면 남아 있는 다른 비료를 든다. */
   function holdFert(id = fertId) {
     const pick = (fertStock[id] ?? 0) > 0 ? id : FERTILIZERS.find(item => (fertStock[item.id] ?? 0) > 0)?.id ?? id;
@@ -1867,7 +1874,8 @@ export default function Home() {
         <span className="dock-sep" />
         {(() => { const held = FERTILIZERS.find(item => item.id === (activeFert ? activeFert.id : fertId)) ?? FERTILIZERS[0];
           return <div className="fert-slot">
-            <button className={`fert ${activeFert ? "on" : ""}`} onClick={() => { if (activeFert) setFertMenu(open => !open); else { holdFert(); setFertMenu(true); } }} aria-expanded={fertMenu} aria-haspopup="menu" title={`비료 고르기 · 지금 ${held.name} ${fertStock[held.id] ?? 0}개 (5)`}><b>{held.icon}</b><span>{held.name}</span><small className={fertStock[held.id] ? "" : "empty"}>{currentSpreader.w * currentSpreader.h > 1 ? `${currentSpreader.note} · ` : ""}{fertStock[held.id] ?? 0}개 ▾</small><kbd>5</kbd></button>
+            <button className={`fert ${activeFert ? "on" : ""}`} onClick={() => holdFert()} aria-pressed={Boolean(activeFert)} title={`${held.name} 들기 · ${fertStock[held.id] ?? 0}개 남음 (5)`}><b>{held.icon}</b><span>{held.name}</span><small className={fertStock[held.id] ? "" : "empty"}>{currentSpreader.w * currentSpreader.h > 1 ? `${currentSpreader.note} · ` : ""}{fertStock[held.id] ?? 0}개</small><kbd>5</kbd></button>
+            <button className={`fert-more ${fertMenu ? "open" : ""}`} onClick={() => setFertMenu(open => !open)} aria-expanded={fertMenu} aria-haspopup="menu" aria-label="비료 종류 고르기" title="비료 종류 고르기">▼</button>
             {fertMenu && <div className="fert-menu" role="menu" aria-label="비료 고르기">{FERTILIZERS.map(item => <button key={item.id} role="menuitemradio" aria-checked={held.id === item.id} className={held.id === item.id ? "on" : ""} onClick={() => holdFert(item.id)}><b>{item.icon}</b><span>{item.name}<small>{item.note}</small></span><em className={fertStock[item.id] ? "" : "empty"}>{fertStock[item.id] ?? 0}개</em></button>)}</div>}
           </div>; })()}
       </div>}
