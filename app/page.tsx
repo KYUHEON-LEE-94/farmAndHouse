@@ -19,11 +19,11 @@ import { DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rollGrade, 
 import { migrateInventory, pickCategory, replaceCategory, type Inventory, type ItemCategory } from "./items";
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
-import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, SAT_MAX, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
+import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, MARKET_DEMAND, OVERFLOW_RATE, SAT_MAX, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_PRICE_SCALE, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import BossScreen, { BOSS_MODES, type BossMode } from "./bossScreen";
 import ColorPicker from "./colorPicker";
@@ -70,13 +70,19 @@ function cycleRoll(crop: Crop, bucket: number, salt: number) {
  * 장기적으로 늘 유리했다(양배추·오이 쏠림). 연동하면 어떤 작물이든 평균 이익이 같아지고,
  * 선택은 "지금 이 5분 동안 무엇이 좋은가"로만 정해진다.
  */
+/**
+ * 5분 시세: 재배 시간과 가격을 연결한다(비싸면서 빨리 자라는 작물이 나오지 않게).
+ * 초당 목표 순이익(난이도별) × 재배 시간 = 순이익, 씨앗값은 판매가의 45~60%(어려울수록 싸다).
+ * 순이익은 시세마다 ±25% 흔들려서 5분마다 더 좋은 작물을 고르는 재미는 남긴다.
+ */
+const PROFIT_PER_SEC: Record<string, number> = { 쉬움: 1.8, 보통: 1.9, 어려움: 2.1 };
+const SEED_RATIO: Record<string, number> = { 쉬움: 0.575, 보통: 0.525, 어려움: 0.475 };
 function cycleCrop(crop: Crop, bucket: number) {
-  const price = Math.round((70 + cycleRoll(crop, bucket, 17) * 350) * CROP_PRICE_SCALE);
-  return {
-    price,
-    seconds: Math.round(20 + cycleRoll(crop, bucket, 41) * 45),
-    seed: Math.max(10, Math.round(price * (0.2 + cycleRoll(crop, bucket, 73) * 0.12))),
-  };
+  const seconds = Math.round(20 + cycleRoll(crop, bucket, 41) * 45);
+  const profit = seconds * (PROFIT_PER_SEC[crop.difficulty] ?? 1.9) * (0.75 + cycleRoll(crop, bucket, 17) * 0.5);
+  const ratio = (SEED_RATIO[crop.difficulty] ?? 0.525) - 0.025 + cycleRoll(crop, bucket, 73) * 0.05;
+  const price = Math.round(profit / (1 - ratio));
+  return { price, seconds, seed: Math.max(10, Math.round(price * ratio)) };
 }
 
 function marketPrice(crop: Crop, bucket: number) {
@@ -1121,15 +1127,15 @@ export default function Home() {
     }
     const amount = plan.reduce((sum, { key, n }) => sum + coopUnit(key) * n, 0);
     takeFromProduce(plan); setMoney(m => m + amount); playCoinSound([660, 880, 1100]);
-    setNotice(`🏦 농협에 ${count}개를 일괄 출하했어요. 기준가의 ${Math.round(COOP_RATE * 100)}%로 ${amount.toLocaleString()}원! (잠금·주문 예약분은 남겨 뒀어요)`);
+    setNotice(`🏦 농협에 ${count}개를 일괄 출하했어요. 시세의 ${Math.round(COOP_RATE * 100)}%로 ${amount.toLocaleString()}원! (잠금·주문 예약분은 남겨 뒀어요)`);
   }
   function toggleLock(key: string) {
     const locked = isLocked(key);
     setProduceLocks(all => ({ ...all, [key]: !locked }));
   }
 
-  /** 농협 일괄 출하: 기준가(시세 변동·버프 없음)의 80%, 포화 없이 창고 전부를 판다. 급할 때 쓰는 안전장치. */
-  const coopUnit = (key: string) => { const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId); return crop ? Math.round(crop.sell * CROP_PRICE_SCALE * COOP_RATE * QUALITIES[quality].multiplier * (golden ? 3 : 1)) : 0; };
+  /** 농협 일괄 출하: 지금 시세(버프 없음)의 70%, 포화·수요 한도 없이 창고 전부를 판다. 급할 때 쓰는 안전장치. */
+  const coopUnit = (key: string) => { const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId); return crop ? Math.round(marketPrice(crop, marketBucket) * COOP_RATE * QUALITIES[quality].multiplier * (golden ? 3 : 1)) : 0; };
 
 
   function expandStorage() {
@@ -2007,7 +2013,7 @@ export default function Home() {
               : toolShop === "fert" ? [...FERTILIZERS.map(item => <div key={item.id} className={`fert-stock ${tool === item.id ? "on" : ""}`}><button className="fert-pick" onClick={() => holdFert(item.id)} aria-pressed={tool === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.note}</small><em>{fertStock[item.id] ?? 0}개</em></button><QtyBuy label={item.name} unitPrice={item.price} money={money} initial={item.pack} step={item.pack >= 10 ? 5 : 1} onBuy={count => buyFert(item, count)} /></div>), <b key="spreader-title" className="tool-shop-sub">🧺 거름 뿌리개</b>, ...SPREADERS.map(item => <button key={item.id} className={spreaderId === item.id ? "on" : ""} onClick={() => chooseSpreader(item)} aria-pressed={spreaderId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 거름</small><em>{spreaderId === item.id ? "사용 중" : ownsItem(ownedSpreaders, item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)]
               : CANS.map(can => <button key={can.id} className={canId === can.id ? "on" : ""} onClick={() => chooseCan(can)} aria-pressed={canId === can.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${can.w}, 1fr)` }}>{Array.from({ length: can.w * can.h }).map((_, k) => <i key={k} />)}</span><b>{can.name}</b><small>{can.note}</small><em>{canId === can.id ? "사용 중" : ownsItem(ownedCans, can.id) ? "들기" : `${can.price.toLocaleString()}원`}</em></button>)}</div>
           </div>
-          <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~5, 5는 고른 비료). 🌱 심기와 🧺 수확은 따로예요. 둘 다 누른 채 밭 위를 쓸면 연달아 돼요.<br />🌿 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 어떤 도구로든 눌러 잡으세요(벌레 있는 밭을 눌러도 돼요). 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
+          <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~5, 5는 고른 비료). 🌱 심기와 🧺 수확은 따로예요. 둘 다 누른 채 밭 위를 쓸면 연달아 돼요.<br />🌿 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.12, 최상 ×1.3).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 어떤 도구로든 눌러 잡으세요(벌레 있는 밭을 눌러도 돼요). 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
         </aside>
       </div>}
 
@@ -2413,8 +2419,9 @@ export default function Home() {
                 <div className="crop-box-foot"><span>팔 수 있는 {box.sellableCount}개 · 약 {box.value.toLocaleString()}원</span><button onClick={() => setSellConfirm({ kind: "coop", cropId: box.crop.id })} disabled={box.sellableCount < 1}>🏦 이 작물만 농협 출하</button></div>
               </div>)}</div>
               <div className="market-slots" aria-label="시장 포화 슬롯">{market.slots.length ? <>📉 포화 중: {market.slots.map(slot => { const crop = CROPS.find(c => c.id === slot.id); return <span key={slot.id}>{crop?.icon} -{Math.round(Math.min(SAT_MAX, slot.units * 0.02) * 100)}%</span>; })}<small>(최대 3종 · 5분마다 오래된 것부터 풀림)</small></> : <>📈 지금 포화된 작물이 없어요 · 작물마다 5분에 {FREE_PER_CYCLE}개까지 정상가</>}</div>
+              <div className="market-slots" aria-label="시장 전체 수요">🛒 이번 5분 시장 수요 <b>{demandLeft(market)}/{MARKET_DEMAND}개</b> 남음<small>(넘으면 농협이 시세의 {Math.round(OVERFLOW_RATE * 100)}%에 매입 · 미션 납품·가공은 상관없음)</small></div>
               <button className="save-button sell-all" onClick={() => setSellConfirm({ kind: "market" })}>💰 창고 전부 팔기 <small>(잠금·주문 예약분 제외)</small></button>
-              <button className="ghost-button coop-button" onClick={() => setSellConfirm({ kind: "coop" })}>🏦 농협 일괄 출하 <small>(기준가 {Math.round(COOP_RATE * 100)}%, 포화 없음, 잠금·예약분 제외)</small></button>
+              <button className="ghost-button coop-button" onClick={() => setSellConfirm({ kind: "coop" })}>🏦 농협 일괄 출하 <small>(시세의 {Math.round(COOP_RATE * 100)}%, 포화 없음, 잠금·예약분 제외)</small></button>
             </>}
             <div className="field-shop"><div><b>📦 창고 넓히기</b><small>{storageCap >= STORAGE_MAX ? "최대 크기" : `${storagePrice(storageCap).toLocaleString()}원 · +${STORAGE_STEP}개 (${storageCap}/${STORAGE_MAX})`}</small><span className="field-meter"><i style={{ width: `${(storageCap / STORAGE_MAX) * 100}%` }} /></span></div><button onClick={expandStorage} disabled={storageCap >= STORAGE_MAX}>구매</button></div>
             <p className="hint">농산물과 물고기가 같은 총 보관 수량을 사용해요. 잠금은 품질과 관계없이 직접 선택하며, 오늘 미션에 필요한 수량은 📜 예약되어 판매에서 빠져요.</p>
@@ -2423,7 +2430,7 @@ export default function Home() {
 
       {sellConfirm && sellPreview && <div className="modal-backdrop"><section className="modal sell-modal" role="dialog" aria-labelledby="sell-title">
         <h3 id="sell-title">{sellConfirm.kind === "coop" ? "🏦 농협 출하" : "💰 창고 전부 팔기"}{sellConfirm.cropId ? ` · ${CROPS.find(c => c.id === sellConfirm.cropId)?.name ?? ""}` : ""}</h3>
-        {sellPreview.count ? <p><b>{sellPreview.count}개</b>를 약 <b>{sellPreview.amount.toLocaleString()}원</b>에 {sellConfirm.kind === "coop" ? `팔아요(기준가 ${Math.round(COOP_RATE * 100)}%, 포화 없음).` : "시장에 팔아요(포화 슬롯 적용)."}</p> : <p>지금 팔 수 있는 작물이 없어요.</p>}
+        {sellPreview.count ? <p><b>{sellPreview.count}개</b>를 약 <b>{sellPreview.amount.toLocaleString()}원</b>에 {sellConfirm.kind === "coop" ? `팔아요(시세 ${Math.round(COOP_RATE * 100)}%, 포화 없음).` : "시장에 팔아요(포화 슬롯 적용)."}</p> : <p>지금 팔 수 있는 작물이 없어요.</p>}
         <ul className="sell-keep">{sellPreview.lockedCount > 0 && <li>🔒 잠금 {sellPreview.lockedCount}개는 남겨 둬요</li>}{sellPreview.reservedCount > 0 && <li>📜 오늘 주문 예약 {sellPreview.reservedCount}개는 남겨 둬요</li>}</ul>
         <div className="spot-modal-actions"><button className="ghost-button" onClick={() => setSellConfirm(null)}>그만두기</button><button className="save-button" onClick={confirmSell} disabled={!sellPreview.count}>{sellConfirm.kind === "coop" ? "출하하기" : "팔기"}</button></div>
       </section></div>}

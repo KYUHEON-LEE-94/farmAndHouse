@@ -51,8 +51,8 @@ export const STARTER_FERT: Record<string, number> = { compost: 5 };
 
 export const QUALITIES: Quality[] = [
   { id: "normal", name: "보통", stars: "", multiplier: 1 },
-  { id: "good", name: "좋음", stars: "★", multiplier: 1.25 },
-  { id: "best", name: "최상", stars: "★★", multiplier: 1.6 },
+  { id: "good", name: "좋음", stars: "★", multiplier: 1.12 },
+  { id: "best", name: "최상", stars: "★★", multiplier: 1.3 },
 ];
 
 /** 성장 시간이 40초 이상이면 물 줄 시점이 3번, 아니면 2번. */

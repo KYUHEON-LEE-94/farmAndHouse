@@ -6,30 +6,41 @@
  * - 포화 슬롯은 최대 3개. 4번째가 들어오면 가장 오래된 슬롯이 바로 풀리고,
  *   5분 시세가 바뀔 때마다 가장 오래된 슬롯 하나가 풀린다. 팔면 그 슬롯은 최신으로 갱신.
  * - 그래서 여러 작물을 키울수록 모든 작물이 동시에 포화되는 일(전역 디버프)은 생기지 않는다.
+ * - 시장 전체 수요: 5분 주기마다 모든 작물 합쳐 MARKET_DEMAND개까지만 시장가로 사 간다.
+ *   넘는 물량은 농협이 그 시세의 OVERFLOW_RATE(70%)에 매입한다(포화보다 낮으면 그 값).
  * - 상태는 판매할 때 지난 주기만큼 한꺼번에 정리(normalize)하므로 접속하지 않아도 회복된다.
  */
 export const FREE_PER_CYCLE = 5;
 export const SAT_PER_UNIT = 0.02;
 export const SAT_MAX = 0.25;
 export const SAT_SLOTS = 3;
-/** 농협 일괄 출하: 기준가(시세 변동·버프 없음)의 80%, 포화 없음. */
-export const COOP_RATE = 0.8;
+/** 농협 일괄 출하: 지금 시세(버프 없음)의 70%, 포화·수요 한도 없음. */
+export const COOP_RATE = 0.7;
+/** 5분 주기당 시장 전체가 시장가로 사 가는 작물 수(모든 작물 합계). */
+export const MARKET_DEMAND = 100;
+/** 수요를 넘긴 물량의 가격 배수(농협 매입가와 같다). */
+export const OVERFLOW_RATE = COOP_RATE;
 
 export type MarketSlot = { id: string; units: number };
-/** cycle: 마지막으로 정리한 시세 주기, sold: 이번 주기 정상가 판매 수, slots: 오래된 것 → 최신 순. */
-export type MarketState = { cycle: number; sold: Record<string, number>; slots: MarketSlot[] };
-export const EMPTY_MARKET: MarketState = { cycle: 0, sold: {}, slots: [] };
+/** cycle: 마지막으로 정리한 시세 주기, sold: 이번 주기 정상가 판매 수, slots: 오래된 것 → 최신 순, total: 이번 주기 시장 판매 합계. */
+export type MarketState = { cycle: number; sold: Record<string, number>; slots: MarketSlot[]; total?: number };
+export const EMPTY_MARKET: MarketState = { cycle: 0, sold: {}, slots: [], total: 0 };
+/** 이번 주기에 시장가로 더 팔 수 있는 개수(모든 작물 합계). */
+export const demandLeft = (state: MarketState) => Math.max(0, MARKET_DEMAND - (state.total ?? 0));
 
 /** 지난 시세 주기만큼 오래된 슬롯을 풀고, 새 주기면 정상가 판매 수를 초기화한다. */
 export function normalizeMarket(state: MarketState | undefined, cycle: number): MarketState {
   const base = state ?? EMPTY_MARKET;
   if (base.cycle === cycle) return base;
   const passed = base.cycle ? Math.max(0, cycle - base.cycle) : 0;
-  return { cycle, sold: {}, slots: base.slots.slice(Math.min(base.slots.length, passed)) };
+  return { cycle, sold: {}, slots: base.slots.slice(Math.min(base.slots.length, passed)), total: 0 };
 }
 
 /** 다음 1개를 팔 때의 가격 배수(미리보기용, 상태는 바꾸지 않음). */
 export function nextFactor(state: MarketState, id: string) {
+  return Math.min(slotFactor(state, id), demandLeft(state) > 0 ? 1 : OVERFLOW_RATE);
+}
+function slotFactor(state: MarketState, id: string) {
   const slot = state.slots.find(entry => entry.id === id);
   if (slot) return 1 - Math.min(SAT_MAX, (slot.units + 1) * SAT_PER_UNIT);
   return (state.sold[id] ?? 0) < FREE_PER_CYCLE ? 1 : 1 - SAT_PER_UNIT;
@@ -47,6 +58,10 @@ export function freeLeft(state: MarketState, id: string) {
 
 /** 1개를 판다: 가격 배수와 바뀐 상태. */
 export function takeOne(state: MarketState, id: string): { factor: number; state: MarketState } {
+  const over = demandLeft(state) <= 0, step = takeSlot(state, id);
+  return { factor: over ? Math.min(step.factor, OVERFLOW_RATE) : step.factor, state: { ...step.state, total: (state.total ?? 0) + 1 } };
+}
+function takeSlot(state: MarketState, id: string): { factor: number; state: MarketState } {
   let slots = state.slots, sold = state.sold;
   let slot = slots.find(entry => entry.id === id);
   if (!slot) {
