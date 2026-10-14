@@ -2250,7 +2250,8 @@ export default function Home() {
             </div>; })}</div>
         </section>; })()}
       {tab === "book" && bookKind === "fish" && (() => {
-        const shown = bookSeason ?? season, special = shown === "special", list = special ? SPECIAL_FISH : FISH.filter(fish => fish.season === shown);
+        const shown = bookSeason ?? season, special = shown === "special", list = [...(special ? SPECIAL_FISH : FISH.filter(fish => fish.season === shown))]
+          .sort((a, b) => Number(a.rarity === "전설") - Number(b.rarity === "전설"));
         const allFish = [...FISH, ...SPECIAL_FISH], caught = allFish.filter(fish => fishLog[fish.id]).length, specialGot = SPECIAL_FISH.filter(fish => fishLog[fish.id]).length;
         return <section className="panel fish-book book-page">
           <div className="panel-heading"><div><span className="eyebrow">FISH BOOK</span><h3>물고기 도감</h3></div><span className="plot-count">전체 {caught}/{allFish.length} · {Math.round((caught / allFish.length) * 100)}%</span></div>
