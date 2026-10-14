@@ -89,7 +89,7 @@ export const STREAK_TAUNTS = [
   "{n}연패 기념으로 사진 한 장 찍자 ㅋㅋㅋㅋ 찰칵📸",
   "ㅋㅋㅋㅋㅋㅋ {n}연패면 그냥 나한테 월급 이체하는 게 빠르지 않아? ㅋㅋㅋ",
 ];
-export const PARITY_TAUNTS = ["{result}이었는데 {pick}을 고르다니 ㅋㅋㅋㅋ 쯧쯧쯧", "{pick}? ㅋㅋㅋㅋㅋ 나라면 눈 감고도 {result} 골랐다 ㅋㅋㅋ", "반반 확률인데 그걸 틀려? ㅋㅋㅋㅋㅋㅋㅋ 대단하다 진짜"];
+export const PARITY_TAUNTS = ["{result}이었는데 {pick}을 고르다니 ㅋㅋㅋㅋ 쯧쯧쯧", "{pick}? ㅋㅋㅋㅋㅋ 나라면 눈 감고도 {result} 골랐다 ㅋㅋㅋ", "이 확률에 도박을 해? ㅋㅋㅋㅋ 개이득~ 땡큐!"];
 export const NEAR_MISS_TAUNTS = [
   "아깝다아아아ㅋㅋㅋㅋㅋ 하나만 더 맞았으면 ×{x}였는데~ ㅋㅋㅋㅋㅋ",
   "{icon}{icon}까지 나왔는데!! 푸하하핫 ㅋㅋㅋㅋ 아이고 배야 ㅋㅋㅋㅋ",
