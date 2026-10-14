@@ -5,7 +5,7 @@
  *   crop:tomato:1:0  — 농산물(품질 0 보통·1 좋음·2 최상, 황금 0/1)
  *   fish:dace        — 물고기(등급 없음)
  *   goods:pickle     — 절임 항아리 가공품
- *   dish:maeuntang   — 주방 요리
+ *   dish:maeuntang:2:0 — 주방 요리(사냥 준비물, 등급 0 보통·1 맛있음·2 일품)
  * 저장은 `inventory`(키 → 개수) 하나. 예전 저장(produce·fishStock·goods)은 migrateInventory로 옮긴다.
  */
 export type ItemCategory = "crop" | "fish" | "goods" | "dish";
@@ -13,7 +13,7 @@ export type ItemRef = { category: ItemCategory; id: string; quality: number; gol
 export type Inventory = Record<string, number>;
 
 export const ITEM_CATEGORIES: ItemCategory[] = ["crop", "fish", "goods", "dish"];
-const HAS_QUALITY: Record<ItemCategory, boolean> = { crop: true, fish: false, goods: false, dish: false };
+const HAS_QUALITY: Record<ItemCategory, boolean> = { crop: true, fish: false, goods: false, dish: true };
 
 export function itemKey(ref: Pick<ItemRef, "category" | "id"> & Partial<ItemRef>) {
   return HAS_QUALITY[ref.category] ? `${ref.category}:${ref.id}:${ref.quality ?? 0}:${ref.golden ? 1 : 0}` : `${ref.category}:${ref.id}`;
@@ -25,12 +25,12 @@ export function parseItemKey(key: string): ItemRef {
 }
 
 /**
- * 분류별 "하위 키" 보기. 기존 코드와 맞추려고 농산물은 예전 produce 키(`작물|품질|황금`),
+ * 분류별 "하위 키" 보기. 품질이 있는 분류(농산물·요리)는 `id|품질|황금`(농산물은 예전 produce 키와 같음),
  * 나머지는 id만 쓴다.
  */
-function subKey(ref: ItemRef) { return ref.category === "crop" ? `${ref.id}|${ref.quality}|${ref.golden ? 1 : 0}` : ref.id; }
+function subKey(ref: ItemRef) { return HAS_QUALITY[ref.category] ? `${ref.id}|${ref.quality}|${ref.golden ? 1 : 0}` : ref.id; }
 function fromSubKey(category: ItemCategory, sub: string): string {
-  if (category !== "crop") return itemKey({ category, id: sub });
+  if (!HAS_QUALITY[category]) return itemKey({ category, id: sub });
   const [id, quality, golden] = sub.split("|");
   return itemKey({ category, id, quality: Number(quality) || 0, golden: golden === "1" });
 }

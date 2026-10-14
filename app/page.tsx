@@ -10,6 +10,9 @@ import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS
 import { BET_PRESETS, CHERRY_PAIR, DICE_FACES, MAX_BET, MIN_BET, PARITY_NAME, PAYOUT, SLOT_SYMBOLS, parityOf, rollDice, slotMultiplier, slotReturnRate, spinReel, type Parity, type Roll } from "./casino";
 import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
+import { CookingGame } from "./CookingGame";
+import { KitchenPanel } from "./KitchenPanel";
+import { DISH_GRADES, dishEffectText, gradeChances, rollGrade, type Dish } from "./kitchen";
 import { migrateInventory, pickCategory, replaceCategory, type Inventory, type ItemCategory } from "./items";
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
@@ -304,6 +307,10 @@ export default function Home() {
   const categorySetter = (category: ItemCategory) => (update: Record<string, number> | ((view: Record<string, number>) => Record<string, number>)) =>
     setInventory(current => replaceCategory(current, category, typeof update === "function" ? update(pickCategory(current, category)) : update));
   const setProduce = categorySetter("crop"), setFishStock = categorySetter("fish"), setGoods = categorySetter("goods");
+  const dishStock = useMemo(() => pickCategory(inventory, "dish"), [inventory]), setDishStock = categorySetter("dish");
+  // 주방(사냥 준비물): 지금 하는 요리(미니게임), 방금 나온 결과
+  const [cooking, setCooking] = useState<{ dish: Dish; at: number } | null>(null);
+  const [cookResult, setCookResult] = useState<{ dish: Dish; grade: number; score: number } | null>(null);
   const [storageCap, setStorageCap] = useState(STORAGE_START);
   // 창고 잠금(묶음 키 → 잠금 여부). 황금 작물은 따로 정하지 않으면 잠금.
   const [produceLocks, setProduceLocks] = useState<Record<string, boolean>>({});
@@ -316,7 +323,7 @@ export default function Home() {
   const [showMissions, setShowMissions] = useState(false);
   const [sellConfirm, setSellConfirm] = useState<{ kind: "market" | "coop"; cropId?: string } | null>(null);
   const [harvestMode, setHarvestMode] = useState<"sell" | "store">("store");
-  const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders" | "workshop">("seed");
+  const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders" | "workshop" | "kitchen">("seed");
   // 시장 포화: 작물별로 최근에 판 양(시간이 지나면 회복)
   const [marketState, setMarketState] = useState<MarketState>(EMPTY_MARKET);
   // 오늘의 주문서: 날짜별로 납품한 주문 id
@@ -506,7 +513,7 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || showMissions || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || showMissions || Boolean(cooking) || Boolean(cookResult) || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -1157,6 +1164,33 @@ export default function Home() {
     if (money < price) return setNotice(`항아리를 하나 더 들이려면 ${price.toLocaleString()}원이 필요해요.`);
     setMoney(value => value - price); setWorkshop(shop => ({ ...shop, slots: shop.slots + 1 })); playCoinSound([660, 990, 1320]);
     setNotice(`🏺 항아리를 하나 더 들였어요! 이제 ${workshop.slots + 1}개를 동시에 담글 수 있어요.`);
+  }
+
+  // ---------- 주방(사냥 준비물) ----------
+  /** 요리에 쓸 수 있는 물고기(전설 제외, 미션 예약분 제외). 싼 것부터. */
+  const cookFishList = () => Object.entries(fishStock).map(([id, count]) => ({ id, fish: [...FISH, ...SPECIAL_FISH].find(item => item.id === id), free: count - (fishReserved[id] ?? 0) }))
+    .filter(entry => entry.fish && entry.fish.rarity !== "전설" && entry.free > 0).sort((a, b) => a.fish!.price - b.fish!.price);
+  const cookFishCount = () => cookFishList().reduce((sum, entry) => sum + entry.free, 0);
+  function startCooking(dish: Dish) {
+    const missing = dish.ingredients.find(ing => (ing.kind === "crop" ? usableOf(ing.id) : cookFishCount()) < ing.count);
+    if (missing) return setNotice("🍳 재료가 모자라요. 창고 보관으로 모아 주세요(잠금·미션 예약분은 쓰지 않아요).");
+    // 재료는 요리를 시작할 때 꺼낸다: 작물은 낮은 품질·황금 아닌 것부터, 물고기는 싼 것부터.
+    const nextCrops = { ...produce }, nextFish = { ...fishStock };
+    dish.ingredients.forEach(ing => {
+      let need = ing.count;
+      if (ing.kind === "crop") Object.keys(nextCrops).filter(key => parseProduceKey(key).cropId === ing.id)
+        .sort((a, b) => { const x = parseProduceKey(a), y = parseProduceKey(b); return Number(x.golden) - Number(y.golden) || x.quality - y.quality; })
+        .forEach(key => { const take = Math.min(need, sellableOf(key)); if (take <= 0) return; nextCrops[key] -= take; need -= take; if (nextCrops[key] <= 0) delete nextCrops[key]; });
+      else cookFishList().forEach(entry => { const take = Math.min(need, entry.free, nextFish[entry.id] ?? 0); if (take <= 0) return; nextFish[entry.id] -= take; need -= take; if (nextFish[entry.id] <= 0) delete nextFish[entry.id]; });
+    });
+    setProduce(nextCrops); setFishStock(nextFish); setCookResult(null); setCooking({ dish, at: Date.now() }); playPlop();
+  }
+  function finishCooking(score: number) {
+    const dish = cooking?.dish; if (!dish) return;
+    const grade = rollGrade(score), key = `${dish.id}|${grade}|0`;
+    setDishStock(stock => ({ ...stock, [key]: (stock[key] ?? 0) + 1 }));
+    setCooking(null); setCookResult({ dish, grade, score });
+    playCoinSound(grade === 2 ? [523, 659, 784, 1047, 1319] : grade === 1 ? [660, 880, 1100] : [660, 880]);
   }
 
   // ---------- 오늘의 주문서 ----------
@@ -1877,13 +1911,15 @@ export default function Home() {
         <aside className="seed-panel panel">
           <div className="side-tabs" role="tablist" aria-label="씨앗과 가공">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗</button>
+            <button role="tab" aria-selected={sidePanel === "kitchen"} className={sidePanel === "kitchen" ? "on" : ""} onClick={() => setSidePanel("kitchen")}>🍳 주방</button>
             <button role="tab" aria-selected={sidePanel === "workshop"} className={sidePanel === "workshop" ? "on" : ""} onClick={() => setSidePanel("workshop")}>🏺 가공 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot" aria-label={`다 된 가공 ${doneJobs}건`}>{doneJobs}</i>}</button>
           </div>
           {sidePanel === "seed" ? <>
           <div className="panel-heading"><div><span className="eyebrow">SEED BOX · 5분 시세</span><h3>{season} 씨앗 상자</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
-          </> : sidePanel === "workshop" ? <div className="workshop-view">
+          </> : sidePanel === "kitchen" ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} dishStock={dishStock} onCook={startCooking} />
+          : sidePanel === "workshop" ? <div className="workshop-view">
             <div className="panel-heading"><div><span className="eyebrow">WORKSHOP · 절임 항아리</span><h3>가공 공방</h3></div><span className="plot-count">항아리 {workshop.slots}개</span></div>
             <p className="hint">창고 작물을 담가 비싼 가공품으로 만들어요. <b>여러 작물을 섞을수록 배율이 높아요</b>(단일 ×1.25 → 4종 ×1.9). 가공품은 시세·포화와 상관없는 고정가예요. 잠금·주문 예약분은 쓰지 않아요.</p>
             <div className="jar-row">{Array.from({ length: workshop.slots }).map((_, i) => { const job = workshop.jobs[i], recipe = job && RECIPES.find(r => r.id === job.recipeId);
@@ -2228,6 +2264,17 @@ export default function Home() {
         <h3 id="spot-title">{spotConfirm.name}에 입장할까요?</h3>
         <p>입장권 <b>{spotConfirm.price.toLocaleString()}원</b> · {spotConfirm.minutes}분 동안 낚시할 수 있어요.<br />{spotConfirm.note}{SPECIAL_FISH.some(fish => fish.spot === spotConfirm.id) ? ` · 이곳에서만 ${SPECIAL_FISH.find(fish => fish.spot === spotConfirm.id)!.name}이(가) 잡혀요` : ""}</p>
         <div className="spot-modal-actions"><button className="ghost-button" onClick={() => setSpotConfirm(null)}>그만두기</button><button className="save-button" onClick={() => chooseSpot(spotConfirm)} disabled={money < spotConfirm.price}>{money < spotConfirm.price ? "돈이 모자라요" : `🎫 입장권 사고 입장 (${spotConfirm.price.toLocaleString()}원)`}</button></div>
+      </section></div>}
+
+      {(cooking || cookResult) && <div className="modal-backdrop storage-backdrop"><section className="modal cook-modal" role="dialog" aria-modal="true" aria-label="요리">
+        {cooking ? <CookingGame key={cooking.at} title={cooking.dish.name} icon={cooking.dish.icon} onFinish={finishCooking} /> : cookResult && (() => { const [normal, good, best] = gradeChances(cookResult.score);
+          return <div className={`cook-result grade-${cookResult.grade}`}>
+            <span className="cook-result-icon">{cookResult.dish.icon}</span>
+            <h3>{cookResult.grade === 2 ? "✨ 일품 요리 완성!" : cookResult.grade === 1 ? "맛있게 됐어요! ★" : "요리 완성"}</h3>
+            <p><b>{cookResult.dish.name} {DISH_GRADES[cookResult.grade].stars} {DISH_GRADES[cookResult.grade].name}</b><br />사냥에서 먹으면 {dishEffectText(cookResult.dish, cookResult.grade)}</p>
+            <small>타이밍 점수 {cookResult.score}/6 → 이번 확률: 일품 {Math.round(best * 100)}% · 맛있음 {Math.round(good * 100)}% · 보통 {Math.round(normal * 100)}%<br />🎒 사냥 가방에 넣었어요.</small>
+            <button className="save-button" onClick={() => setCookResult(null)}>주방으로</button>
+          </div>; })()}
       </section></div>}
 
       {showMissions && <div className="modal-backdrop storage-backdrop"><section className="modal storage-modal missions-modal" role="dialog" aria-modal="true" aria-labelledby="missions-title">
