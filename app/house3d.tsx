@@ -141,6 +141,31 @@ function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
 }
 
 const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => void> = {
+  shoerack: (g, c) => {
+    [-1, 1].forEach(x => box(g, .04, .65, .38, c.dark, x * .43));
+    [0, .3, .61].forEach(y => box(g, .9, .04, .38, c.main, 0, y));
+    [.08, .38].forEach((y, row) => [-.28, -.1, .12, .3].forEach(x => ball(g, .07, row ? "#8096a3" : "#a96b4f", x, y, .02, [.8, .6, 1.7])));
+  },
+  teacart: (g, c) => {
+    [-1, 1].forEach(x => [-1, 1].forEach(z => { box(g, .035, .66, .035, c.dark, x * .35, .1, z * .2); ball(g, .055, "#49443d", x * .35, .055, z * .2); }));
+    [.2, .7].forEach(y => box(g, .8, .04, .5, c.main, 0, y));
+    ball(g, .1, "#ece6d7", -.1, .82, 0, [1, .8, 1]); cyl(g, .065, .065, .02, "#91ac91", -.1, .89);
+    const spout = cyl(g, .025, .04, .13, "#ece6d7", -.21, .78); spout.rotation.z = .7;
+    [.15, .28].forEach(x => cyl(g, .04, .03, .07, "#91ac91", x, .74, .08));
+  },
+  recordcab: (g, c) => {
+    [-1, 1].forEach(x => [-1, 1].forEach(z => box(g, .05, .15, .05, c.dark, x * .37, 0, z * .18)));
+    box(g, .9, .62, .5, c.main, 0, .15); box(g, .75, .35, .02, c.dark, 0, .3, .255);
+    for (let x = -.32; x <= .32; x += .08) box(g, .025, .3, .025, c.light, x, .32, .27);
+    cyl(g, .18, .18, .025, "#303034", -.13, .77); cyl(g, .045, .045, .03, "#caa15e", -.13, .77);
+    box(g, .025, .08, .025, "#cec6b7", .29, .77, -.13); box(g, .23, .025, .025, "#cec6b7", .19, .825, -.13);
+  },
+  vanity: (g, c) => {
+    [-1, 1].forEach(x => [-1, 1].forEach(z => box(g, .06, .68, .06, c.dark, x * .42, 0, z * .18)));
+    box(g, 1, .14, .5, c.main, 0, .68); ball(g, .025, "#e9c677", 0, .75, .26);
+    ball(g, .32, c.dark, 0, 1.14, -.19, [1, 1.12, .12]); ball(g, .28, "#c6e0e4", 0, 1.14, -.15, [1, 1.12, .08]);
+    cyl(g, .04, .04, .12, "#9a8bbb", .35, .82, .02);
+  },
   chair: (g, c) => { box(g, 0.46, 0.06, 0.46, c.light, 0, 0.44); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => box(g, 0.05, 0.44, 0.05, c.dark, sx * 0.19, 0, sz * 0.19)); box(g, 0.46, 0.46, 0.05, c.main, 0, 0.5, -0.205); box(g, 0.36, 0.06, 0.06, c.light, 0, 0.78, -0.2); },
   plant: (g, c) => { cyl(g, 0.21, 0.15, 0.38, "#c9784f"); cyl(g, 0.23, 0.23, 0.05, "#b0623f", 0, 0.35); for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; ball(g, 0.2, i % 2 ? c.main : c.dark, Math.cos(a) * 0.2, 0.62 + (i % 3) * 0.12, Math.sin(a) * 0.2, [1.25, 0.45, 0.85]).rotation.y = -a; } ball(g, 0.17, c.light, 0, 0.98, 0, [0.8, 1.35, 0.8]); },
   lamp: (g, c) => { cyl(g, 0.16, 0.18, 0.04, "#4a3b2e"); cyl(g, 0.018, 0.018, 1.25, "#5b4a3a", 0, 0.04); cyl(g, 0.12, 0.22, 0.3, c.main, 0, 1.26, 0, { side: THREE.DoubleSide, emissive: c.main, emissiveIntensity: 0.15 }); ball(g, 0.06, "#fff4c7", 0, 1.33, 0, [1, 1, 1], { emissive: "#ffe9a8", emissiveIntensity: 0.6 }); const light = new THREE.PointLight("#ffd58a", 0, 7, 1.6); light.position.set(0, 1.3, 0); light.userData.nightLight = true; g.add(light); },
