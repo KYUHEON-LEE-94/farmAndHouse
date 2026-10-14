@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const source = ts.transpileModule(readFileSync(new URL('../app/equipment.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText;
-const { EFFECTS, EFFECT_SLOTS, drawEffect, emptyEquipment, equipEffect, restoreEquipment } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const { EFFECTS, EFFECT_SLOTS, EFFECT_CHANCE, rollEffectReward, drawEffect, emptyEquipment, equipEffect, restoreEquipment } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 test('each draw stays in category, never repeats, and stops at completion', () => {
   for (const slot of EFFECT_SLOTS) {
     const owned = [];
@@ -28,4 +28,22 @@ test('old saves default safely; invalid collection and equipment cannot unlock i
   const state = { owned: ['fish-bubble'], equipment: { ...emptyEquipment(), fish: 'fish-bubble' } };
   const saved = JSON.parse(JSON.stringify(state));
   assert.deepEqual(restoreEquipment(saved.owned, saved.equipment), state);
+});
+
+test('reward boundaries enforce 25% effects and 37.5% each supply', () => {
+  assert.equal(EFFECT_CHANCE, .25);
+  for (const [roll, kind] of [[0, 'effect'], [.249999, 'effect'], [.25, 'bait'], [.624999, 'bait'], [.625, 'fert'], [.999999, 'fert']]) {
+    const reward = rollEffectReward([], 'farm', () => roll);
+    assert.equal(reward.kind, kind);
+    if (kind === 'effect') assert.equal(reward.effect.slot, 'farm');
+    else { assert.equal(reward.count, 10); assert.equal(reward.id, kind === 'bait' ? 'worm' : 'compost'); }
+  }
+  const counts = { effect: 0, bait: 0, fert: 0 };
+  for (let i = 0; i < 800; i++) counts[rollEffectReward([], 'fish', () => i / 800).kind]++;
+  assert.deepEqual(counts, { effect: 200, bait: 300, fert: 300 });
+});
+test('old complete collections can earn new effects; fully complete categories cannot draw', () => {
+  const owned = ['farm-petal', 'farm-leaf', 'farm-star'];
+  assert.equal(rollEffectReward(owned, 'farm', () => 0).effect.id, 'farm-butterfly');
+  assert.equal(rollEffectReward(EFFECTS.map(item => item.id), 'farm', () => .9), null);
 });

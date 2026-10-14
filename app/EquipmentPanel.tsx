@@ -1,6 +1,6 @@
 "use client";
 import { useState, type CSSProperties } from 'react';
-import { EFFECTS, EFFECT_PRICE, EFFECT_SLOTS, SLOT_LABELS, effectPool, type EffectSlot, type Equipment } from './equipment';
+import { EFFECTS, EFFECT_PRICE, EFFECT_CHANCE, type EffectReward, EFFECT_SLOTS, SLOT_LABELS, effectPool, type EffectSlot, type Equipment } from './equipment';
 
 export function EffectBurst({ id }: { id: string | null }) {
   const effect = EFFECTS.find(item => item.id === id);
@@ -10,16 +10,16 @@ export function EffectBurst({ id }: { id: string | null }) {
   </span>;
 }
 
-export function EffectGacha({ owned, money, onDraw, onEquipment, result }: { owned: string[]; money: number; onDraw: (slot: EffectSlot) => void; onEquipment: () => void; result: string | null }) {
+export function EffectGacha({ owned, money, onDraw, onEquipment, result }: { owned: string[]; money: number; onDraw: (slot: EffectSlot) => void; onEquipment: () => void; result: EffectReward | null }) {
   const [slot, setSlot] = useState<EffectSlot>('farm');
-  const pool = effectPool(owned, slot), effect = EFFECTS.find(item => item.id === result);
+  const pool = effectPool(owned, slot), effect = result?.kind === 'effect' ? result.effect : null;
   return <section className="panel effect-gacha">
     <div className="panel-heading"><div><span className="eyebrow">EFFECT COLLECTION</span><h3>✨ 이펙트 뽑기</h3></div><span>{owned.length} / {EFFECTS.length}</span></div>
-    <p className="hint">내 플레이에 작은 반짝임을. 능력치 변화 없이 영구 소장해요.</p>
+    <p className="hint">이펙트 또는 기본 미끼·비료가 나와요. 이펙트는 능력치 변화 없이 영구 소장해요.</p>
     <div className="equipment-tabs" role="group" aria-label="뽑을 이펙트 분야">{EFFECT_SLOTS.map(key => <button key={key} aria-pressed={slot === key} onClick={() => setSlot(key)}>{SLOT_LABELS[key]}</button>)}</div>
-    <div className="effect-stage" role="status">{effect ? <><EffectBurst key={effect.id} id={effect.id} /><b>{effect.icon}</b><strong>{effect.name}</strong><small>{SLOT_LABELS[effect.slot]} 이펙트를 얻었어요!</small></> : <><b>✨</b><strong>오늘은 어떤 빛이 찾아올까요?</strong><small>분야를 고르고 뽑아 보세요</small></>}</div>
+    <div className="effect-stage" role="status">{effect ? <><EffectBurst key={effect.id} id={effect.id} /><b>{effect.icon}</b><strong>{effect.name}</strong><small>{SLOT_LABELS[effect.slot]} 이펙트를 얻었어요!</small></> : result && result.kind !== 'effect' ? <><b>{result.icon}</b><strong>{result.name} {result.count}개</strong><small>보유 수량에 추가했어요. 다음 행운을 기다려 봐요!</small></> : <><b>✨</b><strong>오늘은 어떤 빛이 찾아올까요?</strong><small>분야를 고르고 뽑아 보세요</small></>}</div>
     <button className="gacha-button" disabled={!pool.length || money < EFFECT_PRICE} onClick={() => onDraw(slot)}>{pool.length ? `${SLOT_LABELS[slot]} 뽑기 · ${EFFECT_PRICE.toLocaleString()}원` : '🏆 이 분야를 모두 모았어요'}</button>
-    <p className="hint">꽝·중복 없음 · 남은 {pool.length}종 균등 확률{pool.length ? ` (각 ${(100 / pool.length).toFixed(1)}%)` : ''} · 획득 후 장비창에서 장착</p>
+    <p className="hint">이펙트 {EFFECT_CHANCE * 100}% · 지렁이 10개 37.5% · 퇴비 10개 37.5%<br />{pool.length ? `미보유 이펙트 ${pool.length}종 중 균등 추첨 (각 ${(EFFECT_CHANCE * 100 / pool.length).toFixed(2)}%) · 이펙트 중복 없음` : '이 분야를 모두 모아 뽑기가 종료됐어요.'}</p>
     <div className="effect-pool">{EFFECTS.filter(item => item.slot === slot).map(item => <span key={item.id}>{item.icon} {item.name} {owned.includes(item.id) ? '✓ 보유' : ''}</span>)}</div>
     <button className="ghost-button" onClick={onEquipment}>🎒 장비창 열기</button>
   </section>;

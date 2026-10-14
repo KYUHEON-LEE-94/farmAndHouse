@@ -43,3 +43,15 @@ export function restoreEquipment(ownedValue: unknown, equipmentValue: unknown) {
   for (const slot of EFFECT_SLOTS) if (typeof saved[slot] === 'string') equipment = equipEffect(equipment, owned, slot, saved[slot]);
   return { owned, equipment };
 }
+
+export const EFFECT_CHANCE = 0.25;
+export type EffectReward = { kind: 'effect'; effect: CosmeticEffect } | { kind: 'bait' | 'fert'; id: string; name: string; icon: string; count: number };
+/** 모두 모은 분야는 판매 중지. 이펙트 당첨 시 미보유 상품 중 균등 추첨. */
+export function rollEffectReward(owned: readonly string[], slot: EffectSlot, random = Math.random): EffectReward | null {
+  if (!effectPool(owned, slot).length) return null;
+  const roll = random();
+  if (roll < EFFECT_CHANCE) return { kind: 'effect', effect: drawEffect(owned, slot, random)! };
+  return roll < EFFECT_CHANCE + (1 - EFFECT_CHANCE) / 2
+    ? { kind: 'bait', id: 'worm', name: '기본 미끼 · 지렁이', icon: '🪱', count: 10 }
+    : { kind: 'fert', id: 'compost', name: '기본 비료 · 퇴비', icon: '🍂', count: 10 };
+}

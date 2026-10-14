@@ -26,7 +26,7 @@ import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, e
 import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import { EffectBurst, EffectGacha, EquipmentPanel } from "./EquipmentPanel";
-import { EFFECT_PRICE, drawEffect, emptyEquipment, equipEffect, restoreEquipment, type EffectSlot, type Equipment } from "./equipment";
+import { EFFECT_PRICE, rollEffectReward, type EffectReward, emptyEquipment, equipEffect, restoreEquipment, type EffectSlot, type Equipment } from "./equipment";
 
 import BossScreen, { BOSS_MODES, type BossMode } from "./bossScreen";
 import ColorPicker from "./colorPicker";
@@ -352,7 +352,7 @@ export default function Home() {
   const [furnitureGachaResult, setFurnitureGachaResult] = useState<{ item: Furniture | null; at: number } | null>(null);
   const [ownedEffects, setOwnedEffects] = useState<string[]>([]);
   const [equipment, setEquipment] = useState<Equipment>(emptyEquipment);
-  const [effectResult, setEffectResult] = useState<string | null>(null);
+  const [effectResult, setEffectResult] = useState<EffectReward | null>(null);
   const effectDrawLock = useRef(false);
   const [gachaCollected, setGachaCollected] = useState<string[]>([]);
   const [cheer, setCheer] = useState<{ id: string; at: number } | undefined>(undefined);
@@ -1649,15 +1649,23 @@ export default function Home() {
   /** 펫 뽑기: 1,000원. 능력 펫 10%, 일반 펫 90%. 뽑은 펫은 지금 보는 층의 빈자리에 놓인다. */
   function drawCosmetic(slot: EffectSlot) {
     if (effectDrawLock.current || money < EFFECT_PRICE) return;
-    const effect = drawEffect(ownedEffects, slot);
-    if (!effect) return;
+    const reward = rollEffectReward(ownedEffects, slot);
+    if (!reward) return;
     effectDrawLock.current = true;
     setMoney(value => value - EFFECT_PRICE);
-    setOwnedEffects(ids => [...ids, effect.id]); setEffectResult(effect.id);
-    playCoinSound([660, 990, 1320]);
-    setNotice(`✨ ${effect.name} 획득! 장비창에서 장착해 주세요.`);
+    setEffectResult(reward);
+    if (reward.kind === 'effect') {
+      setOwnedEffects(ids => [...ids, reward.effect.id]);
+      playCoinSound([660, 990, 1320]);
+      setNotice(`✨ ${reward.effect.name} 획득! 장비창에서 장착해 주세요.`);
+    } else {
+      const setStock = reward.kind === 'bait' ? setBaits : setFertStock;
+      setStock(stock => ({ ...stock, [reward.id]: (stock[reward.id] ?? 0) + reward.count }));
+      playCoinSound([440, 550]);
+      setNotice(`${reward.icon} ${reward.name} ${reward.count}개 획득! 보유 수량에 추가했어요.`);
+    }
   }
-  useEffect(() => { effectDrawLock.current = false; }, [ownedEffects]);
+  useEffect(() => { effectDrawLock.current = false; }, [effectResult]);
 
   function drawPet() {
     if (money < GACHA_PRICE) return setNotice(`펫 뽑기는 ${GACHA_PRICE.toLocaleString()}원이에요.`);
