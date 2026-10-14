@@ -8,7 +8,8 @@ export type Crop = { id: string; name: string; icon: string; seasons: Season[]; 
 /** bug: 지금 앉아 있는 벌레가 날아온 시각, bugHits: 놓친 벌레 수(마리당 판매가 -10%). */
 export type Plot = { cropId: string; plantedAt: number; growSeconds?: number; waterTotal?: number; water?: number[]; fert?: string; bug?: number; bugHits?: number } | null;
 /** 거름은 미끼처럼 묶음(pack개)으로 사 두고, 한 칸에 1개씩 쓴다. price는 1개 값. */
-export type Fertilizer = { id: string; name: string; icon: string; price: number; pack: number; speed: number; quality: number; note: string };
+/** waterSave: 이 거름을 주면 필요한 물 횟수가 그만큼 줄어든다(최소 1번). */
+export type Fertilizer = { id: string; name: string; icon: string; price: number; pack: number; speed: number; quality: number; waterSave?: number; note: string };
 export type Quality = { id: "normal" | "good" | "best"; name: string; stars: string; multiplier: number };
 
 export const CROPS: Crop[] = [
@@ -42,7 +43,7 @@ export const CROPS: Crop[] = [
 export const FERTILIZERS: Fertilizer[] = [
   { id: "compost", name: "퇴비", icon: "🍂", price: 15, pack: 10, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
   { id: "premium", name: "고급 비료", icon: "🧪", price: 50, pack: 10, speed: 0.25, quality: 1, note: "남은 시간 -25% · 품질 +1" },
-  { id: "golden", name: "황금 비료", icon: "🌟", price: 120, pack: 5, speed: 0.3, quality: 2, note: "남은 시간 -30% · 품질 +2" },
+  { id: "golden", name: "황금 비료", icon: "🌟", price: 140, pack: 5, speed: 0.3, quality: 2, waterSave: 1, note: "남은 시간 -30% · 품질 +2 · 물주기 1번 줄임" },
 ];
 
 /** 처음 시작할 때(또는 예전 저장) 주는 거름. */
@@ -155,7 +156,14 @@ export function applyFertilizer(plot: NonNullable<Plot>, crop: Crop, fertilizer:
   // 덕분에 비료를 준 순간 물주기 판정이 사라지거나 다음 물칸이 건너뛰지 않는다.
   const ratio = grow > 0 ? nextGrow / grow : 1;
   const water = (plot.water ?? []).map(time => plot.plantedAt + (time - plot.plantedAt) * ratio);
-  return { ...plot, fert: fertilizer.id, water, growSeconds: Math.round(nextGrow) };
+  const fertilized = { ...plot, fert: fertilizer.id, water, growSeconds: Math.round(nextGrow) };
+  if (!fertilizer.waterSave) return fertilized;
+  // 황금 비료: 필요한 물 횟수를 줄인다(최소 1번). 이미 준 물 횟수는 그대로 인정해 새 칸의 앞쪽부터 채운다.
+  const n = plot.waterTotal ?? waterCheckpoints(crop.seconds), nextN = Math.max(1, n - fertilizer.waterSave);
+  if (nextN === n) return fertilized;
+  const done = Math.min(nextN, plotStatus(fertilized, crop, now).satisfied), growMs = fertilized.growSeconds * 1000;
+  const marks = Array.from({ length: done }, (_, k) => plot.plantedAt + (growMs * (k + 1)) / (nextN + 1) + 1);
+  return { ...fertilized, waterTotal: nextN, water: marks };
 }
 
 /** 계절이 바뀌기 5분 전에 보여 줄 비유 문구. 다음 계절 기준(직접 "곧 여름"이라고 말하지 않는다). */
