@@ -2,33 +2,33 @@ export type Season = "봄" | "여름" | "가을" | "겨울";
 export type FishRarity = "흔함" | "보통" | "희귀" | "전설";
 export type Fish = { id: string; name: string; icon: string; season: Season; rarity: FishRarity; price: number; note: string };
 /** barBonus: 낚시 미니게임 초록 막대 길이 보너스(트랙 비율). */
-export type Bait = { id: string; name: string; icon: string; pack: number; price: number; normalBoost: number; rareBoost: number; barBonus: number; note: string };
+export type Bait = { id: string; name: string; icon: string; pack: number; price: number; normalBoost: number; rareBoost: number; legendBoost: number; barBonus: number; note: string };
 
-// 등급별 기본 확률. 전설은 기획상 0.1% 고정이며 미끼·버프로도 바뀌지 않는다.
-export const LEGEND_CHANCE = 0.001;
+// 전설 기본 확률 1%. 낚싯대와 미끼의 legendBoost가 곱해진다.
+export const LEGEND_CHANCE = 0.01;
 export const RARITY_WEIGHT: Record<Exclude<FishRarity, "전설">, number> = { 흔함: 0.6, 보통: 0.3, 희귀: 0.1 };
 
 export const BAITS: Bait[] = [
-  { id: "worm", name: "지렁이", icon: "🪱", pack: 10, price: 100, normalBoost: 1, rareBoost: 1, barBonus: 0, note: "가장 기본적인 미끼" },
-  { id: "paste", name: "떡밥", icon: "🍙", pack: 10, price: 250, normalBoost: 1.6, rareBoost: 1, barBonus: 0.02, note: "보통 등급이 잘 물어요 · 막대 조금 길게" },
-  { id: "shrimp", name: "민물새우", icon: "🦐", pack: 10, price: 600, normalBoost: 1.2, rareBoost: 2, barBonus: 0.03, note: "희귀 등급 ×2 · 막대 길게" },
-  { id: "golden", name: "황금 미끼", icon: "✨", pack: 3, price: 1500, normalBoost: 1.5, rareBoost: 3.5, barBonus: 0.06, note: "희귀 등급 ×3.5 · 막대 아주 길게" },
+  { id: "worm", name: "지렁이", icon: "🪱", pack: 10, price: 100, normalBoost: 1, rareBoost: 1, legendBoost: 1, barBonus: 0, note: "기본 미끼 · 전설 ×1" },
+  { id: "paste", name: "떡밥", icon: "🍙", pack: 10, price: 250, normalBoost: 1.6, rareBoost: 1, legendBoost: 1.1, barBonus: 0.02, note: "보통 ×1.6 · 전설 ×1.1" },
+  { id: "shrimp", name: "민물새우", icon: "🦐", pack: 10, price: 600, normalBoost: 1.2, rareBoost: 2, legendBoost: 1.5, barBonus: 0.03, note: "희귀 ×2 · 전설 ×1.5" },
+  { id: "golden", name: "황금 미끼", icon: "✨", pack: 3, price: 1500, normalBoost: 1.5, rareBoost: 3.5, legendBoost: 2.5, barBonus: 0.06, note: "희귀 ×3.5 · 전설 ×2.5" },
 ];
 export const STARTER_BAIT: Record<string, number> = { worm: 10 };
 /** 미끼가 하나도 없을 때 무료 낚시터에서 쓰는 맨손 낚시: 입질이 느리고 흔함·보통만 잡힌다(희귀·전설·특별 없음). */
-export const BARE_HAND: Bait = { id: "barehand", name: "맨손 낚시", icon: "🫳", pack: 0, price: 0, normalBoost: 1, rareBoost: 0, barBonus: 0, note: "미끼 없이 · 입질 느림 · 흔함·보통만" };
+export const BARE_HAND: Bait = { id: "barehand", name: "맨손 낚시", icon: "🫳", pack: 0, price: 0, normalBoost: 1, rareBoost: 0, legendBoost: 0, barBonus: 0, note: "미끼 없이 · 입질 느림 · 흔함·보통만" };
 
 /**
  * 낚싯대: 미니게임 난이도를 낮춰 준다.
  * bar: 초록 막대 길이(트랙 비율), gain/drain: 게이지가 차고 줄어드는 속도 배수, treasure: 보물상자 확률.
  */
-export type Rod = { id: string; name: string; icon: string; price: number; bar: number; gain: number; drain: number; treasure: number; note: string };
+export type Rod = { id: string; name: string; icon: string; price: number; bar: number; gain: number; drain: number; treasure: number; legendBoost: number; note: string };
 export const RODS: Rod[] = [
-  { id: "bamboo", name: "대나무 낚싯대", icon: "🎋", price: 0, bar: 0.22, gain: 1, drain: 1, treasure: 0.18, note: "기본 낚싯대" },
-  { id: "fiberglass", name: "유리섬유 낚싯대", icon: "🎣", price: 2500, bar: 0.26, gain: 1.1, drain: 0.9, treasure: 0.2, note: "막대 조금 길게 · 게이지 +10%" },
-  { id: "carbon", name: "카본 낚싯대", icon: "🪝", price: 7000, bar: 0.3, gain: 1.2, drain: 0.8, treasure: 0.22, note: "막대 길게 · 게이지 +20% · 손실 -20%" },
-  { id: "iridium", name: "이리듐 낚싯대", icon: "💎", price: 18000, bar: 0.35, gain: 1.32, drain: 0.7, treasure: 0.25, note: "막대 아주 길게 · 게이지 +32% · 손실 -30%" },
-  { id: "golden", name: "전설의 황금 낚싯대", icon: "👑", price: 40000, bar: 0.4, gain: 1.45, drain: 0.6, treasure: 0.35, note: "최고의 낚싯대 · 보물상자 자주" },
+  { id: "bamboo", name: "대나무 낚싯대", icon: "🎋", price: 0, bar: 0.22, gain: 1, drain: 1, treasure: 0.18, legendBoost: 1, note: "기본 낚싯대 · 전설 ×1" },
+  { id: "fiberglass", name: "유리섬유 낚싯대", icon: "🎣", price: 2500, bar: 0.26, gain: 1.1, drain: 0.9, treasure: 0.2, legendBoost: 1.2, note: "게이지 +10% · 전설 ×1.2" },
+  { id: "carbon", name: "카본 낚싯대", icon: "🪝", price: 7000, bar: 0.3, gain: 1.2, drain: 0.8, treasure: 0.22, legendBoost: 1.5, note: "게이지 +20% · 전설 ×1.5" },
+  { id: "iridium", name: "이리듐 낚싯대", icon: "💎", price: 18000, bar: 0.35, gain: 1.32, drain: 0.7, treasure: 0.25, legendBoost: 2, note: "게이지 +32% · 전설 ×2" },
+  { id: "golden", name: "전설의 황금 낚싯대", icon: "👑", price: 40000, bar: 0.4, gain: 1.45, drain: 0.6, treasure: 0.35, legendBoost: 3, note: "최고의 낚싯대 · 전설 ×3" },
 ];
 
 export const FISH: Fish[] = [
@@ -70,10 +70,10 @@ export const FISH: Fish[] = [
   { id: "legend-winter", name: "얼음 용왕 철갑상어", icon: "🐉", season: "겨울", rarity: "전설", price: 30000, note: "언 강 깊은 곳에서 백 년을 산 수호자." },
 ];
 
-/** 계절 물고기 한 마리를 뽑는다. 같은 등급 안에서는 균등, 등급 간에는 가중치. 전설은 항상 0.1%. */
-export function rollFish(season: Season, boost: { normal?: number; rare?: number } = {}, random = Math.random): Fish {
+/** 계절 물고기 한 마리를 뽑는다. 전설은 기본 1%에 낚싯대·미끼·버프 배수를 적용한다. */
+export function rollFish(season: Season, boost: { normal?: number; rare?: number; legend?: number } = {}, random = Math.random): Fish {
   const pool = FISH.filter(fish => fish.season === season);
-  if (random() < LEGEND_CHANCE) return pool.find(fish => fish.rarity === "전설")!;
+  if (random() < Math.min(.25, LEGEND_CHANCE * (boost.legend ?? 1))) return pool.find(fish => fish.rarity === "전설")!;
   const multiplier = { 흔함: 1, 보통: boost.normal ?? 1, 희귀: boost.rare ?? 1 };
   const weights = pool.filter(fish => fish.rarity !== "전설").map(fish => {
     const rarity = fish.rarity as keyof typeof RARITY_WEIGHT;
@@ -86,7 +86,7 @@ export function rollFish(season: Season, boost: { normal?: number; rare?: number
 
 /**
  * 낚시 장소. 유료 장소는 입장권(minutes분)을 사야 하고, 시간이 지나면 다시 사야 한다.
- * normalBoost/rareBoost는 미끼·버프와 곱해진다. 전설 0.1%는 장소와 무관하게 고정.
+ * normalBoost/rareBoost는 미끼·버프와 곱해진다. 전설은 낚싯대와 미끼 배수를 사용한다.
  */
 export type FishingSpot = { id: string; name: string; icon: string; price: number; minutes: number; normalBoost: number; rareBoost: number; treasureBonus: number; note: string };
 export const SPOTS: FishingSpot[] = [

@@ -6,7 +6,7 @@ export type ShopGroup = "furniture" | "decor" | "structure" | "yard" | "pet" | "
 export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; reward?: boolean; rare?: boolean; legend?: boolean; tier?: "junk" | "common" | "rare" | "legend" };
 /** 바닥 가구는 x·z(방 중심 기준 미터)와 rot(도), 벽 가구는 wall(벽 번호)·u(벽 위치 0~1)·h(높이 m). story는 층(0=1층, 1=2층), 마당 소품은 층이 없다. */
 /** host·side: 가벽(partition/arch)에 붙은 벽 장식이면 그 가벽 id와 붙은 면(1 앞, -1 뒤). */
-export type PlacedItem = Furniture & { instanceId: string; x: number; z: number; rot: number; tint?: string; wall?: number; u?: number; h?: number; story?: number; host?: string; side?: number };
+export type PlacedItem = Furniture & { instanceId: string; x: number; z: number; rot: number; tint?: string; wall?: number; u?: number; h?: number; story?: number; host?: string; side?: number; locked?: boolean; nickname?: string };
 export type Theme = { id: string; name: string; price: number; swatch: string };
 export type RoomShape = "rect" | "square" | "ell";
 export type Room = { points: [number, number][]; width: number; depth: number; area: number };
