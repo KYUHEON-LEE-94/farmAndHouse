@@ -626,3 +626,16 @@ button { color:inherit; }
 .storage-view.big>.field-shop{flex:1 1 360px;margin:0}
 .storage-view.big>.hint{flex:2 1 360px;margin:0}
 @media(max-width:860px){.storage-modal{padding:16px}}
+
+/* 비료 칸 하나 + 고르기 메뉴 */
+.fert-slot{position:relative}
+.fert-menu{position:absolute;right:calc(100% + 8px);top:0;z-index:12;display:grid;gap:4px;width:220px;padding:6px;border-radius:14px;background:#fffdf8;border:1px solid var(--line);box-shadow:0 12px 30px rgba(38,52,41,.25)}
+.tool-dock .fert-menu button{display:grid;grid-template-columns:30px 1fr auto;align-items:center;justify-items:start;gap:6px;width:100%;padding:6px 8px;text-align:left}
+.tool-dock .fert-menu button:hover:not(:disabled){transform:none}
+.fert-menu button b{font-size:20px}.fert-menu button span{display:grid;font-size:12px;font-weight:700;white-space:normal}.fert-menu button span small{font-size:10px;color:#8a7042;font-weight:400}
+.fert-menu button em{font-style:normal;font:700 12px "Gowun Dodum";color:#7a5a2a}.fert-menu button em.empty{color:#c4573b}
+.tool-dock .fert-menu button.on{background:#f4eadb;border-color:#7a5a2a;color:inherit}
+@media(max-width:760px){.fert-menu{right:auto;left:0;top:auto;bottom:calc(100% + 8px)}}
+/* 거름 상점의 수량 상자가 상점 버튼 스타일을 물려받아 길쭉해지던 문제 */
+.can-shop-list .qty-buy button{display:inline-flex;align-items:center;justify-content:center;grid-template-columns:none;min-width:30px;width:auto;padding:0 8px;text-align:center}
+.can-shop-list .qty-buy .qty-go{padding:0 12px}

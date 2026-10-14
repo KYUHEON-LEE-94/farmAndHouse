@@ -290,6 +290,9 @@ export default function Home() {
   const [ownedSpreaders, setOwnedSpreaders] = useState<string[]>(["pinch"]);
   const [spreaderId, setSpreaderId] = useState("pinch");
   const [fertStock, setFertStock] = useState<Record<string, number>>(STARTER_FERT);
+  // 비료는 5번 키 하나: 마지막으로 고른 비료를 기억하고, 도구함 비료 칸을 눌러 메뉴에서 고른다.
+  const [fertId, setFertId] = useState(FERTILIZERS[0].id);
+  const [fertMenu, setFertMenu] = useState(false);
   // 농산물 창고: 묶음(작물|품질|황금) → 개수
   const [produce, setProduce] = useState<Record<string, number>>({});
   const [storageCap, setStorageCap] = useState(STORAGE_START);
@@ -402,7 +405,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); setOwnedSpreaders(data.ownedSpreaders ?? ["pinch"]); setSpreaderId(data.spreaderId ?? "pinch"); setFertStock(data.fertStock ?? STARTER_FERT); setProduce(data.produce ?? {}); setStorageCap(data.storageCap ?? (data.storageSlots ? migrateStorageSlots(data.storageSlots) : STORAGE_START)); setProduceLocks(data.produceLocks ?? {}); setWorkshop(data.workshop ?? EMPTY_WORKSHOP); setGoods(data.goods ?? {}); setHarvestMode(data.harvestMode ?? "sell"); setMarketState(data.market ?? EMPTY_MARKET); setOrdersDone(data.ordersDone ?? { date: "", ids: [] }); setCropLog(data.cropLog ?? {}); setCropRewards(data.cropRewards ?? []); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); setOwnedSpreaders(data.ownedSpreaders ?? ["pinch"]); setSpreaderId(data.spreaderId ?? "pinch"); setFertStock(data.fertStock ?? STARTER_FERT); if (data.fertId) setFertId(data.fertId); setProduce(data.produce ?? {}); setStorageCap(data.storageCap ?? (data.storageSlots ? migrateStorageSlots(data.storageSlots) : STORAGE_START)); setProduceLocks(data.produceLocks ?? {}); setWorkshop(data.workshop ?? EMPTY_WORKSHOP); setGoods(data.goods ?? {}); setHarvestMode(data.harvestMode ?? "sell"); setMarketState(data.market ?? EMPTY_MARKET); setOrdersDone(data.ordersDone ?? { date: "", ids: [] }); setCropLog(data.cropLog ?? {}); setCropRewards(data.cropRewards ?? []); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
         let petIndex = 0;
         const movePetOut = (item: PlacedItem): PlacedItem => (!data.petsInYard && item.pet ? { ...item, story: 0, x: ((petIndex++ % 6) - 2.5) * 0.9, z: room.depth / 2 + 1.3 + Math.floor((petIndex - 1) / 6) * 0.9 } : item);
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
@@ -421,8 +424,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishStock, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageCap, produceLocks, workshop, goods, harvestMode, market: marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishStock, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageCap, produceLocks, workshop, goods, harvestMode, marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishStock, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, produce, storageCap, produceLocks, workshop, goods, harvestMode, market: marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishStock, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, produce, storageCap, produceLocks, workshop, goods, harvestMode, marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -549,7 +552,7 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [loaded]);
 
-  // 농사 도구 단축키: 1 심기, 2 수확, 3 물뿌리개, 4 우물, 5~7 거름 (입력창에 쓰는 중이면 무시)
+  // 농사 도구 단축키: 1 심기, 2 수확, 3 물뿌리개, 4 우물, 5 비료(고른 비료) (입력창에 쓰는 중이면 무시)
   useEffect(() => {
     if (tab !== "farm") return;
     const onKey = (event: KeyboardEvent) => {
@@ -558,7 +561,7 @@ export default function Home() {
       else if (event.key === "2") setTool("hand");
       else if (event.key === "3") setTool("water");
       else if (event.key === "4") refillCan();
-      else if (["5", "6", "7"].includes(event.key)) setTool(FERTILIZERS[Number(event.key) - 5].id);
+      else if (event.key === "5") holdFert();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -888,6 +891,12 @@ export default function Home() {
     setNotice(`🚰 우물에서 물뿌리개를 가득 채웠어요. (${canMax}번 줄 수 있어요)`);
   }
 
+  /** 5번 비료: 고른 비료가 없으면 남아 있는 다른 비료를 든다. */
+  function holdFert(id = fertId) {
+    const pick = (fertStock[id] ?? 0) > 0 ? id : FERTILIZERS.find(item => (fertStock[item.id] ?? 0) > 0)?.id ?? id;
+    setFertId(pick); setTool(pick); setFertMenu(false);
+    if (pick !== id) { const from = FERTILIZERS.find(item => item.id === id)!, to = FERTILIZERS.find(item => item.id === pick)!; setNotice(`${from.icon} ${josa(from.name, "이가")} 없어서 ${to.icon} ${josa(to.name, "을를")} 들었어요.`); }
+  }
   /** 거름: 뿌리개 범위 안의 자라는 작물(거름 안 준 것)에 한꺼번에 준다. 돈이 모자라면 살 수 있는 만큼만. */
   function fertilize(index: number, fertilizer: Fertilizer, quiet = false) {
     const time = Date.now();
@@ -902,9 +911,18 @@ export default function Home() {
       return describePlot(index);
     }
     const affordable = targets.slice(0, fertStock[fertilizer.id] ?? 0);
-    if (!affordable.length) return setNotice(`${fertilizer.icon} ${josa(fertilizer.name, "이가")} 없어요. 🌿 거름 상점(오른쪽 도구 상점)에서 사 두세요.`);
+    if (!affordable.length) {
+      const other = FERTILIZERS.find(item => item.id !== fertilizer.id && (fertStock[item.id] ?? 0) > 0);
+      if (other) { setFertId(other.id); setTool(other.id); return setNotice(`${fertilizer.icon} ${josa(fertilizer.name, "이가")} 없어서 ${other.icon} ${josa(other.name, "을를")} 들었어요. 다시 눌러 뿌려 주세요.`); }
+      return setNotice(`${fertilizer.icon} ${josa(fertilizer.name, "이가")} 없어요. 🌿 거름 상점(오른쪽 도구 상점)에서 사 두세요.`);
+    }
     affordable.forEach(i => justFertilized.current.add(i)); window.setTimeout(() => affordable.forEach(i => justFertilized.current.delete(i)), 600);
     setFertStock(stock => ({ ...stock, [fertilizer.id]: Math.max(0, (stock[fertilizer.id] ?? 0) - affordable.length) }));
+    // 쓰던 비료가 떨어지면 남아 있는 다른 비료로 바꿔 든다.
+    if ((fertStock[fertilizer.id] ?? 0) - affordable.length <= 0) {
+      const next = FERTILIZERS.find(item => item.id !== fertilizer.id && (fertStock[item.id] ?? 0) > 0);
+      if (next) { setFertId(next.id); setTool(next.id); window.setTimeout(() => setNotice(`${fertilizer.icon} ${josa(fertilizer.name, "이가")} 다 떨어져서 ${next.icon} ${josa(next.name, "을를")} 이어서 들었어요. (${fertStock[next.id]}개)`), 0); }
+    }
     const savedSeconds = affordable.reduce((sum, i) => { const item = plots[i], crop = item ? CROPS.find(c => c.id === item.cropId) : undefined; if (!item || !crop) return sum; return sum + plotStatus(item, crop, time, bugPenalty).remaining - plotStatus(applyFertilizer(item, crop, fertilizer, time), crop, time, bugPenalty).remaining; }, 0);
     setPlots(current => current.map((item, i) => { const crop = item ? CROPS.find(c => c.id === item.cropId) : undefined; return affordable.includes(i) && item && crop && !item.fert ? applyFertilizer(item, crop, fertilizer, time) : item; }));
     playPlop();
@@ -1792,14 +1810,18 @@ export default function Home() {
         <button className={tab === "casino" ? "active" : ""} onClick={() => switchTab("casino")}>🎲 도박장</button>
       </nav>
 
-      {tab === "farm" && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~7)">
+      {tab === "farm" && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~5)">
         <span className="dock-title">도구</span>
         <button className={`seed ${tool === "seed" ? "on" : ""}`} onClick={() => setTool("seed")} aria-pressed={tool === "seed"} title={`${currentPlanter.name}: 빈 밭 ${currentPlanter.note}에 ${selectedCropInfo.name} 심기. 누른 채 쓸어도 돼요 (1)`}><b>{selectedCropInfo.icon}</b><span>{currentPlanter.w * currentPlanter.h > 1 ? `${currentPlanter.icon} ${currentPlanter.note}` : "심기"}</span><small>{seedPrice(selectedCropInfo)}원</small><kbd>1</kbd></button>
         <button className={`harvest ${tool === "hand" ? "on" : ""}`} onClick={() => setTool("hand")} aria-pressed={tool === "hand"} title={`${currentHand.name}: 다 자란 작물 ${currentHand.note} 수확. 누른 채 쓸어도 돼요 (2)`}><b>{currentHand.icon}</b><span>{currentHand.w * currentHand.h > 1 ? currentHand.note : "수확"}</span><small>{currentHand.name}</small><kbd>2</kbd></button>
         <button className={`can ${tool === "water" ? "on" : ""}`} onClick={() => setTool("water")} aria-pressed={tool === "water"} title={`${currentCan.name} · ${currentCan.note}. 누른 채로 쓸고 지나가도 돼요 (3)`}><b>🚿</b><span>{currentCan.w * currentCan.h > 1 ? `${currentCan.w}×${currentCan.h}칸` : "물뿌리개"}</span><small className="can-meter" aria-label={`물 ${canWater}/${canMax}`}><i style={{ width: `${(Math.min(canWater, canMax) / canMax) * 100}%` }} /></small><small className="can-count">💧 {Math.min(canWater, canMax)}/{canMax}</small><kbd>3</kbd></button>
         <button className={`refill ${canWater === 0 ? "empty" : ""}`} onClick={refillCan} disabled={canWater >= canMax} title="물뿌리개 가득 채우기 (4)"><b>🚰</b><span>우물</span><kbd>4</kbd></button>
         <span className="dock-sep" />
-        {FERTILIZERS.map((item, index) => <button key={item.id} className={`fert ${tool === item.id ? "on" : ""}`} onClick={() => setTool(current => (current === item.id ? "seed" : item.id))} aria-pressed={tool === item.id} title={`${item.name} ${fertStock[item.id] ?? 0}개 남음 · ${item.note} (${index + 5})`}><b>{item.icon}</b><span>{item.name}</span><small className={fertStock[item.id] ? "" : "empty"}>{currentSpreader.w * currentSpreader.h > 1 ? `${currentSpreader.note} · ` : ""}{fertStock[item.id] ?? 0}개</small><kbd>{index + 5}</kbd></button>)}
+        {(() => { const held = FERTILIZERS.find(item => item.id === (activeFert ? activeFert.id : fertId)) ?? FERTILIZERS[0];
+          return <div className="fert-slot">
+            <button className={`fert ${activeFert ? "on" : ""}`} onClick={() => { if (activeFert) setFertMenu(open => !open); else { holdFert(); setFertMenu(true); } }} aria-expanded={fertMenu} aria-haspopup="menu" title={`비료 고르기 · 지금 ${held.name} ${fertStock[held.id] ?? 0}개 (5)`}><b>{held.icon}</b><span>{held.name}</span><small className={fertStock[held.id] ? "" : "empty"}>{currentSpreader.w * currentSpreader.h > 1 ? `${currentSpreader.note} · ` : ""}{fertStock[held.id] ?? 0}개 ▾</small><kbd>5</kbd></button>
+            {fertMenu && <div className="fert-menu" role="menu" aria-label="비료 고르기">{FERTILIZERS.map(item => <button key={item.id} role="menuitemradio" aria-checked={held.id === item.id} className={held.id === item.id ? "on" : ""} onClick={() => holdFert(item.id)}><b>{item.icon}</b><span>{item.name}<small>{item.note}</small></span><em className={fertStock[item.id] ? "" : "empty"}>{fertStock[item.id] ?? 0}개</em></button>)}</div>}
+          </div>; })()}
       </div>}
       {tab === "farm" && <div className="game-grid">
         <section className="farm-panel panel">
@@ -1883,10 +1905,10 @@ export default function Home() {
             <small>{toolShop === "seed" ? "좋은 도구일수록 빈 밭 넓은 범위에 씨앗을 한꺼번에 심어요(씨앗값은 칸마다)" : toolShop === "hand" ? "좋은 도구일수록 다 자란 작물을 넓은 범위로 한꺼번에 거둬요" : toolShop === "fert" ? "거름은 미리 사 두고 칸마다 1개씩 써요. 좋은 뿌리개일수록 자라는 작물 넓은 범위에 한꺼번에 뿌려요" : "좋을수록 물을 많이 담고, 한 번에 여러 칸에 물을 줘요"}</small>
             <div className="can-shop-list">{toolShop === "seed" ? PLANT_TOOLS.map(item => <button key={item.id} className={planterId === item.id ? "on" : ""} onClick={() => choosePlanter(item)} aria-pressed={planterId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 심기</small><em>{planterId === item.id ? "사용 중" : ownedPlanters.includes(item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)
               : toolShop === "hand" ? HARVEST_TOOLS.map(hand => <button key={hand.id} className={handId === hand.id ? "on" : ""} onClick={() => chooseHand(hand)} aria-pressed={handId === hand.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${hand.w}, 1fr)` }}>{Array.from({ length: hand.w * hand.h }).map((_, k) => <i key={k} />)}</span><b>{hand.icon} {hand.name}</b><small>{hand.note} 수확</small><em>{handId === hand.id ? "사용 중" : ownedHands.includes(hand.id) ? "들기" : `${hand.price.toLocaleString()}원`}</em></button>)
-              : toolShop === "fert" ? [...FERTILIZERS.map(item => <div key={item.id} className={`fert-stock ${tool === item.id ? "on" : ""}`}><button className="fert-pick" onClick={() => setTool(item.id)} aria-pressed={tool === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.note}</small><em>{fertStock[item.id] ?? 0}개</em></button><QtyBuy label={item.name} unitPrice={item.price} money={money} initial={item.pack} step={item.pack >= 10 ? 5 : 1} onBuy={count => buyFert(item, count)} /></div>), <b key="spreader-title" className="tool-shop-sub">🧺 거름 뿌리개</b>, ...SPREADERS.map(item => <button key={item.id} className={spreaderId === item.id ? "on" : ""} onClick={() => chooseSpreader(item)} aria-pressed={spreaderId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 거름</small><em>{spreaderId === item.id ? "사용 중" : ownedSpreaders.includes(item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)]
+              : toolShop === "fert" ? [...FERTILIZERS.map(item => <div key={item.id} className={`fert-stock ${tool === item.id ? "on" : ""}`}><button className="fert-pick" onClick={() => holdFert(item.id)} aria-pressed={tool === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.note}</small><em>{fertStock[item.id] ?? 0}개</em></button><QtyBuy label={item.name} unitPrice={item.price} money={money} initial={item.pack} step={item.pack >= 10 ? 5 : 1} onBuy={count => buyFert(item, count)} /></div>), <b key="spreader-title" className="tool-shop-sub">🧺 거름 뿌리개</b>, ...SPREADERS.map(item => <button key={item.id} className={spreaderId === item.id ? "on" : ""} onClick={() => chooseSpreader(item)} aria-pressed={spreaderId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 거름</small><em>{spreaderId === item.id ? "사용 중" : ownedSpreaders.includes(item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)]
               : CANS.map(can => <button key={can.id} className={canId === can.id ? "on" : ""} onClick={() => chooseCan(can)} aria-pressed={canId === can.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${can.w}, 1fr)` }}>{Array.from({ length: can.w * can.h }).map((_, k) => <i key={k} />)}</span><b>{can.name}</b><small>{can.note}</small><em>{canId === can.id ? "사용 중" : ownedCans.includes(can.id) ? "들기" : `${can.price.toLocaleString()}원`}</em></button>)}</div>
           </div>
-          <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~7). 🌱 심기와 🧺 수확은 따로예요. 둘 다 누른 채 밭 위를 쓸면 연달아 돼요.<br />🌿 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 어떤 도구로든 눌러 잡으세요(벌레 있는 밭을 눌러도 돼요). 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
+          <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~5, 5는 고른 비료). 🌱 심기와 🧺 수확은 따로예요. 둘 다 누른 채 밭 위를 쓸면 연달아 돼요.<br />🌿 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 어떤 도구로든 눌러 잡으세요(벌레 있는 밭을 눌러도 돼요). 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
         </aside>
       </div>}
 
