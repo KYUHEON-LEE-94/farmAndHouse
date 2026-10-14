@@ -3,7 +3,7 @@ import type { Season } from "./fishing";
 /** 작물 판매가 전체 배율. 농사 수입이 너무 빨라 0.9로 낮췄다(씨앗값은 그대로라 이익은 약 15~17% 감소). */
 export const CROP_PRICE_SCALE = 0.9;
 
-export type Crop = { id: string; name: string; icon: string; seasons: Season[]; seed: number; sell: number; seconds: number; difficulty: string };
+export type Crop = { id: string; name: string; icon: string; seasons: Season[]; seed: number; sell: number; seconds: number; difficulty: string; seasonalLimit?: number };
 /** water: 물 준 시각들, fert: 준 거름 id. growSeconds는 심을 때(버프·거름 반영) 정해진 성장 시간. */
 /** bug: 지금 앉아 있는 벌레가 날아온 시각, bugHits: 놓친 벌레 수(마리당 판매가 -10%). */
 export type Plot = { cropId: string; plantedAt: number; growSeconds?: number; waterTotal?: number; water?: number[]; fert?: string; bug?: number; bugHits?: number } | null;
@@ -38,6 +38,18 @@ export const CROPS: Crop[] = [
   { id: "pinemushroom", name: "송이버섯", icon: "🍄", seasons: ["가을"], seed: 140, sell: 380, seconds: 60, difficulty: "어려움" },
   { id: "garlic", name: "마늘", icon: "🧄", seasons: ["겨울"], seed: 35, sell: 86, seconds: 24, difficulty: "쉬움" },
   { id: "ginger", name: "생강", icon: "🫚", seasons: ["겨울"], seed: 60, sell: 170, seconds: 40, difficulty: "보통" },
+  { id: "lettuce", name: "상추", icon: "🥬", seasons: ["봄"], seed: 30, sell: 80, seconds: 24, difficulty: "쉬움" },
+  { id: "asparagus", name: "아스파라거스", icon: "🌱", seasons: ["봄"], seed: 90, sell: 250, seconds: 48, difficulty: "어려움" },
+  { id: "eggplant", name: "가지", icon: "🍆", seasons: ["여름"], seed: 50, sell: 135, seconds: 30, difficulty: "보통" },
+  { id: "blueberry", name: "블루베리", icon: "🫐", seasons: ["여름"], seed: 85, sell: 230, seconds: 46, difficulty: "보통" },
+  { id: "carrot", name: "당근", icon: "🥕", seasons: ["가을"], seed: 40, sell: 100, seconds: 26, difficulty: "쉬움" },
+  { id: "persimmon", name: "단감", icon: "🍊", seasons: ["가을"], seed: 95, sell: 270, seconds: 50, difficulty: "어려움" },
+  { id: "napa", name: "배추", icon: "🥬", seasons: ["겨울"], seed: 45, sell: 120, seconds: 30, difficulty: "쉬움" },
+  { id: "leek", name: "부추", icon: "🌿", seasons: ["겨울"], seed: 35, sell: 95, seconds: 24, difficulty: "보통" },
+  { id: "royal-strawberry", name: "왕딸기", icon: "🍓", seasons: ["봄"], seed: 700, sell: 1500, seconds: 180, difficulty: "어려움", seasonalLimit: 30 },
+  { id: "royal-melon", name: "황실 멜론", icon: "🍈", seasons: ["여름"], seed: 850, sell: 1800, seconds: 210, difficulty: "어려움", seasonalLimit: 30 },
+  { id: "royal-grape", name: "루비 포도", icon: "🍇", seasons: ["가을"], seed: 1000, sell: 2200, seconds: 240, difficulty: "어려움", seasonalLimit: 30 },
+  { id: "royal-ginseng", name: "설원 인삼", icon: "🌱", seasons: ["겨울"], seed: 1300, sell: 2800, seconds: 300, difficulty: "어려움", seasonalLimit: 30 },
 ];
 
 export const FERTILIZERS: Fertilizer[] = [
@@ -223,3 +235,53 @@ export function saturatedTotal(unit: number, pressure: number, count: number) {
 /** 작물 도감: 계절 작물을 모두 한 번씩 수확하면 받는 마당 장식. */
 export const CROP_BOOK_REWARDS: Record<Season, string> = { 봄: "blossomscarecrow", 여름: "melonparasol", 가을: "goldenstraw", 겨울: "tangerinestove" };
 export type CropRecord = { n: number; best: number; golden: number; top: number };
+
+function cycleRoll(crop: Crop, bucket: number, salt: number) {
+  let hash = bucket * 374761393 + salt * 668265263;
+  for (const char of crop.id) hash = Math.imul(hash ^ char.charCodeAt(0), 1274126177);
+  hash = Math.imul(hash ^ (hash >>> 13), 2246822519);
+  return ((hash ^ (hash >>> 16)) >>> 0) / 4294967295;
+}
+
+/**
+ * 5분 시세: 재배 시간과 가격을 연결한다(비싸면서 빨리 자라는 작물이 나오지 않게).
+ * 초당 목표 순이익(난이도별) × 재배 시간 = 순이익, 씨앗값은 판매가의 45~60%(어려울수록 싸다).
+ * 순이익은 시세마다 ±25% 흔들려서 5분마다 더 좋은 작물을 고르는 재미는 남긴다.
+ */
+const PROFIT_PER_SEC: Record<string, number> = { 쉬움: 1.8, 보통: 1.9, 어려움: 2.1 };
+const SEED_RATIO: Record<string, number> = { 쉬움: 0.575, 보통: 0.525, 어려움: 0.475 };
+export function cycleCrop(crop: Crop, bucket: number) {
+  if (crop.seasonalLimit) return { price: Math.round(crop.sell * (0.9 + cycleRoll(crop, bucket, 17) * 0.2)), seconds: crop.seconds, seed: crop.seed };
+  const seconds = Math.round(20 + cycleRoll(crop, bucket, 41) * 45);
+  const profit = seconds * (PROFIT_PER_SEC[crop.difficulty] ?? 1.9) * (0.75 + cycleRoll(crop, bucket, 17) * 0.5);
+  const ratio = (SEED_RATIO[crop.difficulty] ?? 0.525) - 0.025 + cycleRoll(crop, bucket, 73) * 0.05;
+  const price = Math.round(profit / (1 - ratio));
+  return { price, seconds, seed: Math.max(10, Math.round(price * ratio)) };
+}
+
+
+/** Each crop belongs to exactly one limited season per local game day.
+ * Keeping all four counters prevents changing operating hours from restoring a spent allowance. */
+export type PlantingLedger = { date: string; counts: Record<string, number> };
+export function restorePlantingLedger(value: unknown): PlantingLedger {
+  const empty: PlantingLedger = { date: '', counts: {} };
+  if (!value || typeof value !== 'object') return empty;
+  const data = value as Partial<PlantingLedger>;
+  if (typeof data.date !== 'string' || !data.counts || typeof data.counts !== 'object') return empty;
+  const counts: Record<string, number> = {};
+  for (const crop of CROPS) {
+    const n = data.counts[crop.id];
+    if (crop.seasonalLimit && typeof n === 'number' && Number.isFinite(n)) counts[crop.id] = Math.min(crop.seasonalLimit, Math.max(0, Math.floor(n)));
+  }
+  return { date: data.date, counts };
+}
+export function plantingAllowance(crop: Crop, ledger: PlantingLedger, date: string) {
+  if (!crop.seasonalLimit) return Infinity;
+  return Math.max(0, crop.seasonalLimit - (ledger.date === date ? ledger.counts[crop.id] ?? 0 : 0));
+}
+export function reservePlanting(crop: Crop, ledger: PlantingLedger, date: string, requested: number) {
+  const count = Math.min(Math.max(0, Math.floor(requested)), plantingAllowance(crop, ledger, date));
+  if (!crop.seasonalLimit || !count) return { count, ledger };
+  const counts = ledger.date === date ? ledger.counts : {};
+  return { count, ledger: { date, counts: { ...counts, [crop.id]: (counts[crop.id] ?? 0) + count } } };
+}

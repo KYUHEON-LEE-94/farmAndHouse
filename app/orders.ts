@@ -23,7 +23,7 @@ const round10 = (value: number) => Math.round(value / 10) * 10;
 
 export function dailyOrders(dateKey: string): Order[] {
   const random = seeded(`wolru-missions-${dateKey}`), pick = <T,>(list: T[]) => list[Math.floor(random() * list.length)];
-  const crops = [...CROPS].sort(() => random() - .5), fish = [...FISH].sort(() => random() - .5), npcs = [...NPCS].sort(() => random() - .5);
+  const crops = CROPS.filter(crop => !crop.seasonalLimit).sort(() => random() - .5), fish = [...FISH].sort(() => random() - .5), npcs = [...NPCS].sort(() => random() - .5);
   const cropItem = (quality = 0): CropOrderItem => ({ kind: "crop", cropId: crops.shift()!.id, count: 3 + Math.floor(random() * 4), minQuality: quality });
   const fishItem = (): FishOrderItem => ({ kind: "fish", fishId: fish.shift()!.id, count: 1 + Math.floor(random() * 3) });
   const make = (id: string, npc: Npc, items: OrderItem[], special = false): Order => ({ id: `${dateKey}-${id}`, npc, line: pick(npc.lines), items, reward: round10(items.reduce((sum, item) => sum + itemValue(item), 0) * (special ? 1.8 : 1.45)), bonus: special ? { kind: "fert", id: "golden", count: 3 } : random() < .5 ? { kind: "fert", id: "compost", count: 3 } : { kind: "food", id: "kibble", count: 2 }, special });

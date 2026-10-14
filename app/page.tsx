@@ -23,7 +23,7 @@ import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, MARKET_DEMAND, OVERFLOW_RATE, 
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import { EffectBurst, EffectGacha, EquipmentPanel } from "./EquipmentPanel";
 import { EFFECT_PRICE, drawEffect, emptyEquipment, equipEffect, restoreEquipment, type EffectSlot, type Equipment } from "./equipment";
@@ -59,34 +59,6 @@ const FISH_BOOST_MAX = 1.5;
 /** 이 금액 미만이면 파산으로 본다. */
 const BAILOUT_THRESHOLD = 50;
 const BITE_WINDOW_MS = 1300;
-
-function cycleRoll(crop: Crop, bucket: number, salt: number) {
-  let hash = bucket * 374761393 + salt * 668265263;
-  for (const char of crop.id) hash = Math.imul(hash ^ char.charCodeAt(0), 1274126177);
-  hash = Math.imul(hash ^ (hash >>> 13), 2246822519);
-  return ((hash ^ (hash >>> 16)) >>> 0) / 4294967295;
-}
-
-/**
- * 5분마다 작물의 기존 가격·난이도와 무관하게 거래가·재배 시간·씨앗값을 다시 배정한다.
- * 씨앗값은 그 시세 거래가의 20~32%로 함께 움직인다. 씨앗값이 고정이던 때는 씨앗이 싼 작물이
- * 장기적으로 늘 유리했다(양배추·오이 쏠림). 연동하면 어떤 작물이든 평균 이익이 같아지고,
- * 선택은 "지금 이 5분 동안 무엇이 좋은가"로만 정해진다.
- */
-/**
- * 5분 시세: 재배 시간과 가격을 연결한다(비싸면서 빨리 자라는 작물이 나오지 않게).
- * 초당 목표 순이익(난이도별) × 재배 시간 = 순이익, 씨앗값은 판매가의 45~60%(어려울수록 싸다).
- * 순이익은 시세마다 ±25% 흔들려서 5분마다 더 좋은 작물을 고르는 재미는 남긴다.
- */
-const PROFIT_PER_SEC: Record<string, number> = { 쉬움: 1.8, 보통: 1.9, 어려움: 2.1 };
-const SEED_RATIO: Record<string, number> = { 쉬움: 0.575, 보통: 0.525, 어려움: 0.475 };
-function cycleCrop(crop: Crop, bucket: number) {
-  const seconds = Math.round(20 + cycleRoll(crop, bucket, 41) * 45);
-  const profit = seconds * (PROFIT_PER_SEC[crop.difficulty] ?? 1.9) * (0.75 + cycleRoll(crop, bucket, 17) * 0.5);
-  const ratio = (SEED_RATIO[crop.difficulty] ?? 0.525) - 0.025 + cycleRoll(crop, bucket, 73) * 0.05;
-  const price = Math.round(profit / (1 - ratio));
-  return { price, seconds, seed: Math.max(10, Math.round(price * ratio)) };
-}
 
 function marketPrice(crop: Crop, bucket: number) {
   return cycleCrop(crop, bucket).price;
@@ -361,6 +333,8 @@ export default function Home() {
   const [ordersDone, setOrdersDone] = useState<{ date: string; ids: string[]; deposits?: Record<string, Record<string, number>> }>({ date: "", ids: [], deposits: {} });
   // 작물 도감: 작물별 수확 기록, 받은 계절 보상
   const [cropLog, setCropLog] = useState<Record<string, CropRecord>>({});
+  const [specialPlantings, setSpecialPlantings] = useState<PlantingLedger>({ date: "", counts: {} });
+  const specialPlantingsRef = useRef<PlantingLedger>({ date: "", counts: {} });
   const [cropRewards, setCropRewards] = useState<string[]>([]);
   const [bookKind, setBookKind] = useState<"fish" | "crop">("fish");
   const justFertilized = useRef(new Set<number>());
@@ -451,6 +425,8 @@ export default function Home() {
         const data = JSON.parse(saved);
         const restoredEquipment = restoreEquipment(data.ownedEffects, data.equipment);
         setOwnedEffects(restoredEquipment.owned); setEquipment(restoredEquipment.equipment);
+        const restoredPlantings = restorePlantingLedger(data.specialPlantings);
+        setSpecialPlantings(restoredPlantings); specialPlantingsRef.current = restoredPlantings;
         const version = data.version ?? 1;
         const level = data.houseLevel ?? 1, shape: RoomShape = data.houseShape ?? "rect", room = roomFor(level, shape);
         const hydrate = (list: LegacyItem[]) => (list ?? []).map(item => hydrateItem(item, version, room)).filter((item): item is PlacedItem => Boolean(item));
@@ -476,8 +452,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -489,6 +465,7 @@ export default function Home() {
   const seasonProgress = isWorkTime ? Math.max(0, Math.min(100, ((currentHour - seasonStart) / (seasonEnd - seasonStart)) * 100)) : 0;
   const seasonSecondsLeft = isWorkTime ? Math.floor((seasonEnd - currentHour) * 3600) : 0;
   const currentPeriod = seasonPeriod(nowMs, startHour, endHour);
+  const plantingDate = now.toDateString();
   const available = CROPS.filter(c => c.seasons.includes(season));
   const plotCount = ownedPlots;
   const marketBucket = Math.floor(nowMs / 300000);
@@ -877,13 +854,17 @@ export default function Home() {
     const price = seedPrice(crop);
     const empty = canArea(index, plotColumns(), plotCount, currentPlanter).filter(i => !plots[i] && !justPlanted.current.has(i));
     if (!empty.length) { if (!quiet) describePlot(index); return; }
-    const targets = empty.slice(0, Math.floor(money / price));
+    const allowance = plantingAllowance(crop, specialPlantingsRef.current, plantingDate);
+    if (allowance <= 0) return setNotice(`${crop.name}은 이번 ${season}의 30개를 모두 심었어요. 다음 ${season}에 다시 심을 수 있어요.`);
+    const reservation = reservePlanting(crop, specialPlantingsRef.current, plantingDate, Math.min(empty.length, Math.floor(money / price)));
+    const targets = empty.slice(0, reservation.count);
     if (!targets.length) return setNotice("씨앗을 살 돈이 부족해요. 익은 작물을 수확해 보세요.");
+    if (crop.seasonalLimit) { specialPlantingsRef.current = reservation.ledger; setSpecialPlantings(reservation.ledger); }
     targets.forEach(i => justPlanted.current.add(i)); window.setTimeout(() => targets.forEach(i => justPlanted.current.delete(i)), 600);
     const time = Date.now();
     setPlots(current => current.map((plot, i) => (targets.includes(i) && !plot ? { cropId: crop.id, plantedAt: time, growSeconds, waterTotal: waterCheckpoints(growSeconds), water: [] } : plot)));
     setMoney(m => m - price * targets.length); playPlop();
-    const short = targets.length < empty.length ? ` (돈이 모자라 ${empty.length}칸 중 ${targets.length}칸만)` : "";
+    const short = `${targets.length < empty.length ? ` (자금·파종 한도에 맞춰 ${empty.length}칸 중 ${targets.length}칸만)` : ""}${crop.seasonalLimit ? ` · 이번 ${season} 남은 파종 ${allowance - targets.length}/30개` : ""}`;
     setNotice(targets.length > 1 ? `${currentPlanter.icon} ${crop.icon} ${josa(crop.name, "을를")} ${targets.length}칸에 한꺼번에 심었어요! 씨앗 ${(price * targets.length).toLocaleString()}원 · ${growSeconds}초 뒤 수확${short}` : `${crop.icon} ${josa(crop.name, "을를")} 심었어요. ${growSeconds}초 뒤 수확해요! 중간에 목말라하면 물을 주세요.${short}`);
   }
 
@@ -1883,10 +1864,13 @@ export default function Home() {
 
   const cropCards = available.map(crop => {
     const cycleSeconds = cycleCrop(crop, marketBucket).seconds;
-    const tooLate = isWorkTime && Math.round(cycleSeconds * growthMul) > seasonSecondsLeft;
-    return <button key={crop.id} className={`crop-card ${selectedCrop === crop.id ? "selected" : ""} ${tooLate ? "too-late" : ""}`} onClick={() => { setSelectedCrop(crop.id); setTool("seed"); }} aria-pressed={selectedCrop === crop.id}>
-      <span className="crop-icon">{crop.icon}</span><span className="crop-name">{crop.name}</span>
-      <span className="crop-meta">{tooLate ? "이번 계절엔 시간 부족" : `씨앗 ${seedPrice(crop)}원 · 이번 재배 ${Math.round(cycleSeconds * growthMul)}초`}</span>
+    const shownSeconds = Math.round(cycleSeconds * growthMul * (1 - 0.05 * pw("mole")) * (1 - 0.15 * pw("dragon")));
+    const tooLate = isWorkTime && shownSeconds > seasonSecondsLeft;
+    const allowance = plantingAllowance(crop, specialPlantings, plantingDate);
+    return <button key={crop.id} className={`crop-card ${crop.seasonalLimit ? "special-crop" : ""} ${selectedCrop === crop.id ? "selected" : ""} ${tooLate ? "too-late" : ""}`} onClick={() => { setSelectedCrop(crop.id); setTool("seed"); }} aria-pressed={selectedCrop === crop.id} disabled={allowance <= 0}>
+      <span className="crop-icon">{crop.icon}</span><span className="crop-name">{crop.seasonalLimit ? "👑 " : ""}{crop.name}</span>
+      <span className="crop-meta">{tooLate ? "이번 계절엔 시간 부족" : `씨앗 ${seedPrice(crop)}원 · 이번 재배 ${formatClock(shownSeconds)}`}</span>
+      {crop.seasonalLimit && <span className="special-crop-limit">계절 한정 · 남은 파종 {allowance}/30개 · 기본 {formatClock(crop.seconds)}<small>수확·시듦 후에도 사용한 한도는 돌아오지 않아요</small></span>}
       {saturationOf(market, crop.id) > 0 ? <span className="sat-chip" title="많이 팔아서 값이 내려갔어요. 다른 작물을 팔거나 5분 시세가 바뀌면 풀려요.">📉 포화 -{Math.round(saturationOf(market, crop.id) * 100)}%</span> : freeLeft(market, crop.id) < FREE_PER_CYCLE ? <span className="sat-chip free" title="이번 5분 동안 이 개수까지는 정상가로 팔려요.">정상가 {freeLeft(market, crop.id)}개 남음</span> : null}
       {(() => { const base = marketPrice(crop, marketBucket), final = salePrice(crop), boost = Math.round((final / base - 1) * 100);
         return <span className={`crop-price ${boost ? (boost > 0 ? "up" : "down") : ""}`}><small>{boost ? <>시세 <s>{base.toLocaleString()}</s> {boost > 0 ? "▲" : "▼"}{Math.abs(boost)}%</> : "현재 시세"}</small>{final.toLocaleString()}원</span>; })()}

@@ -70,9 +70,22 @@ export const FISH: Fish[] = [
   { id: "masu", name: "산천어", icon: "🐠", season: "겨울", rarity: "희귀", price: 240, note: "계곡 얼음 밑의 보석." },
   { id: "golden-mandarin", name: "황쏘가리", icon: "🐠", season: "겨울", rarity: "희귀", price: 300, note: "온몸이 금빛인 천연기념물." },
   { id: "legend-winter", name: "얼음 용왕 철갑상어", icon: "🐉", season: "겨울", rarity: "전설", price: 30000, note: "언 강 깊은 곳에서 백 년을 산 수호자." },
+  { id: "stone-moroko", name: "돌고기", icon: "🐟", season: "봄", rarity: "흔함", price: 40, note: "봄 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "striped-shiner", name: "줄납자루", icon: "🐟", season: "봄", rarity: "보통", price: 85, note: "봄 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "korean-spined-loach", name: "수수미꾸리", icon: "🐟", season: "봄", rarity: "희귀", price: 240, note: "봄 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "sharpbelly", name: "살치", icon: "🐟", season: "여름", rarity: "흔함", price: 40, note: "여름 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "korean-gudgeon", name: "돌마자", icon: "🐟", season: "여름", rarity: "보통", price: 90, note: "여름 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "yellow-catfish", name: "대농갱이", icon: "🐟", season: "여름", rarity: "희귀", price: 270, note: "여름 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "pungtungia", name: "참마자", icon: "🐟", season: "가을", rarity: "흔함", price: 40, note: "가을 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "long-nose-barbel", name: "대마자", icon: "🐟", season: "가을", rarity: "보통", price: 90, note: "가을 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "spotted-barbel", name: "꾸구리", icon: "🐟", season: "가을", rarity: "희귀", price: 260, note: "가을 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "amur-minnow", name: "버들개", icon: "🐟", season: "겨울", rarity: "흔함", price: 35, note: "겨울 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "spotted-sleeper", name: "얼룩동사리", icon: "🐟", season: "겨울", rarity: "보통", price: 90, note: "겨울 낚시 도감의 새로운 수집 대상이에요." },
+  { id: "slender-shiner", name: "가는돌고기", icon: "🐟", season: "겨울", rarity: "희귀", price: 270, note: "겨울 낚시 도감의 새로운 수집 대상이에요." },
+
 ];
 
-/** 계절 물고기 한 마리를 뽑는다. 전설은 기본 1%에 낚싯대·미끼·버프 배수를 적용한다. */
+/** 계절 물고기 한 마리를 뽑는다. 전설은 1% 고정이며 일반 등급은 종 수와 무관하게 등급별 가중치를 유지한다. */
 export function rollFish(season: Season, boost: { normal?: number; rare?: number; legend?: number } = {}, random = Math.random): Fish {
   const pool = FISH.filter(fish => fish.season === season);
   if (boost.legend !== 0 && random() < HIDDEN_CHANCE) return HIDDEN_FISH[Math.floor(random() * HIDDEN_FISH.length)];
@@ -89,15 +102,15 @@ export function rollFish(season: Season, boost: { normal?: number; rare?: number
 
 /**
  * 낚시 장소. 유료 장소는 입장권(minutes분)을 사야 하고, 시간이 지나면 다시 사야 한다.
- * normalBoost/rareBoost는 미끼·버프와 곱해진다. 전설은 낚싯대와 미끼 배수를 사용한다.
+ * normalBoost/rareBoost는 미끼·버프와 곱해진다. 전설 확률은 장소와 무관하게 고정이다.
  */
 export type FishingSpot = { id: string; name: string; icon: string; price: number; minutes: number; normalBoost: number; rareBoost: number; treasureBonus: number; note: string };
 export const SPOTS: FishingSpot[] = [
   { id: "river", name: "강가", icon: "🏞️", price: 0, minutes: 0, normalBoost: 1, rareBoost: 1, treasureBonus: 0, note: "무료 · 기본 낚시터" },
   { id: "lake", name: "호숫가", icon: "⛰️", price: 0, minutes: 0, normalBoost: 1.3, rareBoost: 1, treasureBonus: 0, note: "무료 · 보통 등급 ×1.3" },
-  { id: "sea", name: "바다 방파제", icon: "🌊", price: 1500, minutes: 10, normalBoost: 1.2, rareBoost: 1.8, treasureBonus: 0.03, note: "희귀 ×1.8 · 보통 ×1.2" },
-  { id: "valley", name: "깊은 계곡", icon: "🏔️", price: 3000, minutes: 10, normalBoost: 1.5, rareBoost: 2.5, treasureBonus: 0.05, note: "희귀 ×2.5 · 보통 ×1.5" },
-  { id: "reservoir", name: "비밀 저수지", icon: "🌌", price: 8000, minutes: 10, normalBoost: 2, rareBoost: 4, treasureBonus: 0.1, note: "희귀 ×4 · 보통 ×2 · 보물상자 +10%" },
+  { id: "sea", name: "바다 방파제", icon: "🌊", price: 900, minutes: 5, normalBoost: 1.2, rareBoost: 1.8, treasureBonus: 0.03, note: "희귀 ×1.8 · 보통 ×1.2" },
+  { id: "valley", name: "깊은 계곡", icon: "🏔️", price: 1800, minutes: 5, normalBoost: 1.5, rareBoost: 2.5, treasureBonus: 0.05, note: "희귀 ×2.5 · 보통 ×1.5" },
+  { id: "reservoir", name: "비밀 저수지", icon: "🌌", price: 4800, minutes: 5, normalBoost: 2, rareBoost: 4, treasureBonus: 0.1, note: "희귀 ×4 · 보통 ×2 · 보물상자 +10%" },
 ];
 
 /**
