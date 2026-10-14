@@ -72,6 +72,21 @@ export const HARVEST_TOOLS: HarvestTool[] = [
   { id: "rake", name: "황금 갈퀴", icon: "🔱", price: 15000, w: 4, h: 2, note: "4×2칸" },
 ];
 
+/** 심기 도구: w×h 범위의 빈 밭에 고른 씨앗을 한 번에 심는다(씨앗값은 칸마다). */
+export const PLANT_TOOLS: HarvestTool[] = [
+  { id: "seedhand", name: "손 심기", icon: "🫘", price: 0, w: 1, h: 1, note: "1칸" },
+  { id: "trowel", name: "모종삽", icon: "🥄", price: 1500, w: 2, h: 1, note: "가로 2칸" },
+  { id: "seeder", name: "씨앗 파종기", icon: "🧺", price: 5000, w: 4, h: 1, note: "가로 4칸" },
+  { id: "tractor", name: "꼬마 트랙터", icon: "🚜", price: 14000, w: 4, h: 2, note: "4×2칸" },
+];
+
+/** 밭은 8칸에서 시작해 2칸씩 최대 32칸까지 넓힌다. */
+export const START_PLOTS = 8;
+export const MAX_PLOTS = 32;
+export function fieldPrice(owned: number) { return 2400 + (owned - START_PLOTS) * 700; }
+/** 밭 칸 수에 따른 열 수(넓은 화면 기준): 16칸까지 4열, 24칸까지 6열, 그 이상 8열. */
+export function fieldColumns(total: number) { return total <= 16 ? 4 : total <= 24 ? 6 : 8; }
+
 /** 밭 격자(columns열)에서 index를 기준으로 w×h 범위의 밭 번호들. 가장자리에서는 안쪽으로 밀어 넣는다. */
 export function canArea(index: number, columns: number, total: number, can: { w: number; h: number }) {
   // 좁은 화면(2열)에서는 가로 범위를 열 수에 맞게 줄이고, 줄어든 만큼 세로로 늘려 같은 칸 수를 유지한다.
