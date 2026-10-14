@@ -25,6 +25,9 @@ import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, s
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
 import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
+import { EffectBurst, EffectGacha, EquipmentPanel } from "./EquipmentPanel";
+import { EFFECT_PRICE, drawEffect, emptyEquipment, equipEffect, restoreEquipment, type EffectSlot, type Equipment } from "./equipment";
+
 import BossScreen, { BOSS_MODES, type BossMode } from "./bossScreen";
 import ColorPicker from "./colorPicker";
 
@@ -271,7 +274,7 @@ const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(M
 
 export default function Home() {
   const [now, setNow] = useState(new Date());
-  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha">("farm");
+  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment">("farm");
   const [bookSeason, setBookSeason] = useState<Season | "special" | null>(null);
   const [bet, setBet] = useState(100);
   const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
@@ -373,6 +376,10 @@ export default function Home() {
   const pendingPours = useRef(0);
   const [gachaResult, setGachaResult] = useState<{ item: Furniture; at: number } | null>(null);
   const [furnitureGachaResult, setFurnitureGachaResult] = useState<{ item: Furniture | null; at: number } | null>(null);
+  const [ownedEffects, setOwnedEffects] = useState<string[]>([]);
+  const [equipment, setEquipment] = useState<Equipment>(emptyEquipment);
+  const [effectResult, setEffectResult] = useState<string | null>(null);
+  const effectDrawLock = useRef(false);
   const [gachaCollected, setGachaCollected] = useState<string[]>([]);
   const [cheer, setCheer] = useState<{ id: string; at: number } | undefined>(undefined);
   const [fishState, setFishState] = useState<FishState>({ phase: "idle" });
@@ -442,6 +449,8 @@ export default function Home() {
     if (saved) {
       try {
         const data = JSON.parse(saved);
+        const restoredEquipment = restoreEquipment(data.ownedEffects, data.equipment);
+        setOwnedEffects(restoredEquipment.owned); setEquipment(restoredEquipment.equipment);
         const version = data.version ?? 1;
         const level = data.houseLevel ?? 1, shape: RoomShape = data.houseShape ?? "rect", room = roomFor(level, shape);
         const hydrate = (list: LegacyItem[]) => (list ?? []).map(item => hydrateItem(item, version, room)).filter((item): item is PlacedItem => Boolean(item));
@@ -467,8 +476,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -1657,6 +1666,18 @@ export default function Home() {
   }
 
   /** 펫 뽑기: 1,000원. 능력 펫 10%, 일반 펫 90%. 뽑은 펫은 지금 보는 층의 빈자리에 놓인다. */
+  function drawCosmetic(slot: EffectSlot) {
+    if (effectDrawLock.current || money < EFFECT_PRICE) return;
+    const effect = drawEffect(ownedEffects, slot);
+    if (!effect) return;
+    effectDrawLock.current = true;
+    setMoney(value => value - EFFECT_PRICE);
+    setOwnedEffects(ids => [...ids, effect.id]); setEffectResult(effect.id);
+    playCoinSound([660, 990, 1320]);
+    setNotice(`✨ ${effect.name} 획득! 장비창에서 장착해 주세요.`);
+  }
+  useEffect(() => { effectDrawLock.current = false; }, [ownedEffects]);
+
   function drawPet() {
     if (money < GACHA_PRICE) return setNotice(`펫 뽑기는 ${GACHA_PRICE.toLocaleString()}원이에요.`);
     const pet = rollPet(), instanceId = `${pet.id}-${Date.now()}`;
@@ -1922,6 +1943,7 @@ export default function Home() {
         <button className={tab === "home" ? "active" : ""} onClick={() => switchTab("home")}>🏡 나의 집</button>
         <button className={tab === "pets" ? "active" : ""} onClick={() => switchTab("pets")}>🐾 펫</button>
         <button className={tab === "gacha" ? "active" : ""} onClick={() => switchTab("gacha")}>🛍️ 상점</button>
+        <button className={tab === "equipment" ? "active" : ""} onClick={() => switchTab("equipment")}>🎒 장비</button>
         <button className={tab === "casino" ? "active" : ""} onClick={() => switchTab("casino")}>🎲 도박장</button>
       </nav>
 
@@ -1971,7 +1993,7 @@ export default function Home() {
                   <span className="plot-badges">{Array.from({ length: status.total }).map((_, k) => <i key={k} className={k < status.satisfied ? "on" : ""}>💧</i>)}{plot?.bugHits ? <i className="hurt">🐛-{Math.round((1 - status.bugMultiplier) * 100)}%</i> : null}</span>
                 </> : <><span className="soil-lines">╱ ╱ ╱</span><span className="plot-label">{tool === "seed" ? `${selectedCropInfo.icon} 심기` : "빈 밭"}</span></>}
                 {waterFx.filter(fx => fx.plotIndex === index).map(fx => <span className="water-fx" key={fx.id}><i>💧</i><i>💧</i><i>💧</i><i>💧</i></span>)}
-                {harvestFx.filter(fx => fx.plotIndex === index).map(fx => <span className="harvest-fx" key={fx.id}><b>{fx.icon}</b><i>{fx.amount ? `＋${fx.amount.toLocaleString()}원 ` : ""}{fx.stars}</i><em>✦</em><em>✦</em><em>●</em></span>)}
+                {harvestFx.filter(fx => fx.plotIndex === index).map(fx => <span className="harvest-fx" key={fx.id}><EffectBurst id={equipment.farm} /><b>{fx.icon}</b><i>{fx.amount ? `＋${fx.amount.toLocaleString()}원 ` : ""}{fx.stars}</i><em>✦</em><em>✦</em><em>●</em></span>)}
               </button>{squashFx.filter(fx => fx.plotIndex === index).map(fx => <span key={fx.id} className="squash-fx" style={{ left: fx.x, top: fx.y }} aria-hidden="true"><b>🐛</b>{[0, 1, 2, 3, 4, 5, 6].map(k => <i key={k} style={{ "--a": `${k * 51}deg` } as CSSProperties} />)}<em>찍!</em></span>)}{plot?.bug && !withered && <button className="bug" aria-label={`벌레 잡기, ${bugLeft}초 남음`} onPointerDown={event => { event.stopPropagation(); catchBug(index, event.currentTarget); }} onPointerEnter={event => { if (event.buttons & 1) catchBug(index, event.currentTarget); }} onClick={event => { event.stopPropagation(); if (event.detail === 0) catchBug(index, event.currentTarget); }}>🐛<b>{bugLeft}</b></button>}</div>;
             })}
           </div>
@@ -2032,7 +2054,7 @@ export default function Home() {
             <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
             {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} rod={gameRod} barBonus={fishState.bait?.barBonus ?? 0} onFinish={finishFishing} /></Suspense>}
             {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : fishState.fish?.rarity === "신화" ? "legend mythic" : ""}`}>
-              {fishState.fish ? <>{LEGEND_ART[fishState.fish.id] ? <span className={`legend-fish-art ${LEGEND_ART[fishState.fish.id]}`} role="img" aria-label={fishState.fish.name} /> : <b>{fishState.fish.icon}</b>}<strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트!</span>}<small>{fishState.fish.note}</small><em>{fishState.stored ? "📦 통합 창고 보관" : `＋${(fishState.price ?? fishState.fish.price).toLocaleString()}원`}</em></> : <><b>💨</b><small>{fishState.text}</small></>}
+              {fishState.fish ? <><EffectBurst id={equipment.fish} />{LEGEND_ART[fishState.fish.id] ? <span className={`legend-fish-art ${LEGEND_ART[fishState.fish.id]}`} role="img" aria-label={fishState.fish.name} /> : <b>{fishState.fish.icon}</b>}<strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트!</span>}<small>{fishState.fish.note}</small><em>{fishState.stored ? "📦 통합 창고 보관" : `＋${(fishState.price ?? fishState.fish.price).toLocaleString()}원`}</em></> : <><b>💨</b><small>{fishState.text}</small></>}
               {fishState.reward && <span className="treasure">🎁 보물상자: {fishState.reward}</span>}
             </div>}
           </div>
@@ -2057,6 +2079,7 @@ export default function Home() {
         </aside>
       </div>}
 
+      {tab === "equipment" && <EquipmentPanel owned={ownedEffects} equipment={equipment} onEquip={(slot, id) => setEquipment(current => equipEffect(current, ownedEffects, slot, id))} onShop={() => { setShopMain("gacha"); switchTab("gacha"); }} />}
       {tab === "gacha" && <div className="shop-main-tabs" role="tablist" aria-label="상점">{([["gacha", "🎁 가챠"], ["food", "🦴 펫 먹이"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={shopMain === id} className={shopMain === id ? "on" : ""} onClick={() => setShopMain(id)}>{label}</button>)}</div>}
       {tab === "gacha" && shopMain === "food" && <section className="panel food-shop">
         <div className="panel-heading"><div><span className="eyebrow">PET FOOD</span><h3>펫 먹이</h3></div><button className="ghost-button small" onClick={() => switchTab("pets")}>🐾 펫 돌보러 가기</button></div>
@@ -2067,6 +2090,7 @@ export default function Home() {
         </div>)}</div>
       </section>}
       {tab === "gacha" && shopMain === "gacha" && <div className="gacha-grid">
+        <EffectGacha owned={ownedEffects} money={money} onDraw={drawCosmetic} result={effectResult} onEquipment={() => switchTab("equipment")} />
         <section className="panel gacha">
           <div className="panel-heading"><div><span className="eyebrow">PET GACHA</span><h3>펫 뽑기</h3></div><span className="plot-count">전설 0.1%</span></div>
           <div key={gachaResult?.at ?? 0} className={`gacha-machine ${gachaResult ? (gachaResult.item.legend ? "legend" : gachaResult.item.rare ? "rare" : "common") : ""}`}>
@@ -2131,7 +2155,7 @@ export default function Home() {
           <div className="hunt-weapons" role="radiogroup" aria-label="무기">{WEAPONS.map(item => <button key={item.id} role="radio" aria-checked={weaponId === item.id} className={weaponId === item.id ? "on" : ""} onClick={() => chooseWeapon(item)}><b>{item.icon}</b><span>{item.name}</span><small>데미지 {item.damage} · {item.cooldown}초</small><em>{weaponId === item.id ? "사용 중" : hasWeapon(item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)}</div>
           {HUNT_TEST_UNLOCK_ALL && <p className="hint test-flag">🧪 로컬 테스트: 무기가 모두 열려 있어요(HUNT_TEST_UNLOCK_ALL).</p>}
           {huntTicket <= nowMs ? <div className="hunt-gate"><p>사냥터는 <b>입장권 {HUNT_TICKET_PRICE.toLocaleString()}원</b>을 내고 <b>{HUNT_TICKET_MINUTES}분</b> 동안 이용해요.{TEST_MODE ? " (테스트 모드: 무료)" : ""}</p><button className="save-button" onClick={buyHuntTicket} disabled={!TEST_MODE && money < HUNT_TICKET_PRICE}>🎫 입장하기 ({TEST_MODE ? "무료" : `${HUNT_TICKET_PRICE.toLocaleString()}원`})</button></div> :
-          <HuntingGround weapon={WEAPONS.find(item => item.id === weaponId) ?? WEAPONS[0]} paused={bossMode || tab !== "hunt" || huntTicket <= nowMs} petCatch={pets.has("dog") ? 0.25 : pets.has("cat") ? 0.15 : 0} petName={pets.has("dog") ? "강아지" : "고양이"} lootName={id => { const loot = ALL_LOOT.find(item => item.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }}
+          <HuntingGround effectId={equipment.hunt} weapon={WEAPONS.find(item => item.id === weaponId) ?? WEAPONS[0]} paused={bossMode || tab !== "hunt" || huntTicket <= nowMs} petCatch={pets.has("dog") ? 0.25 : pets.has("cat") ? 0.15 : 0} petName={pets.has("dog") ? "강아지" : "고양이"} lootName={id => { const loot = ALL_LOOT.find(item => item.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }}
             onLoot={loot => { setHuntStock(stock => { const next = { ...stock }; Object.entries(loot).forEach(([id, n]) => { next[id] = (next[id] ?? 0) + n; }); return next; }); playCoinSound([660, 990]); }} />}
         </section>
         <aside className="panel hunt-bag">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { EffectBurst } from "./EquipmentPanel";
 import { ANIMALS, GAP_MS, RESULT_MS, damageTo, pickAnimal, rollLoot, startMotion, stepMotion, type Animal, type HuntOutcome, type Motion, type Weapon } from "./hunting";
 
 /**
@@ -17,7 +18,7 @@ type Pop = { id: number; x: number; y: number; text: string; hit: boolean };
 const clock = () => Date.now();
 const rnd = () => Math.random();
 
-export function HuntingGround({ weapon, paused, petCatch, petName, lootName, onLoot }: { weapon: Weapon; paused: boolean; petCatch: number; petName: string; lootName: (id: string) => string; onLoot: (loot: Record<string, number>, outcome: HuntOutcome, animal: Animal) => void }) {
+export function HuntingGround({ effectId, weapon, paused, petCatch, petName, lootName, onLoot }: { effectId: string | null; weapon: Weapon; paused: boolean; petCatch: number; petName: string; lootName: (id: string) => string; onLoot: (loot: Record<string, number>, outcome: HuntOutcome, animal: Animal) => void }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [round, setRound] = useState<Round | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -106,7 +107,7 @@ export function HuntingGround({ weapon, paused, petCatch, petName, lootName, onL
         <span ref={hpEl} className="hunt-hp" style={{ left: `${spawn.x}%`, top: `${spawn.y}%` }} aria-label={`체력 ${round.hp}/${round.animal.hp}`}><i style={{ width: `${Math.max(0, round.hp / round.animal.hp) * 100}%` }} /></span>
         <span key={round.startAt} className="hunt-timer" style={{ animationDuration: `${round.animal.window}s` }} aria-hidden="true" />
       </>}
-      {pops.map(pop => <span key={pop.id} className={`hunt-pop ${pop.hit ? "hit" : "miss"}`} style={{ left: `${pop.x}%`, top: `${pop.y}%` }}>{pop.text}</span>)}
+      {pops.map(pop => <span key={pop.id} className={`hunt-pop ${pop.hit ? "hit" : "miss"}`} style={{ left: `${pop.x}%`, top: `${pop.y}%` }}>{pop.hit && <EffectBurst id={effectId} />}{pop.text}</span>)}
       {result && <div className={`hunt-result ${result.outcome}`} style={{ left: `${Math.max(12, Math.min(88, result.x))}%`, top: `${Math.max(30, result.y)}%` }}><b>{result.outcome === "great" ? "대성공!" : result.outcome === "success" ? "성공!" : "도주…"}</b><small>{result.text}</small>{Object.entries(result.loot).map(([id, n]) => <em key={id}>+{lootName(id)} ×{n}</em>)}</div>}
       {phase !== "idle" && <button className="hunt-stop" onClick={stop} onPointerDown={event => event.stopPropagation()}>멈추기</button>}
     </div>
