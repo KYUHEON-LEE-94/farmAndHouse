@@ -479,3 +479,26 @@ button { color:inherit; }
 .bait{grid-template-columns:1fr}
 .bait .qty-buy,.fert-stock .qty-buy{min-height:32px;justify-content:flex-end}
 .qty-buy button,.qty-buy input{height:32px}
+
+/* 씨앗 | 창고 탭 */
+.side-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:12px;border-radius:12px;background:#ece6d6}
+.side-tabs button{border:0;border-radius:9px;padding:9px 6px;background:transparent;font:700 13px "Gowun Dodum";color:#6b6450;cursor:pointer}
+.side-tabs button.on{background:#fffdf8;color:#24372b;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.side-tabs small{font-size:11px;color:#8a7c5c}
+/* 농산물 창고 */
+.harvest-mode{display:flex;align-items:center;gap:6px;margin:4px 0 12px;font-size:12px;color:#6b6450}
+.harvest-mode button{flex:1;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fffdf8;font:700 12px "Gowun Dodum";cursor:pointer}
+.harvest-mode button.on{background:#24372b;color:#fff;border-color:#24372b}
+.storage-list{display:grid;gap:6px}
+.stack{display:grid;grid-template-columns:40px 1fr;gap:4px 8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:#fffdf8}
+.stack.golden{border-color:#e8c35a;background:#fffaea}.stack.best{box-shadow:inset 3px 0 0 #e2883a}
+.stack-icon{position:relative;font-size:28px;text-align:center}.stack-icon i{position:absolute;right:-4px;top:-6px;font-size:13px;font-style:normal}
+.stack-info{display:grid;gap:2px;min-width:0}.stack-info b{font:700 13px "Gowun Batang"}.stack-info em{font-style:normal;color:#2f6f90}
+.stack-info small{font-size:10.5px;color:#6b6450}
+.spark{display:flex;align-items:flex-end;gap:2px;height:16px}.spark i{flex:1;max-width:10px;border-radius:2px;background:#d8cfb8}.spark i.now{background:#e2883a}
+.stack-actions{grid-column:1/-1;display:flex;gap:6px;justify-content:flex-end}
+.stack-actions button{border:1px solid var(--line);border-radius:8px;padding:5px 10px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
+.stack-actions button.all{background:#24372b;color:#fff;border-color:#24372b}
+.sell-all{width:100%;margin-top:10px}
+.mode-toggle{margin-left:auto;border:1px solid #d9c37a;border-radius:999px;padding:3px 10px;background:#fffdf3;font:700 11px "Gowun Dodum";cursor:pointer}
+.mode-toggle.store{background:#e7f3f9;border-color:#8cc3e0}

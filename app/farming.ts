@@ -1,5 +1,8 @@
 import type { Season } from "./fishing";
 
+/** 작물 판매가 전체 배율. 농사 수입이 너무 빨라 0.9로 낮췄다(씨앗값은 그대로라 이익은 약 15~17% 감소). */
+export const CROP_PRICE_SCALE = 0.9;
+
 export type Crop = { id: string; name: string; icon: string; seasons: Season[]; seed: number; sell: number; seconds: number; difficulty: string };
 /** water: 물 준 시각들, fert: 준 거름 id. growSeconds는 심을 때(버프·거름 반영) 정해진 성장 시간. */
 /** bug: 지금 앉아 있는 벌레가 날아온 시각, bugHits: 놓친 벌레 수(마리당 판매가 -10%). */
@@ -160,4 +163,23 @@ export const SEASON_OMENS: Record<"여름" | "가을" | "겨울", string[]> = {
 export function seasonOmen(next: "여름" | "가을" | "겨울", date = new Date()) {
   const list = SEASON_OMENS[next];
   return list[date.getDate() % list.length];
+}
+
+/**
+ * 농산물 창고: 작물 × 품질(× 황금) 묶음 단위로 보관한다. 한 묶음은 몇 개든 창고 1칸.
+ * 보관 중인 작물은 썩지 않는다. 벌레 피해가 있던 작물은 품질 한 단계 낮춰 보관한다.
+ */
+export const STORAGE_START = 20;
+export const STORAGE_STEP = 10;
+export const STORAGE_MAX = 60;
+export function storagePrice(slots: number) { return 3000 + ((slots - STORAGE_START) / STORAGE_STEP) * 2000; }
+export function produceKey(cropId: string, quality: number, golden: boolean) { return `${cropId}|${quality}|${golden ? 1 : 0}`; }
+export function parseProduceKey(key: string) {
+  const [cropId, quality, golden] = key.split("|");
+  return { cropId, quality: Math.max(0, Math.min(QUALITIES.length - 1, Number(quality) || 0)), golden: golden === "1" };
+}
+/** 수확한 작물을 보관할 때의 품질 단계(벌레 피해가 있으면 한 단계 낮춤). */
+export function storedQuality(qualityId: string, bugMultiplier: number) {
+  const index = Math.max(0, QUALITIES.findIndex(quality => quality.id === qualityId));
+  return bugMultiplier < 1 ? Math.max(0, index - 1) : index;
 }
