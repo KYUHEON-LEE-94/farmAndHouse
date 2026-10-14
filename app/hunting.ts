@@ -12,7 +12,7 @@ export type Loot = { id: string; name: string; icon: string; price: number };
 export type Animal = { id: string; name: string; icon: string; weight: number; speed: number; hp: number; defense: number; move: MoveKind; moveName: string; window: number; size: number; loot: Loot; rare: Loot };
 
 /** 토끼 속도(사냥터 가로 %/초). 다른 동물은 이 배수. */
-export const BASE_SPEED = 56;
+export const BASE_SPEED = 48;
 
 export const ANIMALS: Animal[] = [
   { id: "rabbit", name: "토끼", icon: "🐇", weight: 30, speed: 1, hp: 2, defense: 0, move: "hop", moveName: "지그재그로 깡충", window: 3.5, size: 4.2, loot: { id: "rabbitfur", name: "토끼 털뭉치", icon: "🤍", price: 60 }, rare: { id: "luckyfoot", name: "행운의 털", icon: "🍀", price: 300 } },
