@@ -639,3 +639,16 @@ button { color:inherit; }
 /* 거름 상점의 수량 상자가 상점 버튼 스타일을 물려받아 길쭉해지던 문제 */
 .can-shop-list .qty-buy button{display:inline-flex;align-items:center;justify-content:center;grid-template-columns:none;min-width:30px;width:auto;padding:0 8px;text-align:center}
 .can-shop-list .qty-buy .qty-go{padding:0 12px}
+
+/* 보관한 물고기: 종류마다 칸 하나(등급 없음) */
+.fish-store{display:grid;gap:8px}
+.fish-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.fish-card{display:grid;grid-template-columns:40px 1fr;grid-template-rows:auto auto;gap:6px 8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:#f3f8fb}
+.fish-card.rarity-희귀{border-color:#8cc3e0;background:#eaf4fa}.fish-card.rarity-전설{border-color:#e8c35a;background:#fff6dc}
+.fish-card-icon{grid-row:1/3;font-size:30px;text-align:center}
+.fish-card-info{display:grid;gap:2px;min-width:0}.fish-card-info b{font:700 13px "Gowun Batang"}.fish-card-info em{font-style:normal;color:#2f6f90}
+.fish-card-info small{font-size:10.5px;color:#6b6450}.fish-card-info .reserve-tag{margin:0;justify-self:start}
+.fish-card-actions{display:flex;gap:4px}
+.fish-card-actions button{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;font:700 10.5px "Gowun Dodum";cursor:pointer;white-space:nowrap}
+.fish-card-actions button.all{flex:1;background:#24372b;color:#fff;border-color:#24372b}
+.fish-card-actions button:disabled{opacity:.4;cursor:default}
