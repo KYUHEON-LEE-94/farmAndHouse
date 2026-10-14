@@ -28,10 +28,21 @@ test('all 100 levels have small finite bonuses and nonnegative penalties', () =>
     }
   }
   close(pets.PET_POWER[99], 1.099);
-  close(pets.tigerDebuff(100), .4505);
+  close(pets.tigerDebuff(100), .5604);
   close(pets.friendSaleBonus(100), .0099);
   close(pets.whiteTigerBugReduction(100), .099);
-  assert.match(pets.petAbility('dog', 2, true), /25.025%/);
-  assert.match(pets.petAbility('dog', 100, true), /27.475%/);
+  assert.match(pets.petAbility('dog', 2, true), /20.02%/);
+  assert.match(pets.petAbility('dog', 100, true), /21.98%/);
   assert.match(pets.petAbility('chick', 100, false), /0.99%/);
+});
+
+test('base bonuses are reduced and pest protection cannot stack into immunity', () => {
+  close(pets.PET_BASE.dog, .2); close(pets.PET_BASE.cat, .16);
+  close(pets.PET_BASE.dragon, .12); close(pets.PET_BASE.gumiho, .12);
+  close(pets.tigerDebuff(1), .6);
+  close(pets.petBugPenalty(0, 0), .1);
+  close(pets.petBugPenalty(1, 0), .06);
+  close(pets.petBugPenalty(0, 1), .02);
+  close(pets.petBugPenalty(1, 1), .02);
+  assert.ok(pets.petBugPenalty(pets.PET_POWER[99], pets.PET_POWER[99]) > 0);
 });

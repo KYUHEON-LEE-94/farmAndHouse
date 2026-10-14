@@ -1,3 +1,4 @@
+import { petAbility } from "./pets";
 import type { ReactNode } from "react";
 
 export type FurnitureKind = "floor" | "rug" | "wall";
@@ -149,18 +150,18 @@ export function rollGachaFurniture(collected: string[], random = Math.random): F
 
 /** 능력 펫마다 하나씩, 집에 있는 동안 항상 적용되는 작은 고유 효과. */
 export const PET_BUFFS: Record<string, { title: string; text: string }> = {
-  dog: { title: "든든한 경비견", text: "벌레가 날아오면 25% 확률로 짖어서 쫓아내요" },
-  cat: { title: "생선 냄새", text: "희귀 물고기 확률 ×1.2" },
-  rabbit: { title: "알뜰 장보기", text: "씨앗값 -5%" },
-  duck: { title: "물놀이 친구", text: "물뿌리개 용량 +2" },
-  mole: { title: "땅 고르기", text: "새로 심는 작물 성장 시간 -5%" },
-  weasel: { title: "해충 사냥꾼", text: "벌레를 놓쳤을 때 판매가 피해 -10% → -5%" },
-  tiger: { title: "산군의 위엄", text: "마을 이벤트 디버프 지속 시간 절반" },
-  dragon: { title: "청룡의 비", text: "새로 심는 작물 성장 시간 -15%" },
-  phoenix: { title: "주작의 불꽃", text: "낚시 미니게임 게이지가 25% 빨리 참" },
-  whitetiger: { title: "백호의 포효", text: "벌레를 놓쳐도 작물이 전혀 상하지 않음" },
-  blacktortoise: { title: "현무의 물줄기", text: "물뿌리개 용량 +8" },
-  gumiho: { title: "구미호의 홀림", text: "작물 판매가 +15%" },
+  dog: { title: "든든한 경비견", text: petAbility("dog", 1, true) },
+  cat: { title: "생선 냄새", text: petAbility("cat", 1, true) },
+  rabbit: { title: "알뜰 장보기", text: petAbility("rabbit", 1, true) },
+  duck: { title: "물놀이 친구", text: petAbility("duck", 1, true) },
+  mole: { title: "땅 고르기", text: petAbility("mole", 1, true) },
+  weasel: { title: "해충 사냥꾼", text: petAbility("weasel", 1, true) },
+  tiger: { title: "산군의 위엄", text: petAbility("tiger", 1, true) },
+  dragon: { title: "청룡의 비", text: petAbility("dragon", 1, true) },
+  phoenix: { title: "주작의 불꽃", text: petAbility("phoenix", 1, true) },
+  whitetiger: { title: "백호의 포효", text: petAbility("whitetiger", 1, true) },
+  blacktortoise: { title: "현무의 물줄기", text: petAbility("blacktortoise", 1, true) },
+  gumiho: { title: "구미호의 홀림", text: petAbility("gumiho", 1, true) },
 };
 
 export const TINTS = ["#c78979", "#e2b85a", "#81a96b", "#8ba5bc", "#9a7bb0", "#57514f", "#efe6d6"];

@@ -20,10 +20,10 @@ import { migrateInventory, pickCategory, replaceCategory, type Inventory, type I
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
 import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, MARKET_DEMAND, OVERFLOW_RATE, SAT_MAX, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
-import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
+import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_BASE, petBugPenalty, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import { EffectBurst, EffectGacha, EquipmentPanel } from "./EquipmentPanel";
 import { EFFECT_PRICE, drawEffect, emptyEquipment, equipEffect, restoreEquipment, type EffectSlot, type Equipment } from "./equipment";
@@ -481,7 +481,7 @@ export default function Home() {
   // 펫 레벨이 오를수록 능력이 강해진다(능력 배수 PET_POWER). 집에 없는 펫은 0.
   const petLevel = (id: string) => Math.min(PET_MAX_LEVEL, petCare[id]?.level ?? 1);
   const pw = (id: string) => (pets.has(id) ? PET_POWER[petLevel(id) - 1] : 0);
-  const petCanBonus = (pets.has("duck") ? Math.round(2 * pw("duck")) : 0) + (pets.has("blacktortoise") ? Math.round(8 * pw("blacktortoise")) : 0);
+  const petCanBonus = (pets.has("duck") ? Math.round(PET_BASE.duck * pw("duck")) : 0) + (pets.has("blacktortoise") ? Math.round(PET_BASE.blacktortoise * pw("blacktortoise")) : 0);
   // 일반 펫은 종류마다 레벨당 판매가 +0.01%p.
   const friendBonus = 1 + [...new Set(placed.filter(item => item.pet && !item.rare && !item.legend).map(item => item.id))].reduce((sum, id) => sum + friendSaleBonus(petLevel(id)), 0);
   const currentCan = CANS.find(item => item.id === canId) ?? CANS[0];
@@ -489,7 +489,7 @@ export default function Home() {
   const currentPlanter = PLANT_TOOLS.find(item => item.id === planterId) ?? PLANT_TOOLS[0];
   const currentSpreader = SPREADERS.find(item => item.id === spreaderId) ?? SPREADERS[0];
   const canMax = currentCan.capacity + petCanBonus;
-  const bugPenalty = pets.has("whitetiger") ? 0 : BUG_PENALTY * (1 - 0.5 * pw("weasel"));
+  const bugPenalty = petBugPenalty(pw("weasel"), pw("whitetiger"));
   const today = now.toDateString();
   // 파산: 보유 자금이 50원 미만이면 너구리가 지원금을 준다(하루 한 번).
   const broke = loaded && money < BAILOUT_THRESHOLD;
@@ -503,9 +503,9 @@ export default function Home() {
     switchTab("fish");
   }
   /** 이번 5분 씨앗값(시세 거래가에 연동) × 버프·토끼. */
-  const seedPrice = (crop: Crop) => Math.round(cycleCrop(crop, marketBucket).seed * seedMul * (1 - 0.05 * pw("rabbit")));
+  const seedPrice = (crop: Crop) => Math.round(cycleCrop(crop, marketBucket).seed * seedMul * (1 - PET_BASE.rabbit * pw("rabbit")));
   /** 포화 전 판매가(시세 × 버프·펫 효과). */
-  const basePrice = (crop: Crop) => marketPrice(crop, marketBucket) * priceMul * (1 + 0.15 * pw("gumiho")) * friendBonus;
+  const basePrice = (crop: Crop) => marketPrice(crop, marketBucket) * priceMul * (1 + PET_BASE.gumiho * pw("gumiho")) * friendBonus;
   // 시장 포화 슬롯: 지난 시세 주기만큼 정리한 지금 상태
   const market = normalizeMarket(marketState, marketBucket);
   /** 지금 1개 팔 때 값(시장 포화 반영). */
@@ -541,7 +541,7 @@ export default function Home() {
   }, [loaded]);
 
   // 벌레: 운영 시간 중 주기적으로 자라는 작물 하나에 날아온다. 제때 못 잡으면 그 작물 판매가가 깎인다.
-  useEffect(() => { bugGate.current = { ready: loaded && isWorkTime, plots, dog: 0.25 * pw("dog"), bugChance: wx.bugChance * (pets.has("whitetiger") ? 1 - whiteTigerBugReduction(petLevel("whitetiger")) : 1), rain: wx.autoWater }; });
+  useEffect(() => { bugGate.current = { ready: loaded && isWorkTime, plots, dog: PET_BASE.dog * pw("dog"), bugChance: wx.bugChance * (pets.has("whitetiger") ? 1 - whiteTigerBugReduction(petLevel("whitetiger")) : 1), rain: wx.autoWater }; });
   useEffect(() => {
     if (!loaded) return;
     let lastSpawn = Date.now();
@@ -849,7 +849,7 @@ export default function Home() {
     if (!isWorkTime) return setNotice(`농장은 ${startHour}:00에 문을 열어요. 시간 설정에서 바꿀 수 있어요.`);
     const crop = CROPS.find(c => c.id === selectedCrop)!;
     if (!crop.seasons.includes(season)) return setNotice(`${crop.name}은 ${crop.seasons.join("·")} 작물이에요.`);
-    const growSeconds = Math.round(cycleCrop(crop, marketBucket).seconds * growthMul * (1 - 0.05 * pw("mole")) * (1 - 0.15 * pw("dragon")));
+    const growSeconds = Math.round(cycleCrop(crop, marketBucket).seconds * growthMul * (1 - PET_BASE.mole * pw("mole")) * (1 - PET_BASE.dragon * pw("dragon")));
     if (growSeconds > seasonSecondsLeft) return setNotice(`${season}이 ${formatClock(seasonSecondsLeft)} 뒤 끝나요. ${josa(crop.name, "은는")} 그 전에 다 자라지 못해요.`);
     const price = seedPrice(crop);
     const empty = canArea(index, plotColumns(), plotCount, currentPlanter).filter(i => !plots[i] && !justPlanted.current.has(i));
@@ -1383,7 +1383,7 @@ export default function Home() {
     const bait = castBait.current ?? BAITS[0];
     const bare = bait.id === BARE_HAND.id;
     // 희귀 어획: 버프·날씨·고양이를 합쳐 최대 ×1.5. 전설은 미끼·낚싯대만 영향을 준다(버프로 전설이 쏟아지던 사고 방지).
-    const rareBoost = Math.min(FISH_BOOST_MAX, fishMul * (1 + 0.2 * pw("cat")));
+    const rareBoost = Math.min(FISH_BOOST_MAX, fishMul * (1 + PET_BASE.cat * pw("cat")));
     let rolled = rollFish(season, { normal: bait.normalBoost * currentSpot.normalBoost, rare: bait.rareBoost * currentSpot.rareBoost * rareBoost, legend: bait.legendBoost * currentRod.legendBoost });
     // 맨손 낚시는 전설도 걸리지 않는다(희귀는 rareBoost 0으로 이미 빠짐).
     while (bare && (rolled.rarity === "전설" || rolled.rarity === "신화")) rolled = rollFish(season, { normal: currentSpot.normalBoost, rare: 0, legend: 0 });
@@ -1864,7 +1864,7 @@ export default function Home() {
 
   const cropCards = available.map(crop => {
     const cycleSeconds = cycleCrop(crop, marketBucket).seconds;
-    const shownSeconds = Math.round(cycleSeconds * growthMul * (1 - 0.05 * pw("mole")) * (1 - 0.15 * pw("dragon")));
+    const shownSeconds = Math.round(cycleSeconds * growthMul * (1 - PET_BASE.mole * pw("mole")) * (1 - PET_BASE.dragon * pw("dragon")));
     const tooLate = isWorkTime && shownSeconds > seasonSecondsLeft;
     const allowance = plantingAllowance(crop, specialPlantings, plantingDate);
     return <button key={crop.id} className={`crop-card ${crop.seasonalLimit ? "special-crop" : ""} ${selectedCrop === crop.id ? "selected" : ""} ${tooLate ? "too-late" : ""}`} onClick={() => { setSelectedCrop(crop.id); setTool("seed"); }} aria-pressed={selectedCrop === crop.id} disabled={allowance <= 0}>
@@ -1883,7 +1883,7 @@ export default function Home() {
   const currentRod = RODS.find(item => item.id === rodId) ?? RODS[0];
   const currentSpot = SPOTS.find(item => item.id === spotId) ?? SPOTS[0];
   const phoenix = pw("phoenix");
-  const gameRod = useMemo(() => ({ ...currentRod, gain: currentRod.gain * (1 + 0.25 * phoenix), treasure: currentRod.treasure + currentSpot.treasureBonus }), [currentRod, currentSpot, phoenix]);
+  const gameRod = useMemo(() => ({ ...currentRod, gain: currentRod.gain * (1 + PET_BASE.phoenix * phoenix), treasure: currentRod.treasure + currentSpot.treasureBonus }), [currentRod, currentSpot, phoenix]);
   const bareReady = currentSpot.price === 0 && (selectedBait === BARE_HAND.id || !baits[currentBait.id]);
   const ticketLeft = currentSpot.price > 0 ? Math.max(0, Math.ceil(((tickets[currentSpot.id] ?? 0) - nowMs) / 1000)) : -1;
 
@@ -2139,7 +2139,7 @@ export default function Home() {
           <div className="hunt-weapons" role="radiogroup" aria-label="무기">{WEAPONS.map(item => <button key={item.id} role="radio" aria-checked={weaponId === item.id} className={weaponId === item.id ? "on" : ""} onClick={() => chooseWeapon(item)}><b>{item.icon}</b><span>{item.name}</span><small>데미지 {item.damage} · {item.cooldown}초</small><em>{weaponId === item.id ? "사용 중" : hasWeapon(item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)}</div>
           {HUNT_TEST_UNLOCK_ALL && <p className="hint test-flag">🧪 로컬 테스트: 무기가 모두 열려 있어요(HUNT_TEST_UNLOCK_ALL).</p>}
           {huntTicket <= nowMs ? <div className="hunt-gate"><p>사냥터는 <b>입장권 {HUNT_TICKET_PRICE.toLocaleString()}원</b>을 내고 <b>{HUNT_TICKET_MINUTES}분</b> 동안 이용해요.{TEST_MODE ? " (테스트 모드: 무료)" : ""}</p><button className="save-button" onClick={buyHuntTicket} disabled={!TEST_MODE && money < HUNT_TICKET_PRICE}>🎫 입장하기 ({TEST_MODE ? "무료" : `${HUNT_TICKET_PRICE.toLocaleString()}원`})</button></div> :
-          <HuntingGround effectId={equipment.hunt} weapon={WEAPONS.find(item => item.id === weaponId) ?? WEAPONS[0]} paused={bossMode || tab !== "hunt" || huntTicket <= nowMs} petCatch={pets.has("dog") ? 0.25 : pets.has("cat") ? 0.15 : 0} petName={pets.has("dog") ? "강아지" : "고양이"} lootName={id => { const loot = ALL_LOOT.find(item => item.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }}
+          <HuntingGround effectId={equipment.hunt} weapon={WEAPONS.find(item => item.id === weaponId) ?? WEAPONS[0]} paused={bossMode || tab !== "hunt" || huntTicket <= nowMs} petCatch={pets.has("dog") ? PET_BASE.dogCatch : pets.has("cat") ? PET_BASE.catCatch : 0} petName={pets.has("dog") ? "강아지" : "고양이"} lootName={id => { const loot = ALL_LOOT.find(item => item.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }}
             onLoot={loot => { setHuntStock(stock => { const next = { ...stock }; Object.entries(loot).forEach(([id, n]) => { next[id] = (next[id] ?? 0) + n; }); return next; }); playCoinSound([660, 990]); }} />}
         </section>
         <aside className="panel hunt-bag">
