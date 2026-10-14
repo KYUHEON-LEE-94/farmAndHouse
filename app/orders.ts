@@ -1,6 +1,6 @@
 /** 농사와 낚시가 함께 쓰는 일일 미션. 납품은 시장 포화를 올리지 않는다. */
 import { CROPS, CROP_PRICE_SCALE, QUALITIES } from "./farming";
-import { FISH, SPECIAL_FISH } from "./fishing";
+import { ALL_FISH, FISH } from "./fishing";
 
 export type Npc = { id: string; name: string; icon: string; lines: string[] };
 export const NPCS: Npc[] = [
@@ -18,7 +18,7 @@ export type OrderBonus = { kind: "fert" | "food"; id: string; count: number };
 export type Order = { id: string; npc: Npc; line: string; items: OrderItem[]; reward: number; bonus?: OrderBonus; special: boolean };
 
 function seeded(text: string) { let h = 2166136261; for (const char of text) h = Math.imul(h ^ char.charCodeAt(0), 16777619); return () => { h += 0x6d2b79f5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const itemValue = (item: OrderItem) => item.kind === "crop" ? CROPS.find(c => c.id === item.cropId)!.sell * CROP_PRICE_SCALE * QUALITIES[item.minQuality].multiplier * item.count : [...FISH, ...SPECIAL_FISH].find(f => f.id === item.fishId)!.price * item.count;
+const itemValue = (item: OrderItem) => item.kind === "crop" ? CROPS.find(c => c.id === item.cropId)!.sell * CROP_PRICE_SCALE * QUALITIES[item.minQuality].multiplier * item.count : ALL_FISH.find(f => f.id === item.fishId)!.price * item.count;
 const round10 = (value: number) => Math.round(value / 10) * 10;
 
 export function dailyOrders(dateKey: string): Order[] {

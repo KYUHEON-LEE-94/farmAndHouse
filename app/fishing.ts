@@ -1,12 +1,14 @@
 export type Season = "봄" | "여름" | "가을" | "겨울";
-export type FishRarity = "흔함" | "보통" | "희귀" | "전설";
+export type FishRarity = "흔함" | "보통" | "희귀" | "전설" | "신화";
 export type Fish = { id: string; name: string; icon: string; season: Season; rarity: FishRarity; price: number; note: string };
 /** barBonus: 낚시 미니게임 초록 막대 길이 보너스(트랙 비율). */
 export type Bait = { id: string; name: string; icon: string; pack: number; price: number; normalBoost: number; rareBoost: number; legendBoost: number; barBonus: number; note: string };
 
 // 전설 확률은 1% 고정. 미끼·낚싯대·버프·날씨·펫 어느 것도 바꾸지 않는다(배수가 겹쳐 전설이 쏟아진 사고 이후 고정).
 export const LEGEND_CHANCE = 0.01;
-export const RARITY_WEIGHT: Record<Exclude<FishRarity, "전설">, number> = { 흔함: 0.6, 보통: 0.3, 희귀: 0.1 };
+// 신화(숨겨진 물고기) 확률은 0.1% 고정. 전설보다 먼저 판정하고, 도감에 등록되지 않는다. 맨손 낚시는 0%.
+export const HIDDEN_CHANCE = 0.001;
+export const RARITY_WEIGHT: Record<Exclude<FishRarity, "전설" | "신화">, number> = { 흔함: 0.6, 보통: 0.3, 희귀: 0.1 };
 
 export const BAITS: Bait[] = [
   { id: "worm", name: "지렁이", icon: "🪱", pack: 10, price: 100, normalBoost: 1, rareBoost: 1, legendBoost: 1, barBonus: 0, note: "기본 미끼" },
@@ -73,9 +75,10 @@ export const FISH: Fish[] = [
 /** 계절 물고기 한 마리를 뽑는다. 전설은 기본 1%에 낚싯대·미끼·버프 배수를 적용한다. */
 export function rollFish(season: Season, boost: { normal?: number; rare?: number; legend?: number } = {}, random = Math.random): Fish {
   const pool = FISH.filter(fish => fish.season === season);
+  if (boost.legend !== 0 && random() < HIDDEN_CHANCE) return HIDDEN_FISH[Math.floor(random() * HIDDEN_FISH.length)];
   if (boost.legend !== 0 && random() < LEGEND_CHANCE) return pool.find(fish => fish.rarity === "전설")!;
   const multiplier = { 흔함: 1, 보통: boost.normal ?? 1, 희귀: boost.rare ?? 1 };
-  const weights = pool.filter(fish => fish.rarity !== "전설").map(fish => {
+  const weights = pool.filter(fish => fish.rarity !== "전설" && fish.rarity !== "신화").map(fish => {
     const rarity = fish.rarity as keyof typeof RARITY_WEIGHT;
     return { fish, weight: (RARITY_WEIGHT[rarity] * multiplier[rarity]) / pool.filter(other => other.rarity === rarity).length };
   });
@@ -113,6 +116,17 @@ export const SPECIAL_FISH: SpecialFish[] = [
   { id: "valley-chub", name: "어름치", icon: "🐠", season: "봄", rarity: "희귀", price: 850, note: "맑은 계곡에만 사는 천연기념물.", spot: "valley", condition: "🏔️ 깊은 계곡" },
   { id: "moon-carp", name: "달빛 잉어", icon: "🌙", season: "봄", rarity: "희귀", price: 1200, note: "비밀 저수지의 달빛을 먹고 자랐대요.", spot: "reservoir", condition: "🌌 비밀 저수지" },
 ];
+
+/**
+ * 숨겨진 물고기(신화 등급): 계절·날씨·장소와 무관하게 입질마다 0.1% 고정 확률로 걸린다.
+ * 도감에 없고 도감에 기록되지도 않는다. season은 형식상 값이다.
+ */
+export const HIDDEN_FISH: Fish[] = [
+  { id: "hidden-dragon", name: "승천하는 금룡 잉어", icon: "🐲", season: "봄", rarity: "신화", price: 100000, note: "천 년을 기다려 용이 되려는 잉어. 어느 도감에도 실려 있지 않아요." },
+];
+
+/** 판매·보관·주문에서 찾을 때 쓰는 모든 물고기(도감에는 FISH·SPECIAL_FISH만 나온다). */
+export const ALL_FISH: Fish[] = [...FISH, ...SPECIAL_FISH, ...HIDDEN_FISH];
 
 /** 지금 날씨·장소에서 잡힐 수 있는 특별 물고기 중 하나(없으면 null). */
 export function rollSpecialFish(weather: string | undefined, spot: string, random = Math.random): SpecialFish | null {

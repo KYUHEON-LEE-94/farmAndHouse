@@ -707,3 +707,8 @@ button { color:inherit; }
 .fish-lock{position:absolute;right:6px;top:6px;border:0;background:transparent;font-size:15px;cursor:pointer;padding:0}
 .fish-card.locked{opacity:.85;box-shadow:inset 0 0 0 2px #c9a06a}
 .fish-locked-note{font-style:normal;font:700 11px "Gowun Dodum";color:#7a5a2a}
+
+/* 신화(숨겨진 물고기) */
+.rarity-신화{background:linear-gradient(90deg,#ffe08a,#f7a8d8,#a8d8ff);color:#5a3a00;font-weight:700}
+.fish-card.rarity-신화{border-color:#d9a400;background:linear-gradient(135deg,#fff6d6,#ffe3f3,#e3f2ff)}
+.catch-card.mythic{background:linear-gradient(135deg,#fff6d6,#ffe3f3,#e3f2ff);box-shadow:0 0 0 3px #e8c35a,0 0 28px rgba(232,195,90,.7)}

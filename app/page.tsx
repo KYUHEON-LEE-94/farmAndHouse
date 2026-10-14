@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
 import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, WEATHER_RETRY_SECONDS, fetchWeather, weatherEffect, type WeatherState } from "./weather";
-import { BAITS, BARE_HAND, FISH, LEGEND_CHANCE, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
+import { ALL_FISH, BAITS, BARE_HAND, FISH, LEGEND_CHANCE, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
 import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, laughter, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
@@ -1188,8 +1188,8 @@ export default function Home() {
 
   // ---------- 주방(사냥 준비물) ----------
   /** 요리에 쓸 수 있는 물고기(전설 제외, 미션 예약분 제외). 싼 것부터. */
-  const cookFishList = () => Object.entries(fishStock).filter(([id]) => !fishLocks[id]).map(([id, count]) => ({ id, fish: [...FISH, ...SPECIAL_FISH].find(item => item.id === id), free: count - (fishReserved[id] ?? 0) }))
-    .filter(entry => entry.fish && entry.fish.rarity !== "전설" && entry.free > 0).sort((a, b) => a.fish!.price - b.fish!.price);
+  const cookFishList = () => Object.entries(fishStock).filter(([id]) => !fishLocks[id]).map(([id, count]) => ({ id, fish: ALL_FISH.find(item => item.id === id), free: count - (fishReserved[id] ?? 0) }))
+    .filter(entry => entry.fish && entry.fish.rarity !== "전설" && entry.fish.rarity !== "신화" && entry.free > 0).sort((a, b) => a.fish!.price - b.fish!.price);
   const cookFishCount = () => cookFishList().reduce((sum, entry) => sum + entry.free, 0);
   function startCooking(dish: Dish) {
     const missing = dish.ingredients.find(ing => (ing.kind === "crop" ? usableOf(ing.id) : cookFishCount()) < ing.count);
@@ -1257,7 +1257,7 @@ export default function Home() {
     setNotice(next === "store" ? "📦 이제 수확한 작물을 창고에 넣어요. 시세 좋을 때 창고에서 파세요." : "💰 이제 수확하면 바로 팔아요.");
   }
   function sellStoredFish(fishId: string, count: number) {
-    const fish = [...FISH, ...SPECIAL_FISH].find(item => item.id === fishId), reservedCount = fishReserved[fishId] ?? 0;
+    const fish = ALL_FISH.find(item => item.id === fishId), reservedCount = fishReserved[fishId] ?? 0;
     if (fishLocks[fishId]) return setNotice("🔒 잠근 물고기예요. 팔려면 먼저 잠금을 풀어 주세요.");
     const n = Math.min(count, Math.max(0, (fishStock[fishId] ?? 0) - reservedCount));
     if (!fish || n <= 0) return setNotice("📜 미션 예약분은 판매할 수 없어요.");
@@ -1355,11 +1355,11 @@ export default function Home() {
     const rareBoost = Math.min(FISH_BOOST_MAX, fishMul * (1 + 0.2 * pw("cat")));
     let rolled = rollFish(season, { normal: bait.normalBoost * currentSpot.normalBoost, rare: bait.rareBoost * currentSpot.rareBoost * rareBoost, legend: bait.legendBoost * currentRod.legendBoost });
     // 맨손 낚시는 전설도 걸리지 않는다(희귀는 rareBoost 0으로 이미 빠짐).
-    while (bare && rolled.rarity === "전설") rolled = rollFish(season, { normal: currentSpot.normalBoost, rare: 0, legend: 0 });
+    while (bare && (rolled.rarity === "전설" || rolled.rarity === "신화")) rolled = rollFish(season, { normal: currentSpot.normalBoost, rare: 0, legend: 0 });
     // 전설이 아니면, 날씨·장소 조건에 맞는 특별 물고기가 대신 걸릴 수 있다(맨손 제외).
-    const fish = rolled.rarity === "전설" || bare ? rolled : rollSpecialFish(weather?.kind, currentSpot.id) ?? rolled;
+    const fish = rolled.rarity === "전설" || rolled.rarity === "신화" || bare ? rolled : rollSpecialFish(weather?.kind, currentSpot.id) ?? rolled;
     setFishState({ phase: "game", fish, bait });
-    setNotice(`🎣 걸렸다! ${fish.rarity === "전설" ? "엄청난 힘이 느껴져요…!" : "초록 막대 안에 물고기를 가둬요!"}`);
+    setNotice(`🎣 걸렸다! ${fish.rarity === "신화" ? "물속이 금빛으로 일렁여요…!! 이건 뭐지?!" : fish.rarity === "전설" ? "엄청난 힘이 느껴져요…!" : "초록 막대 안에 물고기를 가둬요!"}`);
   }
 
   function finishFishing(result: FishingResult) {
@@ -1373,18 +1373,19 @@ export default function Home() {
       } else { const coins = 150 + Math.floor(Math.random() * 10) * 50; setMoney(value => value + coins); reward = `💰 ${coins.toLocaleString()}원`; }
     }
     if (!result.caught) {
-      setFishState({ phase: "result", text: `줄이 풀려 ${fish.rarity === "전설" ? "전설의 그림자" : `${fish.rarity} 등급 물고기`}가 달아났어요.`, reward });
+      setFishState({ phase: "result", text: `줄이 풀려 ${fish.rarity === "신화" ? "정체 모를 금빛 그림자" : fish.rarity === "전설" ? "전설의 그림자" : `${fish.rarity} 등급 물고기`}가 달아났어요.`, reward });
       return setNotice(`💨 놓쳤어요…${reward ? ` 그래도 보물상자에서 ${josa(reward, "을를")} 얻었어요!` : ""}`);
     }
     const price = Math.round(fish.price * (result.perfect ? 1.25 : 1));
-    setFishLog(log => ({ ...log, [fish.id]: (log[fish.id] ?? 0) + 1 }));
+    // 신화(숨겨진 물고기)는 도감에 기록하지 않는다.
+    if (fish.rarity !== "신화") setFishLog(log => ({ ...log, [fish.id]: (log[fish.id] ?? 0) + 1 }));
     const used = Object.values(produce).reduce((sum, count) => sum + count, 0) + Object.values(fishStock).reduce((sum, count) => sum + count, 0);
     const stored = fishHarvestMode === "store" && used < storageCap;
     if (stored) setFishStock(stock => ({ ...stock, [fish.id]: (stock[fish.id] ?? 0) + 1 }));
     else setMoney(value => value + price);
     setFishState({ phase: "result", fish, bait, perfect: result.perfect, price, stored, reward });
-    playCoinSound(fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" || result.perfect ? [880, 1100, 1320] : [880, 1320]);
-    setNotice(`${fish.rarity === "전설" ? `✨ 전설의 ${josa(fish.name, "을를")} 낚았어요!!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚았어요.`} ${stored ? "📦 통합 창고에 보관했어요." : `${price.toLocaleString()}원에 바로 팔았어요.`}${fishHarvestMode === "store" && !stored ? " 창고가 가득 찼어요." : ""}${reward ? ` · 보물: ${reward}` : ""}`);
+    playCoinSound(fish.rarity === "신화" ? [523, 660, 880, 1100, 1320, 1760, 2093] : fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" || result.perfect ? [880, 1100, 1320] : [880, 1320]);
+    setNotice(`${fish.rarity === "신화" ? `🐲🌈 도감에도 없는 신화의 물고기, ${josa(fish.name, "을를")} 낚았어요!!!` : fish.rarity === "전설" ? `✨ 전설의 ${josa(fish.name, "을를")} 낚았어요!!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚았어요.`} ${stored ? "📦 통합 창고에 보관했어요." : `${price.toLocaleString()}원에 바로 팔았어요.`}${fishHarvestMode === "store" && !stored ? " 창고가 가득 찼어요." : ""}${reward ? ` · 보물: ${reward}` : ""}`);
   }
 
   // ---------- 도박장(홀짝) ----------
@@ -1987,7 +1988,7 @@ export default function Home() {
             <div className="angler">{avatarImg}</div>
             <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
             {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} rod={gameRod} barBonus={fishState.bait?.barBonus ?? 0} onFinish={finishFishing} /></Suspense>}
-            {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : ""}`}>
+            {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : fishState.fish?.rarity === "신화" ? "legend mythic" : ""}`}>
               {fishState.fish ? <>{LEGEND_ART[fishState.fish.id] ? <span className={`legend-fish-art ${LEGEND_ART[fishState.fish.id]}`} role="img" aria-label={fishState.fish.name} /> : <b>{fishState.fish.icon}</b>}<strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트!</span>}<small>{fishState.fish.note}</small><em>{fishState.stored ? "📦 통합 창고 보관" : `＋${(fishState.price ?? fishState.fish.price).toLocaleString()}원`}</em></> : <><b>💨</b><small>{fishState.text}</small></>}
               {fishState.reward && <span className="treasure">🎁 보물상자: {fishState.reward}</span>}
             </div>}
@@ -2311,7 +2312,7 @@ export default function Home() {
             <div className="order-list">{orders.map(order => { const done = doneToday.includes(order.id), canDeliver = !done && order.items.every(item => depositedFor(order, item) + orderHave(item) >= item.count), canDeposit = !done && order.items.some(item => depositedFor(order, item) < item.count && orderHave(item) > 0);
               return <article key={order.id} className={`order ${order.special ? "special" : ""} ${done ? "done" : ""} ${canDeliver ? "ready" : ""}`}>
                 <div className="order-head"><span className="order-npc">{order.npc.icon}</span><div><b>{order.npc.name}{order.special && <em>특별</em>}</b><small>“{order.line}”</small></div></div>
-                <ul className="order-items">{order.items.map(item => { const deposited = depositedFor(order, item), have = Math.min(item.count, deposited + orderHave(item)); const crop = item.kind === "crop" ? CROPS.find(c => c.id === item.cropId) : undefined; const fish = item.kind === "fish" ? [...FISH, ...SPECIAL_FISH].find(f => f.id === item.fishId) : undefined;
+                <ul className="order-items">{order.items.map(item => { const deposited = depositedFor(order, item), have = Math.min(item.count, deposited + orderHave(item)); const crop = item.kind === "crop" ? CROPS.find(c => c.id === item.cropId) : undefined; const fish = item.kind === "fish" ? ALL_FISH.find(f => f.id === item.fishId) : undefined;
                   return <li key={item.kind === "crop" ? item.cropId : item.fishId} className={have >= item.count ? "ok" : ""}><span>{crop ? `${crop.icon} ${crop.name}${item.kind === "crop" && item.minQuality > 0 ? ` ${QUALITIES[item.minQuality].stars} 이상` : ""}` : `${fish?.icon ?? "🐟"} ${fish?.name ?? "물고기"}`}</span><small>{deposited > 0 ? `선납 ${deposited} · ` : ""}{crop ? crop.seasons.join("·") : "낚시"}</small><b>{done ? item.count : have}/{item.count}</b></li>; })}</ul>
                 <div className="order-foot"><span className="order-reward">💰 {order.reward.toLocaleString()}원{order.bonus && <small> + {bonusLabel(order)}</small>}</span>
                   <button onClick={() => depositOrder(order)} disabled={!canDeposit}>{done ? "✅ 납품 완료" : canDeliver ? "📜 전부 납품" : canDeposit ? "📦 보유분 미리 납품" : "재료 모으는 중"}</button></div>
@@ -2331,7 +2332,7 @@ export default function Home() {
               <button aria-pressed={fishHarvestMode === "store"} className={fishHarvestMode === "store" ? "on" : ""} onClick={() => setFishHarvestMode("store")}>📦 창고 보관</button></div>
             <div className="storage-cap"><span>📦 {storageUsed.toLocaleString()} / {storageCap.toLocaleString()}개</span><span className="field-meter"><i style={{ width: `${Math.min(100, (storageUsed / storageCap) * 100)}%` }} /></span></div>
             {storageUsed === 0 ? <p className="empty">창고가 비었어요. “📦 창고 보관”을 고르고 수확하면 여기 쌓여요. 보관 중인 작물은 썩지 않으니 시세가 좋을 때 파세요!</p> : <>
-              {Object.entries(fishStock).filter(([, count]) => count > 0).length > 0 && (() => { const stored = Object.entries(fishStock).filter(([, count]) => count > 0).map(([id, count]) => ({ fish: [...FISH, ...SPECIAL_FISH].find(item => item.id === id), id, count, reserved: fishReserved[id] ?? 0 })).filter(entry => entry.fish).sort((a, b) => b.fish!.price * b.count - a.fish!.price * a.count);
+              {Object.entries(fishStock).filter(([, count]) => count > 0).length > 0 && (() => { const stored = Object.entries(fishStock).filter(([, count]) => count > 0).map(([id, count]) => ({ fish: ALL_FISH.find(item => item.id === id), id, count, reserved: fishReserved[id] ?? 0 })).filter(entry => entry.fish).sort((a, b) => b.fish!.price * b.count - a.fish!.price * a.count);
                 return <div className="fish-store"><b className="tool-shop-sub">🎣 보관한 물고기 · {stored.reduce((sum, entry) => sum + entry.count, 0)}마리</b><div className="fish-grid">{stored.map(({ fish, id, count, reserved }) => { const free = count - reserved;
                   const locked = Boolean(fishLocks[id]);
                   return <div key={id} className={`fish-card rarity-${fish!.rarity} ${locked ? "locked" : ""}`}><button className="fish-lock" onClick={() => setFishLocks(all => ({ ...all, [id]: !locked }))} aria-pressed={locked} title={locked ? "잠금 해제(팔 수 있게)" : "잠그기(팔기·요리에서 제외)"}>{locked ? "🔒" : "🔓"}</button><span className="fish-card-icon">{fish!.icon}</span><span className="fish-card-info"><b>{fish!.name} <em>×{count}</em></b><small>{fish!.rarity} · 마리당 {fish!.price.toLocaleString()}원</small>{reserved > 0 && <i className="reserve-tag">📜 미션 예약 {reserved}</i>}</span>

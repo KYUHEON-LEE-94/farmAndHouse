@@ -11,14 +11,14 @@ const BEHAVIORS: Behavior[] = ["smooth", "mixed", "sinker", "floater", "dart"];
 
 /** 등급별 난이도(0~100). 같은 등급 안에서도 물고기마다 조금씩 다르다. */
 export function fishDifficulty(fish: Fish) {
-  const base = { 흔함: 15, 보통: 40, 희귀: 72, 전설: 100 }[fish.rarity];
+  const base = { 흔함: 15, 보통: 40, 희귀: 72, 전설: 100, 신화: 100 }[fish.rarity];
   const jitter = ([...fish.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 17) - 8;
   return Math.max(10, Math.min(100, base + jitter));
 }
 
 /** 물고기 움직임 성향. 전설은 항상 이리저리 튀는 "dart". */
 export function fishBehavior(fish: Fish): Behavior {
-  if (fish.rarity === "전설") return "dart";
+  if (fish.rarity === "전설" || fish.rarity === "신화") return "dart";
   const hash = [...fish.id].reduce((sum, char) => sum + char.charCodeAt(0) * 7, 0);
   return fish.rarity === "흔함" ? (hash % 2 ? "smooth" : "floater") : BEHAVIORS[hash % BEHAVIORS.length];
 }
@@ -113,7 +113,7 @@ export default function FishingGame({ fish, rod, barBonus, onFinish }: { fish: F
       <div className="fg-rod" />
       <div className="fg-track" ref={trackRef}>
         <div className="fg-bar" ref={barRef} />
-        <span className={`fg-fish fg-${fish.rarity}`} ref={fishRef}>{fish.rarity === "전설" ? "✨" : fish.rarity === "희귀" ? "🐠" : "🐟"}</span>
+        <span className={`fg-fish fg-${fish.rarity}`} ref={fishRef}>{fish.rarity === "신화" ? "🐲" : fish.rarity === "전설" ? "✨" : fish.rarity === "희귀" ? "🐠" : "🐟"}</span>
         <span className="fg-chest" ref={chestRef}>🎁<i><b ref={chestFillRef} /></i></span>
       </div>
       <div className="fg-meter"><div ref={progressRef} style={{ height: "35%" }} /></div>
