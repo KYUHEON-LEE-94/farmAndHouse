@@ -300,6 +300,8 @@ export default function Home() {
   // 가공 공방: 담그는 중인 작업, 만든 가공품
   const [workshop, setWorkshop] = useState<Workshop>(EMPTY_WORKSHOP);
   const [goods, setGoods] = useState<Record<string, number>>({});
+  // 통합 창고는 화면 가운데 큰 팝업으로 띄운다(E 키로 열고 닫기).
+  const [showStorage, setShowStorage] = useState(false);
   const [sellConfirm, setSellConfirm] = useState<{ kind: "market" | "coop"; cropId?: string } | null>(null);
   const [harvestMode, setHarvestMode] = useState<"sell" | "store">("store");
   const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders" | "workshop">("seed");
@@ -460,7 +462,7 @@ export default function Home() {
   const today = now.toDateString();
   // 파산: 가장 싼 제철 씨앗도 못 사고, 밭에 이번 계절 작물이 없고, 미끼도 없을 때.
   const broke = loaded && money < Math.min(...available.map(crop => Math.round(crop.seed * seedMul * (1 - 0.05 * pw("rabbit"))))) && noBait && !plots.some(plot => plot && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod);
-  const showBailout = broke && isWorkTime && lastBailout !== today && !activeEvent && !offWork && !spotConfirm && !bossMode && !showSettings && !showAvatar && !showAccount && guideStep === null && (fishState.phase === "idle" || fishState.phase === "result");
+  const showBailout = broke && isWorkTime && lastBailout !== today && !activeEvent && !offWork && !spotConfirm && !bossMode && !showSettings && !showAvatar && !showAccount && !showStorage && guideStep === null && (fishState.phase === "idle" || fishState.phase === "result");
   function takeBailout() {
     setMoney(value => value + BAILOUT_AMOUNT); setLastBailout(today); playCoinSound([523, 659, 784]);
     setNotice(`🦝 "옛다 ${BAILOUT_AMOUNT}원~ 모자라면 낚시터 가서 맨손으로 잡아 와 ㅋㅋ" (지원금은 하루 한 번)`);
@@ -493,7 +495,7 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -616,7 +618,7 @@ export default function Home() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.key === "e" || event.key === "E") && !(event.target instanceof Element && event.target.closest("input, textarea, select, .house3d-wrap"))) {
-        event.preventDefault(); setTab("farm"); setSidePanel("storage");
+        event.preventDefault(); setShowStorage(open => !open);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1839,7 +1841,7 @@ export default function Home() {
         <aside className="seed-panel panel">
           <div className="side-tabs" role="tablist" aria-label="씨앗과 창고">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗</button>
-            <button role="tab" aria-selected={sidePanel === "storage"} className={sidePanel === "storage" ? "on" : ""} onClick={() => setSidePanel("storage")}>📦 창고 <small>{storageUsed}/{storageCap}</small></button>
+            <button role="tab" aria-selected={showStorage} className={showStorage ? "on" : ""} onClick={() => setShowStorage(true)}>📦 창고 <small>{storageUsed}/{storageCap}</small></button>
             <button role="tab" aria-selected={sidePanel === "orders"} className={`${sidePanel === "orders" ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => setSidePanel("orders")}>📜 주문 <small>{doneToday.length}/{orders.length}</small>{readyOrders > 0 && <i className="tab-dot" aria-label={`납품 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
             <button role="tab" aria-selected={sidePanel === "workshop"} className={sidePanel === "workshop" ? "on" : ""} onClick={() => setSidePanel("workshop")}>🏺 가공 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot" aria-label={`다 된 가공 ${doneJobs}건`}>{doneJobs}</i>}</button>
           </div>
@@ -1874,42 +1876,7 @@ export default function Home() {
                 <div className="order-foot"><span className="order-reward">💰 {order.reward.toLocaleString()}원{order.bonus && <small> + {bonusLabel(order)}</small>}</span>
                   <button onClick={() => depositOrder(order)} disabled={!canDeposit}>{done ? "✅ 납품 완료" : canDeliver ? "📜 전부 납품" : canDeposit ? "📦 보유분 미리 납품" : "재료 모으는 중"}</button></div>
               </article>; })}</div>
-          </div> : <div className="storage-view">
-            <div className="panel-heading"><div><span className="eyebrow">GLOBAL STORAGE · E</span><h3>농사·낚시 통합 창고</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
-            <div className="harvest-mode" role="group" aria-label="수확한 작물 처리"><span>🌾 농사</span>
-              <button aria-pressed={harvestMode === "sell"} className={harvestMode === "sell" ? "on" : ""} onClick={() => harvestMode !== "sell" && toggleHarvestMode()}>💰 바로 판매</button>
-              <button aria-pressed={harvestMode === "store"} className={harvestMode === "store" ? "on" : ""} onClick={() => harvestMode !== "store" && toggleHarvestMode()}>📦 창고 보관</button></div>
-            <div className="harvest-mode" role="group" aria-label="잡은 물고기 처리"><span>🎣 낚시</span>
-              <button aria-pressed={fishHarvestMode === "sell"} className={fishHarvestMode === "sell" ? "on" : ""} onClick={() => setFishHarvestMode("sell")}>💰 바로 판매</button>
-              <button aria-pressed={fishHarvestMode === "store"} className={fishHarvestMode === "store" ? "on" : ""} onClick={() => setFishHarvestMode("store")}>📦 창고 보관</button></div>
-            <div className="storage-cap"><span>📦 {storageUsed.toLocaleString()} / {storageCap.toLocaleString()}개</span><span className="field-meter"><i style={{ width: `${Math.min(100, (storageUsed / storageCap) * 100)}%` }} /></span></div>
-            {storageUsed === 0 ? <p className="empty">창고가 비었어요. “📦 창고 보관”을 고르고 수확하면 여기 쌓여요. 보관 중인 작물은 썩지 않으니 시세가 좋을 때 파세요!</p> : <>
-              {Object.entries(fishStock).filter(([, count]) => count > 0).length > 0 && <div className="goods-list"><b className="tool-shop-sub">🎣 보관한 물고기</b>{Object.entries(fishStock).filter(([, count]) => count > 0).map(([id, count]) => { const fish = [...FISH, ...SPECIAL_FISH].find(item => item.id === id); const reserved = fishReserved[id] ?? 0; return fish && <div key={id} className="goods-item"><span>{fish.icon}</span><b>{fish.name} ×{count}{reserved > 0 && <small> · 📜 미션 예약 {reserved}</small>}</b><small>마리당 {fish.price.toLocaleString()}원</small><button onClick={() => sellStoredFish(id, 1)} disabled={count - reserved < 1}>1마리</button><button className="all" onClick={() => sellStoredFish(id, count - reserved)} disabled={count - reserved < 1}>{count - reserved}마리 팔기</button></div>; })}</div>}
-              <div className="storage-tools">
-                <select value={storageSort} onChange={event => setStorageSort(event.target.value as typeof storageSort)} aria-label="정렬"><option value="value">가치순</option><option value="count">수량순</option><option value="name">이름순</option></select>
-                {([["all", "전체"], ["order", "📜 주문 재료"], ["calm", "📈 포화 아님"], ["golden", "✨ 황금"]] as const).map(([id, label]) => <button key={id} className={storageFilter === id ? "on" : ""} onClick={() => setStorageFilter(id)} aria-pressed={storageFilter === id}>{label}</button>)}
-              </div>
-              <div className="storage-list">{storageBoxes.length === 0 ? <p className="empty">이 조건에 맞는 작물이 없어요.</p> : storageBoxes.map(box => <div key={box.crop.id} className={`crop-box ${box.trend.best ? "best" : ""}`}>
-                <div className="crop-box-head"><span className="stack-icon">{box.crop.icon}</span>
-                  <span className="stack-info"><b>{box.crop.name} <em>×{box.total}</em>{box.reservedCount > 0 && <i className="reserve-tag">📜 주문 예약 {box.reservedCount}</i>}</b>
-                    <small>{box.trend.label}{box.sat > 0 ? <b className="sat-badge"> · 📉 포화 -{box.sat}%</b> : box.free < FREE_PER_CYCLE ? <b className="free-badge"> · 정상가 {box.free}개 남음</b> : null}</small>
-                    <span className="spark" aria-hidden="true">{box.trend.history.map((value, i) => <i key={i} className={i === box.trend.history.length - 1 ? "now" : ""} style={{ height: `${20 + ((value - box.trend.min) / Math.max(1, box.trend.max - box.trend.min)) * 80}%` }} />)}</span></span></div>
-                <ul className="quality-rows">{box.rows.map(row => <li key={row.key} className={`${row.golden ? "golden" : ""} ${row.locked ? "locked" : ""}`}>
-                  <button className="lock" onClick={() => toggleLock(row.key)} aria-pressed={row.locked} title={row.locked ? "잠금 해제(팔 수 있게)" : "잠그기(전부 팔기·농협 출하에서 제외)"}>{row.locked ? "🔒" : "🔓"}</button>
-                  <span className="q-name">{row.golden ? "✨ 황금" : row.quality.name}{row.quality.stars ? ` ${row.quality.stars}` : ""}</span>
-                  <span className="q-count">{row.count}개{row.reserved > 0 && <small> (예약 {row.reserved})</small>}</span>
-                  <span className="q-price">개당 {row.unit.toLocaleString()}원</span>
-                  <span className="q-actions"><button onClick={() => sellProduce(row.key, 1)} disabled={row.sellable < 1}>1개</button><button className="all" onClick={() => sellProduce(row.key, row.sellable)} disabled={row.sellable < 1}>{row.sellable}개 팔기</button></span>
-                </li>)}</ul>
-                <div className="crop-box-foot"><span>팔 수 있는 {box.sellableCount}개 · 약 {box.value.toLocaleString()}원</span><button onClick={() => setSellConfirm({ kind: "coop", cropId: box.crop.id })} disabled={box.sellableCount < 1}>🏦 이 작물만 농협 출하</button></div>
-              </div>)}</div>
-              <div className="market-slots" aria-label="시장 포화 슬롯">{market.slots.length ? <>📉 포화 중: {market.slots.map(slot => { const crop = CROPS.find(c => c.id === slot.id); return <span key={slot.id}>{crop?.icon} -{Math.round(Math.min(SAT_MAX, slot.units * 0.02) * 100)}%</span>; })}<small>(최대 3종 · 5분마다 오래된 것부터 풀림)</small></> : <>📈 지금 포화된 작물이 없어요 · 작물마다 5분에 {FREE_PER_CYCLE}개까지 정상가</>}</div>
-              <button className="save-button sell-all" onClick={() => setSellConfirm({ kind: "market" })}>💰 창고 전부 팔기 <small>(잠금·주문 예약분 제외)</small></button>
-              <button className="ghost-button coop-button" onClick={() => setSellConfirm({ kind: "coop" })}>🏦 농협 일괄 출하 <small>(기준가 {Math.round(COOP_RATE * 100)}%, 포화 없음, 잠금·예약분 제외)</small></button>
-            </>}
-            <div className="field-shop"><div><b>📦 창고 넓히기</b><small>{storageCap >= STORAGE_MAX ? "최대 크기" : `${storagePrice(storageCap).toLocaleString()}원 · +${STORAGE_STEP}개 (${storageCap}/${STORAGE_MAX})`}</small><span className="field-meter"><i style={{ width: `${(storageCap / STORAGE_MAX) * 100}%` }} /></span></div><button onClick={expandStorage} disabled={storageCap >= STORAGE_MAX}>구매</button></div>
-            <p className="hint">농산물과 물고기가 같은 총 보관 수량을 사용해요. 잠금은 품질과 관계없이 직접 선택하며, 오늘 미션에 필요한 수량은 📜 예약되어 판매에서 빠져요.</p>
-          </div>}
+          </div> : null}
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `${fieldPrice(ownedPlots).toLocaleString()}원 · ${ownedPlots}/${MAX_PLOTS}칸`}</small><span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span></div><button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>구매</button></div>
           <div className="tool-shop">
             <div className="tool-shop-tabs" role="tablist" aria-label="도구 상점">{([["seed", "🌱 심기"], ["hand", "🧺 수확"], ["water", "🚿 물"], ["fert", "🌿 거름"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={toolShop === id} className={toolShop === id ? "on" : ""} onClick={() => setToolShop(id)}>{label}</button>)}</div>
@@ -2209,7 +2176,7 @@ export default function Home() {
 
       <div className="global-quick-actions" aria-label="공용 기능">
         <button onClick={() => { setTab("farm"); setSidePanel("orders"); }}>📜 미션 <small>{doneToday.length}/{orders.length}{readyOrders ? ` · ${readyOrders}건 완료 가능` : ""}</small></button>
-        <button onClick={() => { setTab("farm"); setSidePanel("storage"); }}>📦 통합 창고 <kbd>E</kbd><small>{storageUsed}/{storageCap}</small></button>
+        <button onClick={() => setShowStorage(true)}>📦 통합 창고 <kbd>E</kbd><small>{storageUsed}/{storageCap}</small></button>
       </div>
 
       <section className="bottom-dock">
@@ -2242,6 +2209,46 @@ export default function Home() {
         <h3 id="spot-title">{spotConfirm.name}에 입장할까요?</h3>
         <p>입장권 <b>{spotConfirm.price.toLocaleString()}원</b> · {spotConfirm.minutes}분 동안 낚시할 수 있어요.<br />{spotConfirm.note}{SPECIAL_FISH.some(fish => fish.spot === spotConfirm.id) ? ` · 이곳에서만 ${SPECIAL_FISH.find(fish => fish.spot === spotConfirm.id)!.name}이(가) 잡혀요` : ""}</p>
         <div className="spot-modal-actions"><button className="ghost-button" onClick={() => setSpotConfirm(null)}>그만두기</button><button className="save-button" onClick={() => chooseSpot(spotConfirm)} disabled={money < spotConfirm.price}>{money < spotConfirm.price ? "돈이 모자라요" : `🎫 입장권 사고 입장 (${spotConfirm.price.toLocaleString()}원)`}</button></div>
+      </section></div>}
+
+      {showStorage && <div className="modal-backdrop storage-backdrop"><section className="modal storage-modal" role="dialog" aria-modal="true" aria-labelledby="storage-title">
+        <button className="modal-close" onClick={() => setShowStorage(false)} aria-label="창고 닫기 (E)">×</button>
+        <div className="storage-view big">
+            <div className="panel-heading"><div><span className="eyebrow">GLOBAL STORAGE · E</span><h3 id="storage-title">농사·낚시 통합 창고</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
+            <div className="harvest-mode" role="group" aria-label="수확한 작물 처리"><span>🌾 농사</span>
+              <button aria-pressed={harvestMode === "sell"} className={harvestMode === "sell" ? "on" : ""} onClick={() => harvestMode !== "sell" && toggleHarvestMode()}>💰 바로 판매</button>
+              <button aria-pressed={harvestMode === "store"} className={harvestMode === "store" ? "on" : ""} onClick={() => harvestMode !== "store" && toggleHarvestMode()}>📦 창고 보관</button></div>
+            <div className="harvest-mode" role="group" aria-label="잡은 물고기 처리"><span>🎣 낚시</span>
+              <button aria-pressed={fishHarvestMode === "sell"} className={fishHarvestMode === "sell" ? "on" : ""} onClick={() => setFishHarvestMode("sell")}>💰 바로 판매</button>
+              <button aria-pressed={fishHarvestMode === "store"} className={fishHarvestMode === "store" ? "on" : ""} onClick={() => setFishHarvestMode("store")}>📦 창고 보관</button></div>
+            <div className="storage-cap"><span>📦 {storageUsed.toLocaleString()} / {storageCap.toLocaleString()}개</span><span className="field-meter"><i style={{ width: `${Math.min(100, (storageUsed / storageCap) * 100)}%` }} /></span></div>
+            {storageUsed === 0 ? <p className="empty">창고가 비었어요. “📦 창고 보관”을 고르고 수확하면 여기 쌓여요. 보관 중인 작물은 썩지 않으니 시세가 좋을 때 파세요!</p> : <>
+              {Object.entries(fishStock).filter(([, count]) => count > 0).length > 0 && <div className="goods-list"><b className="tool-shop-sub">🎣 보관한 물고기</b>{Object.entries(fishStock).filter(([, count]) => count > 0).map(([id, count]) => { const fish = [...FISH, ...SPECIAL_FISH].find(item => item.id === id); const reserved = fishReserved[id] ?? 0; return fish && <div key={id} className="goods-item"><span>{fish.icon}</span><b>{fish.name} ×{count}{reserved > 0 && <small> · 📜 미션 예약 {reserved}</small>}</b><small>마리당 {fish.price.toLocaleString()}원</small><button onClick={() => sellStoredFish(id, 1)} disabled={count - reserved < 1}>1마리</button><button className="all" onClick={() => sellStoredFish(id, count - reserved)} disabled={count - reserved < 1}>{count - reserved}마리 팔기</button></div>; })}</div>}
+              <div className="storage-tools">
+                <select value={storageSort} onChange={event => setStorageSort(event.target.value as typeof storageSort)} aria-label="정렬"><option value="value">가치순</option><option value="count">수량순</option><option value="name">이름순</option></select>
+                {([["all", "전체"], ["order", "📜 주문 재료"], ["calm", "📈 포화 아님"], ["golden", "✨ 황금"]] as const).map(([id, label]) => <button key={id} className={storageFilter === id ? "on" : ""} onClick={() => setStorageFilter(id)} aria-pressed={storageFilter === id}>{label}</button>)}
+              </div>
+              <div className="storage-list">{storageBoxes.length === 0 ? <p className="empty">이 조건에 맞는 작물이 없어요.</p> : storageBoxes.map(box => <div key={box.crop.id} className={`crop-box ${box.trend.best ? "best" : ""}`}>
+                <div className="crop-box-head"><span className="stack-icon">{box.crop.icon}</span>
+                  <span className="stack-info"><b>{box.crop.name} <em>×{box.total}</em>{box.reservedCount > 0 && <i className="reserve-tag">📜 주문 예약 {box.reservedCount}</i>}</b>
+                    <small>{box.trend.label}{box.sat > 0 ? <b className="sat-badge"> · 📉 포화 -{box.sat}%</b> : box.free < FREE_PER_CYCLE ? <b className="free-badge"> · 정상가 {box.free}개 남음</b> : null}</small>
+                    <span className="spark" aria-hidden="true">{box.trend.history.map((value, i) => <i key={i} className={i === box.trend.history.length - 1 ? "now" : ""} style={{ height: `${20 + ((value - box.trend.min) / Math.max(1, box.trend.max - box.trend.min)) * 80}%` }} />)}</span></span></div>
+                <ul className="quality-rows">{box.rows.map(row => <li key={row.key} className={`${row.golden ? "golden" : ""} ${row.locked ? "locked" : ""}`}>
+                  <button className="lock" onClick={() => toggleLock(row.key)} aria-pressed={row.locked} title={row.locked ? "잠금 해제(팔 수 있게)" : "잠그기(전부 팔기·농협 출하에서 제외)"}>{row.locked ? "🔒" : "🔓"}</button>
+                  <span className="q-name">{row.golden ? "✨ 황금" : row.quality.name}{row.quality.stars ? ` ${row.quality.stars}` : ""}</span>
+                  <span className="q-count">{row.count}개{row.reserved > 0 && <small> (예약 {row.reserved})</small>}</span>
+                  <span className="q-price">개당 {row.unit.toLocaleString()}원</span>
+                  <span className="q-actions"><button onClick={() => sellProduce(row.key, 1)} disabled={row.sellable < 1}>1개</button><button className="all" onClick={() => sellProduce(row.key, row.sellable)} disabled={row.sellable < 1}>{row.sellable}개 팔기</button></span>
+                </li>)}</ul>
+                <div className="crop-box-foot"><span>팔 수 있는 {box.sellableCount}개 · 약 {box.value.toLocaleString()}원</span><button onClick={() => setSellConfirm({ kind: "coop", cropId: box.crop.id })} disabled={box.sellableCount < 1}>🏦 이 작물만 농협 출하</button></div>
+              </div>)}</div>
+              <div className="market-slots" aria-label="시장 포화 슬롯">{market.slots.length ? <>📉 포화 중: {market.slots.map(slot => { const crop = CROPS.find(c => c.id === slot.id); return <span key={slot.id}>{crop?.icon} -{Math.round(Math.min(SAT_MAX, slot.units * 0.02) * 100)}%</span>; })}<small>(최대 3종 · 5분마다 오래된 것부터 풀림)</small></> : <>📈 지금 포화된 작물이 없어요 · 작물마다 5분에 {FREE_PER_CYCLE}개까지 정상가</>}</div>
+              <button className="save-button sell-all" onClick={() => setSellConfirm({ kind: "market" })}>💰 창고 전부 팔기 <small>(잠금·주문 예약분 제외)</small></button>
+              <button className="ghost-button coop-button" onClick={() => setSellConfirm({ kind: "coop" })}>🏦 농협 일괄 출하 <small>(기준가 {Math.round(COOP_RATE * 100)}%, 포화 없음, 잠금·예약분 제외)</small></button>
+            </>}
+            <div className="field-shop"><div><b>📦 창고 넓히기</b><small>{storageCap >= STORAGE_MAX ? "최대 크기" : `${storagePrice(storageCap).toLocaleString()}원 · +${STORAGE_STEP}개 (${storageCap}/${STORAGE_MAX})`}</small><span className="field-meter"><i style={{ width: `${(storageCap / STORAGE_MAX) * 100}%` }} /></span></div><button onClick={expandStorage} disabled={storageCap >= STORAGE_MAX}>구매</button></div>
+            <p className="hint">농산물과 물고기가 같은 총 보관 수량을 사용해요. 잠금은 품질과 관계없이 직접 선택하며, 오늘 미션에 필요한 수량은 📜 예약되어 판매에서 빠져요.</p>
+          </div>
       </section></div>}
 
       {sellConfirm && sellPreview && <div className="modal-backdrop"><section className="modal sell-modal" role="dialog" aria-labelledby="sell-title">

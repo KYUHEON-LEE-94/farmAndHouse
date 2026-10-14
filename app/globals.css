@@ -610,3 +610,19 @@ button { color:inherit; }
 .global-quick-actions{position:fixed;left:22px;bottom:92px;z-index:55;display:flex;gap:8px}.global-quick-actions button{display:flex;align-items:center;gap:7px;border:1px solid #d8d2c2;border-radius:16px;padding:10px 14px;background:#fffdf7;box-shadow:0 8px 24px #24392c2b;color:#21372b;font-weight:800}.global-quick-actions small{color:#768276;font-weight:600}.global-quick-actions kbd{border-radius:5px;background:#21372b;color:white;padding:2px 6px;font:700 11px inherit}
 @media(max-width:700px){.global-quick-actions{left:10px;bottom:82px;flex-direction:column;align-items:flex-start}.global-quick-actions button{padding:8px 11px}.global-quick-actions small{display:none}}
 .legend-fish-art{display:block;width:190px;height:145px;background-image:url('/images/fish/legendary-fish-sprite.png');background-repeat:no-repeat;background-size:200% 200%;filter:drop-shadow(0 5px 4px #6d431f26)}.legend-fish-art.spring{background-position:0 0}.legend-fish-art.summer{background-position:100% 0}.legend-fish-art.autumn{background-position:0 100%}.legend-fish-art.winter{background-position:100% 100%}.legend-fish-art.book{width:82px;height:66px;margin:auto}
+
+/* 통합 창고 팝업: 넓게, 작물 상자를 여러 열로 */
+.storage-modal{width:min(1180px,calc(100vw - 32px));max-width:none;max-height:calc(100vh - 48px);overflow:auto;padding:22px 24px}
+.sell-modal{z-index:2}
+.storage-backdrop{z-index:80}
+.storage-view.big{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.storage-view.big>*{flex:1 1 100%}
+.storage-view.big>.harvest-mode{flex:1 1 300px;margin:0}
+.storage-view.big>.storage-cap{flex:1 1 260px;margin:0}
+.storage-view.big .storage-tools{margin:0}
+.storage-view.big .storage-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.storage-view.big .crop-box{align-content:start}
+.storage-view.big>.sell-all,.storage-view.big>.coop-button{flex:1 1 300px;width:auto;margin:0}
+.storage-view.big>.field-shop{flex:1 1 360px;margin:0}
+.storage-view.big>.hint{flex:2 1 360px;margin:0}
+@media(max-width:860px){.storage-modal{padding:16px}}
