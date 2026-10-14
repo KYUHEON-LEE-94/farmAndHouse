@@ -328,7 +328,7 @@ function placeItem(group: THREE.Group, item: PlacedItem, room: Room, hosts?: Hos
     group.rotation.set(0, theta + (side < 0 ? Math.PI : 0), 0);
     return;
   }
-  if (item.kind !== "wall") { group.position.set(item.x, storyY(item), item.z); group.rotation.set(0, THREE.MathUtils.degToRad(item.rot), 0); return; }
+  if (item.kind !== "wall") { group.position.set(item.x, storyY(item), item.z); group.rotation.set(0, THREE.MathUtils.degToRad(item.rot), 0); group.scale.set(item.sx ?? 1, 1, item.sz ?? 1); return; }
   const wall = wallInfo(room.points, item.wall ?? 0), u = item.u ?? 0.5;
   group.position.set(wall.start[0] + wall.dir[0] * wall.length * u + wall.normal[0] * (item.size[2] / 2 + 0.01), storyY(item) + (item.h ?? item.mount ?? 1.4), wall.start[1] + wall.dir[1] * wall.length * u + wall.normal[1] * (item.size[2] / 2 + 0.01));
   group.rotation.set(0, Math.atan2(wall.normal[0], wall.normal[1]), 0);
@@ -581,7 +581,7 @@ export default function House3D(props: Props) {
         if (entry) { ctx.furniture.remove(entry.group); disposeTree(entry.group); }
         entry = { group: buildItem(item), key }; ctx.items.set(item.instanceId, entry); ctx.furniture.add(entry.group);
       }
-      const posKey = `${item.x},${item.z},${item.rot},${item.story ?? 0},${item.wall},${item.u},${item.h}`;
+      const posKey = `${item.x},${item.z},${item.rot},${item.story ?? 0},${item.wall},${item.u},${item.h},${item.sx},${item.sz}`;
       if (!item.pet || entry.group.userData.posKey !== posKey) placeItem(entry.group, item, room, hosts);
       entry.group.userData.posKey = posKey;
       entry.group.userData.wall = item.kind === "wall" && !(item.host && hosts.has(item.host)) ? item.wall ?? 0 : undefined;

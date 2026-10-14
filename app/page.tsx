@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
+import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme, isResizable, RUG_SCALE } from "./house";
 import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, WEATHER_RETRY_SECONDS, fetchWeather, weatherEffect, type WeatherState } from "./weather";
 import { ALL_FISH, BAITS, BARE_HAND, FISH, LEGEND_CHANCE, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
@@ -222,13 +222,13 @@ function getYoutubeId(value: string) {
   return "";
 }
 
-type LegacyItem = { id: string; instanceId: string; x: number; y?: number; z?: number; rot?: number; tint?: string; wall?: number; u?: number; h?: number; story?: number; host?: string; side?: number; locked?: boolean; nickname?: string };
+type LegacyItem = { id: string; instanceId: string; x: number; y?: number; z?: number; rot?: number; tint?: string; wall?: number; u?: number; h?: number; story?: number; host?: string; side?: number; locked?: boolean; nickname?: string; sx?: number; sz?: number };
 
 /** 저장된 가구를 최신 카탈로그와 합친다. 버전 5 미만의 2D 좌표(%)는 3D 방 좌표(m)로 옮긴다. */
 function hydrateItem(raw: LegacyItem, version: number, room: Room): PlacedItem | null {
   const base = FURNITURE.find(item => item.id === raw.id);
   if (!base) return null;
-  if (version >= 5) return { ...base, instanceId: raw.instanceId, x: raw.x, z: raw.z ?? 0, rot: raw.rot ?? 0, tint: raw.tint, wall: raw.wall, u: raw.u, h: raw.h, story: raw.story, host: raw.host, side: raw.side, locked: raw.locked, nickname: raw.nickname };
+  if (version >= 5) return { ...base, instanceId: raw.instanceId, x: raw.x, z: raw.z ?? 0, rot: raw.rot ?? 0, tint: raw.tint, wall: raw.wall, u: raw.u, h: raw.h, story: raw.story, host: raw.host, side: raw.side, locked: raw.locked, nickname: raw.nickname, sx: raw.sx, sz: raw.sz };
   let x = raw.x, y = raw.y ?? 50;
   if (version < 3 && x <= 10) { x = 14 + x * 14; y = 20 + y * 28; }
   if (version < 4) y = ((y - 10) / 81) * 100;
@@ -2224,6 +2224,10 @@ export default function Home() {
               <input type="range" min="0" max="355" step="5" value={Math.round(selectedItem.rot)} onChange={event => rotateSelected(null, Number(event.target.value))} aria-label="회전 각도" />
               <b>{Math.round(selectedItem.rot)}°</b>
               <button onClick={() => rotateSelected(15)}>↻15°</button><button onClick={() => rotateSelected(45)}>↻45°</button>
+            </div>}
+            {selectedItem && isResizable(selectedItem) && <div className="rotate-row size-row" role="group" aria-label="러그 크기">
+              {(["sx", "sz"] as const).map(axis => <label key={axis}>{axis === "sx" ? "가로" : "세로"}<input type="range" min={RUG_SCALE.min} max={RUG_SCALE.max} step={RUG_SCALE.step} value={selectedItem[axis] ?? 1} onChange={event => updateItem(selectedItem.instanceId, { [axis]: Number(event.target.value) })} aria-label={`러그 ${axis === "sx" ? "가로" : "세로"} 크기`} /><b>×{(selectedItem[axis] ?? 1).toFixed(1)}</b></label>)}
+              <button onClick={() => updateItem(selectedItem.instanceId, { sx: undefined, sz: undefined })}>원래 크기</button>
             </div>}
             {selectedItem && <div className="tint-row" role="group" aria-label="가구 색상">{TINTS.map(color => <button key={color} className={`tint ${(selectedItem.tint ?? selectedItem.color) === color ? "on" : ""}`} style={{ background: color }} onClick={() => updateItem(selectedItem.instanceId, { tint: color })} aria-label={`색상 ${color}`} />)}<button className="tint reset" onClick={() => updateItem(selectedItem.instanceId, { tint: undefined })} aria-label="기본 색상">↺</button><button className="tint more" onClick={() => setShowPicker(on => !on)} aria-label="더 많은 색" aria-expanded={showPicker} style={{ background: selectedItem.tint ?? selectedItem.color }}>🎨</button></div>}
             {selectedItem && showPicker && <ColorPicker key={selectedItem.instanceId} value={selectedItem.tint ?? selectedItem.color} onChange={hex => updateItem(selectedItem.instanceId, { tint: hex })} onClose={() => setShowPicker(false)} />}

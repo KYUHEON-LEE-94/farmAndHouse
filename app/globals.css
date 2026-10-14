@@ -712,3 +712,8 @@ button { color:inherit; }
 .rarity-신화{background:linear-gradient(90deg,#ffe08a,#f7a8d8,#a8d8ff);color:#5a3a00;font-weight:700}
 .fish-card.rarity-신화{border-color:#d9a400;background:linear-gradient(135deg,#fff6d6,#ffe3f3,#e3f2ff)}
 .catch-card.mythic{background:linear-gradient(135deg,#fff6d6,#ffe3f3,#e3f2ff);box-shadow:0 0 0 3px #e8c35a,0 0 28px rgba(232,195,90,.7)}
+
+/* 러그 크기 조절 */
+.size-row{flex-basis:100%;width:100%;flex-wrap:wrap}
+.size-row label{white-space:nowrap;display:flex;align-items:center;gap:6px;flex:1;min-width:150px;font:700 12px "Gowun Dodum"}
+.size-row label input{flex:1}
