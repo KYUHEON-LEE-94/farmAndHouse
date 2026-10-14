@@ -20,6 +20,19 @@ export const CROPS: Crop[] = [
   { id: "spinach", name: "시금치", icon: "🌿", seasons: ["겨울"], seed: 30, sell: 80, seconds: 20, difficulty: "쉬움" },
   { id: "greenonion", name: "대파", icon: "🧅", seasons: ["겨울"], seed: 50, sell: 130, seconds: 36, difficulty: "보통" },
   { id: "tangerine", name: "감귤", icon: "🍊", seasons: ["겨울"], seed: 120, sell: 360, seconds: 58, difficulty: "어려움" },
+  { id: "pea", name: "완두콩", icon: "🫛", seasons: ["봄"], seed: 30, sell: 75, seconds: 22, difficulty: "쉬움" },
+  { id: "broccoli", name: "브로콜리", icon: "🥦", seasons: ["봄", "겨울"], seed: 50, sell: 140, seconds: 34, difficulty: "보통" },
+  { id: "cherry", name: "체리", icon: "🍒", seasons: ["봄"], seed: 105, sell: 300, seconds: 52, difficulty: "어려움" },
+  { id: "cucumber", name: "오이", icon: "🥒", seasons: ["여름"], seed: 30, sell: 76, seconds: 22, difficulty: "쉬움" },
+  { id: "pepper", name: "고추", icon: "🌶️", seasons: ["여름"], seed: 50, sell: 140, seconds: 34, difficulty: "보통" },
+  { id: "koreanmelon", name: "참외", icon: "🍈", seasons: ["여름"], seed: 65, sell: 180, seconds: 40, difficulty: "보통" },
+  { id: "peach", name: "복숭아", icon: "🍑", seasons: ["여름"], seed: 115, sell: 330, seconds: 56, difficulty: "어려움" },
+  { id: "peanut", name: "땅콩", icon: "🥜", seasons: ["가을"], seed: 35, sell: 85, seconds: 24, difficulty: "쉬움" },
+  { id: "grape", name: "포도", icon: "🍇", seasons: ["가을"], seed: 70, sell: 190, seconds: 42, difficulty: "보통" },
+  { id: "apple", name: "사과", icon: "🍎", seasons: ["가을"], seed: 110, sell: 320, seconds: 55, difficulty: "어려움" },
+  { id: "pinemushroom", name: "송이버섯", icon: "🍄", seasons: ["가을"], seed: 140, sell: 380, seconds: 60, difficulty: "어려움" },
+  { id: "garlic", name: "마늘", icon: "🧄", seasons: ["겨울"], seed: 35, sell: 86, seconds: 24, difficulty: "쉬움" },
+  { id: "ginger", name: "생강", icon: "🫚", seasons: ["겨울"], seed: 60, sell: 170, seconds: 40, difficulty: "보통" },
 ];
 
 export const FERTILIZERS: Fertilizer[] = [

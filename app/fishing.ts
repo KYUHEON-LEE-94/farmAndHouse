@@ -94,3 +94,27 @@ export const SPOTS: FishingSpot[] = [
   { id: "valley", name: "깊은 계곡", icon: "🏔️", price: 3000, minutes: 10, normalBoost: 1.5, rareBoost: 2.5, treasureBonus: 0.05, note: "희귀 ×2.5 · 보통 ×1.5" },
   { id: "reservoir", name: "비밀 저수지", icon: "🌌", price: 8000, minutes: 10, normalBoost: 2, rareBoost: 4, treasureBonus: 0.1, note: "희귀 ×4 · 보통 ×2 · 보물상자 +10%" },
 ];
+
+/**
+ * 특별 물고기: 계절과 무관하게 특정 날씨나 유료 낚시 장소에서만 잡힌다(희귀 등급 난이도).
+ * 조건이 맞으면 입질 때 SPECIAL_CHANCE 확률로 이 물고기가 걸린다(전설 판정 다음).
+ */
+export type SpecialFish = Fish & { weather?: string; spot?: string; condition: string };
+export const SPECIAL_CHANCE = 0.08;
+export const SPECIAL_FISH: SpecialFish[] = [
+  { id: "sun-goldfish", name: "햇살 금붕어", icon: "🐡", season: "봄", rarity: "희귀", price: 450, note: "햇빛을 받아 비늘이 금빛으로 빛나요.", weather: "clear", condition: "☀️ 맑은 날" },
+  { id: "rain-sweetfish", name: "빗방울 은어", icon: "💧", season: "봄", rarity: "희귀", price: 480, note: "빗소리를 따라 수면 가까이 올라와요.", weather: "rain", condition: "🌧️ 비 오는 날" },
+  { id: "thunder-eel", name: "번개 장어", icon: "⚡", season: "봄", rarity: "희귀", price: 650, note: "몸에서 찌릿찌릿 전기가 흘러요.", weather: "storm", condition: "⛈️ 천둥번개 치는 날" },
+  { id: "snow-smelt", name: "눈꽃 빙어", icon: "❄️", season: "봄", rarity: "희귀", price: 520, note: "몸에 눈꽃 무늬가 새겨져 있어요.", weather: "snow", condition: "🌨️ 눈 오는 날" },
+  { id: "fog-catfish", name: "안개 메기", icon: "🌫️", season: "봄", rarity: "희귀", price: 500, note: "안개 속에서만 모습을 드러내요.", weather: "fog", condition: "🌫️ 안개 낀 날" },
+  { id: "sea-bream", name: "참돔", icon: "🐟", season: "봄", rarity: "희귀", price: 700, note: "바다의 여왕. 붉은 비늘이 아름다워요.", spot: "sea", condition: "🌊 바다 방파제" },
+  { id: "valley-chub", name: "어름치", icon: "🐠", season: "봄", rarity: "희귀", price: 850, note: "맑은 계곡에만 사는 천연기념물.", spot: "valley", condition: "🏔️ 깊은 계곡" },
+  { id: "moon-carp", name: "달빛 잉어", icon: "🌙", season: "봄", rarity: "희귀", price: 1200, note: "비밀 저수지의 달빛을 먹고 자랐대요.", spot: "reservoir", condition: "🌌 비밀 저수지" },
+];
+
+/** 지금 날씨·장소에서 잡힐 수 있는 특별 물고기 중 하나(없으면 null). */
+export function rollSpecialFish(weather: string | undefined, spot: string, random = Math.random): SpecialFish | null {
+  const pool = SPECIAL_FISH.filter(fish => (fish.weather && fish.weather === weather) || (fish.spot && fish.spot === spot));
+  if (!pool.length || random() >= SPECIAL_CHANCE * pool.length) return null;
+  return pool[Math.floor(random() * pool.length)];
+}
