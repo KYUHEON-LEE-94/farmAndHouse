@@ -462,3 +462,20 @@ button { color:inherit; }
 .season-omen.omen-1{box-shadow:0 0 0 2px rgba(243,190,80,.5)}.season-omen.omen-2{box-shadow:0 0 0 2px rgba(214,128,60,.45)}.season-omen.omen-3{box-shadow:0 0 0 2px rgba(140,180,220,.6)}
 @keyframes omenIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes omenGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.08)}}
+
+/* 수량 정해서 사기 */
+.qty-buy{display:inline-flex;align-items:stretch;gap:3px;flex-wrap:nowrap}
+.qty-buy button{border:1px solid var(--line);border-radius:8px;background:#fffdf8;min-width:26px;padding:0 6px;font:700 13px "Gowun Dodum";cursor:pointer;color:#24372b}
+.qty-buy input{width:46px;border:1px solid var(--line);border-radius:8px;text-align:center;font:700 13px "Gowun Dodum";background:#fff;-moz-appearance:textfield}
+.qty-buy input::-webkit-outer-spin-button,.qty-buy input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.qty-buy .qty-max{font-size:11px;color:#6b6450}
+.qty-buy .qty-go{background:#24372b;border-color:#24372b;color:#fff;padding:0 10px;white-space:nowrap}
+.qty-buy button:disabled{opacity:.4;cursor:default}
+.bait .qty-buy,.fert-stock .qty-buy{min-height:44px}
+.can-shop-list .fert-stock{grid-template-columns:1fr}
+.can-shop-list .fert-stock .qty-buy{justify-content:flex-end}
+.food-item{grid-template-columns:48px 1fr auto auto}
+@media(max-width:760px){.food-item .qty-buy{grid-column:1/-1;justify-content:flex-end}}
+.bait{grid-template-columns:1fr}
+.bait .qty-buy,.fert-stock .qty-buy{min-height:32px;justify-content:flex-end}
+.qty-buy button,.qty-buy input{height:32px}

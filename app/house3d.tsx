@@ -63,8 +63,11 @@ function shade(color: string) {
   const main = new THREE.Color(color);
   return { main, dark: main.clone().multiplyScalar(0.68), light: main.clone().lerp(new THREE.Color("#ffffff"), 0.4) };
 }
+/** 금속이 비출 주변 환경. 장면 전체(scene.environment)에 깔면 벽·유리까지 하얗게 바래므로 금속 재질에만 붙인다. */
+let METAL_ENV: THREE.Texture | null = null;
 function solid(g: THREE.Object3D, geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation, x: number, y: number, z: number, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) {
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra }));
+  const metal = (extra.metalness ?? 0) > 0.4;
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...(metal && METAL_ENV ? { envMap: METAL_ENV } : {}), ...extra }));
   mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh;
 }
 const box = (g: THREE.Object3D, w: number, h: number, d: number, c: THREE.ColorRepresentation, x = 0, y = 0, z = 0, extra?: Partial<THREE.MeshStandardMaterialParameters>) => solid(g, new THREE.BoxGeometry(w, h, d), c, x, y + h / 2, z, extra);
@@ -343,9 +346,9 @@ export default function House3D(props: Props) {
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
-    // 금속(거울·미러볼·황금 소품)이 비출 주변 환경. 없으면 금속이 새까맣게 보인다. 툰 재질에는 영향이 없다.
+    // 금속(거울·미러볼·황금 소품)이 비출 주변 환경. 없으면 금속이 새까맣게 보인다. 금속 재질에만 붙인다(solid 참고).
     const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose();
+    const metalEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose(); METAL_ENV = metalEnv;
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
     const hemi = new THREE.HemisphereLight("#ffffff", "#8a7a5a", 2.2);
     const sun = new THREE.DirectionalLight("#fff3dc", 2.4);
@@ -454,7 +457,7 @@ export default function House3D(props: Props) {
 
     return () => {
       observer.disconnect(); cancelAnimationFrame(frame); controls.dispose();
-      disposeTree(scene); scene.environment?.dispose(); renderer.dispose(); renderer.domElement.remove(); sceneRef.current = null;
+      disposeTree(scene); if (METAL_ENV === metalEnv) METAL_ENV = null; metalEnv.dispose(); renderer.dispose(); renderer.domElement.remove(); sceneRef.current = null;
     };
   }, []);
 
