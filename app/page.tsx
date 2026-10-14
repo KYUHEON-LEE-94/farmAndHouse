@@ -14,7 +14,7 @@ import { dailyOrders, type Order } from "./orders";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_PRICE_SCALE, pressureNow, saturationFactor, saturatedTotal, type MarketPressure, STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_PRICE_SCALE, CROP_BOOK_REWARDS, type CropRecord, pressureNow, saturationFactor, saturatedTotal, type MarketPressure, STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import BossScreen, { BOSS_MODES, type BossMode } from "./bossScreen";
 import ColorPicker from "./colorPicker";
@@ -283,6 +283,10 @@ export default function Home() {
   const [pressure, setPressure] = useState<MarketPressure>({});
   // 오늘의 주문서: 날짜별로 납품한 주문 id
   const [ordersDone, setOrdersDone] = useState<{ date: string; ids: string[] }>({ date: "", ids: [] });
+  // 작물 도감: 작물별 수확 기록, 받은 계절 보상
+  const [cropLog, setCropLog] = useState<Record<string, CropRecord>>({});
+  const [cropRewards, setCropRewards] = useState<string[]>([]);
+  const [bookKind, setBookKind] = useState<"fish" | "crop">("fish");
   const justFertilized = useRef(new Set<number>());
   const [toolShop, setToolShop] = useState<"seed" | "hand" | "water" | "fert">("seed");
   const justPlanted = useRef(new Set<number>());
@@ -370,7 +374,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); setOwnedSpreaders(data.ownedSpreaders ?? ["pinch"]); setSpreaderId(data.spreaderId ?? "pinch"); setFertStock(data.fertStock ?? STARTER_FERT); setProduce(data.produce ?? {}); setStorageSlots(data.storageSlots ?? STORAGE_START); setHarvestMode(data.harvestMode ?? "sell"); setPressure(data.pressure ?? {}); setOrdersDone(data.ordersDone ?? { date: "", ids: [] }); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); setOwnedSpreaders(data.ownedSpreaders ?? ["pinch"]); setSpreaderId(data.spreaderId ?? "pinch"); setFertStock(data.fertStock ?? STARTER_FERT); setProduce(data.produce ?? {}); setStorageSlots(data.storageSlots ?? STORAGE_START); setHarvestMode(data.harvestMode ?? "sell"); setPressure(data.pressure ?? {}); setOrdersDone(data.ordersDone ?? { date: "", ids: [] }); setCropLog(data.cropLog ?? {}); setCropRewards(data.cropRewards ?? []); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
         let petIndex = 0;
         const movePetOut = (item: PlacedItem): PlacedItem => (!data.petsInYard && item.pet ? { ...item, story: 0, x: ((petIndex++ % 6) - 2.5) * 0.9, z: room.depth / 2 + 1.3 + Math.floor((petIndex - 1) / 6) * 0.9 } : item);
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
@@ -389,8 +393,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageSlots, harvestMode, pressure, ordersDone, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageSlots, harvestMode, pressure, ordersDone, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageSlots, harvestMode, pressure, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageSlots, harvestMode, pressure, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -927,6 +931,9 @@ export default function Home() {
       const unit = Math.round(basePrice(crop) * saturationFactor(cropPressure(crop.id) + k));
       return { i, crop, status, golden, base: marketPrice(crop, marketBucket), boosted: unit, amount: Math.round(unit * status.quality.multiplier * status.bugMultiplier * (golden ? 3 : 1)) }; });
     setPlots(current => current.map((plot, i) => (sales.some(sale => sale.i === i) ? null : plot)));
+    // 작물 도감 기록: 수확 수·최고 품질·황금·최고 판매가(1개 값)
+    setCropLog(log => { const next = { ...log }; sales.forEach(sale => { const old = next[sale.crop.id] ?? { n: 0, best: 0, golden: 0, top: 0 }, quality = storedQuality(sale.status.quality.id, 1);
+      next[sale.crop.id] = { n: old.n + 1, best: Math.max(old.best, quality), golden: old.golden + (sale.golden ? 1 : 0), top: Math.max(old.top, sale.amount) }; }); return next; });
     // 창고 보관 모드: 묶음(작물|품질|황금)으로 쌓는다. 새 묶음 자리가 없으면 그 작물만 바로 판다.
     if (harvestMode === "store") {
       const keys = new Set(Object.keys(produce).filter(key => produce[key] > 0)), stored: Record<string, number> = {};
@@ -993,6 +1000,17 @@ export default function Home() {
     setMoney(value => value - price); setStorageSlots(value => value + STORAGE_STEP); playCoinSound([660, 990, 1320]);
     setNotice(`📦 창고를 ${storageSlots + STORAGE_STEP}칸으로 넓혔어요!`);
   }
+  // ---------- 작물 도감 ----------
+  function claimCropReward(target: Season) {
+    const id = CROP_BOOK_REWARDS[target], item = FURNITURE.find(entry => entry.id === id);
+    if (!item || cropRewards.includes(target)) return;
+    if (!CROPS.filter(crop => crop.seasons.includes(target)).every(crop => cropLog[crop.id]?.n)) return setNotice(`${target} 작물을 아직 다 수확하지 못했어요.`);
+    setCropRewards(list => [...list, target]);
+    setWarehouse(items => [...items, { ...item, instanceId: `${id}-${Date.now()}`, x: 0, z: 0, rot: 0 }]);
+    playCoinSound([523, 659, 784, 1047, 1319]);
+    setNotice(`🎉 ${target} 작물 도감 완성! ${item.icon} ${josa(item.name, "을를")} 받았어요. 🏡 나의 집 › 창고에서 마당에 꺼내 놓을 수 있어요.`);
+  }
+
   // ---------- 오늘의 주문서 ----------
   /** 창고에서 이 품목으로 낼 수 있는 개수(최소 품질 이상). */
   function orderHave(cropId: string, minQuality: number) {
@@ -1534,7 +1552,7 @@ export default function Home() {
     </button>;
   });
 
-  const shopItems = FURNITURE.filter(item => item.group === shopTab);
+  const shopItems = FURNITURE.filter(item => item.group === shopTab && !item.reward);
   const avatarImg = <img src={avatar.src} alt="" className={avatar.pixelated ? "pixelated" : ""} draggable={false} />;
   const currentBait = BAITS.find(item => item.id === selectedBait) ?? BAITS[0];
   const currentRod = RODS.find(item => item.id === rodId) ?? RODS[0];
@@ -1867,7 +1885,25 @@ export default function Home() {
         </aside>
       </div>}
 
-      {tab === "book" && (() => {
+      {tab === "book" && <div className="book-kind" role="tablist" aria-label="도감 종류">{([["fish", "🐟 물고기 도감"], ["crop", "🌱 작물 도감"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={bookKind === id} className={bookKind === id ? "on" : ""} onClick={() => setBookKind(id)}>{label}</button>)}</div>}
+      {tab === "book" && bookKind === "crop" && (() => {
+        const shown: Season = bookSeason && bookSeason !== "special" ? bookSeason : season, list = CROPS.filter(crop => crop.seasons.includes(shown));
+        const got = CROPS.filter(crop => cropLog[crop.id]?.n).length, seasonDone = list.every(crop => cropLog[crop.id]?.n), reward = FURNITURE.find(item => item.id === CROP_BOOK_REWARDS[shown])!, claimed = cropRewards.includes(shown);
+        return <section className="panel crop-book book-page">
+          <div className="panel-heading"><div><span className="eyebrow">CROP BOOK</span><h3>작물 도감</h3></div><span className="plot-count">전체 {got}/{CROPS.length} · {Math.round((got / CROPS.length) * 100)}%</span></div>
+          <div className="book-seasons" role="tablist">{SEASONS.map(s => { const items = CROPS.filter(crop => crop.seasons.includes(s)), have = items.filter(crop => cropLog[crop.id]?.n).length;
+            return <button key={s} role="tab" aria-selected={shown === s} className={`${shown === s ? "on" : ""} ${have === items.length ? "done" : ""}`} onClick={() => setBookSeason(s)}><b>{SEASON_ICON[s]} {s}</b><small>{have}/{items.length}{cropRewards.includes(s) ? " 🎁" : have === items.length ? " 완성!" : ""}</small><i style={{ width: `${(have / items.length) * 100}%` }} /></button>; })}</div>
+          <div className={`crop-reward ${seasonDone ? (claimed ? "claimed" : "ready") : ""}`}><span className="crop-reward-art furniture-thumb" style={{ "--c": reward.color } as CSSProperties}><FurnitureArt id={reward.id} /></span>
+            <span><b>{shown} 완성 보상 · {reward.name}</b><small>{claimed ? "받았어요! 🏡 나의 집 창고에서 마당에 놓을 수 있어요." : seasonDone ? "모두 수확했어요! 보상을 받으세요." : `${shown} 작물 ${list.length}종을 모두 한 번씩 수확하면 받을 수 있는 마당 장식이에요.`}</small></span>
+            {seasonDone && !claimed && <button className="save-button" onClick={() => claimCropReward(shown)}>🎁 받기</button>}</div>
+          <div className="book-grid">{list.map(crop => { const record = cropLog[crop.id];
+            return <div key={crop.id} className={`book-card ${record?.n ? "caught" : ""}`}>
+              <span className="book-icon">{record?.n ? crop.icon : <span className="silhouette">{crop.icon}</span>}</span>
+              <b>{record?.n ? crop.name : "???"}</b>
+              {record?.n ? <p className="crop-record"><span>수확 {record.n.toLocaleString()}개</span><span>최고 품질 {QUALITIES[record.best].name}{QUALITIES[record.best].stars ? ` ${QUALITIES[record.best].stars}` : ""}</span>{record.golden > 0 && <span>✨ 황금 {record.golden}번</span>}<span>최고 판매가 {record.top.toLocaleString()}원</span></p> : <p>{crop.seasons.join("·")} 작물 · 아직 수확하지 못했어요.</p>}
+            </div>; })}</div>
+        </section>; })()}
+      {tab === "book" && bookKind === "fish" && (() => {
         const shown = bookSeason ?? season, special = shown === "special", list = special ? SPECIAL_FISH : FISH.filter(fish => fish.season === shown);
         const allFish = [...FISH, ...SPECIAL_FISH], caught = allFish.filter(fish => fishLog[fish.id]).length, specialGot = SPECIAL_FISH.filter(fish => fishLog[fish.id]).length;
         return <section className="panel fish-book book-page">

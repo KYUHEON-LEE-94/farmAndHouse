@@ -203,3 +203,7 @@ export function saturatedTotal(unit: number, pressure: number, count: number) {
   for (let k = 0; k < count; k++) total += unit * saturationFactor(pressure + k);
   return Math.round(total);
 }
+
+/** 작물 도감: 계절 작물을 모두 한 번씩 수확하면 받는 마당 장식. */
+export const CROP_BOOK_REWARDS: Record<Season, string> = { 봄: "blossomscarecrow", 여름: "melonparasol", 가을: "goldenstraw", 겨울: "tangerinestove" };
+export type CropRecord = { n: number; best: number; golden: number; top: number };
