@@ -2,10 +2,10 @@
 export type Parity = "odd" | "even";
 export type Roll = { dice: [number, number]; result: Parity; pick: Parity; bet: number; payout: number; at: number };
 
-export const MIN_BET = 100;
-export const MAX_BET = 10000;
-/** 맞히면 건 돈의 1.95배를 돌려준다(하우스 몫 2.5%라 장기적으로는 잃는다). */
-export const PAYOUT = 1.95;
+/** 판돈은 최소 10원부터 가진 돈 전부까지 자유롭게 건다(상한 없음). 대신 배당을 낮춰 둔다. */
+export const MIN_BET = 10;
+/** 맞히면 건 돈의 1.9배를 돌려준다. 이길 확률 48%와 합치면 기대 환수율 약 91%(판돈 상한을 없앤 대신 낮췄다). */
+export const PAYOUT = 1.9;
 export const BET_PRESETS = [100, 500, 1000, 5000];
 export const DICE_FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 export const PARITY_NAME: Record<Parity, string> = { odd: "홀", even: "짝" };
@@ -16,16 +16,25 @@ export function rollDice(random = Math.random): [number, number] {
 
 export const parityOf = (dice: [number, number]): Parity => ((dice[0] + dice[1]) % 2 ? "odd" : "even");
 
-/** 슬롯머신: 릴 3개. 같은 그림 3개면 배당, 체리가 정확히 2개면 ×1.5. 기대 환수율 약 90%. */
+/** 홀짝은 항상 하우스가 조금 유리하다: 이길 확률 48%, 질 확률 52%. */
+export const PARITY_WIN_CHANCE = 0.48;
+/** 고른 쪽(pick)에 대해 48% 확률로 맞는 주사위, 아니면 틀린 주사위를 굴린다(주사위 모양은 자연스럽게). */
+export function rollParity(pick: Parity, random = Math.random): [number, number] {
+  const want: Parity = random() < PARITY_WIN_CHANCE ? pick : pick === "odd" ? "even" : "odd";
+  for (let i = 0; i < 50; i++) { const dice = rollDice(random); if (parityOf(dice) === want) return dice; }
+  return want === "odd" ? [1, 2] : [1, 1];
+}
+
+/** 슬롯머신: 릴 3개. 같은 그림 3개면 배당, 체리가 정확히 2개면 ×1.3. 기대 환수율 약 72%(판돈 상한을 없앤 대신 낮췄다). */
 export const SLOT_SYMBOLS = [
-  { icon: "🍒", weight: 30, triple: 8 },
-  { icon: "🍋", weight: 25, triple: 10 },
-  { icon: "🍉", weight: 20, triple: 15 },
-  { icon: "🔔", weight: 13, triple: 30 },
-  { icon: "⭐", weight: 8, triple: 80 },
-  { icon: "7️⃣", weight: 4, triple: 300 },
+  { icon: "🍒", weight: 30, triple: 6 },
+  { icon: "🍋", weight: 25, triple: 8 },
+  { icon: "🍉", weight: 20, triple: 12 },
+  { icon: "🔔", weight: 13, triple: 25 },
+  { icon: "⭐", weight: 8, triple: 60 },
+  { icon: "7️⃣", weight: 4, triple: 150 },
 ];
-export const CHERRY_PAIR = 1.5;
+export const CHERRY_PAIR = 1.3;
 
 export function spinReel(random = Math.random) {
   let roll = random() * SLOT_SYMBOLS.reduce((sum, symbol) => sum + symbol.weight, 0);
@@ -92,7 +101,9 @@ export function dealerLine(lines: string[], vars: Record<string, string | number
 // ---------- 블랙잭 ----------
 /** 카드 덱은 무한 덱(매번 무작위)으로 단순화. 딜러는 17 이상에서 멈춘다(소프트 17 포함). 블랙잭은 3:2. */
 export type Card = { rank: number; suit: "♠" | "♥" | "♦" | "♣" };
-export const BLACKJACK_PAYOUT = 2.5;
+/** 블랙잭(처음 두 장 21) ×2.2, 일반 승리 ×1.9. 판돈 상한을 없앤 대신 낮췄다. */
+export const BLACKJACK_PAYOUT = 2.2;
+export const BLACKJACK_WIN = 1.9;
 const SUITS: Card["suit"][] = ["♠", "♥", "♦", "♣"];
 
 export function drawCard(random = Math.random): Card {
@@ -120,7 +131,7 @@ export function settleBlackjack(player: Card[], dealer: Card[], bet: number): { 
   if (p > 21) return { outcome: "bust", payout: 0 };
   if (isBlackjack(player) && !isBlackjack(dealer)) return { outcome: "blackjack", payout: Math.floor(bet * BLACKJACK_PAYOUT) };
   if (isBlackjack(dealer) && !isBlackjack(player)) return { outcome: "lose", payout: 0 };
-  if (d > 21 || p > d) return { outcome: "win", payout: bet * 2 };
+  if (d > 21 || p > d) return { outcome: "win", payout: Math.floor(bet * BLACKJACK_WIN) };
   if (p === d) return { outcome: "push", payout: bet };
   return { outcome: "lose", payout: 0 };
 }

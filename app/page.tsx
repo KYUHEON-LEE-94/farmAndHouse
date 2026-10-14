@@ -7,7 +7,7 @@ import { BAITS, BARE_HAND, FISH, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFi
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
 import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, laughter, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
-import { BET_PRESETS, CHERRY_PAIR, DICE_FACES, MAX_BET, MIN_BET, PARITY_NAME, PAYOUT, SLOT_SYMBOLS, parityOf, rollDice, slotMultiplier, slotReturnRate, spinReel, type Parity, type Roll } from "./casino";
+import { BET_PRESETS, BLACKJACK_PAYOUT, BLACKJACK_WIN, CHERRY_PAIR, DICE_FACES, MIN_BET, PARITY_NAME, PAYOUT, PARITY_WIN_CHANCE, SLOT_SYMBOLS, parityOf, rollParity, slotMultiplier, slotReturnRate, spinReel, type Parity, type Roll } from "./casino";
 import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
@@ -253,7 +253,7 @@ export default function Home() {
   const [now, setNow] = useState(new Date());
   const [tab, setTab] = useState<"farm" | "fish" | "book" | "home" | "pets" | "casino" | "gacha">("farm");
   const [bookSeason, setBookSeason] = useState<Season | "special" | null>(null);
-  const [bet, setBet] = useState(MIN_BET);
+  const [bet, setBet] = useState(100);
   const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
   const [lastRoll, setLastRoll] = useState<Roll | null>(null);
   const [rollHistory, setRollHistory] = useState<Roll[]>([]);
@@ -1367,13 +1367,13 @@ export default function Home() {
   // ---------- 도박장(홀짝) ----------
   function placeBet(pick: Parity) {
     if (rolling) return;
-    const amount = Math.min(bet, MAX_BET);
+    const amount = Math.max(MIN_BET, Math.floor(bet));
     if (amount < MIN_BET) return setNotice(`최소 ${MIN_BET.toLocaleString()}원부터 걸 수 있어요.`);
     if (money < amount) return setNotice("판돈이 모자라요. 판돈을 줄여 주세요.");
     setMoney(value => value - amount); setCasinoFx(null);
     setRolling({ pick, bet: amount });
     window.setTimeout(() => {
-      const dice = rollDice(), result = parityOf(dice), win = result === pick, payout = win ? Math.floor(amount * PAYOUT) : 0;
+      const dice = rollParity(pick), result = parityOf(dice), win = result === pick, payout = win ? Math.floor(amount * PAYOUT) : 0;
       const roll: Roll = { dice, result, pick, bet: amount, payout, at: Date.now() };
       if (win) setMoney(value => value + payout);
       setLastRoll(roll); setRollHistory(items => [roll, ...items].slice(0, 12)); setRolling(null);
@@ -1404,7 +1404,7 @@ export default function Home() {
   /** 슬롯머신: 결과를 먼저 정하고, 릴이 왼쪽부터 차례로 멈추는 연출을 보여준다. */
   function pullLever() {
     if (slotSpinning || rolling) return;
-    const amount = Math.min(bet, MAX_BET);
+    const amount = Math.max(MIN_BET, Math.floor(bet));
     if (money < amount) return setNotice("판돈이 모자라요. 판돈을 줄여 주세요.");
     const final = [spinReel(), spinReel(), spinReel()], multiplier = slotMultiplier(final), payout = Math.floor(amount * multiplier);
     setMoney(value => value - amount); setSlotSpinning(3); setLastSlot(null); setCasinoFx(null);
@@ -1432,7 +1432,7 @@ export default function Home() {
   // ---------- 블랙잭 ----------
   function dealBlackjack() {
     if (bj.phase === "player" || bj.phase === "dealer") return;
-    const amount = Math.min(bet, MAX_BET);
+    const amount = Math.max(MIN_BET, Math.floor(bet));
     if (money < amount) return setNotice("판돈이 모자라요. 판돈을 줄여 주세요.");
     const player = [drawCard(), drawCard()], dealer = [drawCard(), drawCard()];
     setMoney(value => value - amount); setCasinoFx(null);
@@ -2105,24 +2105,24 @@ export default function Home() {
           <div className="bet-row">
             <span>판돈</span>
             {BET_PRESETS.map(amount => <button key={amount} className={bet === amount ? "on" : ""} onClick={() => setBet(amount)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>{amount.toLocaleString()}</button>)}
-            <button className={bet === Math.min(MAX_BET, Math.floor(money / 100) * 100) ? "on" : ""} onClick={() => setBet(Math.max(MIN_BET, Math.min(MAX_BET, Math.floor(money / 100) * 100)))} disabled={Boolean(rolling)}>최대</button>
-            <input type="number" min={MIN_BET} max={MAX_BET} step={100} value={bet} onChange={event => setBet(Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(event.target.value) / 100) * 100 || MIN_BET)))} aria-label="판돈" disabled={Boolean(rolling)} />
+            <button className={bet === Math.max(MIN_BET, money) ? "on" : ""} onClick={() => setBet(Math.max(MIN_BET, money))} disabled={Boolean(rolling)} title="가진 돈 전부">올인</button>
+            <input type="number" min={MIN_BET} step={10} value={bet} onChange={event => setBet(Math.max(MIN_BET, Math.floor(Number(event.target.value)) || MIN_BET))} aria-label="판돈(자유 입력)" disabled={Boolean(rolling)} />
           </div>
           {casinoGame === "parity" && lastRoll && !lastRoll.payout && !rolling && <div className="revenge-row">
             <button onClick={() => placeBet(lastRoll.pick)} disabled={money < bet}>🔥 복수전! 다시 {PARITY_NAME[lastRoll.pick]}에 {bet.toLocaleString()}원</button>
-            <button className="double" onClick={() => { const doubled = Math.min(MAX_BET, Math.floor(money / 100) * 100, bet * 2); setBet(doubled); }} disabled={bet * 2 > MAX_BET || money < bet * 2}>💥 판돈 2배</button>
+            <button className="double" onClick={() => { setBet(Math.min(money, bet * 2)); }} disabled={money < bet * 2}>💥 판돈 2배</button>
           </div>}
           {casinoGame === "blackjack" && (bj.phase === "player" ? <div className="bj-actions">
             <button onClick={hitBlackjack}>🃏 히트</button>
             <button onClick={() => runDealer(bj.player, bj.dealer, bj.bet)}>✋ 스탠드</button>
             <button className="double" onClick={doubleBlackjack} disabled={bj.player.length !== 2 || money < bj.bet}>💥 더블다운</button>
           </div> : <button className={`lever-button ${bj.outcome === "lose" || bj.outcome === "bust" ? "revenge" : ""}`} onClick={dealBlackjack} disabled={bj.phase === "dealer" || money < bet}>{bj.outcome === "lose" || bj.outcome === "bust" ? "🔥 복수의 딜" : "🃏 카드 받기"} · {bet.toLocaleString()}원</button>)}
-          {casinoGame === "blackjack" && <p className="bj-rules">21을 넘지 않고 딜러보다 높으면 ×2 · 처음 두 장이 21이면 블랙잭 ×2.5 · 비기면 반환 · 딜러는 17 이상에서 멈춰요 · 더블다운: 판돈 2배로 딱 한 장 더</p>}
+          {casinoGame === "blackjack" && <p className="bj-rules">21을 넘지 않고 딜러보다 높으면 ×{BLACKJACK_WIN} · 처음 두 장이 21이면 블랙잭 ×{BLACKJACK_PAYOUT} · 비기면 반환 · 딜러는 17 이상에서 멈춰요 · 더블다운: 판돈 2배로 딱 한 장 더</p>}
           {casinoGame === "slot" && <>
             <button className={`lever-button ${lastSlot && lastSlot.payout < lastSlot.bet ? "revenge" : ""}`} onClick={pullLever} disabled={slotSpinning > 0 || money < bet}>{lastSlot && lastSlot.payout < lastSlot.bet ? "🔥 복수의 레버" : "🎰 레버 당기기"} · {bet.toLocaleString()}원</button>
             <div className="slot-paytable">{SLOT_SYMBOLS.map(symbol => <span key={symbol.icon}>{symbol.icon}{symbol.icon}{symbol.icon}<b>×{symbol.triple}</b></span>)}<span>🍒🍒 + 아무거나<b>×{CHERRY_PAIR}</b></span></div>
           </>}
-          <p className="hint">⚠ 게임 속 돈으로만 하는 놀이예요. {casinoGame === "blackjack" ? "블랙잭은 딜러가 마지막에 카드를 받아 조금 유리해서" : casinoGame === "slot" ? `슬롯의 기대 환수율은 약 ${Math.round(slotReturnRate() * 100)}%라` : `홀짝은 확률이 반반이지만 배당이 ×${PAYOUT}라`} 오래 하면 조금씩 잃게 돼요. 판돈 {MIN_BET.toLocaleString()}~{MAX_BET.toLocaleString()}원.</p>
+          <p className="hint">⚠ 게임 속 돈으로만 하는 놀이예요. {casinoGame === "blackjack" ? "블랙잭은 딜러가 마지막에 카드를 받아 조금 유리해서" : casinoGame === "slot" ? `슬롯의 기대 환수율은 약 ${Math.round(slotReturnRate() * 100)}%라` : `홀짝은 이길 확률 ${Math.round(PARITY_WIN_CHANCE * 100)}% · 질 확률 ${100 - Math.round(PARITY_WIN_CHANCE * 100)}%에 배당 ×${PAYOUT}라`} 오래 하면 조금씩 잃게 돼요. 판돈은 {MIN_BET.toLocaleString()}원부터 가진 돈 전부까지 자유롭게 걸 수 있어요(올인 주의!).</p>
         </section>
         <aside className="panel casino-side">
           <div className="panel-heading"><div><span className="eyebrow">RECORD</span><h3>전적</h3></div></div>
