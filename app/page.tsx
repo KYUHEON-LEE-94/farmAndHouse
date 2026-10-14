@@ -12,7 +12,7 @@ import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import BossScreen, { BOSS_MODES, type BossMode } from "./bossScreen";
 import ColorPicker from "./colorPicker";
@@ -58,6 +58,21 @@ function seasonPeriod(time: number, startHour: number, endHour: number) {
 
 /** 보스 키 화면일 때는 모든 효과음을 끈다. */
 let quietMode = false;
+
+/** 계절 예고용 맑은 풍경 소리. */
+function playChime() {
+  if (quietMode) return;
+  const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return;
+  const context = new AudioCtx(), t = context.currentTime;
+  [1318, 1568, 1976, 2637].forEach((freq, i) => {
+    const voice = context.createOscillator(), gain = context.createGain(), start = t + i * 0.18;
+    voice.type = "sine"; voice.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, start); gain.gain.exponentialRampToValueAtTime(0.08, start + 0.02); gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.2);
+    voice.connect(gain); gain.connect(context.destination); voice.start(start); voice.stop(start + 1.25);
+  });
+  window.setTimeout(() => context.close(), 2200);
+}
 
 function playCoinSound(notes = [880, 1320]) {
   if (quietMode) return;
@@ -254,7 +269,11 @@ export default function Home() {
   const [handId, setHandId] = useState("hand");
   const [ownedPlanters, setOwnedPlanters] = useState<string[]>(["seedhand"]);
   const [planterId, setPlanterId] = useState("seedhand");
-  const [toolShop, setToolShop] = useState<"seed" | "hand" | "water">("seed");
+  const [ownedSpreaders, setOwnedSpreaders] = useState<string[]>(["pinch"]);
+  const [spreaderId, setSpreaderId] = useState("pinch");
+  const [fertStock, setFertStock] = useState<Record<string, number>>(STARTER_FERT);
+  const justFertilized = useRef(new Set<number>());
+  const [toolShop, setToolShop] = useState<"seed" | "hand" | "water" | "fert">("seed");
   const justPlanted = useRef(new Set<number>());
   const justHarvested = useRef(new Set<number>());
   const [canId, setCanId] = useState("tin");
@@ -318,7 +337,7 @@ export default function Home() {
   const [pendingLoad, setPendingLoad] = useState<{ save: string; updatedAt: number; session: Session } | null>(null);
   const suspendSave = useRef(false);
   const lastSynced = useRef("");
-  const offGate = useRef({ isWorkTime: false, secondsLeft: -1, money: 0, notify: false, dayStart: null as { date: string; money: number } | null, endHour: 18 });
+  const offGate = useRef({ isWorkTime: false, secondsLeft: -1, money: 0, notify: false, dayStart: null as { date: string; money: number } | null, endHour: 18, seasonIndex: -1, seasonLeft: 0 });
   const [loaded, setLoaded] = useState(false);
   const fishTimer = useRef<number | undefined>(undefined);
   const castBait = useRef<Bait | null>(null);
@@ -340,7 +359,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); setOwnedSpreaders(data.ownedSpreaders ?? ["pinch"]); setSpreaderId(data.spreaderId ?? "pinch"); setFertStock(data.fertStock ?? STARTER_FERT); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
         let petIndex = 0;
         const movePetOut = (item: PlacedItem): PlacedItem => (!data.petsInYard && item.pet ? { ...item, story: 0, x: ((petIndex++ % 6) - 2.5) * 0.9, z: room.depth / 2 + 1.3 + Math.floor((petIndex - 1) / 6) * 0.9 } : item);
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
@@ -359,8 +378,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -393,6 +412,7 @@ export default function Home() {
   const currentCan = CANS.find(item => item.id === canId) ?? CANS[0];
   const currentHand = HARVEST_TOOLS.find(item => item.id === handId) ?? HARVEST_TOOLS[0];
   const currentPlanter = PLANT_TOOLS.find(item => item.id === planterId) ?? PLANT_TOOLS[0];
+  const currentSpreader = SPREADERS.find(item => item.id === spreaderId) ?? SPREADERS[0];
   const canMax = currentCan.capacity + petCanBonus;
   const bugPenalty = pets.has("whitetiger") ? 0 : BUG_PENALTY * (1 - 0.5 * pw("weasel"));
   const noBait = Object.values(baits).every(count => !count);
@@ -484,10 +504,10 @@ export default function Home() {
   });
 
   // 퇴근 알림: 운영 시간이 끝나는 순간 "월루~~" 팝업, 10분 전 예고. 하루 시작 자금을 기억해 오늘 번 돈을 보여준다.
-  useEffect(() => { offGate.current = { isWorkTime, secondsLeft: isWorkTime ? Math.floor((endHour - currentHour) * 3600) : -1, money, notify: notifyOffWork, dayStart, endHour }; });
+  useEffect(() => { offGate.current = { isWorkTime, secondsLeft: isWorkTime ? Math.floor((endHour - currentHour) * 3600) : -1, money, notify: notifyOffWork, dayStart, endHour, seasonIndex, seasonLeft: seasonSecondsLeft }; });
   useEffect(() => {
     if (!loaded) return;
-    let wasWorking: boolean | null = null, warnedDay = "";
+    let wasWorking: boolean | null = null, warnedDay = "", warnedSeason = "";
     const notify = (title: string, body: string) => {
       if (!offGate.current.notify || typeof Notification === "undefined" || Notification.permission !== "granted") return;
       try { new Notification(title, { body, icon: DEFAULT_AVATAR }); } catch { /* 일부 환경에서는 알림 생성 불가 */ }
@@ -506,6 +526,14 @@ export default function Home() {
         warnedDay = today;
         setNotice("⏰ 퇴근 10분 전! 수확할 작물은 지금 거둬 두세요. 계절이 끝나면 시들어요.");
         notify("⏰ 퇴근 10분 전!", "수확할 작물은 지금 거둬 두세요.");
+      }
+      // 계절이 바뀌기 5분 전: "곧 여름" 대신 비유적인 문구로 한 번 알려 준다(마지막 계절은 퇴근 알림이 대신함).
+      const seasonKey = `${today}-${gate.seasonIndex}`;
+      if (gate.isWorkTime && gate.seasonIndex >= 0 && gate.seasonIndex < 3 && gate.seasonLeft > 0 && gate.seasonLeft <= SEASON_WARN_SECONDS && warnedSeason !== seasonKey) {
+        warnedSeason = seasonKey;
+        const omen = seasonOmen((["여름", "가을", "겨울"] as const)[gate.seasonIndex]);
+        setNotice(`🍃 ${omen} 남은 작물은 서둘러 거둬 주세요.`); playChime();
+        notify("🍃 계절의 기운이 바뀌어요", omen);
       }
       if (wasWorking && !gate.isWorkTime && new Date().getHours() >= gate.endHour - 1) showOffWork();
       wasWorking = gate.isWorkTime;
@@ -716,7 +744,7 @@ export default function Home() {
     const crop = CROPS.find(c => c.id === selectedCrop)!;
     if (!crop.seasons.includes(season)) return setNotice(`${crop.name}은 ${crop.seasons.join("·")} 작물이에요.`);
     const growSeconds = Math.round(crop.seconds * growthMul * (1 - 0.05 * pw("mole")) * (1 - 0.15 * pw("dragon")));
-    if (growSeconds > seasonSecondsLeft) return setNotice(`${season}이 ${formatClock(seasonSecondsLeft)} 뒤 끝나요. ${crop.name}은(는) 그 전에 다 자라지 못해요.`);
+    if (growSeconds > seasonSecondsLeft) return setNotice(`${season}이 ${formatClock(seasonSecondsLeft)} 뒤 끝나요. ${josa(crop.name, "은는")} 그 전에 다 자라지 못해요.`);
     const price = seedPrice(crop);
     const empty = canArea(index, plotColumns(), plotCount, currentPlanter).filter(i => !plots[i] && !justPlanted.current.has(i));
     if (!empty.length) { if (!quiet) describePlot(index); return; }
@@ -727,7 +755,7 @@ export default function Home() {
     setPlots(current => current.map((plot, i) => (targets.includes(i) && !plot ? { cropId: crop.id, plantedAt: time, growSeconds, water: [] } : plot)));
     setMoney(m => m - price * targets.length); playPlop();
     const short = targets.length < empty.length ? ` (돈이 모자라 ${empty.length}칸 중 ${targets.length}칸만)` : "";
-    setNotice(targets.length > 1 ? `${currentPlanter.icon} ${crop.icon} ${crop.name}을(를) ${targets.length}칸에 한꺼번에 심었어요! 씨앗 ${(price * targets.length).toLocaleString()}원 · ${growSeconds}초 뒤 수확${short}` : `${crop.icon} ${crop.name}을(를) 심었어요. ${growSeconds}초 뒤 수확해요! 중간에 목말라하면 물을 주세요.${short}`);
+    setNotice(targets.length > 1 ? `${currentPlanter.icon} ${crop.icon} ${josa(crop.name, "을를")} ${targets.length}칸에 한꺼번에 심었어요! 씨앗 ${(price * targets.length).toLocaleString()}원 · ${growSeconds}초 뒤 수확${short}` : `${crop.icon} ${josa(crop.name, "을를")} 심었어요. ${growSeconds}초 뒤 수확해요! 중간에 목말라하면 물을 주세요.${short}`);
   }
 
   /** 밭 한 칸의 상태를 알려 준다. */
@@ -735,7 +763,7 @@ export default function Home() {
     const plot = plots[index], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
     if (!plot || !crop) return setNotice("빈 밭이에요. 🌱 심기 도구(1)를 들고 눌러 씨앗을 심어요.");
     const status = plotStatus(plot, crop, Date.now(), bugPenalty);
-    if (status.ready) return setNotice(`${crop.icon} ${crop.name}이(가) 다 자랐어요! 🧺 수확 도구(2)로 거둬요.`);
+    if (status.ready) return setNotice(`${crop.icon} ${josa(crop.name, "이가")} 다 자랐어요! 🧺 수확 도구(2)로 거둬요.`);
     if (status.thirsty) return setNotice("💧 목말라해요! 🚿 물뿌리개(3)를 들고 눌러서 물을 주세요.");
     setNotice(`${crop.icon} ${crop.name} ${Math.floor(status.progress)}% · ${status.remaining}초 남음 · 물 ${status.satisfied}/${status.total}${status.fert ? ` · ${status.fert.name}` : ""}`);
   }
@@ -761,7 +789,7 @@ export default function Home() {
     const targets = thirstyInArea(index);
     if (!targets.length) {
       const plot = plots[index], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
-      if (crop && plot && currentCan.w * currentCan.h === 1 && !justWatered.current.has(index)) setNotice(plotStatus(plot, crop, Date.now(), bugPenalty).ready ? `${crop.name}은(는) 다 자랐어요. 🧺 수확 도구(2)로 거둬요.` : `${crop.name}은(는) 아직 목마르지 않아요.`);
+      if (crop && plot && currentCan.w * currentCan.h === 1 && !justWatered.current.has(index)) setNotice(plotStatus(plot, crop, Date.now(), bugPenalty).ready ? `${josa(crop.name, "은는")} 다 자랐어요. 🧺 수확 도구(2)로 거둬요.` : `${josa(crop.name, "은는")} 아직 목마르지 않아요.`);
       return;
     }
     if (canWater - pendingPours.current <= 0) return setNotice("🚿 물뿌리개가 비었어요. 🚰 우물에서 물을 채워 주세요.");
@@ -776,12 +804,12 @@ export default function Home() {
   }
 
   function chooseCan(can: WateringCan) {
-    if (ownedCans.includes(can.id)) { setCanId(can.id); setTool("water"); setCanWater(value => Math.min(value, can.capacity + petCanBonus)); return setNotice(`${can.icon} ${can.name}을(를) 들었어요. (${can.note})`); }
-    if (money < can.price) return setNotice(`${can.name}은(는) ${can.price.toLocaleString()}원이에요.`);
+    if (ownedCans.includes(can.id)) { setCanId(can.id); setTool("water"); setCanWater(value => Math.min(value, can.capacity + petCanBonus)); return setNotice(`${can.icon} ${josa(can.name, "을를")} 들었어요. (${can.note})`); }
+    if (money < can.price) return setNotice(`${josa(can.name, "은는")} ${can.price.toLocaleString()}원이에요.`);
     setMoney(value => value - can.price); setOwnedCans(items => [...items, can.id]); setCanId(can.id); setTool("water");
     setCanWater(can.capacity + petCanBonus);
     playCoinSound([660, 990, 1320]);
-    setNotice(`${can.icon} ${can.name}을(를) 샀어요! 물을 가득 채워 드렸어요. (${can.note})`);
+    setNotice(`${can.icon} ${josa(can.name, "을를")} 샀어요! 물을 가득 채워 드렸어요. (${can.note})`);
   }
 
   function refillCan() {
@@ -790,13 +818,48 @@ export default function Home() {
     setNotice(`🚰 우물에서 물뿌리개를 가득 채웠어요. (${canMax}번 줄 수 있어요)`);
   }
 
-  function fertilize(index: number, plot: NonNullable<Plot>, crop: Crop, fertilizer: Fertilizer) {
-    if (plot.fert) return setNotice(`${crop.name}에는 이미 거름을 줬어요. 한 작물에 한 번만 줄 수 있어요.`);
-    if (money < fertilizer.price) return setNotice(`${fertilizer.name}은(는) ${fertilizer.price.toLocaleString()}원이에요.`);
-    setMoney(m => m - fertilizer.price);
-    setPlots(current => current.map((item, i) => (i === index && item ? applyFertilizer(item, crop, fertilizer, Date.now()) : item)));
-    setNotice(`${fertilizer.icon} ${crop.name}에 ${fertilizer.name}을(를) 줬어요. (${fertilizer.note})`);
+  /** 거름: 뿌리개 범위 안의 자라는 작물(거름 안 준 것)에 한꺼번에 준다. 돈이 모자라면 살 수 있는 만큼만. */
+  function fertilize(index: number, fertilizer: Fertilizer, quiet = false) {
+    const time = Date.now();
+    const targets = canArea(index, plotColumns(), plotCount, currentSpreader).filter(i => {
+      const plot = plots[i], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
+      return plot && crop && !plot.fert && !justFertilized.current.has(i) && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod && !plotStatus(plot, crop, time, bugPenalty).ready;
+    });
+    if (!targets.length) {
+      if (quiet) return;
+      const plot = plots[index], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
+      if (plot?.fert && crop) return setNotice(`${crop.name}에는 이미 거름을 줬어요. 한 작물에 한 번만 줄 수 있어요.`);
+      return describePlot(index);
+    }
+    const affordable = targets.slice(0, fertStock[fertilizer.id] ?? 0);
+    if (!affordable.length) return setNotice(`${fertilizer.icon} ${josa(fertilizer.name, "이가")} 없어요. 🌿 거름 상점(오른쪽 도구 상점)에서 사 두세요.`);
+    affordable.forEach(i => justFertilized.current.add(i)); window.setTimeout(() => affordable.forEach(i => justFertilized.current.delete(i)), 600);
+    setFertStock(stock => ({ ...stock, [fertilizer.id]: Math.max(0, (stock[fertilizer.id] ?? 0) - affordable.length) }));
+    setPlots(current => current.map((item, i) => { const crop = item ? CROPS.find(c => c.id === item.cropId) : undefined; return affordable.includes(i) && item && crop && !item.fert ? applyFertilizer(item, crop, fertilizer, time) : item; }));
+    playPlop();
+    const short = affordable.length < targets.length ? ` (거름이 모자라 ${targets.length}칸 중 ${affordable.length}칸만)` : "", left = (fertStock[fertilizer.id] ?? 0) - affordable.length;
+    if (affordable.length > 1) return setNotice(`${currentSpreader.icon} ${fertilizer.icon} ${josa(fertilizer.name, "을를")} ${affordable.length}칸에 한꺼번에 뿌렸어요! ${fertilizer.note} · 남은 ${left}개${short}`);
+    const crop = CROPS.find(c => c.id === plots[affordable[0]]?.cropId);
+    setNotice(`${fertilizer.icon} ${crop?.name ?? "작물"}에 ${josa(fertilizer.name, "을를")} 줬어요. (${fertilizer.note} · 남은 ${left}개)${short}`);
   }
+
+  function buyFert(fertilizer: Fertilizer) {
+    const price = fertilizer.price * fertilizer.pack;
+    if (money < price) return setNotice(`${fertilizer.name} ${fertilizer.pack}개는 ${price.toLocaleString()}원이에요.`);
+    setMoney(value => value - price); setFertStock(stock => ({ ...stock, [fertilizer.id]: (stock[fertilizer.id] ?? 0) + fertilizer.pack })); setTool(fertilizer.id);
+    playCoinSound([660, 880]);
+    setNotice(`${fertilizer.icon} ${fertilizer.name} ${fertilizer.pack}개를 샀어요! 들고 자라는 작물을 누르면 칸마다 1개씩 써요.`);
+  }
+
+  function chooseSpreader(spreader: HarvestTool) {
+    const fert = FERTILIZERS.some(item => item.id === tool) ? tool : FERTILIZERS[0].id;
+    if (ownedSpreaders.includes(spreader.id)) { setSpreaderId(spreader.id); setTool(fert); return setNotice(`${spreader.icon} ${josa(spreader.name, "을를")} 들었어요. (${spreader.note} 거름 주기)`); }
+    if (money < spreader.price) return setNotice(`${josa(spreader.name, "은는")} ${spreader.price.toLocaleString()}원이에요.`);
+    setMoney(value => value - spreader.price); setOwnedSpreaders(items => [...items, spreader.id]); setSpreaderId(spreader.id); setTool(fert);
+    playCoinSound([660, 990, 1320]);
+    setNotice(`${spreader.icon} ${josa(spreader.name, "을를")} 샀어요! 자라는 작물 ${spreader.note}에 거름을 한꺼번에 뿌려요.`);
+  }
+
 
   /** 벌레 잡기: 어떤 도구를 들고 있어도 벌레나 벌레 있는 밭을 누르면 잡힌다. */
   function catchBug(index: number, bugEl?: Element | null) {
@@ -819,13 +882,13 @@ export default function Home() {
     if (tool === "hand") return harvest(index);
     if (tool === "water") return waterPlot(index);
     const fertilizer = FERTILIZERS.find(item => item.id === tool);
-    if (fertilizer && plot && crop && !plotStatus(plot, crop, Date.now(), bugPenalty).ready) return fertilize(index, plot, crop, fertilizer);
+    if (fertilizer) return fertilize(index, fertilizer);
     describePlot(index);
   }
 
   function clearWithered(index: number, crop: Crop) {
     const next = [...plots]; next[index] = null; setPlots(next);
-    setNotice(`🥀 계절이 지나 시든 ${crop.name}을(를) 걷어냈어요. 제철 씨앗을 심어볼까요?`);
+    setNotice(`🥀 계절이 지나 시든 ${josa(crop.name, "을를")} 걷어냈어요. 제철 씨앗을 심어볼까요?`);
   }
 
   /** 수확: 수확 도구 범위 안의 다 자란 작물을 한꺼번에 팔아요. 자라는 중·시든 작물은 건드리지 않아요. */
@@ -851,23 +914,23 @@ export default function Home() {
     if (sales.length > 1) return setNotice(`짤랑짤랑~ ${currentHand.icon} ${sales.length}칸을 한꺼번에 수확해서 ${total.toLocaleString()}원에 팔았어요! (${sales.map(sale => sale.crop.icon).join("")})${goldens.length ? ` ✨ 황금 작물 ${goldens.length}개!` : ""}`);
     const { crop, status, base, boosted, amount, golden } = sales[0];
     const parts = [`시세 ${base.toLocaleString()}원`, boosted !== base ? `판매가 효과 ${boosted > base ? "+" : ""}${Math.round((boosted / base - 1) * 100)}%` : "", status.quality.multiplier !== 1 ? `품질 ${status.quality.name} ×${status.quality.multiplier}` : "", status.bugMultiplier < 1 ? `벌레 피해 -${Math.round((1 - status.bugMultiplier) * 100)}%` : "", golden ? "✨ 황금 작물 ×3" : ""].filter(Boolean);
-    setNotice(`${golden ? "✨ 황금 " : ""}짤랑~ ${crop.icon} ${crop.name}을(를) ${amount.toLocaleString()}원에 팔았어요! (${parts.join(" × ")})`);
+    setNotice(`${golden ? "✨ 황금 " : ""}짤랑~ ${crop.icon} ${josa(crop.name, "을를")} ${amount.toLocaleString()}원에 팔았어요! (${parts.join(" × ")})`);
   }
 
   function chooseHand(hand: HarvestTool) {
-    if (ownedHands.includes(hand.id)) { setHandId(hand.id); setTool("hand"); return setNotice(`${hand.icon} ${hand.name}을(를) 들었어요. (${hand.note} 수확)`); }
-    if (money < hand.price) return setNotice(`${hand.name}은(는) ${hand.price.toLocaleString()}원이에요.`);
+    if (ownedHands.includes(hand.id)) { setHandId(hand.id); setTool("hand"); return setNotice(`${hand.icon} ${josa(hand.name, "을를")} 들었어요. (${hand.note} 수확)`); }
+    if (money < hand.price) return setNotice(`${josa(hand.name, "은는")} ${hand.price.toLocaleString()}원이에요.`);
     setMoney(value => value - hand.price); setOwnedHands(items => [...items, hand.id]); setHandId(hand.id); setTool("hand");
     playCoinSound([660, 990, 1320]);
-    setNotice(`${hand.icon} ${hand.name}을(를) 샀어요! 다 자란 작물을 ${hand.note} 범위로 한꺼번에 수확해요.`);
+    setNotice(`${hand.icon} ${josa(hand.name, "을를")} 샀어요! 다 자란 작물을 ${hand.note} 범위로 한꺼번에 수확해요.`);
   }
 
   function choosePlanter(planter: HarvestTool) {
-    if (ownedPlanters.includes(planter.id)) { setPlanterId(planter.id); setTool("seed"); return setNotice(`${planter.icon} ${planter.name}을(를) 들었어요. (${planter.note} 심기)`); }
-    if (money < planter.price) return setNotice(`${planter.name}은(는) ${planter.price.toLocaleString()}원이에요.`);
+    if (ownedPlanters.includes(planter.id)) { setPlanterId(planter.id); setTool("seed"); return setNotice(`${planter.icon} ${josa(planter.name, "을를")} 들었어요. (${planter.note} 심기)`); }
+    if (money < planter.price) return setNotice(`${josa(planter.name, "은는")} ${planter.price.toLocaleString()}원이에요.`);
     setMoney(value => value - planter.price); setOwnedPlanters(items => [...items, planter.id]); setPlanterId(planter.id); setTool("seed");
     playCoinSound([660, 990, 1320]);
-    setNotice(`${planter.icon} ${planter.name}을(를) 샀어요! 빈 밭 ${planter.note}에 씨앗을 한꺼번에 심어요.`);
+    setNotice(`${planter.icon} ${josa(planter.name, "을를")} 샀어요! 빈 밭 ${planter.note}에 씨앗을 한꺼번에 심어요.`);
   }
 
   function expandField() {
@@ -888,11 +951,11 @@ export default function Home() {
 
   function chooseRod(rod: Rod) {
     if (fishState.phase === "game") return;
-    if (ownedRods.includes(rod.id)) { setRodId(rod.id); return setNotice(`${rod.icon} ${rod.name}을(를) 들었어요.`); }
-    if (money < rod.price) return setNotice(`${rod.name}은(는) ${rod.price.toLocaleString()}원이에요.`);
+    if (ownedRods.includes(rod.id)) { setRodId(rod.id); return setNotice(`${rod.icon} ${josa(rod.name, "을를")} 들었어요.`); }
+    if (money < rod.price) return setNotice(`${josa(rod.name, "은는")} ${rod.price.toLocaleString()}원이에요.`);
     setMoney(value => value - rod.price); setOwnedRods(items => [...items, rod.id]); setRodId(rod.id);
     playCoinSound([660, 990, 1320]);
-    setNotice(`${rod.icon} ${rod.name}을(를) 샀어요! ${rod.note}`);
+    setNotice(`${rod.icon} ${josa(rod.name, "을를")} 샀어요! ${rod.note}`);
   }
 
   /** 낚시 장소 이동. 유료 장소는 입장권이 없거나 만료됐으면 새로 산다. */
@@ -917,7 +980,7 @@ export default function Home() {
     // 미끼가 하나도 없으면 무료 낚시터에서는 맨손 낚시로 던질 수 있다(돈이 바닥나도 다시 벌 수 있게).
     const wantBare = selectedBait === BARE_HAND.id || !baits[bait.id];
     const bare = wantBare && currentSpot.price === 0;
-    if (wantBare && !bare) return setNotice(selectedBait === BARE_HAND.id ? "🫳 유료 낚시터에서는 맨손 낚시를 할 수 없어요. 미끼를 고르거나 강가·호숫가로 가요." : `${bait.icon} ${bait.name}이(가) 없어요. 미끼를 사거나 🫳 맨손 낚시를 골라요(강가·호숫가).`);
+    if (wantBare && !bare) return setNotice(selectedBait === BARE_HAND.id ? "🫳 유료 낚시터에서는 맨손 낚시를 할 수 없어요. 미끼를 고르거나 강가·호숫가로 가요." : `${bait.icon} ${josa(bait.name, "이가")} 없어요. 미끼를 사거나 🫳 맨손 낚시를 골라요(강가·호숫가).`);
     if (bare) castBait.current = BARE_HAND;
     else { setBaits(stock => ({ ...stock, [bait.id]: stock[bait.id] - 1 })); castBait.current = bait; }
     window.clearTimeout(fishTimer.current);
@@ -956,14 +1019,14 @@ export default function Home() {
     }
     if (!result.caught) {
       setFishState({ phase: "result", text: `줄이 풀려 ${fish.rarity === "전설" ? "전설의 그림자" : `${fish.rarity} 등급 물고기`}가 달아났어요.`, reward });
-      return setNotice(`💨 놓쳤어요…${reward ? ` 그래도 보물상자에서 ${reward}을(를) 얻었어요!` : ""}`);
+      return setNotice(`💨 놓쳤어요…${reward ? ` 그래도 보물상자에서 ${josa(reward, "을를")} 얻었어요!` : ""}`);
     }
     const price = Math.round(fish.price * (result.perfect ? 1.25 : 1));
     setMoney(value => value + price);
     setFishLog(log => ({ ...log, [fish.id]: (log[fish.id] ?? 0) + 1 }));
     setFishState({ phase: "result", fish, bait, perfect: result.perfect, price, reward });
     playCoinSound(fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" || result.perfect ? [880, 1100, 1320] : [880, 1320]);
-    setNotice(`${fish.rarity === "전설" ? `✨ 전설의 ${fish.name}을(를) 낚았어요!!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚았어요.`}${result.perfect ? " 퍼펙트! +25%" : ""} ${price.toLocaleString()}원${reward ? ` · 보물: ${reward}` : ""}`);
+    setNotice(`${fish.rarity === "전설" ? `✨ 전설의 ${josa(fish.name, "을를")} 낚았어요!!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚았어요.`}${result.perfect ? " 퍼펙트! +25%" : ""} ${price.toLocaleString()}원${reward ? ` · 보물: ${reward}` : ""}`);
   }
 
   // ---------- 도박장(홀짝) ----------
@@ -1201,8 +1264,8 @@ export default function Home() {
     setPlaced(items => [...items, fitToRoom({ ...pet, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(pet, items.length) }, room, yardLevel)]);
     setGachaResult({ item: pet, at: Date.now() });
     playCoinSound(pet.legend ? [523, 659, 784, 1047, 1319, 1568, 2093] : pet.rare ? [660, 880, 1100, 1320, 1760] : [740, 990]);
-    if (pet.legend) return setNotice(`🌈🌈 전설!!! 0.1%의 기적, ${pet.icon} ${pet.name}이(가) 나타났어요!! ${PET_BUFFS[pet.id].title}: ${PET_BUFFS[pet.id].text}`);
-    setNotice(pet.rare ? `✨ 대박! 능력 펫 ${pet.icon} ${pet.name}이(가) 나왔어요! ${PET_BUFFS[pet.id].title}: ${PET_BUFFS[pet.id].text}` : `${pet.icon} ${pet.name}이(가) 나왔어요. 집 안을 귀엽게 돌아다녀요.`);
+    if (pet.legend) return setNotice(`🌈🌈 전설!!! 0.1%의 기적, ${pet.icon} ${josa(pet.name, "이가")} 나타났어요!! ${PET_BUFFS[pet.id].title}: ${PET_BUFFS[pet.id].text}`);
+    setNotice(pet.rare ? `✨ 대박! 능력 펫 ${pet.icon} ${josa(pet.name, "이가")} 나왔어요! ${PET_BUFFS[pet.id].title}: ${PET_BUFFS[pet.id].text}` : `${pet.icon} ${josa(pet.name, "이가")} 나왔어요. 집 안을 귀엽게 돌아다녀요.`);
   }
 
   /** 가구 뽑기: 2,000원. 가챠샵 전용 가구가 일반 60% · 희귀 35% · 전설 5%로 나온다. */
@@ -1218,7 +1281,7 @@ export default function Home() {
     setPlaced(items => [...items, fitToRoom({ ...item, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(item, items.length) }, room, yardLevel)]);
     if (item.tier === "junk") { playSadTrombone(); return setNotice(`🗑️ ${item.icon} ${item.name}… 쓸데없는 상품이에요. 일단 집에 놓아 두었어요. (되팔기 ${Math.round(item.price / 2)}원)`); }
     playCoinSound(item.tier === "legend" ? [523, 659, 784, 1047, 1319, 1568] : item.tier === "rare" ? [660, 880, 1100, 1320] : [740, 990]);
-    setNotice(`${item.tier === "legend" ? "🌈 전설 가구!!" : item.tier === "rare" ? "✨ 희귀 가구!" : "🎁"} ${item.icon} ${item.name}이(가) 나왔어요. 나의 집에 놓아 두었어요.`);
+    setNotice(`${item.tier === "legend" ? "🌈 전설 가구!!" : item.tier === "rare" ? "✨ 희귀 가구!" : "🎁"} ${item.icon} ${josa(item.name, "이가")} 나왔어요. 나의 집에 놓아 두었어요.`);
   }
 
   function sellPet(item: PlacedItem) {
@@ -1227,23 +1290,23 @@ export default function Home() {
     setWarehouse(items => items.filter(entry => entry.instanceId !== item.instanceId));
     if (selectedFurniture === item.instanceId) setSelectedFurniture(null);
     setMoney(value => value + refund);
-    setNotice(`${item.icon} ${item.name}을(를) 새 가족에게 보내고 ${refund.toLocaleString()}원을 받았어요.`);
+    setNotice(`${item.icon} ${josa(item.name, "을를")} 새 가족에게 보내고 ${refund.toLocaleString()}원을 받았어요.`);
   }
 
   function buyFurniture(item: Furniture) {
-    if (money < item.price) return setNotice(`${item.name}을(를) 사려면 ${item.price.toLocaleString()}원이 필요해요.`);
+    if (money < item.price) return setNotice(`${josa(item.name, "을를")} 사려면 ${item.price.toLocaleString()}원이 필요해요.`);
     const instanceId = `${item.id}-${Date.now()}`;
     setMoney(m => m - item.price); setPlaced(p => [...p, fitToRoom({ ...item, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(item, placed.length) }, room, yardLevel)]);
     setSelectedFurniture(instanceId);
-    setNotice(item.pet ? `${item.icon} ${item.name}이(가) 가족이 되었어요! ${PET_BUFFS[item.id].title}: ${PET_BUFFS[item.id].text}` : `${item.icon} ${item.name}을(를) 집에 들였어요. 끌어서 자리를 잡고 원하는 각도로 돌려 보세요.`);
+    setNotice(item.pet ? `${item.icon} ${josa(item.name, "이가")} 가족이 되었어요! ${PET_BUFFS[item.id].title}: ${PET_BUFFS[item.id].text}` : `${item.icon} ${josa(item.name, "을를")} 집에 들였어요. 끌어서 자리를 잡고 원하는 각도로 돌려 보세요.`);
   }
 
   function buyTheme(kind: "wall" | "floor", theme: Theme) {
     const key = `${kind}:${theme.id}`, apply = kind === "wall" ? setWallpaper : setFloor;
     if (ownedThemes.includes(key)) { apply(theme.id); return setNotice(`🎨 ${theme.name}(으)로 바꿨어요.`); }
-    if (money < theme.price) return setNotice(`${theme.name}은(는) ${theme.price.toLocaleString()}원이에요.`);
+    if (money < theme.price) return setNotice(`${josa(theme.name, "은는")} ${theme.price.toLocaleString()}원이에요.`);
     setMoney(value => value - theme.price); setOwnedThemes(items => [...items, key]); apply(theme.id);
-    setNotice(`🎨 ${theme.name}을(를) 시공했어요! 이제 언제든 무료로 바꿀 수 있어요.`);
+    setNotice(`🎨 ${josa(theme.name, "을를")} 시공했어요! 이제 언제든 무료로 바꿀 수 있어요.`);
   }
 
   function updateItem(id: string, patch: Partial<PlacedItem>) {
@@ -1288,14 +1351,14 @@ export default function Home() {
     const refund = Math.round(selectedItem.price * 0.5);
     setPlaced(detachFrom(selectedItem.instanceId));
     setMoney(value => value + refund); setSelectedFurniture(null);
-    setNotice(`${selectedItem.icon} ${selectedItem.name}을(를) 정리하고 ${refund.toLocaleString()}원을 돌려받았어요.`);
+    setNotice(`${selectedItem.icon} ${josa(selectedItem.name, "을를")} 정리하고 ${refund.toLocaleString()}원을 돌려받았어요.`);
   }
 
   function storeFurniture() {
     if (!selectedItem) return;
     setPlaced(detachFrom(selectedItem.instanceId));
     setWarehouse(items => [...items, { ...selectedItem, host: undefined, side: undefined }]); setSelectedFurniture(null);
-    setNotice(`📦 ${selectedItem.name}을(를) 창고에 안전하게 보관했어요.`);
+    setNotice(`📦 ${josa(selectedItem.name, "을를")} 창고에 안전하게 보관했어요.`);
   }
 
   /** 내 펫 관리: 집에 있는 펫은 보관함으로, 보관 중인 펫은 집으로. */
@@ -1303,20 +1366,20 @@ export default function Home() {
     setPlaced(items => items.filter(entry => entry.instanceId !== item.instanceId));
     setWarehouse(items => [...items, item]);
     if (selectedFurniture === item.instanceId) setSelectedFurniture(null);
-    setNotice(`${item.icon} ${item.name}을(를) 펫 보관함으로 옮겼어요.${item.rare || item.legend ? " 보관 중에는 능력 효과가 꺼져요." : ""}`);
+    setNotice(`${item.icon} ${josa(item.name, "을를")} 펫 보관함으로 옮겼어요.${item.rare || item.legend ? " 보관 중에는 능력 효과가 꺼져요." : ""}`);
   }
 
   function restoreFurniture(item: PlacedItem) {
     setWarehouse(items => items.filter(furniture => furniture.instanceId !== item.instanceId));
     setPlaced(items => [...items, fitToRoom({ ...item, ...defaultSpot(item, 2) }, room, yardLevel)]); setSelectedFurniture(item.instanceId);
-    setNotice(`${item.icon} ${item.name}을(를) 창고에서 꺼냈어요. 원하는 곳으로 옮겨주세요.`);
+    setNotice(`${item.icon} ${josa(item.name, "을를")} 창고에서 꺼냈어요. 원하는 곳으로 옮겨주세요.`);
   }
 
   function sellWarehouseFurniture(item: PlacedItem) {
     const refund = Math.round(item.price * 0.5);
     setWarehouse(items => items.filter(furniture => furniture.instanceId !== item.instanceId));
     setMoney(value => value + refund);
-    setNotice(`${item.icon} ${item.name}을(를) 창고에서 판매하고 ${refund.toLocaleString()}원을 받았어요.`);
+    setNotice(`${item.icon} ${josa(item.name, "을를")} 창고에서 판매하고 ${refund.toLocaleString()}원을 받았어요.`);
   }
 
   const selectedCropInfo = CROPS.find(c => c.id === selectedCrop) ?? available[0] ?? CROPS[0];
@@ -1331,7 +1394,7 @@ export default function Home() {
   const toolBanner = tool === "seed" ? <><b>{currentPlanter.icon} {currentPlanter.name}</b> 빈 밭 {currentPlanter.note}에 <b>{selectedCropInfo.icon} {selectedCropInfo.name}</b> 심기 · 씨앗 {seedPrice(selectedCropInfo)}원/칸<small>씨앗은 오른쪽 상자에서 골라요</small></>
     : tool === "hand" ? <><b>{currentHand.icon} {currentHand.name}</b> 다 자란 작물 {currentHand.note} 수확{fieldStats.ready ? ` · 지금 ${fieldStats.ready}칸 수확 가능` : ""}<small>누른 채 쓸면 연달아 거둬요</small></>
     : tool === "water" ? <><b>🚿 {currentCan.name}</b> 목마른 작물 {currentCan.note.split(" · ")[0]}에 물 주기 · 💧 {Math.min(canWater, canMax)}/{canMax}<small>{canWater ? "누른 채 쓸어도 돼요" : "물이 없어요! 🚰 우물(4)"}</small></>
-    : activeFert ? <><b>{activeFert.icon} {activeFert.name}</b> 자라는 작물에 한 번 · {activeFert.price}원<small>{activeFert.note}</small></> : null;
+    : activeFert ? <><b>{currentSpreader.icon} {currentSpreader.name}</b> 자라는 작물 {currentSpreader.note}에 <b>{activeFert.icon} {activeFert.name}</b> · 남은 {fertStock[activeFert.id] ?? 0}개(칸당 1개)<small>{fertStock[activeFert.id] ? `${activeFert.note} · 작물당 1번` : "거름이 없어요! 🌿 거름 상점에서 사 두세요"}</small></> : null;
 
   const cropCards = available.map(crop => {
     const tooLate = isWorkTime && Math.round(crop.seconds * growthMul) > seasonSecondsLeft;
@@ -1368,7 +1431,7 @@ export default function Home() {
       </header>
 
       <section className="season-strip">
-        <div className="season-copy"><span className="eyebrow">REAL-TIME SEASON</span><h2>{isWorkTime ? `${season}의 농장` : "오늘의 농사가 끝났어요"}</h2><p>{isWorkTime ? `${toClock(seasonStart)}—${toClock(seasonEnd)} · ${formatClock(seasonSecondsLeft)} 뒤 ${nextSeason}` : `${startHour}:00—${endHour}:00 사이에 농사를 지을 수 있어요`}</p></div>
+        <div className="season-copy"><span className="eyebrow">REAL-TIME SEASON</span><h2>{isWorkTime ? `${season}의 농장` : "오늘의 농사가 끝났어요"}</h2><p>{isWorkTime ? `${toClock(seasonStart)}—${toClock(seasonEnd)} · ${formatClock(seasonSecondsLeft)} 뒤 ${nextSeason}` : `${startHour}:00—${endHour}:00 사이에 농사를 지을 수 있어요`}</p>{isWorkTime && seasonIndex >= 0 && seasonIndex < 3 && seasonSecondsLeft <= SEASON_WARN_SECONDS && <p className={`season-omen omen-${seasonIndex + 1}`}>🍃 {seasonOmen((["여름", "가을", "겨울"] as const)[seasonIndex], now)}</p>}</div>
         <div className="season-track" aria-label="오늘의 계절 진행도">
           {SEASONS.map((s, i) => <div key={s} className={`season-step ${i === seasonIndex ? "active" : ""}`}><span>{SEASON_ICON[s]}</span><b>{s}</b></div>)}
           <div className="season-fill" style={{ width: `${seasonIndex < 0 ? 0 : (seasonIndex * 25) + seasonProgress / 4}%` }} />
@@ -1399,7 +1462,7 @@ export default function Home() {
         <button className={`can ${tool === "water" ? "on" : ""}`} onClick={() => setTool("water")} aria-pressed={tool === "water"} title={`${currentCan.name} · ${currentCan.note}. 누른 채로 쓸고 지나가도 돼요 (3)`}><b>🚿</b><span>{currentCan.w * currentCan.h > 1 ? `${currentCan.w}×${currentCan.h}칸` : "물뿌리개"}</span><small className="can-meter" aria-label={`물 ${canWater}/${canMax}`}><i style={{ width: `${(Math.min(canWater, canMax) / canMax) * 100}%` }} /></small><small className="can-count">💧 {Math.min(canWater, canMax)}/{canMax}</small><kbd>3</kbd></button>
         <button className={`refill ${canWater === 0 ? "empty" : ""}`} onClick={refillCan} disabled={canWater >= canMax} title="물뿌리개 가득 채우기 (4)"><b>🚰</b><span>우물</span><kbd>4</kbd></button>
         <span className="dock-sep" />
-        {FERTILIZERS.map((item, index) => <button key={item.id} className={`fert ${tool === item.id ? "on" : ""}`} onClick={() => setTool(current => (current === item.id ? "seed" : item.id))} aria-pressed={tool === item.id} title={`${item.name} ${item.price}원 · ${item.note} (${index + 5})`}><b>{item.icon}</b><span>{item.name}</span><small>{item.price}원</small><kbd>{index + 5}</kbd></button>)}
+        {FERTILIZERS.map((item, index) => <button key={item.id} className={`fert ${tool === item.id ? "on" : ""}`} onClick={() => setTool(current => (current === item.id ? "seed" : item.id))} aria-pressed={tool === item.id} title={`${item.name} ${fertStock[item.id] ?? 0}개 남음 · ${item.note} (${index + 5})`}><b>{item.icon}</b><span>{item.name}</span><small className={fertStock[item.id] ? "" : "empty"}>{currentSpreader.w * currentSpreader.h > 1 ? `${currentSpreader.note} · ` : ""}{fertStock[item.id] ?? 0}개</small><kbd>{index + 5}</kbd></button>)}
       </div>}
       {tab === "farm" && <div className="game-grid">
         <section className="farm-panel panel">
@@ -1417,17 +1480,17 @@ export default function Home() {
               const withered = Boolean(plot && seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod);
               const status = plot && crop ? plotStatus(plot, crop, nowMs, bugPenalty) : null;
               const progress = status?.progress ?? 0, bugLeft = plot?.bug ? Math.max(0, BUG_SECONDS - Math.floor((nowMs - plot.bug) / 1000)) : 0;
-              return <div key={index} className={`plot-cell ${hoverArea.includes(index) ? (tool === "water" ? "can-area" : tool === "hand" ? "hand-area" : tool === "seed" ? "seed-area" : "") : ""}`}><button className={`plot ${withered ? "withered" : status?.ready ? "ready" : status?.thirsty ? "thirsty" : ""} ${FERTILIZERS.some(item => item.id === tool) && status && !status.ready && !status.fert && !withered ? "fert-target" : ""} ${status?.fert && !withered ? `fert-${status.fert.id}` : ""}`}
+              return <div key={index} className={`plot-cell ${hoverArea.includes(index) ? (tool === "water" ? "can-area" : tool === "hand" ? "hand-area" : tool === "seed" ? "seed-area" : activeFert ? "fert-area" : "") : ""}`}><button className={`plot ${withered ? "withered" : status?.ready ? "ready" : status?.thirsty ? "thirsty" : ""} ${FERTILIZERS.some(item => item.id === tool) && status && !status.ready && !status.fert && !withered ? "fert-target" : ""} ${status?.fert && !withered ? `fert-${status.fert.id}` : ""}`}
                 onClick={event => { if (tool === "water" && event.detail > 0) return; clickPlot(index); }}
-                onPointerDown={event => { if (tool !== "water" && tool !== "hand" && tool !== "seed") return; event.currentTarget.releasePointerCapture?.(event.pointerId); if (tool === "water") { if (plot?.bug) catchBug(index); else waterPlot(index); } }}
-                onPointerEnter={event => { const reach = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : null;
+                onPointerDown={event => { if (tool !== "water" && tool !== "hand" && tool !== "seed" && !activeFert) return; event.currentTarget.releasePointerCapture?.(event.pointerId); if (tool === "water") { if (plot?.bug) catchBug(index); else waterPlot(index); } }}
+                onPointerEnter={event => { const reach = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : activeFert ? currentSpreader : null;
                   if (reach && (tool === "water" || reach.w * reach.h > 1)) setHoverArea(canArea(index, plotColumns(), plotCount, reach));
                   if (!(event.buttons & 1)) return;
                   if (plot?.bug) return catchBug(index);
-                  if (tool === "water") waterPlot(index); else if (tool === "hand") harvest(index, true); else if (tool === "seed") plant(index, true); }}>
+                  if (tool === "water") waterPlot(index); else if (tool === "hand") harvest(index, true); else if (tool === "seed") plant(index, true); else if (activeFert) fertilize(index, activeFert, true); }}>
                 {status?.fert && !withered && <span className={`fert-tag fert-tag-${status.fert.id}`}>{status.fert.icon} {status.fert.name}</span>}
                 {crop && withered ? <><span className="plant">🥀</span><span className="plot-label">시듦 · 치우기</span></> : crop && status ? <>
-                  <span className="plant">{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span>
+                  <span className={`plant stage-${status.ready ? "ripe" : progress < 35 ? "sprout" : progress < 75 ? "grow" : "mature"}`}>{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span>{status.ready && <span className="ripe-sparkle" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i></span>}
                   <span className="plot-label">{status.ready ? `수확하기 ${status.quality.stars}` : status.thirsty ? "💧 목말라요" : `${Math.floor(progress)}%`}</span>
                   <span className="grow-bar"><i style={{ width: `${progress}%` }} /></span>
                   <span className="plot-badges">{Array.from({ length: status.total }).map((_, k) => <i key={k} className={k < status.satisfied ? "on" : ""}>💧</i>)}{plot?.bugHits ? <i className="hurt">🐛-{Math.round((1 - status.bugMultiplier) * 100)}%</i> : null}</span>
@@ -1444,10 +1507,11 @@ export default function Home() {
           <div className="crop-list">{cropCards}</div>
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `${fieldPrice(ownedPlots).toLocaleString()}원 · ${ownedPlots}/${MAX_PLOTS}칸`}</small><span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span></div><button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>구매</button></div>
           <div className="tool-shop">
-            <div className="tool-shop-tabs" role="tablist" aria-label="도구 상점">{([["seed", "🌱 심기"], ["hand", "🧺 수확"], ["water", "🚿 물뿌리개"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={toolShop === id} className={toolShop === id ? "on" : ""} onClick={() => setToolShop(id)}>{label}</button>)}</div>
-            <small>{toolShop === "seed" ? "좋은 도구일수록 빈 밭 넓은 범위에 씨앗을 한꺼번에 심어요(씨앗값은 칸마다)" : toolShop === "hand" ? "좋은 도구일수록 다 자란 작물을 넓은 범위로 한꺼번에 거둬요" : "좋을수록 물을 많이 담고, 한 번에 여러 칸에 물을 줘요"}</small>
+            <div className="tool-shop-tabs" role="tablist" aria-label="도구 상점">{([["seed", "🌱 심기"], ["hand", "🧺 수확"], ["water", "🚿 물"], ["fert", "🌿 거름"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={toolShop === id} className={toolShop === id ? "on" : ""} onClick={() => setToolShop(id)}>{label}</button>)}</div>
+            <small>{toolShop === "seed" ? "좋은 도구일수록 빈 밭 넓은 범위에 씨앗을 한꺼번에 심어요(씨앗값은 칸마다)" : toolShop === "hand" ? "좋은 도구일수록 다 자란 작물을 넓은 범위로 한꺼번에 거둬요" : toolShop === "fert" ? "거름은 미리 사 두고 칸마다 1개씩 써요. 좋은 뿌리개일수록 자라는 작물 넓은 범위에 한꺼번에 뿌려요" : "좋을수록 물을 많이 담고, 한 번에 여러 칸에 물을 줘요"}</small>
             <div className="can-shop-list">{toolShop === "seed" ? PLANT_TOOLS.map(item => <button key={item.id} className={planterId === item.id ? "on" : ""} onClick={() => choosePlanter(item)} aria-pressed={planterId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 심기</small><em>{planterId === item.id ? "사용 중" : ownedPlanters.includes(item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)
               : toolShop === "hand" ? HARVEST_TOOLS.map(hand => <button key={hand.id} className={handId === hand.id ? "on" : ""} onClick={() => chooseHand(hand)} aria-pressed={handId === hand.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${hand.w}, 1fr)` }}>{Array.from({ length: hand.w * hand.h }).map((_, k) => <i key={k} />)}</span><b>{hand.icon} {hand.name}</b><small>{hand.note} 수확</small><em>{handId === hand.id ? "사용 중" : ownedHands.includes(hand.id) ? "들기" : `${hand.price.toLocaleString()}원`}</em></button>)
+              : toolShop === "fert" ? [...FERTILIZERS.map(item => <div key={item.id} className={`fert-stock ${tool === item.id ? "on" : ""}`}><button className="fert-pick" onClick={() => setTool(item.id)} aria-pressed={tool === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.note}</small><em>{fertStock[item.id] ?? 0}개</em></button><button className="fert-buy" onClick={() => buyFert(item)} disabled={money < item.price * item.pack}>{item.pack}개 {(item.price * item.pack).toLocaleString()}원</button></div>), <b key="spreader-title" className="tool-shop-sub">🧺 거름 뿌리개</b>, ...SPREADERS.map(item => <button key={item.id} className={spreaderId === item.id ? "on" : ""} onClick={() => chooseSpreader(item)} aria-pressed={spreaderId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 거름</small><em>{spreaderId === item.id ? "사용 중" : ownedSpreaders.includes(item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)]
               : CANS.map(can => <button key={can.id} className={canId === can.id ? "on" : ""} onClick={() => chooseCan(can)} aria-pressed={canId === can.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${can.w}, 1fr)` }}>{Array.from({ length: can.w * can.h }).map((_, k) => <i key={k} />)}</span><b>{can.name}</b><small>{can.note}</small><em>{canId === can.id ? "사용 중" : ownedCans.includes(can.id) ? "들기" : `${can.price.toLocaleString()}원`}</em></button>)}</div>
           </div>
           <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~7). 🌱 심기와 🧺 수확은 따로예요. 둘 다 누른 채 밭 위를 쓸면 연달아 돼요.<br />🌿 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.25, 최상 ×1.6).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 어떤 도구로든 눌러 잡으세요(벌레 있는 밭을 눌러도 돼요). 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
@@ -1541,7 +1605,7 @@ export default function Home() {
       {tab === "pets" && (() => { const ids = [...new Set([...placed, ...warehouse].filter(item => item.pet).map(item => item.id))];
         return <section className="panel pet-care-panel">
           <div className="panel-heading"><div><span className="eyebrow">PET CARE</span><h3>펫 돌보기</h3></div><span className="plot-count">{ids.length}마리</span></div>
-          <p className="hint">🍽️ 먹이·🦮 산책·🤗 교감으로 애정도를 채우면 레벨업해요(최대 Lv{PET_MAX_LEVEL}). 레벨이 오를 때마다 그 펫의 능력이 강해져요(×1 → ×1.25 → ×1.5). 능력은 집에 둔 펫만 적용돼요.</p>
+          <p className="hint">🍽️ 먹이·🦮 산책·🤗 교감으로 애정도를 채우면 레벨업해요(최대 Lv{PET_MAX_LEVEL}). 레벨이 오를 때마다 그 펫의 능력이 강해져요(×1 → ×1.15 → ×1.3). 능력은 집에 둔 펫만 적용돼요.</p>
           <div className="pet-food-bar">{PET_FOODS.map(food => <span key={food.id} title={`${food.name} · ${food.note}`}>{food.icon} {petFood[food.id] ?? 0}</span>)}<button className="ghost-button small" onClick={() => { setShopMain("food"); switchTab("gacha"); }}>🛍️ 먹이 사러 가기</button></div>
           {ids.length === 0 ? <p className="empty">아직 펫이 없어요. 🛍️ 상점의 가챠에서 첫 친구를 뽑아 보세요!</p> : <div className="pet-care-grid">{ids.map(id => {
             const item = FURNITURE.find(entry => entry.id === id)!, care = petCare[id] ?? newCare(nowMs), full = fullness(care, nowMs), special = Boolean(item.rare || item.legend), home = placed.some(entry => entry.id === id);
@@ -1687,7 +1751,7 @@ export default function Home() {
             </div>}
             {selectedItem && <div className="tint-row" role="group" aria-label="가구 색상">{TINTS.map(color => <button key={color} className={`tint ${(selectedItem.tint ?? selectedItem.color) === color ? "on" : ""}`} style={{ background: color }} onClick={() => updateItem(selectedItem.instanceId, { tint: color })} aria-label={`색상 ${color}`} />)}<button className="tint reset" onClick={() => updateItem(selectedItem.instanceId, { tint: undefined })} aria-label="기본 색상">↺</button><button className="tint more" onClick={() => setShowPicker(on => !on)} aria-label="더 많은 색" aria-expanded={showPicker} style={{ background: selectedItem.tint ?? selectedItem.color }}>🎨</button></div>}
             {selectedItem && showPicker && <ColorPicker key={selectedItem.instanceId} value={selectedItem.tint ?? selectedItem.color} onChange={hex => updateItem(selectedItem.instanceId, { tint: hex })} onClose={() => setShowPicker(false)} />}
-            {selectedItem?.pet && <>{selectedItem.rare ? <span className="pet-info">{selectedItem.icon} <b>{PET_BUFFS[selectedItem.id].title}</b> {PET_BUFFS[selectedItem.id].text}</span> : <span className="pet-info">{selectedItem.icon} 일반 펫 · 능력 없음</span>}<button onClick={() => { setCheer({ id: selectedItem.instanceId, at: performance.now() }); setNotice(`${selectedItem.icon} ${selectedItem.name}이(가) 기분이 좋아 폴짝 뛰었어요! 💕`); }}>💕 쓰다듬기</button></>}
+            {selectedItem?.pet && <>{selectedItem.rare ? <span className="pet-info">{selectedItem.icon} <b>{PET_BUFFS[selectedItem.id].title}</b> {PET_BUFFS[selectedItem.id].text}</span> : <span className="pet-info">{selectedItem.icon} 일반 펫 · 능력 없음</span>}<button onClick={() => { setCheer({ id: selectedItem.instanceId, at: performance.now() }); setNotice(`${selectedItem.icon} ${josa(selectedItem.name, "이가")} 기분이 좋아 폴짝 뛰었어요! 💕`); }}>💕 쓰다듬기</button></>}
             {selectedItem && <><button onClick={storeFurniture}>📦 창고 보관</button><button className="sell-button" onClick={sellFurniture}>{selectedItem.pet ? "되팔기" : "판매"} (50%)</button></>}
             {selectedFurniture === AVATAR_ID && <><button onClick={() => setShowAvatar(true)}>🪞 아바타 이미지 바꾸기</button>{stories > 1 && avatarPos.story !== viewStory && <button onClick={() => setAvatarPos({ x: 0, z: 0, story: viewStory })}>🧍 아바타를 {viewStory + 1}층으로</button>}</>}
           </div>

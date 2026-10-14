@@ -4,7 +4,8 @@ export type Crop = { id: string; name: string; icon: string; seasons: Season[]; 
 /** water: 물 준 시각들, fert: 준 거름 id. growSeconds는 심을 때(버프·거름 반영) 정해진 성장 시간. */
 /** bug: 지금 앉아 있는 벌레가 날아온 시각, bugHits: 놓친 벌레 수(마리당 판매가 -10%). */
 export type Plot = { cropId: string; plantedAt: number; growSeconds?: number; water?: number[]; fert?: string; bug?: number; bugHits?: number } | null;
-export type Fertilizer = { id: string; name: string; icon: string; price: number; speed: number; quality: number; note: string };
+/** 거름은 미끼처럼 묶음(pack개)으로 사 두고, 한 칸에 1개씩 쓴다. price는 1개 값. */
+export type Fertilizer = { id: string; name: string; icon: string; price: number; pack: number; speed: number; quality: number; note: string };
 export type Quality = { id: "normal" | "good" | "best"; name: string; stars: string; multiplier: number };
 
 export const CROPS: Crop[] = [
@@ -36,10 +37,13 @@ export const CROPS: Crop[] = [
 ];
 
 export const FERTILIZERS: Fertilizer[] = [
-  { id: "compost", name: "퇴비", icon: "🍂", price: 15, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
-  { id: "premium", name: "고급 비료", icon: "🧪", price: 50, speed: 0.25, quality: 1, note: "남은 시간 -25% · 품질 +1" },
-  { id: "golden", name: "황금 비료", icon: "🌟", price: 120, speed: 0.3, quality: 2, note: "남은 시간 -30% · 품질 +2" },
+  { id: "compost", name: "퇴비", icon: "🍂", price: 15, pack: 10, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
+  { id: "premium", name: "고급 비료", icon: "🧪", price: 50, pack: 10, speed: 0.25, quality: 1, note: "남은 시간 -25% · 품질 +1" },
+  { id: "golden", name: "황금 비료", icon: "🌟", price: 120, pack: 5, speed: 0.3, quality: 2, note: "남은 시간 -30% · 품질 +2" },
 ];
+
+/** 처음 시작할 때(또는 예전 저장) 주는 거름. */
+export const STARTER_FERT: Record<string, number> = { compost: 5 };
 
 export const QUALITIES: Quality[] = [
   { id: "normal", name: "보통", stars: "", multiplier: 1 },
@@ -60,7 +64,9 @@ export const CANS: WateringCan[] = [
   { id: "tin", name: "양철 물뿌리개", icon: "🪣", price: 0, capacity: CAN_CAPACITY, w: 1, h: 1, note: "1칸 · 물 5" },
   { id: "copper", name: "구리 물뿌리개", icon: "🟠", price: 1500, capacity: 8, w: 2, h: 1, note: "가로 2칸 · 물 8" },
   { id: "steel", name: "강철 물뿌리개", icon: "⚙️", price: 4000, capacity: 12, w: 4, h: 1, note: "가로 4칸 · 물 12" },
+  { id: "long", name: "긴 물뿌리개", icon: "🪈", price: 7000, capacity: 15, w: 6, h: 1, note: "가로 6칸 · 물 15" },
   { id: "gold", name: "황금 물뿌리개", icon: "🌟", price: 10000, capacity: 18, w: 4, h: 2, note: "4×2칸 · 물 18" },
+  { id: "sprinkler", name: "스프링클러", icon: "⛲", price: 20000, capacity: 24, w: 6, h: 2, note: "6×2칸 · 물 24" },
 ];
 
 /** 수확 도구(맨손 상위 단계): w×h 범위의 다 자란 작물을 한 번에 수확한다. */
@@ -69,7 +75,9 @@ export const HARVEST_TOOLS: HarvestTool[] = [
   { id: "hand", name: "맨손", icon: "✋", price: 0, w: 1, h: 1, note: "1칸" },
   { id: "hoe", name: "호미", icon: "⛏️", price: 2000, w: 2, h: 1, note: "가로 2칸" },
   { id: "sickle", name: "낫", icon: "🌾", price: 6000, w: 4, h: 1, note: "가로 4칸" },
+  { id: "scythe", name: "큰 낫", icon: "🪓", price: 10000, w: 6, h: 1, note: "가로 6칸" },
   { id: "rake", name: "황금 갈퀴", icon: "🔱", price: 15000, w: 4, h: 2, note: "4×2칸" },
+  { id: "combine", name: "콤바인", icon: "🚜", price: 28000, w: 6, h: 2, note: "6×2칸" },
 ];
 
 /** 심기 도구: w×h 범위의 빈 밭에 고른 씨앗을 한 번에 심는다(씨앗값은 칸마다). */
@@ -77,15 +85,27 @@ export const PLANT_TOOLS: HarvestTool[] = [
   { id: "seedhand", name: "손 심기", icon: "🫘", price: 0, w: 1, h: 1, note: "1칸" },
   { id: "trowel", name: "모종삽", icon: "🥄", price: 1500, w: 2, h: 1, note: "가로 2칸" },
   { id: "seeder", name: "씨앗 파종기", icon: "🧺", price: 5000, w: 4, h: 1, note: "가로 4칸" },
+  { id: "rowseeder", name: "줄 파종기", icon: "🛞", price: 9000, w: 6, h: 1, note: "가로 6칸" },
   { id: "tractor", name: "꼬마 트랙터", icon: "🚜", price: 14000, w: 4, h: 2, note: "4×2칸" },
+  { id: "bigtractor", name: "대형 트랙터", icon: "🚛", price: 25000, w: 6, h: 2, note: "6×2칸" },
 ];
 
-/** 밭은 8칸에서 시작해 2칸씩 최대 32칸까지 넓힌다. */
+/** 거름 뿌리개: w×h 범위의 자라는 작물에 고른 거름을 한 번에 준다(거름값은 칸마다). */
+export const SPREADERS: HarvestTool[] = [
+  { id: "pinch", name: "한 줌 뿌리기", icon: "🤏", price: 0, w: 1, h: 1, note: "1칸" },
+  { id: "jar", name: "거름 바가지", icon: "🫙", price: 2000, w: 2, h: 1, note: "가로 2칸" },
+  { id: "cart", name: "비료 수레", icon: "🛒", price: 6000, w: 4, h: 1, note: "가로 4칸" },
+  { id: "longcart", name: "긴 비료 수레", icon: "🚃", price: 9000, w: 6, h: 1, note: "가로 6칸" },
+  { id: "drone", name: "살포 드론", icon: "🚁", price: 15000, w: 4, h: 2, note: "4×2칸" },
+  { id: "bigdrone", name: "대형 살포 드론", icon: "🛸", price: 26000, w: 6, h: 2, note: "6×2칸" },
+];
+
+/** 밭은 8칸에서 시작해 2칸씩 최대 36칸(6열 × 6줄)까지 넓힌다. 도구 범위(1·2·4·6·4×2·6×2)는 이 열 수에 맞춘다. */
 export const START_PLOTS = 8;
-export const MAX_PLOTS = 32;
+export const MAX_PLOTS = 36;
 export function fieldPrice(owned: number) { return 2400 + (owned - START_PLOTS) * 700; }
-/** 밭 칸 수에 따른 열 수(넓은 화면 기준): 16칸까지 4열, 24칸까지 6열, 그 이상 8열. */
-export function fieldColumns(total: number) { return total <= 16 ? 4 : total <= 24 ? 6 : 8; }
+/** 밭 칸 수에 따른 열 수(넓은 화면 기준): 16칸까지 4열, 그 이상은 한 줄 6칸. */
+export function fieldColumns(total: number) { return total <= 16 ? 4 : 6; }
 
 /** 밭 격자(columns열)에서 index를 기준으로 w×h 범위의 밭 번호들. 가장자리에서는 안쪽으로 밀어 넣는다. */
 export function canArea(index: number, columns: number, total: number, can: { w: number; h: number }) {
@@ -127,4 +147,17 @@ export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number, bug
 export function applyFertilizer(plot: NonNullable<Plot>, crop: Crop, fertilizer: Fertilizer, now: number): NonNullable<Plot> {
   const grow = plot.growSeconds ?? crop.seconds, elapsed = (now - plot.plantedAt) / 1000;
   return { ...plot, fert: fertilizer.id, growSeconds: Math.round(elapsed + Math.max(0, grow - elapsed) * (1 - fertilizer.speed)) };
+}
+
+/** 계절이 바뀌기 5분 전에 보여 줄 비유 문구. 다음 계절 기준(직접 "곧 여름"이라고 말하지 않는다). */
+export const SEASON_WARN_SECONDS = 300;
+export const SEASON_OMENS: Record<"여름" | "가을" | "겨울", string[]> = {
+  여름: ["햇살이 점점 따가워지는 것 같아요… 🌞", "어디선가 매미 소리가 들릴 듯 말 듯해요.", "바람이 미지근해졌어요. 그늘이 반가워지네요."],
+  가을: ["바람 끝이 선선해졌어요. 🍂", "하늘이 부쩍 높아 보여요. 잠자리가 한 마리 지나가요.", "나뭇잎 끝이 살짝 물들기 시작했어요."],
+  겨울: ["입김이 하얗게 나오기 시작했어요. ❄️", "나뭇가지가 앙상해졌어요. 손끝이 시려요.", "아침 공기가 차갑게 코끝을 스쳐요."],
+};
+/** 오늘 날짜로 문구 하나를 고른다(하루 동안은 같은 문구). */
+export function seasonOmen(next: "여름" | "가을" | "겨울", date = new Date()) {
+  const list = SEASON_OMENS[next];
+  return list[date.getDate() % list.length];
 }

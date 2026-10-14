@@ -1,6 +1,6 @@
 /**
  * 펫 키우기: 먹이·산책·교감으로 애정도를 올리고, 애정도가 가득 차면 레벨업(최대 3).
- * 레벨이 오를 때마다 그 펫의 능력이 강해진다(능력 배수 Lv1 ×1 · Lv2 ×1.25 · Lv3 ×1.5).
+ * 레벨이 오를 때마다 그 펫의 능력이 강해진다(능력 배수 Lv1 ×1 · Lv2 ×1.15 · Lv3 ×1.3).
  */
 export type PetFood = { id: string; name: string; icon: string; price: number; affection: number; note: string };
 export const PET_FOODS: PetFood[] = [
@@ -13,7 +13,7 @@ export const PET_FOODS: PetFood[] = [
 export const PET_MAX_LEVEL = 3;
 export const AFFECTION_MAX = 100;
 /** 능력 배수: 레벨 1·2·3. */
-export const PET_POWER = [1, 1.25, 1.5];
+export const PET_POWER = [1, 1.15, 1.3];
 
 /** 배부름: 먹이 한 번에 +40, 1분에 1씩 줄어든다. 80 이상이면 배불러서 안 먹는다. */
 export const FULL_PER_FEED = 40;
