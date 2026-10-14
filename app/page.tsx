@@ -1863,10 +1863,8 @@ export default function Home() {
           </div>
         </section>
         <aside className="seed-panel panel">
-          <div className="side-tabs" role="tablist" aria-label="씨앗과 창고">
+          <div className="side-tabs" role="tablist" aria-label="씨앗과 가공">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗</button>
-            <button role="tab" aria-selected={showStorage} className={showStorage ? "on" : ""} onClick={() => setShowStorage(true)}>📦 창고 <small>{storageUsed}/{storageCap}</small></button>
-            <button role="tab" aria-selected={showMissions} className={`${showMissions ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => setShowMissions(true)}>📜 주문 <small>{doneToday.length}/{orders.length}</small>{readyOrders > 0 && <i className="tab-dot" aria-label={`납품 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
             <button role="tab" aria-selected={sidePanel === "workshop"} className={sidePanel === "workshop" ? "on" : ""} onClick={() => setSidePanel("workshop")}>🏺 가공 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot" aria-label={`다 된 가공 ${doneJobs}건`}>{doneJobs}</i>}</button>
           </div>
           {sidePanel === "seed" ? <>
@@ -2188,7 +2186,7 @@ export default function Home() {
       </div>}
 
       <div className="global-quick-actions" aria-label="공용 기능">
-        <button onClick={() => { setShowMissions(true); }}>📜 미션 <small>{doneToday.length}/{orders.length}{readyOrders ? ` · ${readyOrders}건 완료 가능` : ""}</small></button>
+        <button onClick={() => { setShowMissions(true); }}>📜 미션 <kbd>M</kbd><small>{doneToday.length}/{orders.length}{readyOrders ? ` · ${readyOrders}건 완료 가능` : ""}</small></button>
         <button onClick={() => setShowStorage(true)}>📦 통합 창고 <kbd>E</kbd><small>{storageUsed}/{storageCap}</small></button>
       </div>
 

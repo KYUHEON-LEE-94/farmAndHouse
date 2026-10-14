@@ -481,7 +481,7 @@ button { color:inherit; }
 .qty-buy button,.qty-buy input{height:32px}
 
 /* 씨앗 | 창고 탭 */
-.side-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;margin-bottom:12px;border-radius:12px;background:#ece6d6}
+.side-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:4px;margin-bottom:12px;border-radius:12px;background:#ece6d6}
 .side-tabs button{border:0;border-radius:9px;padding:9px 6px;background:transparent;font:700 13px "Gowun Dodum";color:#6b6450;cursor:pointer}
 .side-tabs button.on{background:#fffdf8;color:#24372b;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .side-tabs small{font-size:11px;color:#8a7c5c}
