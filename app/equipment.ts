@@ -4,7 +4,7 @@ export const EFFECT_SLOTS = ['farm', 'fish', 'hunt'] as const;
 export type EffectSlot = typeof EFFECT_SLOTS[number];
 export type EquipmentSlot = EffectSlot | 'weapon' | 'armor';
 export type Equipment = Record<EquipmentSlot, string | null>;
-export type CosmeticEffect = { id: string; slot: EffectSlot; name: string; icon: string; color: string; motion: 'bloom' | 'ring' | 'star' };
+export type CosmeticEffect = { id: string; slot: EffectSlot; name: string; icon: string; color: string; motion: 'bloom' | 'ring' | 'star' | 'flutter' | 'rise' | 'comet' };
 export const SLOT_LABELS: Record<EffectSlot, string> = { farm: '🌱 농사', fish: '🎣 낚시', hunt: '🏹 사냥' };
 export const EFFECTS: CosmeticEffect[] = [
   { id: 'farm-petal', slot: 'farm', name: '벚꽃 흩날림', icon: '🌸', color: '#ef8bac', motion: 'bloom' },
@@ -16,6 +16,15 @@ export const EFFECTS: CosmeticEffect[] = [
   { id: 'hunt-leaf', slot: 'hunt', name: '숲의 메아리', icon: '🍂', color: '#d29056', motion: 'bloom' },
   { id: 'hunt-flame', slot: 'hunt', name: '불꽃 명중', icon: '🔥', color: '#ee8055', motion: 'star' },
   { id: 'hunt-moon', slot: 'hunt', name: '달빛 충격파', icon: '☾', color: '#a99be8', motion: 'ring' },
+  { id: 'farm-butterfly', slot: 'farm', name: '나비의 춤', icon: '🦋', color: '#b88ee0', motion: 'flutter' },
+  { id: 'farm-clover', slot: 'farm', name: '행운의 클로버', icon: '🍀', color: '#69bd75', motion: 'rise' },
+  { id: 'farm-sun', slot: 'farm', name: '햇살 한 줌', icon: '☀', color: '#edbb4b', motion: 'comet' },
+  { id: 'fish-snow', slot: 'fish', name: '서리 물결', icon: '❄', color: '#91cfe9', motion: 'flutter' },
+  { id: 'fish-coral', slot: 'fish', name: '산호의 숨결', icon: '🪸', color: '#ef989c', motion: 'rise' },
+  { id: 'fish-comet', slot: 'fish', name: '유성 낚시', icon: '🌠', color: '#a3a4ee', motion: 'comet' },
+  { id: 'hunt-feather', slot: 'hunt', name: '깃털 바람', icon: '🪶', color: '#c4b8a0', motion: 'flutter' },
+  { id: 'hunt-spirit', slot: 'hunt', name: '숲의 혼불', icon: '🔮', color: '#aa8de1', motion: 'rise' },
+  { id: 'hunt-thunder', slot: 'hunt', name: '번개 일격', icon: '⚡', color: '#f0cf54', motion: 'comet' },
 ];
 export const emptyEquipment = (): Equipment => ({ farm: null, fish: null, hunt: null, weapon: null, armor: null });
 export function effectPool(owned: readonly string[], slot: EffectSlot) { return EFFECTS.filter(effect => effect.slot === slot && !owned.includes(effect.id)); }

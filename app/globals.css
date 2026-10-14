@@ -778,6 +778,9 @@ button { color:inherit; }
 .hunt-sell button.all{background:#24372b;border-color:#24372b;color:#fff}
 
 /* Collectible cosmetic effects and expandable equipment slots. */
+.effect-gacha > .hint { margin:12px 0 16px; line-height:1.6; }
+.effect-gacha > .gacha-button { display:block; max-width:100%; margin-bottom:20px; white-space:normal; line-height:1.5; }
+
 .equipment-layout { display:grid; grid-template-columns:230px minmax(0,1fr); gap:24px; }
 .equipment-tabs,.equipment-actions { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0; }
 .equipment-tabs button,.equipment-slots button,.equipment-reserved { padding:16px; border:1px solid #d8dfd0; border-radius:14px; background:#fafbf6; color:#45553d; }
@@ -803,6 +806,15 @@ button { color:inherit; }
 .cosmetic-ring { position:absolute; left:-20px; top:-20px; width:40px; height:40px; border:2px solid var(--effect-color); border-radius:50%; animation:cosmetic-ring 850ms ease-out both; }
 .motion-ring > i { animation-name:cosmetic-orbit; }
 .motion-star > i { animation-name:cosmetic-star; }
+.motion-flutter > i { animation-name:cosmetic-flutter; }
+.motion-rise > i { animation-name:cosmetic-rise; }
+.motion-comet > i { animation-name:cosmetic-comet; }
+.motion-flutter .cosmetic-ring { border-style:dashed; }
+.motion-rise .cosmetic-ring { border-style:dotted; }
+.motion-comet .cosmetic-ring { border-radius:25%; }
+@keyframes cosmetic-flutter { 0% { opacity:0; transform:rotate(var(--angle)) translateY(-5px) scale(.3); } 25% { opacity:1; } 55% { transform:rotate(calc(var(--angle) - 25deg)) translateY(-40px) rotate(25deg); } 100% { opacity:0; transform:rotate(calc(var(--angle) + 20deg)) translateY(-75px) rotate(-20deg) scale(.6); } }
+@keyframes cosmetic-rise { 0% { opacity:0; transform:rotate(var(--angle)) translateX(12px) rotate(calc(-1 * var(--angle))) scale(.3); } 25% { opacity:1; } 100% { opacity:0; transform:translateY(-75px) rotate(var(--angle)) translateX(45px) rotate(calc(-1 * var(--angle))) scale(1.1); } }
+@keyframes cosmetic-comet { 0% { opacity:0; transform:rotate(var(--angle)) translateY(-75px) scale(.2); } 35% { opacity:1; transform:rotate(var(--angle)) translateY(-12px) scale(1.3); } 100% { opacity:0; transform:rotate(var(--angle)) translateY(55px) scale(.2); } }
 .motion-star .cosmetic-ring { border-radius:20%; transform:rotate(45deg); }
 .harvest-fx .cosmetic-burst > i { font-size:16px; }
 @keyframes cosmetic-bloom { 0% { opacity:0; transform:rotate(var(--angle)) translateY(-8px) scale(.3); } 20% { opacity:1; } 100% { opacity:0; transform:rotate(var(--angle)) translateY(-70px) rotate(100deg) scale(.8); } }

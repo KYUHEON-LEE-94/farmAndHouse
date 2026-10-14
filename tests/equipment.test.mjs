@@ -7,7 +7,7 @@ const { EFFECTS, EFFECT_SLOTS, drawEffect, emptyEquipment, equipEffect, restoreE
 test('each draw stays in category, never repeats, and stops at completion', () => {
   for (const slot of EFFECT_SLOTS) {
     const owned = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < EFFECTS.filter(item => item.slot === slot).length; i++) {
       const item = drawEffect(owned, slot, () => .99);
       assert.equal(item.slot, slot); assert.ok(!owned.includes(item.id)); owned.push(item.id);
     }
