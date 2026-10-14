@@ -788,10 +788,13 @@ export default function Home() {
     const step = GUIDE_STEPS[index];
     if (!step) return closeGuide();
     if (step.tab && step.tab !== tab) switchTab(step.tab);
+    if (step.panel) setSidePanel(step.panel);
+    setShowStorage(step.overlay === "storage");
+    setShowMissions(step.overlay === "missions");
     setGuideStep(index);
   }
   function closeGuide() {
-    setGuideStep(null);
+    setGuideStep(null); setShowStorage(false); setShowMissions(false);
     try { localStorage.setItem(GUIDE_DONE_KEY, "done"); } catch { /* 다음에 또 뜰 수 있음 */ }
   }
   // 지금 단계의 화면 요소를 반짝이게 강조하고 화면 안으로 스크롤한다.

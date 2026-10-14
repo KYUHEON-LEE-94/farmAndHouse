@@ -353,7 +353,7 @@ button { color:inherit; }
 .bait.bare .bait-pick em{color:#4f8a2c;font-weight:700}
 
 /* 기능 소개 가이드 */
-.guide-card{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 32px));padding:16px 18px;border-radius:18px;background:#fffdf8;border:2px solid #24372b;box-shadow:0 18px 50px rgba(30,40,30,.35);animation:guideIn .3s cubic-bezier(.3,1.4,.5,1)}
+.guide-card{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:90;width:min(440px,calc(100vw - 32px));padding:16px 18px;border-radius:18px;background:#fffdf8;border:2px solid #24372b;box-shadow:0 18px 50px rgba(30,40,30,.35);animation:guideIn .3s cubic-bezier(.3,1.4,.5,1)}
 .guide-card.center{top:50%;bottom:auto;transform:translate(-50%,-50%);animation:guideInCenter .3s cubic-bezier(.3,1.4,.5,1)}
 .guide-dim{position:fixed;inset:0;z-index:59;background:rgba(20,28,22,.45)}
 .guide-head{display:flex;align-items:center;gap:8px}
