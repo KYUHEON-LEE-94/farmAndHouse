@@ -20,7 +20,7 @@ import { migrateInventory, pickCategory, replaceCategory, type Inventory, type I
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
 import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, MARKET_DEMAND, OVERFLOW_RATE, SAT_MAX, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
-import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
+import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
 import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
@@ -482,8 +482,8 @@ export default function Home() {
   const petLevel = (id: string) => Math.min(PET_MAX_LEVEL, petCare[id]?.level ?? 1);
   const pw = (id: string) => (pets.has(id) ? PET_POWER[petLevel(id) - 1] : 0);
   const petCanBonus = (pets.has("duck") ? Math.round(2 * pw("duck")) : 0) + (pets.has("blacktortoise") ? Math.round(8 * pw("blacktortoise")) : 0);
-  // 일반 펫은 Lv2부터 "정든 친구": 종류마다 판매가 +1%(Lv2) / +2%(Lv3)
-  const friendBonus = 1 + [...new Set(placed.filter(item => item.pet && !item.rare && !item.legend).map(item => item.id))].reduce((sum, id) => sum + (petLevel(id) - 1) * 0.01, 0);
+  // 일반 펫은 종류마다 레벨당 판매가 +0.01%p.
+  const friendBonus = 1 + [...new Set(placed.filter(item => item.pet && !item.rare && !item.legend).map(item => item.id))].reduce((sum, id) => sum + friendSaleBonus(petLevel(id)), 0);
   const currentCan = CANS.find(item => item.id === canId) ?? CANS[0];
   const currentHand = HARVEST_TOOLS.find(item => item.id === handId) ?? HARVEST_TOOLS[0];
   const currentPlanter = PLANT_TOOLS.find(item => item.id === planterId) ?? PLANT_TOOLS[0];
@@ -541,7 +541,7 @@ export default function Home() {
   }, [loaded]);
 
   // 벌레: 운영 시간 중 주기적으로 자라는 작물 하나에 날아온다. 제때 못 잡으면 그 작물 판매가가 깎인다.
-  useEffect(() => { bugGate.current = { ready: loaded && isWorkTime, plots, dog: 0.25 * pw("dog"), bugChance: wx.bugChance * (pets.has("whitetiger") ? 1 - (petLevel("whitetiger") - 1) * 0.15 : 1), rain: wx.autoWater }; });
+  useEffect(() => { bugGate.current = { ready: loaded && isWorkTime, plots, dog: 0.25 * pw("dog"), bugChance: wx.bugChance * (pets.has("whitetiger") ? 1 - whiteTigerBugReduction(petLevel("whitetiger")) : 1), rain: wx.autoWater }; });
   useEffect(() => {
     if (!loaded) return;
     let lastSpawn = Date.now();
@@ -2112,7 +2112,7 @@ export default function Home() {
       {tab === "pets" && (() => { const ids = [...new Set([...placed, ...warehouse].filter(item => item.pet).map(item => item.id))];
         return <section className="panel pet-care-panel">
           <div className="panel-heading"><div><span className="eyebrow">PET CARE</span><h3>펫 돌보기</h3></div><span className="plot-count">{ids.length}마리</span></div>
-          <p className="hint">🍽️ 먹이·🦮 산책·🤗 교감으로 애정도를 채우면 레벨업해요(최대 Lv{PET_MAX_LEVEL}). 레벨이 오를 때마다 그 펫의 능력이 강해져요(×1 → ×1.15 → ×1.3). 능력은 집에 둔 펫만 적용돼요.</p>
+          <p className="hint">🍽️ 먹이·🦮 산책·🤗 교감으로 애정도를 채우면 레벨업해요(최대 Lv{PET_MAX_LEVEL}). 기본 능력은 레벨당 0.1%씩 조금씩 강해져요. 일반 펫 판매 보너스는 레벨당 +0.01%p예요. 능력은 집에 둔 펫만 적용돼요.</p>
           <div className="pet-food-bar">{PET_FOODS.map(food => <span key={food.id} title={`${food.name} · ${food.note}`}>{food.icon} {petFood[food.id] ?? 0}</span>)}<button className="ghost-button small" onClick={() => { setShopMain("food"); switchTab("gacha"); }}>🛍️ 먹이 사러 가기</button></div>
           {ids.length === 0 ? <p className="empty">아직 펫이 없어요. 🛍️ 상점의 가챠에서 첫 친구를 뽑아 보세요!</p> : <div className="pet-care-grid">{ids.map(id => {
             const item = FURNITURE.find(entry => entry.id === id)!, care = petCare[id] ?? newCare(nowMs), full = fullness(care, nowMs), special = Boolean(item.rare || item.legend), home = placed.some(entry => entry.id === id);
@@ -2120,7 +2120,7 @@ export default function Home() {
             const maxed = care.level >= PET_MAX_LEVEL && care.affection >= AFFECTION_MAX;
             return <article key={id} className={`pet-card ${item.legend ? "legend" : special ? "rare" : ""} ${maxed ? "maxed" : ""}`}>
               <div className="pet-card-top"><span className="furniture-thumb pet-avatar" style={{ "--c": item.color } as CSSProperties}><FurnitureArt id={id} /></span>
-                <div><b>{item.name}</b><span className="pet-level" aria-label={`레벨 ${care.level}`}>{"★".repeat(care.level)}{"☆".repeat(PET_MAX_LEVEL - care.level)} Lv{care.level}</span><small>{home ? "🏡 집에 있음" : "📦 보관 중 · 능력 꺼짐"}</small></div></div>
+                <div><b>{item.name}</b><span className="pet-level" aria-label={`레벨 ${care.level}`}>Lv{care.level} / {PET_MAX_LEVEL}</span><small>{home ? "🏡 집에 있음" : "📦 보관 중 · 능력 꺼짐"}</small></div></div>
               <div className="pet-meter love"><span>💕 애정도</span><span className="bar"><i style={{ width: `${Math.min(100, care.affection)}%` }} /></span><em>{maxed ? "MAX" : `${Math.floor(care.affection)}/${AFFECTION_MAX}`}</em></div>
               <div className={`pet-meter food ${full >= FULL_REFUSE ? "full" : full < 20 ? "hungry" : ""}`}><span>🍽️ 배부름</span><span className="bar"><i style={{ width: `${full}%` }} /></span><em>{full >= FULL_REFUSE ? "배불러요" : full < 20 ? "배고파요!" : Math.round(full)}</em></div>
               <p className="pet-ability"><b>능력</b> {petAbility(id, care.level, special)}{care.level < PET_MAX_LEVEL && <small>다음 Lv{care.level + 1}: {petAbility(id, care.level + 1, special)}</small>}</p>
