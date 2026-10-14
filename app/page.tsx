@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
 import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, WEATHER_RETRY_SECONDS, fetchWeather, weatherEffect, type WeatherState } from "./weather";
-import { BAITS, BARE_HAND, FISH, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
+import { BAITS, BARE_HAND, FISH, LEGEND_CHANCE, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
 import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, laughter, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
@@ -48,6 +48,8 @@ const PALETTES = [
 const initialPlots: Plot[] = Array(8).fill(null);
 /** 파산했을 때 하루 한 번 받는 월루 지원금. */
 const BAILOUT_AMOUNT = 300;
+/** 희귀 어획 버프(이벤트·날씨·고양이) 합산 상한. */
+const FISH_BOOST_MAX = 1.5;
 /** 이 금액 미만이면 파산으로 본다. */
 const BAILOUT_THRESHOLD = 50;
 const BITE_WINDOW_MS = 1300;
@@ -1346,7 +1348,9 @@ export default function Home() {
     // 입질에 맞춰 챘다면 어떤 물고기인지 정해지고, 스타듀밸리식 미니게임이 시작된다.
     const bait = castBait.current ?? BAITS[0];
     const bare = bait.id === BARE_HAND.id;
-    let rolled = rollFish(season, { normal: bait.normalBoost * currentSpot.normalBoost, rare: bait.rareBoost * currentSpot.rareBoost * fishMul * (1 + 0.2 * pw("cat")), legend: bait.legendBoost * currentRod.legendBoost * fishMul * (1 + 0.2 * pw("cat")) });
+    // 희귀 어획: 버프·날씨·고양이를 합쳐 최대 ×1.5. 전설은 미끼·낚싯대만 영향을 준다(버프로 전설이 쏟아지던 사고 방지).
+    const rareBoost = Math.min(FISH_BOOST_MAX, fishMul * (1 + 0.2 * pw("cat")));
+    let rolled = rollFish(season, { normal: bait.normalBoost * currentSpot.normalBoost, rare: bait.rareBoost * currentSpot.rareBoost * rareBoost, legend: bait.legendBoost * currentRod.legendBoost });
     // 맨손 낚시는 전설도 걸리지 않는다(희귀는 rareBoost 0으로 이미 빠짐).
     while (bare && rolled.rarity === "전설") rolled = rollFish(season, { normal: currentSpot.normalBoost, rare: 0, legend: 0 });
     // 전설이 아니면, 날씨·장소 조건에 맞는 특별 물고기가 대신 걸릴 수 있다(맨손 제외).
@@ -1968,7 +1972,7 @@ export default function Home() {
 
       {tab === "fish" && <div className="game-grid">
         <section className="panel fish-panel">
-          <div className="panel-heading"><div><span className="eyebrow">FISHING SPOT</span><h3>{season} {currentSpot.name} {currentSpot.icon}</h3></div><div className="farm-actions"><button className="ghost-button small" onClick={() => setShowAvatar(true)}>🪞 캐릭터 바꾸기</button><span className="plot-count">전설 출현 0.1%</span></div></div>
+          <div className="panel-heading"><div><span className="eyebrow">FISHING SPOT</span><h3>{season} {currentSpot.name} {currentSpot.icon}</h3></div><div className="farm-actions"><button className="ghost-button small" onClick={() => setShowAvatar(true)}>🪞 캐릭터 바꾸기</button><span className="plot-count">전설 출현 {LEGEND_CHANCE * 100}% (고정)</span></div></div>
           <div className="spot-bar" role="group" aria-label="낚시 장소">{SPOTS.map(spot => { const left = spot.price > 0 ? Math.max(0, Math.ceil(((tickets[spot.id] ?? 0) - nowMs) / 1000)) : -1;
             return <button key={spot.id} className={`${spotId === spot.id ? "on" : ""} ${spot.price ? "paid" : ""}`} onClick={() => chooseSpot(spot)} title={spot.note}><b>{spot.icon}</b><span>{spot.name}</span><small>{spot.price === 0 ? "무료" : left > 0 ? `🎫 ${formatClock(left)}` : `${spot.price.toLocaleString()}원/${spot.minutes}분`}</small></button>; })}</div>
           <div className={`pond phase-${fishState.phase} spot-${currentSpot.id}`}>
