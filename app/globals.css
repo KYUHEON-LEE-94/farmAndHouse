@@ -656,3 +656,14 @@ button { color:inherit; }
 /* 미션 팝업: 미션 카드를 여러 열로 */
 .orders-view.big .order-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:start}
 .missions-modal{width:min(1100px,calc(100vw - 32px))}
+
+/* 상단 바의 미션·창고 버튼(화면을 가리지 않는 자리, 모든 탭에서 보임) */
+.top-action{position:relative;cursor:pointer;text-align:left;font:inherit;color:inherit;border:1px solid var(--line)}
+.top-action:hover{border-color:var(--accent);transform:translateY(-1px)}
+.top-action.on{background:#24372b;border-color:#24372b;color:#fff}.top-action.on span{color:#c9d8cb}
+.top-action kbd{font:10px "Gowun Dodum";color:#9aa39c;margin-left:2px}
+.top-action.ready{border-color:#e2557f}
+.top-action .tab-dot{right:-6px;top:-6px}
+@media(max-width:760px){.top-action span{font-size:8px}.top-action kbd{display:none}.top-action strong{font-size:12px}}
+.top-action .ta-label{font-style:normal}
+@media(max-width:760px){.status-cluster{flex-wrap:wrap;row-gap:4px}.top-action{display:flex;align-items:center;gap:4px;padding:6px 8px}.top-action span{font-size:14px}.top-action .ta-label{display:none}}

@@ -1781,6 +1781,8 @@ export default function Home() {
           <div key={tab === "casino" && casinoFx ? casinoFx.id : "money"} className={`status-card money ${tab === "casino" && casinoFx ? (casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "money-gain" : "money-loss") : ""}`}><span>💰 보유 자금</span><strong>{money.toLocaleString()}원</strong>{tab === "casino" && casinoFx && <em className="money-fly">{casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "+" : "-"}{casinoFx.amount.toLocaleString()}원</em>}</div>
           <div className="status-card clock"><span>🕰 {timeLabel}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
           <div className="status-card market-status"><span>📈 다음 시세</span><strong>{formatClock(marketSecondsLeft)}</strong></div>
+          <button className={`status-card top-action ${showMissions ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => { setShowStorage(false); setShowMissions(open => !open); }} aria-label={`미션 ${doneToday.length}/${orders.length} (M)`} title="공용 미션 (M)"><span>📜<em className="ta-label"> 미션</em> <kbd>M</kbd></span><strong>{doneToday.length}/{orders.length}</strong>{readyOrders > 0 && <i className="tab-dot" aria-label={`완료 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
+          <button className={`status-card top-action ${showStorage ? "on" : ""}`} onClick={() => { setShowMissions(false); setShowStorage(open => !open); }} aria-label={`통합 창고 ${storageUsed}/${storageCap} (E)`} title="통합 창고 (E)"><span>📦<em className="ta-label"> 창고</em> <kbd>E</kbd></span><strong>{storageUsed}/{storageCap}</strong></button>
           <button className="icon-button boss-button" onClick={() => setBossMode(true)} aria-label="보스 키: 업무 화면으로 위장 (ESC)" title="보스 키 (ESC)">🙈<small>ESC</small></button>
           <button className={`icon-button account-button ${session ? "on" : ""}`} onClick={() => { setAccountError(""); setShowAccount(true); }} aria-label={session ? `계정: ${session.id}` : "계정 로그인"} title={session ? `${session.id} · 계정 저장 중` : "로그인 · 계정 만들기"}>👤<span>{session ? session.id : "로그인"}</span>{session && <small>☁️</small>}</button>
           <button className="icon-button" onClick={() => setShowSettings(true)} aria-label="시간 설정">⚙</button>
@@ -2185,10 +2187,6 @@ export default function Home() {
         </aside>
       </div>}
 
-      <div className="global-quick-actions" aria-label="공용 기능">
-        <button onClick={() => { setShowMissions(true); }}>📜 미션 <kbd>M</kbd><small>{doneToday.length}/{orders.length}{readyOrders ? ` · ${readyOrders}건 완료 가능` : ""}</small></button>
-        <button onClick={() => setShowStorage(true)}>📦 통합 창고 <kbd>E</kbd><small>{storageUsed}/{storageCap}</small></button>
-      </div>
 
       <section className="bottom-dock">
         <div className="message"><span>✦ 농장 소식</span><p>{notice}</p></div>
