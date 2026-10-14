@@ -15,6 +15,8 @@ export const BAITS: Bait[] = [
   { id: "golden", name: "황금 미끼", icon: "✨", pack: 3, price: 1500, normalBoost: 1.5, rareBoost: 3.5, barBonus: 0.06, note: "희귀 등급 ×3.5 · 막대 아주 길게" },
 ];
 export const STARTER_BAIT: Record<string, number> = { worm: 10 };
+/** 미끼가 하나도 없을 때 무료 낚시터에서 쓰는 맨손 낚시: 입질이 느리고 흔함·보통만 잡힌다(희귀·전설·특별 없음). */
+export const BARE_HAND: Bait = { id: "barehand", name: "맨손 낚시", icon: "🫳", pack: 0, price: 0, normalBoost: 1, rareBoost: 0, barBonus: 0, note: "미끼 없이 · 입질 느림 · 흔함·보통만" };
 
 /**
  * 낚싯대: 미니게임 난이도를 낮춰 준다.

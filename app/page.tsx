@@ -2,12 +2,13 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme } from "./house";
-import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, fetchWeather, weatherEffect, type WeatherState } from "./weather";
-import { BAITS, FISH, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
+import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, WEATHER_RETRY_SECONDS, fetchWeather, weatherEffect, type WeatherState } from "./weather";
+import { BAITS, BARE_HAND, FISH, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
 import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, laughter, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
 import { BET_PRESETS, CHERRY_PAIR, DICE_FACES, MAX_BET, MIN_BET, PARITY_NAME, PAYOUT, SLOT_SYMBOLS, parityOf, rollDice, slotMultiplier, slotReturnRate, spinReel, type Parity, type Roll } from "./casino";
+import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
 import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
@@ -34,6 +35,8 @@ const PALETTES = [
 ];
 
 const initialPlots: Plot[] = Array(8).fill(null);
+/** 파산했을 때 하루 한 번 받는 월루 지원금. */
+const BAILOUT_AMOUNT = 300;
 const BITE_WINDOW_MS = 1300;
 
 function marketPrice(crop: Crop, bucket: number) {
@@ -273,6 +276,8 @@ export default function Home() {
   const [spotConfirm, setSpotConfirm] = useState<FishingSpot | null>(null);
   const [weather, setWeather] = useState<WeatherState | null>(null);
   const [weatherPlace, setWeatherPlace] = useState(DEFAULT_PLACE);
+  const [weatherFailed, setWeatherFailed] = useState(false);
+  const [weatherTry, setWeatherTry] = useState(0);
   const [tickets, setTickets] = useState<Record<string, number>>({});
   const [buffs, setBuffs] = useState<Buff[]>([]);
   const [activeEvent, setActiveEvent] = useState<ActiveEvent | null>(null);
@@ -293,6 +298,18 @@ export default function Home() {
   const [offWork, setOffWork] = useState<{ earned: number } | null>(null);
   const [notifyOffWork, setNotifyOffWork] = useState(false);
   const [dayStart, setDayStart] = useState<{ date: string; money: number } | null>(null);
+  const [lastBailout, setLastBailout] = useState<string | null>(null);
+  // 계정: 로그인하면 진행 상황을 서버에 맡기고, 다른 기기에서 같은 아이디로 불러온다.
+  const [session, setSession] = useState<Session | null>(null);
+  const [showAccount, setShowAccount] = useState(false);
+  const [accountMode, setAccountMode] = useState<"login" | "register">("login");
+  const [accountForm, setAccountForm] = useState({ id: "", password: "", confirm: "" });
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [cloudAt, setCloudAt] = useState<number | null>(null);
+  const [pendingLoad, setPendingLoad] = useState<{ save: string; updatedAt: number; session: Session } | null>(null);
+  const suspendSave = useRef(false);
+  const lastSynced = useRef("");
   const offGate = useRef({ isWorkTime: false, secondsLeft: -1, money: 0, notify: false, dayStart: null as { date: string; money: number } | null, endHour: 18 });
   const [loaded, setLoaded] = useState(false);
   const fishTimer = useRef<number | undefined>(undefined);
@@ -302,6 +319,7 @@ export default function Home() {
   const bugGate = useRef<{ ready: boolean; plots: Plot[]; dog: boolean; bugChance: number; rain: boolean }>({ ready: false, plots: [], dog: false, bugChance: 1, rain: false });
 
   useEffect(() => {
+    setSession(readSession());
     const saved = localStorage.getItem("four-seasons-farm");
     if (saved) {
       try {
@@ -312,7 +330,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null);
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null);
         let petIndex = 0;
         const movePetOut = (item: PlacedItem): PlacedItem => (!data.petsInYard && item.pet ? { ...item, story: 0, x: ((petIndex++ % 6) - 2.5) * 0.9, z: room.depth / 2 + 1.3 + Math.floor((petIndex - 1) / 6) * 0.9 } : item);
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
@@ -330,9 +348,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, casinoStats, notifyOffWork, dayStart, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, casinoStats, notifyOffWork, dayStart, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+    if (!loaded || suspendSave.current) return;
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, casinoStats, notifyOffWork, dayStart, lastBailout, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, casinoStats, notifyOffWork, dayStart, lastBailout, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -361,6 +379,19 @@ export default function Home() {
   const currentPlanter = PLANT_TOOLS.find(item => item.id === planterId) ?? PLANT_TOOLS[0];
   const canMax = currentCan.capacity + (pets.has("duck") ? 2 : 0) + (pets.has("blacktortoise") ? 8 : 0);
   const bugPenalty = pets.has("whitetiger") ? 0 : pets.has("weasel") ? BUG_PENALTY / 2 : BUG_PENALTY;
+  const noBait = Object.values(baits).every(count => !count);
+  const today = now.toDateString();
+  // 파산: 가장 싼 제철 씨앗도 못 사고, 밭에 이번 계절 작물이 없고, 미끼도 없을 때.
+  const broke = loaded && money < Math.min(...available.map(crop => Math.round(crop.seed * seedMul * (pets.has("rabbit") ? 0.95 : 1)))) && noBait && !plots.some(plot => plot && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod);
+  const showBailout = broke && isWorkTime && lastBailout !== today && !activeEvent && !offWork && !spotConfirm && !bossMode && !showSettings && !showAvatar && !showAccount && (fishState.phase === "idle" || fishState.phase === "result");
+  function takeBailout() {
+    setMoney(value => value + BAILOUT_AMOUNT); setLastBailout(today); playCoinSound([523, 659, 784]);
+    setNotice(`🦝 너구리가 슬쩍 ${BAILOUT_AMOUNT}원을 쥐여 줬어요. 지원금은 하루에 한 번뿐! 아껴 써요.`);
+  }
+  function goBareFishing() {
+    if (currentSpot.price > 0) setSpotId("river");
+    switchTab("fish");
+  }
   const seedPrice = (crop: Crop) => Math.round(crop.seed * seedMul * (pets.has("rabbit") ? 0.95 : 1));
   const salePrice = (crop: Crop) => Math.round(marketPrice(crop, marketBucket) * priceMul * (pets.has("gumiho") ? 1.15 : 1));
   const selectedItem = placed.find(item => item.instanceId === selectedFurniture) ?? null;
@@ -373,7 +404,7 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -486,15 +517,16 @@ export default function Home() {
     return () => { document.title = original; };
   }, [bossMode, bossTheme]);
 
-  // 실제 날씨: 처음과 30분마다 가져온다. 실패하면(오프라인 등) 날씨 효과 없이 진행한다.
+  // 실제 날씨: 처음과 30분마다 가져온다. 실패하면(오프라인·응답 없음) 1분 뒤 다시 시도하고, 그동안은 날씨 효과 없이 진행한다.
   useEffect(() => {
     if (!loaded) return;
-    let cancelled = false;
-    const load = () => fetchWeather(weatherPlace.lat, weatherPlace.lon, weatherPlace.name).then(state => { if (!cancelled) setWeather(state); }).catch(() => { /* 오프라인: 효과 없음 */ });
+    let cancelled = false, timer = 0;
+    const load = () => fetchWeather(weatherPlace.lat, weatherPlace.lon, weatherPlace.name)
+      .then(state => { if (cancelled) return; setWeather(state); setWeatherFailed(false); timer = window.setTimeout(load, WEATHER_REFRESH_MINUTES * 60000); })
+      .catch(() => { if (cancelled) return; setWeatherFailed(true); timer = window.setTimeout(load, WEATHER_RETRY_SECONDS * 1000); });
     load();
-    const timer = setInterval(load, WEATHER_REFRESH_MINUTES * 60000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [loaded, weatherPlace]);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [loaded, weatherPlace, weatherTry]);
 
   function useMyLocation() {
     if (!navigator.geolocation) return setNotice("이 기기에서는 위치를 쓸 수 없어요. 서울 날씨로 계속할게요.");
@@ -503,6 +535,82 @@ export default function Home() {
       () => setNotice("위치 권한이 없어 서울 날씨를 계속 쓸게요."),
       { timeout: 8000, maximumAge: 3600000 },
     );
+  }
+
+  // ---------- 계정 ----------
+  /** 바뀐 진행 상황이 있으면 계정에 올린다. */
+  async function syncCloud(force = false) {
+    if (!session || suspendSave.current) return;
+    const save = packSave();
+    if (!force && save === lastSynced.current) return;
+    try {
+      const reply = await accountCall({ action: "save", token: session.token, save });
+      lastSynced.current = save; setCloudAt(reply.updatedAt ?? Date.now());
+      if (force) setNotice("☁️ 계정에 지금 진행 상황을 저장했어요.");
+    } catch (error) {
+      if (error instanceof AccountError && error.status === 401) { writeSession(null); setSession(null); setNotice("☁️ 로그인이 만료됐어요. 👤 계정에서 다시 로그인해 주세요."); }
+      else if (force) setNotice(`☁️ 저장하지 못했어요: ${(error as Error).message}`);
+    }
+  }
+  const syncRef = useRef(syncCloud);
+  useEffect(() => { syncRef.current = syncCloud; });
+  useEffect(() => {
+    if (!session) return;
+    const timer = setInterval(() => syncRef.current(), CLOUD_SYNC_SECONDS * 1000);
+    const onHide = () => { if (document.visibilityState === "hidden") syncRef.current(); };
+    document.addEventListener("visibilitychange", onHide);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onHide); };
+  }, [session]);
+
+  /** 계정의 저장을 이 기기에 덮어쓰고 새로 시작한다. */
+  function applyCloudSave(save: string, next: Session) {
+    suspendSave.current = true;
+    // 덮어쓰기 전에 이 기기의 게임을 따로 백업해 둔다(혹시 모를 실수 대비).
+    try { localStorage.setItem("four-seasons-farm-before-cloud", packSave()); } catch { /* 공간 부족: 백업 없이 진행 */ }
+    if (!unpackSave(save)) { suspendSave.current = false; return setAccountError("저장 데이터를 읽지 못했어요."); }
+    lastSynced.current = save; writeSession(next);
+    window.location.reload();
+  }
+
+  async function submitAccount(event: React.FormEvent) {
+    event.preventDefault();
+    const id = accountForm.id.trim().toLowerCase();
+    if (accountMode === "register" && accountForm.password !== accountForm.confirm) return setAccountError("비밀번호 확인이 맞지 않아요.");
+    setAccountBusy(true); setAccountError("");
+    try {
+      if (accountMode === "register") {
+        const save = packSave();
+        const reply = await accountCall({ action: "register", id, password: accountForm.password, save });
+        const next = { id, token: reply.token! }; writeSession(next); setSession(next);
+        lastSynced.current = save; setCloudAt(reply.updatedAt ?? Date.now());
+        setAccountForm({ id: "", password: "", confirm: "" }); setShowAccount(false);
+        setNotice(`👤 ${id} 계정을 만들었어요! 지금 진행 상황을 계정에 저장했어요. 다른 기기에서 같은 아이디로 불러올 수 있어요.`);
+      } else {
+        const reply = await accountCall({ action: "login", id, password: accountForm.password });
+        const next = { id, token: reply.token! };
+        setAccountForm({ id: "", password: "", confirm: "" });
+        // 계정에 게임이 있으면, 불러올지 덮어쓸지 고르기 전까지는 로그인(자동 저장)을 시작하지 않는다.
+        // 그래야 새 기기의 빈 게임이 계정의 게임을 덮어쓰는 일이 없다.
+        if (reply.save) setPendingLoad({ save: reply.save, updatedAt: reply.updatedAt ?? 0, session: next });
+        else { writeSession(next); setSession(next); setShowAccount(false); setNotice(`👤 ${id}(으)로 로그인했어요.`); window.setTimeout(() => syncRef.current(true), 0); }
+      }
+    } catch (error) {
+      setAccountError((error as Error).message);
+    } finally { setAccountBusy(false); }
+  }
+
+  async function reloadFromCloud() {
+    if (!session) return;
+    setAccountBusy(true); setAccountError("");
+    try { const reply = await accountCall({ action: "load", token: session.token }); if (reply.save) setPendingLoad({ save: reply.save, updatedAt: reply.updatedAt ?? 0, session }); else setAccountError("계정에 저장된 게임이 아직 없어요."); }
+    catch (error) { setAccountError((error as Error).message); }
+    finally { setAccountBusy(false); }
+  }
+
+  async function logout() {
+    if (session) { await syncRef.current(); accountCall({ action: "logout", token: session.token }).catch(() => undefined); }
+    writeSession(null); setSession(null); setCloudAt(null); setPendingLoad(null); lastSynced.current = "";
+    setNotice("👤 로그아웃했어요. 이 기기의 게임은 그대로 남아 있어요.");
   }
 
   function switchTab(next: typeof tab) {
@@ -718,14 +826,18 @@ export default function Home() {
     if (!isWorkTime) return setNotice("밤에는 강물이 차가워 낚시터가 쉬어요.");
     if (currentSpot.price > 0 && (tickets[currentSpot.id] ?? 0) <= Date.now()) return setNotice(`🎫 ${currentSpot.name} 입장권이 만료됐어요. 다시 사거나 무료 낚시터로 이동하세요.`);
     const bait = BAITS.find(item => item.id === selectedBait) ?? BAITS[0];
-    if (!baits[bait.id]) return setNotice(`${bait.icon} ${bait.name}이(가) 없어요. 미끼 가방에서 사 주세요.`);
-    setBaits(stock => ({ ...stock, [bait.id]: stock[bait.id] - 1 })); castBait.current = bait;
+    // 미끼가 하나도 없으면 무료 낚시터에서는 맨손 낚시로 던질 수 있다(돈이 바닥나도 다시 벌 수 있게).
+    const bare = !baits[bait.id] && noBait && currentSpot.price === 0;
+    if (!baits[bait.id] && !bare) return setNotice(noBait ? `🫳 미끼가 없어요. 무료 낚시터(강가·호숫가)에서는 맨손 낚시를 할 수 있어요.` : `${bait.icon} ${bait.name}이(가) 없어요. 미끼 가방에서 다른 미끼를 고르거나 사 주세요.`);
+    if (bare) castBait.current = BARE_HAND;
+    else { setBaits(stock => ({ ...stock, [bait.id]: stock[bait.id] - 1 })); castBait.current = bait; }
     window.clearTimeout(fishTimer.current);
     setFishState({ phase: "waiting" });
+    if (bare) setNotice("🫳 미끼 없이 맨손으로 기다려요… 입질이 느리고 흔한 물고기만 와요.");
     fishTimer.current = window.setTimeout(() => {
       setFishState({ phase: "bite" });
       fishTimer.current = window.setTimeout(() => setFishState({ phase: "result", text: "앗, 물고기가 미끼만 먹고 달아났어요." }), BITE_WINDOW_MS);
-    }, 2000 + Math.random() * 3500);
+    }, bare ? 6000 + Math.random() * 6000 : 2000 + Math.random() * 3500);
   }
 
   function reelIn() {
@@ -733,9 +845,12 @@ export default function Home() {
     if (fishState.phase === "waiting") return setFishState({ phase: "result", text: "너무 일찍 챘어요! 미끼만 날리고 물고기는 도망갔어요." });
     // 입질에 맞춰 챘다면 어떤 물고기인지 정해지고, 스타듀밸리식 미니게임이 시작된다.
     const bait = castBait.current ?? BAITS[0];
-    const rolled = rollFish(season, { normal: bait.normalBoost * currentSpot.normalBoost, rare: bait.rareBoost * currentSpot.rareBoost * fishMul * (pets.has("cat") ? 1.2 : 1) });
-    // 전설이 아니면, 날씨·장소 조건에 맞는 특별 물고기가 대신 걸릴 수 있다.
-    const fish = rolled.rarity === "전설" ? rolled : rollSpecialFish(weather?.kind, currentSpot.id) ?? rolled;
+    const bare = bait.id === BARE_HAND.id;
+    let rolled = rollFish(season, { normal: bait.normalBoost * currentSpot.normalBoost, rare: bait.rareBoost * currentSpot.rareBoost * fishMul * (pets.has("cat") ? 1.2 : 1) });
+    // 맨손 낚시는 전설도 걸리지 않는다(희귀는 rareBoost 0으로 이미 빠짐).
+    while (bare && rolled.rarity === "전설") rolled = rollFish(season, { normal: currentSpot.normalBoost, rare: 0 });
+    // 전설이 아니면, 날씨·장소 조건에 맞는 특별 물고기가 대신 걸릴 수 있다(맨손 제외).
+    const fish = rolled.rarity === "전설" || bare ? rolled : rollSpecialFish(weather?.kind, currentSpot.id) ?? rolled;
     setFishState({ phase: "game", fish, bait });
     setNotice(`🎣 걸렸다! ${fish.rarity === "전설" ? "엄청난 힘이 느껴져요…!" : "초록 막대 안에 물고기를 가둬요!"}`);
   }
@@ -1146,6 +1261,7 @@ export default function Home() {
   const currentSpot = SPOTS.find(item => item.id === spotId) ?? SPOTS[0];
   const phoenix = pets.has("phoenix");
   const gameRod = useMemo(() => ({ ...currentRod, gain: currentRod.gain * (phoenix ? 1.25 : 1), treasure: currentRod.treasure + currentSpot.treasureBonus }), [currentRod, currentSpot, phoenix]);
+  const bareReady = !baits[currentBait.id] && noBait && currentSpot.price === 0;
   const ticketLeft = currentSpot.price > 0 ? Math.max(0, Math.ceil(((tickets[currentSpot.id] ?? 0) - nowMs) / 1000)) : -1;
 
   return (
@@ -1157,6 +1273,7 @@ export default function Home() {
           <div className="status-card clock"><span>🕰 {timeLabel}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
           <div className="status-card market-status"><span>📈 다음 시세</span><strong>{formatClock(marketSecondsLeft)}</strong></div>
           <button className="icon-button boss-button" onClick={() => setBossMode(true)} aria-label="보스 키: 업무 화면으로 위장 (ESC)" title="보스 키 (ESC)">🙈<small>ESC</small></button>
+          <button className={`icon-button account-button ${session ? "on" : ""}`} onClick={() => { setAccountError(""); setShowAccount(true); }} aria-label={session ? `계정: ${session.id}` : "계정 로그인"} title={session ? `${session.id} · 계정 저장 중` : "계정으로 저장하기"}>👤{session && <small>☁️</small>}</button>
           <button className="icon-button" onClick={() => setShowSettings(true)} aria-label="시간 설정">⚙</button>
         </div>
       </header>
@@ -1170,7 +1287,7 @@ export default function Home() {
       </section>
 
       <section className="buff-bar" aria-label="적용 중인 효과">
-        <span className={`buff-chip weather wx-${weather?.kind ?? "none"}`} title={wx.notes.join(" · ")}><b>{wx.icon} {weather ? `${weatherPlace.name} ${wx.name} ${weather.temp}°` : "날씨 불러오는 중…"}</b>{wx.notes.slice(0, 2).join(" · ")}{wx.notes.length > 2 ? " …" : ""}<button onClick={useMyLocation} aria-label="내 위치 날씨로 바꾸기" title="내 위치 날씨 쓰기">📍</button></span>
+        <span className={`buff-chip weather wx-${weather?.kind ?? "none"}`} title={wx.notes.join(" · ")}><b>{wx.icon} {weather ? `${weatherPlace.name} ${wx.name} ${weather.temp}°` : weatherFailed ? "날씨를 못 불러왔어요" : "날씨 불러오는 중…"}</b>{!weather && weatherFailed && <button onClick={() => setWeatherTry(value => value + 1)} aria-label="날씨 다시 불러오기" title="다시 불러오기">🔄</button>}{wx.notes.slice(0, 2).join(" · ")}{wx.notes.length > 2 ? " …" : ""}<button onClick={useMyLocation} aria-label="내 위치 날씨로 바꾸기" title="내 위치 날씨 쓰기">📍</button></span>
         {[...pets].map(id => { const item = FURNITURE.find(entry => entry.id === id)!; return <span key={id} className="buff-chip pet" title={PET_BUFFS[id].text}><b>{item.icon} {PET_BUFFS[id].title}</b>{PET_BUFFS[id].text}</span>; })}
         {activeBuffs.map(buff => { const info = BUFF_INFO[buff.kind], good = info.good(buff.multiplier), percent = Math.round((buff.multiplier - 1) * 100);
           return <span key={buff.id} className={`buff-chip ${good ? "good" : "bad"}`}><b>{good ? "▲" : "▼"} {buff.label}</b>{info.name} {percent > 0 ? "+" : ""}{percent}%<i>{formatClock(Math.ceil((buff.expiresAt - nowMs) / 1000))}</i></span>; })}
@@ -1202,6 +1319,7 @@ export default function Home() {
             <span className={fieldStats.thirsty ? "warn" : ""} title="목마름">💧 {fieldStats.thirsty}</span>
             <span className={fieldStats.bugs ? "bad" : ""} title="벌레">🐛 {fieldStats.bugs}</span>
           </div></div>
+          {broke && lastBailout === today && <div className="broke-banner">💸 돈이 바닥났어요. 오늘 지원금은 이미 받았어요. <b>🎣 강가에서 맨손 낚시</b>로 다시 벌어 봐요!<button onClick={goBareFishing}>낚시하러 가기</button></div>}
           <div className={`tool-banner tb-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>{toolBanner}</div>
           <div ref={plotsRef} onPointerLeave={() => setHoverArea([])} className={`plots plots-${plotCount} cols-${fieldColumns(plotCount)} hand-${handId} planter-${planterId} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
             {Array.from({ length: plotCount }).map((_, index) => {
@@ -1266,8 +1384,8 @@ export default function Home() {
             </div>}
           </div>
           <div className="fish-controls">
-            <p>{fishState.phase === "game" ? "🐟 물고기를 초록 막대 안에! 누르고 있으면 올라가고, 떼면 내려가요. 🎁가 보이면 막대에 함께 담아 보세요." : fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : `${currentRod.icon} ${currentRod.name} · ${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
-            {fishState.phase === "game" ? null : fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime || !baits[currentBait.id]}>{fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
+            <p>{fishState.phase === "game" ? "🐟 물고기를 초록 막대 안에! 누르고 있으면 올라가고, 떼면 내려가요. 🎁가 보이면 막대에 함께 담아 보세요." : fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : bareReady ? `${currentRod.icon} ${currentRod.name} · 🫳 미끼가 없어 맨손 낚시를 해요 (입질 느림 · 흔함·보통만, 공짜)` : `${currentRod.icon} ${currentRod.name} · ${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
+            {fishState.phase === "game" ? null : fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime || (!baits[currentBait.id] && !bareReady)}>{bareReady ? "🫳 맨손으로 던지기" : fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
           </div>
         </section>
         <aside className="panel fish-book">
@@ -1506,6 +1624,15 @@ export default function Home() {
         <div className="spot-modal-actions"><button className="ghost-button" onClick={() => setSpotConfirm(null)}>그만두기</button><button className="save-button" onClick={() => chooseSpot(spotConfirm)} disabled={money < spotConfirm.price}>{money < spotConfirm.price ? "돈이 모자라요" : `🎫 입장권 사고 입장 (${spotConfirm.price.toLocaleString()}원)`}</button></div>
       </section></div>}
 
+      {showBailout && <div className="modal-backdrop"><section className="modal bailout-modal" role="dialog" aria-labelledby="bailout-title">
+        <div className="bailout-raccoon" aria-hidden="true">🦝<span>💸</span></div>
+        <h3 id="bailout-title">월루 지원금</h3>
+        <p className="bailout-line">“…다 잃었어? 쯧. 미안해서 그래.<br />오늘만이야. 다음에 꼭 갚아.”</p>
+        <div className="offwork-summary"><span>지원금 (하루 1번)</span><b className="plus">+{BAILOUT_AMOUNT.toLocaleString()}원</b></div>
+        <p className="bailout-tip">🌱 싼 씨앗부터 심거나, 🎣 강가에서 미끼 없이 맨손 낚시로도 벌 수 있어요.</p>
+        <button className="save-button" onClick={takeBailout}>고맙게 받기 🙏</button>
+      </section></div>}
+
       {offWork && <div className="modal-backdrop offwork-backdrop"><section className="modal offwork-modal" role="dialog" aria-labelledby="offwork-title">
         <div className="offwork-confetti" aria-hidden="true">{["🎉", "✨", "🎊", "💼", "🏃", "🎉", "✨", "🍻", "🎊", "🌙"].map((icon, i) => <i key={i} style={{ left: `${5 + i * 9.5}%`, animationDelay: `${(i % 5) * 0.15}s` }}>{icon}</i>)}</div>
         <div className="offwork-avatar">{avatarImg}</div>
@@ -1513,6 +1640,39 @@ export default function Home() {
         <p className="offwork-sub">{endHour}:00, 퇴근 시간이에요! 🏃💨<br />오늘도 월급 루팡 대성공~</p>
         <div className="offwork-summary"><span>오늘 {offWork.earned >= 0 ? "번 돈" : "쓴 돈"}</span><b className={offWork.earned >= 0 ? "plus" : "minus"}>{offWork.earned >= 0 ? "+" : "-"}{Math.abs(offWork.earned).toLocaleString()}원</b></div>
         <button className="save-button" onClick={() => setOffWork(null)}>퇴근하기 🏃‍♂️</button>
+      </section></div>}
+
+      {showAccount && <div className="modal-backdrop"><section className="modal account-modal" role="dialog" aria-labelledby="account-title">
+        <button className="modal-close" onClick={() => { setShowAccount(false); setPendingLoad(null); }} aria-label="닫기">×</button>
+        <span className="eyebrow">ACCOUNT</span><h3 id="account-title">{pendingLoad ? "저장된 게임 불러오기" : session ? `👤 ${session.id}` : "계정"}</h3>
+        {pendingLoad ? <>
+          <p>이 계정에 저장된 게임이 있어요.<br /><b>마지막 저장 {new Date(pendingLoad.updatedAt).toLocaleString("ko-KR")}</b>{saveSummary(pendingLoad.save) ? ` · 보유 자금 ${saveSummary(pendingLoad.save)!.money.toLocaleString()}원` : ""}</p>
+          <p className="account-warn">불러오면 이 기기의 지금 진행 상황(보유 자금 {money.toLocaleString()}원)은 계정의 게임으로 바뀌어요. (이 기기 게임은 백업해 둬요)</p>
+          <div className="account-actions">
+            <button className="save-button" onClick={() => applyCloudSave(pendingLoad.save, pendingLoad.session)}>☁️ 계정 게임 불러오기</button>
+            <button className="ghost-button" onClick={() => { if (!window.confirm(`계정에 저장된 게임(보유 자금 ${(saveSummary(pendingLoad.save)?.money ?? 0).toLocaleString()}원)을 지우고 이 기기의 게임으로 바꿀까요? 되돌릴 수 없어요.`)) return; const next = pendingLoad.session; writeSession(next); setSession(next); setPendingLoad(null); setShowAccount(false); accountCall({ action: "save", token: next.token, save: packSave() }).then(reply => { lastSynced.current = packSave(); setCloudAt(reply.updatedAt ?? Date.now()); setNotice("☁️ 이 기기의 게임을 계정에 저장했어요."); }).catch(error => setNotice(`☁️ 저장하지 못했어요: ${(error as Error).message}`)); }}>이 기기 게임을 계정에 덮어쓰기</button>
+            <button className="ghost-button" onClick={() => { setPendingLoad(null); if (!session) setShowAccount(false); }}>{session ? "취소" : "취소 (로그인 안 함)"}</button>
+          </div>
+        </> : session ? <>
+          <p>로그인 중이에요. 진행 상황이 {CLOUD_SYNC_SECONDS}초마다 계정에 자동 저장돼요.<br />다른 기기(웹·위젯)에서 같은 아이디로 로그인하면 이어서 할 수 있어요.</p>
+          <p className="account-sync">☁️ {cloudAt ? `마지막 저장 ${new Date(cloudAt).toLocaleTimeString("ko-KR")}` : "아직 이번 접속에서 저장 전"}</p>
+          <div className="account-actions">
+            <button className="save-button" onClick={() => syncRef.current(true)} disabled={accountBusy}>지금 저장</button>
+            <button className="ghost-button" onClick={reloadFromCloud} disabled={accountBusy}>계정에서 다시 불러오기</button>
+            <button className="ghost-button" onClick={logout} disabled={accountBusy}>로그아웃</button>
+          </div>
+        </> : <>
+          <div className="account-tabs" role="tablist">{(["login", "register"] as const).map(mode => <button key={mode} role="tab" aria-selected={accountMode === mode} className={accountMode === mode ? "on" : ""} onClick={() => { setAccountMode(mode); setAccountError(""); }}>{mode === "login" ? "로그인" : "새 계정 만들기"}</button>)}</div>
+          <p>{accountMode === "login" ? "아이디로 로그인하면 계정에 저장된 게임을 불러올 수 있어요." : "이메일 같은 개인정보는 받지 않아요. 아이디와 비밀번호만 정하면, 지금 진행 상황이 계정에 저장돼요."}</p>
+          <form className="account-form" onSubmit={submitAccount}>
+            <label>아이디<input value={accountForm.id} onChange={event => setAccountForm(form => ({ ...form, id: event.target.value }))} autoComplete="username" placeholder="영어 소문자·숫자·_ 3~20자" maxLength={20} required /></label>
+            <label>비밀번호<input type="password" value={accountForm.password} onChange={event => setAccountForm(form => ({ ...form, password: event.target.value }))} autoComplete={accountMode === "login" ? "current-password" : "new-password"} placeholder="4자 이상" minLength={4} maxLength={64} required /></label>
+            {accountMode === "register" && <label>비밀번호 확인<input type="password" value={accountForm.confirm} onChange={event => setAccountForm(form => ({ ...form, confirm: event.target.value }))} autoComplete="new-password" minLength={4} maxLength={64} required /></label>}
+            <button className="save-button" type="submit" disabled={accountBusy}>{accountBusy ? "잠시만요…" : accountMode === "login" ? "로그인" : "계정 만들고 지금 게임 저장"}</button>
+          </form>
+          {accountMode === "register" && <p className="account-warn">⚠ 비밀번호를 잊으면 찾을 방법이 없어요(개인정보를 받지 않기 때문이에요).</p>}
+        </>}
+        {accountError && <p className="account-error" role="alert">{accountError}</p>}
       </section></div>}
 
       {showAvatar && <div className="modal-backdrop" onClick={() => setShowAvatar(false)}><section className="modal avatar-modal" onClick={e => e.stopPropagation()}>

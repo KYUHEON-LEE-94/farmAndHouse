@@ -11,6 +11,8 @@ export type WeatherEffect = {
 
 export const DEFAULT_PLACE = { name: "서울", lat: 37.5665, lon: 126.978 };
 export const WEATHER_REFRESH_MINUTES = 30;
+/** 실패하면 이 간격(초)으로 다시 시도한다. */
+export const WEATHER_RETRY_SECONDS = 60;
 
 /** WMO 날씨 코드 → 게임 날씨. */
 export function kindFromCode(code: number): WeatherKind {
@@ -24,7 +26,9 @@ export function kindFromCode(code: number): WeatherKind {
 
 export async function fetchWeather(lat: number, lon: number, place: string): Promise<WeatherState> {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&current=temperature_2m,weather_code&timezone=auto`;
-  const response = await fetch(url);
+  // 응답이 멈춰도 "불러오는 중"에 갇히지 않도록 8초 뒤 포기한다.
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 8000);
+  const response = await fetch(url, { signal: controller.signal, cache: "no-store" }).finally(() => clearTimeout(timer));
   if (!response.ok) throw new Error(`weather ${response.status}`);
   const data = await response.json();
   return { kind: kindFromCode(data.current.weather_code), temp: Math.round(data.current.temperature_2m), place, fetchedAt: Date.now() };

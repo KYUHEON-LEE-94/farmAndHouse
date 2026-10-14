@@ -320,3 +320,28 @@ button { color:inherit; }
 .tool-shop-tabs button.on{background:#fffdf8;color:#24372b;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .tool-shop>small{display:block;font-size:10px;color:#64705d;margin:8px 0}
 .can-shop-list{display:grid;gap:6px}
+
+/* 파산 구제: 월루 지원금 팝업과 안내 줄 */
+.bailout-modal{text-align:center;max-width:380px}
+.bailout-raccoon{position:relative;display:inline-block;font-size:72px;animation:raccoonLaugh .5s infinite alternate}
+.bailout-raccoon span{position:absolute;right:-22px;top:-6px;font-size:34px;animation:pointPoke .4s infinite alternate}
+.bailout-line{font:700 15px/1.6 "Gowun Batang";color:#5a4325;margin:6px 0 12px}
+.bailout-tip{font-size:12px;color:#6b6450;margin:10px 0 14px}
+.broke-banner{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:-4px 0 10px;padding:9px 12px;border-radius:12px;background:#fde8df;border:1px solid #e59a7e;font-size:12.5px;color:#7a3a22}
+.broke-banner button{margin-left:auto;border:0;border-radius:9px;padding:6px 12px;background:#2f7fa8;color:#fff;font:700 12px "Gowun Dodum";cursor:pointer}
+
+/* 계정 */
+.account-button{position:relative}.account-button small{position:absolute;right:-4px;bottom:-4px;font-size:12px}
+.account-button.on{border-color:#2f7fa8;box-shadow:0 0 0 2px rgba(47,127,168,.2)}
+.account-modal{max-width:400px}
+.account-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;margin:10px 0;border-radius:10px;background:#ece6d6}
+.account-tabs button{border:0;border-radius:8px;padding:8px;background:transparent;font:700 13px "Gowun Dodum";cursor:pointer;color:#6b6450}
+.account-tabs button.on{background:#fffdf8;color:#24372b;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.account-form{display:grid;gap:10px;margin-top:10px}
+.account-form label{display:grid;gap:4px;font:700 12px "Gowun Dodum";color:#4d4433}
+.account-form input{padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:14px "Gowun Dodum";background:#fffdf8}
+.account-form input:focus{outline:2px solid #8cc3e0;border-color:#2f7fa8}
+.account-actions{display:grid;gap:8px;margin-top:12px}
+.account-sync{font-size:12px;color:#2f6f90}
+.account-warn{font-size:11.5px;color:#8a6a2a;background:#fff6dc;border-radius:8px;padding:7px 10px}
+.account-error{margin-top:10px;font-size:12.5px;color:#a5302a;background:#fde5dc;border-radius:8px;padding:8px 10px}
