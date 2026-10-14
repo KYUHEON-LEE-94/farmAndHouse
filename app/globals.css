@@ -481,7 +481,7 @@ button { color:inherit; }
 .qty-buy button,.qty-buy input{height:32px}
 
 /* 씨앗 | 창고 탭 */
-.side-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:12px;border-radius:12px;background:#ece6d6}
+.side-tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:4px;margin-bottom:12px;border-radius:12px;background:#ece6d6}
 .side-tabs button{border:0;border-radius:9px;padding:9px 6px;background:transparent;font:700 13px "Gowun Dodum";color:#6b6450;cursor:pointer}
 .side-tabs button.on{background:#fffdf8;color:#24372b;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .side-tabs small{font-size:11px;color:#8a7c5c}
@@ -507,3 +507,33 @@ button { color:inherit; }
 .crop-card{position:relative}
 .sat-chip{position:absolute;left:50%;top:-8px;transform:translateX(-50%);padding:1px 8px;border-radius:999px;background:#fde5dc;border:1px solid #e59a7e;color:#a5302a;font:700 10px "Gowun Dodum";white-space:nowrap}
 .sat-badge{font-weight:700;color:#a5302a}
+
+/* 오늘의 주문서 */
+.side-tabs button{position:relative}
+.tab-dot{position:absolute;right:4px;top:2px;min-width:16px;height:16px;border-radius:8px;background:#e2557f;color:#fff;font:700 10px/16px "Gowun Dodum";font-style:normal}
+.order-list{display:grid;gap:10px}
+.order{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fffdf8}
+.order.special{border-color:#b98be0;background:linear-gradient(160deg,#f7efff,#fffdf8)}
+.order.ready{border-color:#4f8a2c;box-shadow:0 0 0 2px rgba(79,138,44,.2)}
+.order.done{opacity:.6}
+.order-head{display:flex;gap:10px;align-items:center}.order-npc{font-size:30px}
+.order-head b{display:block;font:700 14px "Gowun Batang"}.order-head b em{margin-left:6px;padding:1px 6px;border-radius:6px;background:#9a6bc8;color:#fff;font:700 10px "Gowun Dodum";font-style:normal}
+.order-head small{font-size:11px;color:#6b6450}
+.order-items{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.order-items li{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;background:#f6f2e6;font-size:12px}
+.order-items li small{font-size:10px;color:#8a7c5c}.order-items li b{font-weight:700;color:#a5302a}.order-items li.ok b{color:#4f8a2c}
+.order-foot{display:flex;align-items:center;gap:8px}
+.order-reward{font:700 13px "Gowun Batang";color:#7a5a1c}.order-reward small{font:700 11px "Gowun Dodum";color:#6b6450}
+.order-foot button{margin-left:auto;border:0;border-radius:10px;padding:8px 12px;background:#24372b;color:#fff;font:700 12px "Gowun Dodum";cursor:pointer;white-space:nowrap}
+.order-foot button:disabled{background:#c9c2ad;cursor:default}
+
+/* 벌레는 어떤 밭(특히 거름 준 밭) 위에서도 바로 보여야 한다: 흰 원 + 빨간 테 + 퍼지는 고리 */
+.bug{background:rgba(255,255,255,.92);box-shadow:0 0 0 3px #e0533a,0 4px 10px rgba(0,0,0,.35);filter:drop-shadow(0 0 2px #fff)}
+.bug::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:3px solid #e0533a;animation:bugAlert 1s ease-out infinite;pointer-events:none}
+.bug:hover{background:#fff}
+@keyframes bugAlert{from{transform:scale(1);opacity:.9}to{transform:scale(1.7);opacity:0}}
+/* 거름 준 밭: 새 고랑 디자인에 맞춰 색과 테두리로 구분(점무늬 최소화) */
+.plot.fert-compost{background:repeating-linear-gradient(180deg,transparent 0 13px,rgba(30,18,8,.3) 13px 16px),radial-gradient(ellipse at 35% 20%,#7a5434,#5e3d22 72%);box-shadow:inset 0 3px 0 rgba(255,228,188,.2),inset 0 -8px 0 rgba(40,25,10,.25),inset 0 0 0 4px rgba(150,110,70,.9),0 5px 0 #4f351c,0 9px 14px rgba(60,40,20,.2)}
+.plot.fert-premium{background:repeating-linear-gradient(180deg,transparent 0 13px,rgba(40,20,40,.28) 13px 16px),radial-gradient(ellipse at 35% 20%,#8a6250,#6b4636 72%);box-shadow:inset 0 3px 0 rgba(255,228,188,.2),inset 0 -8px 0 rgba(40,25,10,.25),inset 0 0 0 4px #9a74c8,0 5px 0 #4f351c,0 9px 14px rgba(60,40,20,.2)}
+.plot.fert-golden{background:radial-gradient(circle at 18% 22%,rgba(255,236,160,.75) 0 1.5px,transparent 2.5px) 0 0/46px 46px,repeating-linear-gradient(180deg,transparent 0 13px,rgba(55,32,14,.28) 13px 16px),radial-gradient(ellipse at 35% 20%,#a07446,#84582f 72%);box-shadow:inset 0 3px 0 rgba(255,236,170,.35),inset 0 -8px 0 rgba(40,25,10,.25),inset 0 0 0 4px #e8c35a,0 5px 0 #4f351c,0 0 14px rgba(243,214,117,.55)}
+@media(prefers-reduced-motion:reduce){.bug::after{display:none}}
