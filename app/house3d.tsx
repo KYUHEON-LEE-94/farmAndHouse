@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { STORY_HEIGHT, WALL_HEIGHT, fitsInRoom, fitsInYard, wallInfo, yardBounds, type PlacedItem, type Room } from "./house";
 
 export type AvatarState = { src: string; pixelated: boolean; x: number; z: number; story: number };
@@ -217,7 +218,14 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
   pumpkinlamp: (g, c) => { [0, 1, 2, 3, 4, 5].forEach(i => { const a = (i / 6) * Math.PI * 2; part(g, sphere(0.16), c.main, Math.cos(a) * 0.08, 0.2, Math.sin(a) * 0.08, [0.75, 1, 0.75]); }); cyl(g, 0.03, 0.03, 0.08, "#5f7a3a", 0, 0.36); const glow = solid(g, new THREE.SphereGeometry(0.12, 12, 10), "#ffd25a", 0, 0.2, 0.17, { emissive: "#ffb02a", emissiveIntensity: 1.2 }); glow.scale.set(1, 0.6, 0.3); glow.castShadow = false; const light = new THREE.PointLight("#ffb05a", 0, 5, 1.6); light.position.set(0, 0.25, 0.25); light.userData.nightLight = true; g.add(light); },
   arcade: (g, c) => { box(g, 0.7, 1.7, 0.7, c.main); box(g, 0.74, 0.12, 0.74, c.dark, 0, 1.6); const screen = box(g, 0.55, 0.45, 0.02, "#1d1d2e", 0, 1.05, 0.34, { emissive: "#5fe08a", emissiveIntensity: 0.35 }); screen.castShadow = false; const panel = box(g, 0.66, 0.08, 0.3, c.dark, 0, 0.82, 0.42); panel.rotation.x = 0.3; [["#e0533a", -0.15], ["#f6d16a", 0.08], ["#5fb0dc", 0.18]].forEach(([color, x]) => ball(g, 0.035, color as string, x as number, 0.9, 0.46)); },
   moai: (g, c) => { box(g, 0.5, 1.45, 0.45, c.main); box(g, 0.56, 0.12, 0.5, c.dark, 0, 1.0); box(g, 0.12, 0.42, 0.14, c.dark, 0, 0.55, 0.26); box(g, 0.28, 0.06, 0.06, c.dark, 0, 0.32, 0.23); [-1, 1].forEach(s => box(g, 0.08, 0.4, 0.2, c.dark, s * 0.28, 0.7, 0)); },
-  discoball: (g, c) => { box(g, 0.32, 0.06, 0.32, "#4a3b2e"); cyl(g, 0.025, 0.025, 1.4, "#5b4a3a", 0, 0.06); const ball2 = solid(g, new THREE.IcosahedronGeometry(0.28, 2), c.main, 0, 1.68, 0, { metalness: 0.95, roughness: 0.08, flatShading: true }); ball2.castShadow = true; const light = new THREE.PointLight("#c9a8ff", 0, 6, 1.4); light.position.set(0, 1.7, 0); light.userData.nightLight = true; g.add(light); },
+  discoball: (g, c) => { box(g, 0.32, 0.06, 0.32, "#4a3b2e"); cyl(g, 0.025, 0.025, 1.4, "#5b4a3a", 0, 0.06);
+    // 거울 조각: 면마다 은색·고른 색·무지갯빛을 섞어 반짝이게 하고, 환경을 비추는 금속 재질로.
+    const geometry = new THREE.IcosahedronGeometry(0.28, 3).toNonIndexed(), tint = new THREE.Color(c.main), colors: number[] = [];
+    const palette = ["#ffffff", "#e9eef5", "#c9d3dc", "#f6e7ff", "#dff3ff", "#fff3d6"].map(hex => new THREE.Color(hex).lerp(tint, 0.25));
+    for (let face = 0; face < geometry.attributes.position.count / 3; face++) { const color = palette[(face * 7 + (face >> 3)) % palette.length]; for (let k = 0; k < 3; k++) colors.push(color.r, color.g, color.b); }
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    const ball2 = solid(g, geometry, "#ffffff", 0, 1.68, 0, { vertexColors: true, metalness: 0.75, roughness: 0.12, flatShading: true, emissive: new THREE.Color("#2a2a3a"), emissiveIntensity: 0.25, envMapIntensity: 1.6 }); ball2.castShadow = true;
+    const light = new THREE.PointLight("#c9a8ff", 0, 6, 1.4); light.position.set(0, 1.7, 0); light.userData.nightLight = true; g.add(light); },
   throne: (g, c) => { box(g, 0.9, 1.7, 0.18, c.main, 0, 0, -0.3); box(g, 0.94, 0.12, 0.2, "#e8c35a", 0, 1.68, -0.3, { metalness: 0.7, roughness: 0.3 }); [-0.28, 0, 0.28].forEach(x => solid(g, new THREE.ConeGeometry(0.06, 0.2, 6), "#e8c35a", x, 1.88, -0.3, { metalness: 0.7, roughness: 0.3 })); box(g, 0.9, 0.5, 0.7, c.main, 0, 0, 0.05); box(g, 0.84, 0.1, 0.62, c.light, 0, 0.5, 0.07); [-1, 1].forEach(s => box(g, 0.1, 0.8, 0.72, "#e8c35a", s * 0.46, 0, 0.05, { metalness: 0.7, roughness: 0.3 })); },
   goldtoilet: (g, c) => { const gold = { metalness: 0.85, roughness: 0.22 }; box(g, 0.42, 0.45, 0.16, c.main, 0, 0.42, -0.26, gold); cyl(g, 0.16, 0.12, 0.38, c.main, 0, 0, 0.05, gold); solid(g, new THREE.TorusGeometry(0.17, 0.035, 10, 24), c.main, 0, 0.4, 0.05, gold).rotation.x = Math.PI / 2; box(g, 0.08, 0.03, 0.03, "#fff6d8", 0.12, 0.8, -0.18, gold); },
   unicorn: (g, c) => { [-1, 1].forEach(s => { const rocker = solid(g, new THREE.TorusGeometry(0.75, 0.03, 6, 24, 1.1), "#e7b8f2", s * 0.2, 0.8, 0); rocker.rotation.set(0, Math.PI / 2, Math.PI + 1.02); }); part(g, capsule(0.17, 0.4), c.main, 0, 0.55, 0).rotation.x = Math.PI / 2; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => part(g, capsule(0.05, 0.3), c.main, sx * 0.1, 0.3, sz * 0.2)); part(g, capsule(0.09, 0.2), c.main, 0, 0.8, 0.32).rotation.x = 0.5; part(g, sphere(0.13), c.main, 0, 0.95, 0.42, [0.9, 1, 1.2]); part(g, new THREE.ConeGeometry(0.03, 0.2, 10), "#f3d675", 0, 1.14, 0.48, [1, 1, 1], false).rotation.x = 0.4; ["#f2899a", "#9ac7f2", "#e7b8f2", "#f6d16a"].forEach((color, i) => part(g, sphere(0.06), color, 0, 0.98 - i * 0.07, 0.3 - i * 0.05, [0.6, 1, 1], false)); part(g, capsule(0.05, 0.25), "#9ac7f2", 0, 0.62, -0.4).rotation.x = -0.6; face(g, 0, 1.0, 0.56, 0.02, 0.06); },
@@ -335,6 +343,9 @@ export default function House3D(props: Props) {
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
+    // 금속(거울·미러볼·황금 소품)이 비출 주변 환경. 없으면 금속이 새까맣게 보인다. 툰 재질에는 영향이 없다.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose();
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
     const hemi = new THREE.HemisphereLight("#ffffff", "#8a7a5a", 2.2);
     const sun = new THREE.DirectionalLight("#fff3dc", 2.4);
@@ -443,7 +454,7 @@ export default function House3D(props: Props) {
 
     return () => {
       observer.disconnect(); cancelAnimationFrame(frame); controls.dispose();
-      disposeTree(scene); renderer.dispose(); renderer.domElement.remove(); sceneRef.current = null;
+      disposeTree(scene); scene.environment?.dispose(); renderer.dispose(); renderer.domElement.remove(); sceneRef.current = null;
     };
   }, []);
 
