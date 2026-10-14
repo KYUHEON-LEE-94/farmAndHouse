@@ -6,7 +6,7 @@ export const CROP_PRICE_SCALE = 0.9;
 export type Crop = { id: string; name: string; icon: string; seasons: Season[]; seed: number; sell: number; seconds: number; difficulty: string };
 /** water: 물 준 시각들, fert: 준 거름 id. growSeconds는 심을 때(버프·거름 반영) 정해진 성장 시간. */
 /** bug: 지금 앉아 있는 벌레가 날아온 시각, bugHits: 놓친 벌레 수(마리당 판매가 -10%). */
-export type Plot = { cropId: string; plantedAt: number; growSeconds?: number; water?: number[]; fert?: string; bug?: number; bugHits?: number } | null;
+export type Plot = { cropId: string; plantedAt: number; growSeconds?: number; waterTotal?: number; water?: number[]; fert?: string; bug?: number; bugHits?: number } | null;
 /** 거름은 미끼처럼 묶음(pack개)으로 사 두고, 한 칸에 1개씩 쓴다. price는 1개 값. */
 export type Fertilizer = { id: string; name: string; icon: string; price: number; pack: number; speed: number; quality: number; note: string };
 export type Quality = { id: "normal" | "good" | "best"; name: string; stars: string; multiplier: number };
@@ -134,7 +134,7 @@ export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number, bug
   const grow = (plot.growSeconds ?? crop.seconds) * 1000, ready = plot.plantedAt + grow;
   const progress = Math.min(100, ((now - plot.plantedAt) / grow) * 100);
   // 물 줄 횟수는 작물 고유 성장 시간으로 고정한다(비료·버프로 시간이 줄어도 3칸→2칸으로 바뀌지 않게).
-  const n = waterCheckpoints(crop.seconds), water = plot.water ?? [];
+  const n = plot.waterTotal ?? waterCheckpoints(crop.seconds), water = plot.water ?? [];
   const checkpoints = Array.from({ length: n }, (_, k) => plot.plantedAt + (grow * (k + 1)) / (n + 1));
   const windows = checkpoints.map((start, k) => ({ start, end: checkpoints[k + 1] ?? ready }));
   const satisfied = windows.filter(window => water.some(time => time >= window.start && time < window.end)).length;
@@ -150,7 +150,12 @@ export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number, bug
 /** 자라는 중인 작물에 거름을 주면 남은 성장 시간만 줄어든다. */
 export function applyFertilizer(plot: NonNullable<Plot>, crop: Crop, fertilizer: Fertilizer, now: number): NonNullable<Plot> {
   const grow = plot.growSeconds ?? crop.seconds, elapsed = (now - plot.plantedAt) / 1000;
-  return { ...plot, fert: fertilizer.id, growSeconds: Math.round(elapsed + Math.max(0, grow - elapsed) * (1 - fertilizer.speed)) };
+  const nextGrow = Math.max(elapsed, elapsed + Math.max(0, grow - elapsed) * (1 - fertilizer.speed));
+  // 성장 구간이 짧아지면 이미 준 물도 같은 진행률 위치로 옮긴다.
+  // 덕분에 비료를 준 순간 물주기 판정이 사라지거나 다음 물칸이 건너뛰지 않는다.
+  const ratio = grow > 0 ? nextGrow / grow : 1;
+  const water = (plot.water ?? []).map(time => plot.plantedAt + (time - plot.plantedAt) * ratio);
+  return { ...plot, fert: fertilizer.id, water, growSeconds: Math.round(nextGrow) };
 }
 
 /** 계절이 바뀌기 5분 전에 보여 줄 비유 문구. 다음 계절 기준(직접 "곧 여름"이라고 말하지 않는다). */

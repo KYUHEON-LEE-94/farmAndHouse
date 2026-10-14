@@ -16,7 +16,7 @@ import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, SAT_MAX, freeLeft, nextFactor,
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_PRICE_SCALE, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_PRICE_SCALE, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import BossScreen, { BOSS_MODES, type BossMode } from "./bossScreen";
 import ColorPicker from "./colorPicker";
@@ -45,10 +45,23 @@ const initialPlots: Plot[] = Array(8).fill(null);
 const BAILOUT_AMOUNT = 300;
 const BITE_WINDOW_MS = 1300;
 
+function cycleRoll(crop: Crop, bucket: number, salt: number) {
+  let hash = bucket * 374761393 + salt * 668265263;
+  for (const char of crop.id) hash = Math.imul(hash ^ char.charCodeAt(0), 1274126177);
+  hash = Math.imul(hash ^ (hash >>> 13), 2246822519);
+  return ((hash ^ (hash >>> 16)) >>> 0) / 4294967295;
+}
+
+/** 5분마다 작물의 기존 가격·난이도와 무관하게 거래가와 재배 시간을 다시 배정한다. */
+function cycleCrop(crop: Crop, bucket: number) {
+  return {
+    price: Math.round((70 + cycleRoll(crop, bucket, 17) * 350) * CROP_PRICE_SCALE),
+    seconds: Math.round(20 + cycleRoll(crop, bucket, 41) * 45),
+  };
+}
+
 function marketPrice(crop: Crop, bucket: number) {
-  const seed = [...crop.id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const wave = ((seed * 97 + bucket * 53) % 201) / 1000;
-  return Math.round(crop.sell * CROP_PRICE_SCALE * (0.9 + wave));
+  return cycleCrop(crop, bucket).price;
 }
 
 /** 특정 시각이 속한 계절 구간. 같은 날 같은 계절일 때만 같은 값이 나온다. */
@@ -786,7 +799,7 @@ export default function Home() {
     if (!isWorkTime) return setNotice(`농장은 ${startHour}:00에 문을 열어요. 시간 설정에서 바꿀 수 있어요.`);
     const crop = CROPS.find(c => c.id === selectedCrop)!;
     if (!crop.seasons.includes(season)) return setNotice(`${crop.name}은 ${crop.seasons.join("·")} 작물이에요.`);
-    const growSeconds = Math.round(crop.seconds * growthMul * (1 - 0.05 * pw("mole")) * (1 - 0.15 * pw("dragon")));
+    const growSeconds = Math.round(cycleCrop(crop, marketBucket).seconds * growthMul * (1 - 0.05 * pw("mole")) * (1 - 0.15 * pw("dragon")));
     if (growSeconds > seasonSecondsLeft) return setNotice(`${season}이 ${formatClock(seasonSecondsLeft)} 뒤 끝나요. ${josa(crop.name, "은는")} 그 전에 다 자라지 못해요.`);
     const price = seedPrice(crop);
     const empty = canArea(index, plotColumns(), plotCount, currentPlanter).filter(i => !plots[i] && !justPlanted.current.has(i));
@@ -795,7 +808,7 @@ export default function Home() {
     if (!targets.length) return setNotice("씨앗을 살 돈이 부족해요. 익은 작물을 수확해 보세요.");
     targets.forEach(i => justPlanted.current.add(i)); window.setTimeout(() => targets.forEach(i => justPlanted.current.delete(i)), 600);
     const time = Date.now();
-    setPlots(current => current.map((plot, i) => (targets.includes(i) && !plot ? { cropId: crop.id, plantedAt: time, growSeconds, water: [] } : plot)));
+    setPlots(current => current.map((plot, i) => (targets.includes(i) && !plot ? { cropId: crop.id, plantedAt: time, growSeconds, waterTotal: waterCheckpoints(growSeconds), water: [] } : plot)));
     setMoney(m => m - price * targets.length); playPlop();
     const short = targets.length < empty.length ? ` (돈이 모자라 ${empty.length}칸 중 ${targets.length}칸만)` : "";
     setNotice(targets.length > 1 ? `${currentPlanter.icon} ${crop.icon} ${josa(crop.name, "을를")} ${targets.length}칸에 한꺼번에 심었어요! 씨앗 ${(price * targets.length).toLocaleString()}원 · ${growSeconds}초 뒤 수확${short}` : `${crop.icon} ${josa(crop.name, "을를")} 심었어요. ${growSeconds}초 뒤 수확해요! 중간에 목말라하면 물을 주세요.${short}`);
@@ -878,12 +891,13 @@ export default function Home() {
     if (!affordable.length) return setNotice(`${fertilizer.icon} ${josa(fertilizer.name, "이가")} 없어요. 🌿 거름 상점(오른쪽 도구 상점)에서 사 두세요.`);
     affordable.forEach(i => justFertilized.current.add(i)); window.setTimeout(() => affordable.forEach(i => justFertilized.current.delete(i)), 600);
     setFertStock(stock => ({ ...stock, [fertilizer.id]: Math.max(0, (stock[fertilizer.id] ?? 0) - affordable.length) }));
+    const savedSeconds = affordable.reduce((sum, i) => { const item = plots[i], crop = item ? CROPS.find(c => c.id === item.cropId) : undefined; if (!item || !crop) return sum; return sum + plotStatus(item, crop, time, bugPenalty).remaining - plotStatus(applyFertilizer(item, crop, fertilizer, time), crop, time, bugPenalty).remaining; }, 0);
     setPlots(current => current.map((item, i) => { const crop = item ? CROPS.find(c => c.id === item.cropId) : undefined; return affordable.includes(i) && item && crop && !item.fert ? applyFertilizer(item, crop, fertilizer, time) : item; }));
     playPlop();
     const short = affordable.length < targets.length ? ` (거름이 모자라 ${targets.length}칸 중 ${affordable.length}칸만)` : "", left = (fertStock[fertilizer.id] ?? 0) - affordable.length;
-    if (affordable.length > 1) return setNotice(`${currentSpreader.icon} ${fertilizer.icon} ${josa(fertilizer.name, "을를")} ${affordable.length}칸에 한꺼번에 뿌렸어요! ${fertilizer.note} · 남은 ${left}개${short}`);
+    if (affordable.length > 1) return setNotice(`${currentSpreader.icon} ${fertilizer.icon} ${josa(fertilizer.name, "을를")} ${affordable.length}칸에 뿌려 총 ${savedSeconds}초 단축! 물 주기 시점도 빨라졌어요. · 남은 ${left}개${short}`);
     const crop = CROPS.find(c => c.id === plots[affordable[0]]?.cropId);
-    setNotice(`${fertilizer.icon} ${crop?.name ?? "작물"}에 ${josa(fertilizer.name, "을를")} 줬어요. (${fertilizer.note} · 남은 ${left}개)${short}`);
+    setNotice(`${fertilizer.icon} ${crop?.name ?? "작물"}에 ${josa(fertilizer.name, "을를")} 줘 ${savedSeconds}초 단축! 물 주기 시점도 빨라졌어요. · 남은 ${left}개${short}`);
   }
 
   /** 거름을 원하는 개수만큼 산다. */
@@ -1607,7 +1621,8 @@ export default function Home() {
   const selectedCropInfo = CROPS.find(c => c.id === selectedCrop) ?? available[0] ?? CROPS[0];
   const storageUsed = Object.values(produce).reduce((sum, count) => sum + Math.max(0, count), 0);
   const doneJobs = workshop.jobs.filter(job => job.doneAt <= nowMs).length;
-  const isLocked = (key: string) => produceLocks[key] ?? parseProduceKey(key).golden;
+  // 황금 여부와 관계없이 잠금은 오직 사용자가 직접 선택한 경우에만 적용한다.
+  const isLocked = (key: string) => produceLocks[key] === true;
   const orderDate = now.toDateString(), orders = useMemo(() => dailyOrders(orderDate), [orderDate]);
   const doneToday = ordersDone.date === orderDate ? ordersDone.ids : [];
   // 오늘 못 끝낸 주문에 필요한 수량을 창고에서 예약해 둔다(낮은 품질·황금 아닌 것부터, 납품 규칙과 같게).
@@ -1658,10 +1673,11 @@ export default function Home() {
     : activeFert ? <><b>{currentSpreader.icon} {currentSpreader.name}</b> 자라는 작물 {currentSpreader.note}에 <b>{activeFert.icon} {activeFert.name}</b> · 남은 {fertStock[activeFert.id] ?? 0}개(칸당 1개)<small>{fertStock[activeFert.id] ? `${activeFert.note} · 작물당 1번` : "거름이 없어요! 🌿 거름 상점에서 사 두세요"}</small></> : null;
 
   const cropCards = available.map(crop => {
-    const tooLate = isWorkTime && Math.round(crop.seconds * growthMul) > seasonSecondsLeft;
+    const cycleSeconds = cycleCrop(crop, marketBucket).seconds;
+    const tooLate = isWorkTime && Math.round(cycleSeconds * growthMul) > seasonSecondsLeft;
     return <button key={crop.id} className={`crop-card ${selectedCrop === crop.id ? "selected" : ""} ${tooLate ? "too-late" : ""}`} onClick={() => { setSelectedCrop(crop.id); setTool("seed"); }} aria-pressed={selectedCrop === crop.id}>
       <span className="crop-icon">{crop.icon}</span><span className="crop-name">{crop.name}</span>
-      <span className="crop-meta">{tooLate ? "이번 계절엔 시간 부족" : `씨앗 ${Math.round(crop.seed * seedMul)}원 · ${Math.round(crop.seconds * growthMul)}초`}</span>
+      <span className="crop-meta">{tooLate ? "이번 계절엔 시간 부족" : `씨앗 ${Math.round(crop.seed * seedMul)}원 · 이번 재배 ${Math.round(cycleSeconds * growthMul)}초`}</span>
       {saturationOf(market, crop.id) > 0 ? <span className="sat-chip" title="많이 팔아서 값이 내려갔어요. 다른 작물을 팔거나 5분 시세가 바뀌면 풀려요.">📉 포화 -{Math.round(saturationOf(market, crop.id) * 100)}%</span> : freeLeft(market, crop.id) < FREE_PER_CYCLE ? <span className="sat-chip free" title="이번 5분 동안 이 개수까지는 정상가로 팔려요.">정상가 {freeLeft(market, crop.id)}개 남음</span> : null}
       {(() => { const base = marketPrice(crop, marketBucket), final = salePrice(crop), boost = Math.round((final / base - 1) * 100);
         return <span className={`crop-price ${boost ? (boost > 0 ? "up" : "down") : ""}`}><small>{boost ? <>시세 <s>{base.toLocaleString()}</s> {boost > 0 ? "▲" : "▼"}{Math.abs(boost)}%</> : "현재 시세"}</small>{final.toLocaleString()}원</span>; })()}
