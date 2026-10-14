@@ -12,7 +12,7 @@ import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { KitchenPanel } from "./KitchenPanel";
-import { DISH_GRADES, dishEffectText, gradeChances, rollGrade, type Dish } from "./kitchen";
+import { DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rollGrade, type Dish } from "./kitchen";
 import { migrateInventory, pickCategory, replaceCategory, type Inventory, type ItemCategory } from "./items";
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
@@ -1928,14 +1928,14 @@ export default function Home() {
         <aside className="seed-panel panel">
           <div className="side-tabs" role="tablist" aria-label="씨앗과 가공">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗</button>
-            <button role="tab" aria-selected={sidePanel === "kitchen"} className={sidePanel === "kitchen" ? "on" : ""} onClick={() => setSidePanel("kitchen")}>🍳 주방</button>
+            {KITCHEN_ENABLED && <button role="tab" aria-selected={sidePanel === "kitchen"} className={sidePanel === "kitchen" ? "on" : ""} onClick={() => setSidePanel("kitchen")}>🍳 주방</button>}
             <button role="tab" aria-selected={sidePanel === "workshop"} className={sidePanel === "workshop" ? "on" : ""} onClick={() => setSidePanel("workshop")}>🏺 가공 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot" aria-label={`다 된 가공 ${doneJobs}건`}>{doneJobs}</i>}</button>
           </div>
           {sidePanel === "seed" ? <>
           <div className="panel-heading"><div><span className="eyebrow">SEED BOX · 5분 시세</span><h3>{season} 씨앗 상자</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
-          </> : sidePanel === "kitchen" ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} dishStock={dishStock} onCook={startCooking} />
+          </> : KITCHEN_ENABLED && sidePanel === "kitchen" ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} dishStock={dishStock} onCook={startCooking} />
           : sidePanel === "workshop" ? <div className="workshop-view">
             <div className="panel-heading"><div><span className="eyebrow">WORKSHOP · 절임 항아리</span><h3>가공 공방</h3></div><span className="plot-count">항아리 {workshop.slots}개</span></div>
             <p className="hint">창고 작물을 담가 비싼 가공품으로 만들어요. <b>여러 작물을 섞을수록 배율이 높아요</b>(단일 ×1.25 → 4종 ×1.9). 가공품은 시세·포화와 상관없는 고정가예요. 잠금·주문 예약분은 쓰지 않아요.</p>

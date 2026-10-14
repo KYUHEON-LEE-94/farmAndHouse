@@ -7,6 +7,9 @@
  */
 import { CROPS } from "./farming";
 
+/** 주방 공개 스위치. 토벌 기능이 나온 뒤 true로 바꿔 공개한다(그 전에는 유저에게 탭을 보이지 않는다). */
+export const KITCHEN_ENABLED = false;
+
 /** 재료: 특정 작물 n개, 또는 아무 물고기 n마리(전설 제외, 싼 것부터). */
 export type Ingredient = { kind: "crop"; id: string; count: number } | { kind: "fish"; count: number };
 /** 사냥에서 쓰일 능력치. */
