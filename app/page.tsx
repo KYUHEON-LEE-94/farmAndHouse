@@ -305,6 +305,7 @@ export default function Home() {
   const [goods, setGoods] = useState<Record<string, number>>({});
   // 통합 창고는 화면 가운데 큰 팝업으로 띄운다(E 키로 열고 닫기).
   const [showStorage, setShowStorage] = useState(false);
+  const [showMissions, setShowMissions] = useState(false);
   const [sellConfirm, setSellConfirm] = useState<{ kind: "market" | "coop"; cropId?: string } | null>(null);
   const [harvestMode, setHarvestMode] = useState<"sell" | "store">("store");
   const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders" | "workshop">("seed");
@@ -465,7 +466,7 @@ export default function Home() {
   const today = now.toDateString();
   // 파산: 가장 싼 제철 씨앗도 못 사고, 밭에 이번 계절 작물이 없고, 미끼도 없을 때.
   const broke = loaded && money < Math.min(...available.map(crop => Math.round(crop.seed * seedMul * (1 - 0.05 * pw("rabbit"))))) && noBait && !plots.some(plot => plot && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod);
-  const showBailout = broke && isWorkTime && lastBailout !== today && !activeEvent && !offWork && !spotConfirm && !bossMode && !showSettings && !showAvatar && !showAccount && !showStorage && guideStep === null && (fishState.phase === "idle" || fishState.phase === "result");
+  const showBailout = broke && isWorkTime && lastBailout !== today && !activeEvent && !offWork && !spotConfirm && !bossMode && !showSettings && !showAvatar && !showAccount && !showStorage && !showMissions && guideStep === null && (fishState.phase === "idle" || fishState.phase === "result");
   function takeBailout() {
     setMoney(value => value + BAILOUT_AMOUNT); setLastBailout(today); playCoinSound([523, 659, 784]);
     setNotice(`🦝 "옛다 ${BAILOUT_AMOUNT}원~ 모자라면 낚시터 가서 맨손으로 잡아 와 ㅋㅋ" (지원금은 하루 한 번)`);
@@ -498,7 +499,7 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || showMissions || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -620,8 +621,9 @@ export default function Home() {
   }, []);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if ((event.key === "m" || event.key === "M") && !(event.target instanceof Element && event.target.closest("input, textarea, select, .house3d-wrap"))) { event.preventDefault(); setShowStorage(false); setShowMissions(open => !open); return; }
       if ((event.key === "e" || event.key === "E") && !(event.target instanceof Element && event.target.closest("input, textarea, select, .house3d-wrap"))) {
-        event.preventDefault(); setShowStorage(open => !open);
+        event.preventDefault(); setShowMissions(false); setShowStorage(open => !open);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1864,7 +1866,7 @@ export default function Home() {
           <div className="side-tabs" role="tablist" aria-label="씨앗과 창고">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗</button>
             <button role="tab" aria-selected={showStorage} className={showStorage ? "on" : ""} onClick={() => setShowStorage(true)}>📦 창고 <small>{storageUsed}/{storageCap}</small></button>
-            <button role="tab" aria-selected={sidePanel === "orders"} className={`${sidePanel === "orders" ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => setSidePanel("orders")}>📜 주문 <small>{doneToday.length}/{orders.length}</small>{readyOrders > 0 && <i className="tab-dot" aria-label={`납품 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
+            <button role="tab" aria-selected={showMissions} className={`${showMissions ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => setShowMissions(true)}>📜 주문 <small>{doneToday.length}/{orders.length}</small>{readyOrders > 0 && <i className="tab-dot" aria-label={`납품 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
             <button role="tab" aria-selected={sidePanel === "workshop"} className={sidePanel === "workshop" ? "on" : ""} onClick={() => setSidePanel("workshop")}>🏺 가공 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot" aria-label={`다 된 가공 ${doneJobs}건`}>{doneJobs}</i>}</button>
           </div>
           {sidePanel === "seed" ? <>
@@ -1887,17 +1889,6 @@ export default function Home() {
                 <button onClick={() => startRecipe(recipe)} disabled={!ok || workshop.jobs.length >= workshop.slots}>{workshop.jobs.length >= workshop.slots ? "항아리 가득" : ok ? "🏺 담그기" : "재료 모으는 중"}</button>
               </div>; })}</div>
             <div className="goods-list"><b className="tool-shop-sub">🎁 만든 가공품</b>{Object.keys(goods).filter(id => goods[id] > 0).length === 0 ? <p className="empty">아직 만든 가공품이 없어요.</p> : RECIPES.filter(recipe => (goods[recipe.id] ?? 0) > 0).map(recipe => <div key={recipe.id} className="goods-item"><span>{recipe.icon}</span><b>{recipe.name} ×{goods[recipe.id]}</b><small>개당 {goodsPrice(recipe).toLocaleString()}원</small><button onClick={() => sellGoods(recipe, 1)}>1개</button><button className="all" onClick={() => sellGoods(recipe, goods[recipe.id])}>전부 {(goodsPrice(recipe) * goods[recipe.id]).toLocaleString()}원</button></div>)}</div>
-          </div> : sidePanel === "orders" ? <div className="orders-view">
-            <div className="panel-heading"><div><span className="eyebrow">DAILY MISSIONS</span><h3>농사·낚시 공용 미션</h3></div><span className="plot-count">{doneToday.length}/{orders.length} 완료</span></div>
-            <p className="hint">농산물과 물고기를 통합 창고에서 납품해요. 필요한 수량은 📜 미션 예약으로 자동 보호되어 판매할 수 없어요.</p>
-            <div className="order-list">{orders.map(order => { const done = doneToday.includes(order.id), canDeliver = !done && order.items.every(item => depositedFor(order, item) + orderHave(item) >= item.count), canDeposit = !done && order.items.some(item => depositedFor(order, item) < item.count && orderHave(item) > 0);
-              return <article key={order.id} className={`order ${order.special ? "special" : ""} ${done ? "done" : ""} ${canDeliver ? "ready" : ""}`}>
-                <div className="order-head"><span className="order-npc">{order.npc.icon}</span><div><b>{order.npc.name}{order.special && <em>특별</em>}</b><small>“{order.line}”</small></div></div>
-                <ul className="order-items">{order.items.map(item => { const deposited = depositedFor(order, item), have = Math.min(item.count, deposited + orderHave(item)); const crop = item.kind === "crop" ? CROPS.find(c => c.id === item.cropId) : undefined; const fish = item.kind === "fish" ? [...FISH, ...SPECIAL_FISH].find(f => f.id === item.fishId) : undefined;
-                  return <li key={item.kind === "crop" ? item.cropId : item.fishId} className={have >= item.count ? "ok" : ""}><span>{crop ? `${crop.icon} ${crop.name}${item.kind === "crop" && item.minQuality > 0 ? ` ${QUALITIES[item.minQuality].stars} 이상` : ""}` : `${fish?.icon ?? "🐟"} ${fish?.name ?? "물고기"}`}</span><small>{deposited > 0 ? `선납 ${deposited} · ` : ""}{crop ? crop.seasons.join("·") : "낚시"}</small><b>{done ? item.count : have}/{item.count}</b></li>; })}</ul>
-                <div className="order-foot"><span className="order-reward">💰 {order.reward.toLocaleString()}원{order.bonus && <small> + {bonusLabel(order)}</small>}</span>
-                  <button onClick={() => depositOrder(order)} disabled={!canDeposit}>{done ? "✅ 납품 완료" : canDeliver ? "📜 전부 납품" : canDeposit ? "📦 보유분 미리 납품" : "재료 모으는 중"}</button></div>
-              </article>; })}</div>
           </div> : null}
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `${fieldPrice(ownedPlots).toLocaleString()}원 · ${ownedPlots}/${MAX_PLOTS}칸`}</small><span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span></div><button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>구매</button></div>
           <div className="tool-shop">
@@ -2197,7 +2188,7 @@ export default function Home() {
       </div>}
 
       <div className="global-quick-actions" aria-label="공용 기능">
-        <button onClick={() => { setTab("farm"); setSidePanel("orders"); }}>📜 미션 <small>{doneToday.length}/{orders.length}{readyOrders ? ` · ${readyOrders}건 완료 가능` : ""}</small></button>
+        <button onClick={() => { setShowMissions(true); }}>📜 미션 <small>{doneToday.length}/{orders.length}{readyOrders ? ` · ${readyOrders}건 완료 가능` : ""}</small></button>
         <button onClick={() => setShowStorage(true)}>📦 통합 창고 <kbd>E</kbd><small>{storageUsed}/{storageCap}</small></button>
       </div>
 
@@ -2231,6 +2222,22 @@ export default function Home() {
         <h3 id="spot-title">{spotConfirm.name}에 입장할까요?</h3>
         <p>입장권 <b>{spotConfirm.price.toLocaleString()}원</b> · {spotConfirm.minutes}분 동안 낚시할 수 있어요.<br />{spotConfirm.note}{SPECIAL_FISH.some(fish => fish.spot === spotConfirm.id) ? ` · 이곳에서만 ${SPECIAL_FISH.find(fish => fish.spot === spotConfirm.id)!.name}이(가) 잡혀요` : ""}</p>
         <div className="spot-modal-actions"><button className="ghost-button" onClick={() => setSpotConfirm(null)}>그만두기</button><button className="save-button" onClick={() => chooseSpot(spotConfirm)} disabled={money < spotConfirm.price}>{money < spotConfirm.price ? "돈이 모자라요" : `🎫 입장권 사고 입장 (${spotConfirm.price.toLocaleString()}원)`}</button></div>
+      </section></div>}
+
+      {showMissions && <div className="modal-backdrop storage-backdrop"><section className="modal storage-modal missions-modal" role="dialog" aria-modal="true" aria-labelledby="missions-title">
+        <button className="modal-close" onClick={() => setShowMissions(false)} aria-label="미션 닫기 (M)">×</button>
+        <div className="orders-view big">
+            <div className="panel-heading"><div><span className="eyebrow">DAILY MISSIONS</span><h3 id="missions-title">농사·낚시 공용 미션</h3></div><span className="plot-count">{doneToday.length}/{orders.length} 완료</span></div>
+            <p className="hint">농산물과 물고기를 통합 창고에서 납품해요. 필요한 수량은 📜 미션 예약으로 자동 보호되어 판매할 수 없어요.</p>
+            <div className="order-list">{orders.map(order => { const done = doneToday.includes(order.id), canDeliver = !done && order.items.every(item => depositedFor(order, item) + orderHave(item) >= item.count), canDeposit = !done && order.items.some(item => depositedFor(order, item) < item.count && orderHave(item) > 0);
+              return <article key={order.id} className={`order ${order.special ? "special" : ""} ${done ? "done" : ""} ${canDeliver ? "ready" : ""}`}>
+                <div className="order-head"><span className="order-npc">{order.npc.icon}</span><div><b>{order.npc.name}{order.special && <em>특별</em>}</b><small>“{order.line}”</small></div></div>
+                <ul className="order-items">{order.items.map(item => { const deposited = depositedFor(order, item), have = Math.min(item.count, deposited + orderHave(item)); const crop = item.kind === "crop" ? CROPS.find(c => c.id === item.cropId) : undefined; const fish = item.kind === "fish" ? [...FISH, ...SPECIAL_FISH].find(f => f.id === item.fishId) : undefined;
+                  return <li key={item.kind === "crop" ? item.cropId : item.fishId} className={have >= item.count ? "ok" : ""}><span>{crop ? `${crop.icon} ${crop.name}${item.kind === "crop" && item.minQuality > 0 ? ` ${QUALITIES[item.minQuality].stars} 이상` : ""}` : `${fish?.icon ?? "🐟"} ${fish?.name ?? "물고기"}`}</span><small>{deposited > 0 ? `선납 ${deposited} · ` : ""}{crop ? crop.seasons.join("·") : "낚시"}</small><b>{done ? item.count : have}/{item.count}</b></li>; })}</ul>
+                <div className="order-foot"><span className="order-reward">💰 {order.reward.toLocaleString()}원{order.bonus && <small> + {bonusLabel(order)}</small>}</span>
+                  <button onClick={() => depositOrder(order)} disabled={!canDeposit}>{done ? "✅ 납품 완료" : canDeliver ? "📜 전부 납품" : canDeposit ? "📦 보유분 미리 납품" : "재료 모으는 중"}</button></div>
+              </article>; })}</div>
+          </div>
       </section></div>}
 
       {showStorage && <div className="modal-backdrop storage-backdrop"><section className="modal storage-modal" role="dialog" aria-modal="true" aria-labelledby="storage-title">

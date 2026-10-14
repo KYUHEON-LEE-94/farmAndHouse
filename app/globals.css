@@ -652,3 +652,7 @@ button { color:inherit; }
 .fish-card-actions button{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;font:700 10.5px "Gowun Dodum";cursor:pointer;white-space:nowrap}
 .fish-card-actions button.all{flex:1;background:#24372b;color:#fff;border-color:#24372b}
 .fish-card-actions button:disabled{opacity:.4;cursor:default}
+
+/* 미션 팝업: 미션 카드를 여러 열로 */
+.orders-view.big .order-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:start}
+.missions-modal{width:min(1100px,calc(100vw - 32px))}
