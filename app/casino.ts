@@ -47,6 +47,17 @@ export function slotMultiplier(reels: string[]) {
   return reels.filter(icon => icon === "🍒").length === 2 ? CHERRY_PAIR : 0;
 }
 
+/** 슬롯 확률표: 그림별 3개 확률과 🍒 2개 확률, 판돈 이상 돌려받을 확률. */
+export function slotOdds() {
+  const total = SLOT_SYMBOLS.reduce((sum, symbol) => sum + symbol.weight, 0), p = (w: number) => w / total;
+  const triples = SLOT_SYMBOLS.map(symbol => ({ icon: symbol.icon, chance: p(symbol.weight) ** 3, payout: symbol.triple }));
+  const cherry = p(SLOT_SYMBOLS[0].weight), cherryPair = 3 * cherry ** 2 * (1 - cherry);
+  const anyWin = triples.reduce((sum, row) => sum + row.chance, 0) + cherryPair;
+  return { triples, cherryPair, anyWin };
+}
+/** 블랙잭 대략 확률(17 미만이면 히트하는 단순 전략, 10만 판 시뮬레이션). 카드는 무작위라 공식 값이 아니라 참고용. */
+export const BLACKJACK_ODDS = { win: 0.414, lose: 0.492, push: 0.093, blackjack: 0.048 };
+
 /** 이론상 기대 환수율(검증용). */
 export function slotReturnRate() {
   const total = SLOT_SYMBOLS.reduce((sum, symbol) => sum + symbol.weight, 0), p = (w: number) => w / total;

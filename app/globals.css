@@ -690,3 +690,7 @@ button { color:inherit; }
 .cook-result-icon{font-size:56px}.cook-result.grade-2 .cook-result-icon{filter:drop-shadow(0 0 10px #f2c33a)}
 .cook-result h3{margin:4px 0;font:700 20px "Gowun Batang"}.cook-result small{display:block;color:#6b6450;margin:6px 0 12px}
 .cook-result .save-button{width:100%}
+
+/* 도박장 확률(한 줄) */
+.odds-line{margin:8px 0 0;padding:6px 12px;border-radius:999px;background:#f6f2e6;font:700 12.5px "Gowun Dodum";color:#4d4433;text-align:center}
+.odds-line .win{color:#3f6a24}.odds-line .lose{color:#a5302a}
