@@ -550,3 +550,11 @@ button { color:inherit; }
 .crop-reward b{display:block;font:700 14px "Gowun Batang"}.crop-reward small{font-size:12px;color:#6b6450}
 .crop-reward button{margin-left:auto;width:auto;white-space:nowrap}
 .crop-record{display:grid;gap:2px;font-size:11px;color:#4d4433}.crop-record span{display:block}
+
+/* 포화 슬롯·농협 출하 */
+.sat-chip.free{background:#eef7e3;border-color:#a9cf86;color:#3f6a24}
+.free-badge{font-weight:700;color:#3f6a24}
+.market-slots{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;border-radius:10px;background:#f6f2e6;font-size:12px;color:#4d4433}
+.market-slots span{padding:2px 8px;border-radius:999px;background:#fde5dc;color:#a5302a;font-weight:700}
+.market-slots small{color:#8a7c5c}
+.coop-button{width:100%;margin-top:6px}.coop-button small{color:#8a7c5c}

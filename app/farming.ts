@@ -133,7 +133,8 @@ export const BUG_CHANCE = 0.4;
 export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number, bugPenalty = BUG_PENALTY) {
   const grow = (plot.growSeconds ?? crop.seconds) * 1000, ready = plot.plantedAt + grow;
   const progress = Math.min(100, ((now - plot.plantedAt) / grow) * 100);
-  const n = waterCheckpoints(grow / 1000), water = plot.water ?? [];
+  // 물 줄 횟수는 작물 고유 성장 시간으로 고정한다(비료·버프로 시간이 줄어도 3칸→2칸으로 바뀌지 않게).
+  const n = waterCheckpoints(crop.seconds), water = plot.water ?? [];
   const checkpoints = Array.from({ length: n }, (_, k) => plot.plantedAt + (grow * (k + 1)) / (n + 1));
   const windows = checkpoints.map((start, k) => ({ start, end: checkpoints[k + 1] ?? ready }));
   const satisfied = windows.filter(window => water.some(time => time >= window.start && time < window.end)).length;
