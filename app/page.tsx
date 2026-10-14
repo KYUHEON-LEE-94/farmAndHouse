@@ -48,6 +48,8 @@ const PALETTES = [
 const initialPlots: Plot[] = Array(8).fill(null);
 /** 파산했을 때 하루 한 번 받는 월루 지원금. */
 const BAILOUT_AMOUNT = 300;
+/** 이 금액 미만이면 파산으로 본다. */
+const BAILOUT_THRESHOLD = 50;
 const BITE_WINDOW_MS = 1300;
 
 function cycleRoll(crop: Crop, bucket: number, salt: number) {
@@ -483,10 +485,9 @@ export default function Home() {
   const currentSpreader = SPREADERS.find(item => item.id === spreaderId) ?? SPREADERS[0];
   const canMax = currentCan.capacity + petCanBonus;
   const bugPenalty = pets.has("whitetiger") ? 0 : BUG_PENALTY * (1 - 0.5 * pw("weasel"));
-  const noBait = Object.values(baits).every(count => !count);
   const today = now.toDateString();
-  // 파산: 가장 싼 제철 씨앗도 못 사고, 밭에 이번 계절 작물이 없고, 미끼도 없을 때.
-  const broke = loaded && money < Math.min(...available.map(crop => Math.round(cycleCrop(crop, marketBucket).seed * seedMul * (1 - 0.05 * pw("rabbit"))))) && noBait && !plots.some(plot => plot && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod);
+  // 파산: 보유 자금이 50원 미만이면 너구리가 지원금을 준다(하루 한 번).
+  const broke = loaded && money < BAILOUT_THRESHOLD;
   const showBailout = broke && isWorkTime && lastBailout !== today && !activeEvent && !offWork && !spotConfirm && !bossMode && !showSettings && !showAvatar && !showAccount && !showStorage && !showMissions && guideStep === null && (fishState.phase === "idle" || fishState.phase === "result");
   function takeBailout() {
     setMoney(value => value + BAILOUT_AMOUNT); setLastBailout(today); playCoinSound([523, 659, 784]);
