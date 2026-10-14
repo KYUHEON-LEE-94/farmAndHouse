@@ -15,7 +15,7 @@ import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, SAT_MAX, freeLeft, nextFactor,
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_PRICE_SCALE, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { BUG_CHANCE, BUG_CHECK_SECONDS, BUG_PENALTY, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_PRICE_SCALE, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import BossScreen, { BOSS_MODES, type BossMode } from "./bossScreen";
 import ColorPicker from "./colorPicker";
@@ -277,7 +277,12 @@ export default function Home() {
   const [fertStock, setFertStock] = useState<Record<string, number>>(STARTER_FERT);
   // 농산물 창고: 묶음(작물|품질|황금) → 개수
   const [produce, setProduce] = useState<Record<string, number>>({});
-  const [storageSlots, setStorageSlots] = useState(STORAGE_START);
+  const [storageCap, setStorageCap] = useState(STORAGE_START);
+  // 창고 잠금(묶음 키 → 잠금 여부). 황금 작물은 따로 정하지 않으면 잠금.
+  const [produceLocks, setProduceLocks] = useState<Record<string, boolean>>({});
+  const [storageSort, setStorageSort] = useState<"value" | "count" | "name">("value");
+  const [storageFilter, setStorageFilter] = useState<"all" | "order" | "calm" | "golden">("all");
+  const [sellConfirm, setSellConfirm] = useState<{ kind: "market" | "coop"; cropId?: string } | null>(null);
   const [harvestMode, setHarvestMode] = useState<"sell" | "store">("sell");
   const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders">("seed");
   // 시장 포화: 작물별로 최근에 판 양(시간이 지나면 회복)
@@ -375,7 +380,7 @@ export default function Home() {
         setMoney(data.money ?? 1500); setPlots(data.plots ?? initialPlots); setStartHour(data.startHour ?? 9);
         setEndHour(data.endHour ?? 18); setHouseLevel(level); setHouseShape(shape); setOwnedPlots(data.ownedPlots ?? 8);
         const yard = data.yardLevel ?? 1;
-        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); setOwnedSpreaders(data.ownedSpreaders ?? ["pinch"]); setSpreaderId(data.spreaderId ?? "pinch"); setFertStock(data.fertStock ?? STARTER_FERT); setProduce(data.produce ?? {}); setStorageSlots(data.storageSlots ?? STORAGE_START); setHarvestMode(data.harvestMode ?? "sell"); setMarketState(data.market ?? EMPTY_MARKET); setOrdersDone(data.ordersDone ?? { date: "", ids: [] }); setCropLog(data.cropLog ?? {}); setCropRewards(data.cropRewards ?? []); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
+        setStories(data.stories ?? 1); setYardLevel(yard); setCanWater(data.canWater ?? CAN_CAPACITY); setOwnedCans(data.ownedCans ?? ["tin"]); setCanId(data.canId ?? "tin"); setOwnedHands(data.ownedHands ?? ["hand"]); setHandId(data.handId ?? "hand"); setOwnedPlanters(data.ownedPlanters ?? ["seedhand"]); setPlanterId(data.planterId ?? "seedhand"); setOwnedSpreaders(data.ownedSpreaders ?? ["pinch"]); setSpreaderId(data.spreaderId ?? "pinch"); setFertStock(data.fertStock ?? STARTER_FERT); setProduce(data.produce ?? {}); setStorageCap(data.storageCap ?? (data.storageSlots ? migrateStorageSlots(data.storageSlots) : STORAGE_START)); setProduceLocks(data.produceLocks ?? {}); setHarvestMode(data.harvestMode ?? "sell"); setMarketState(data.market ?? EMPTY_MARKET); setOrdersDone(data.ordersDone ?? { date: "", ids: [] }); setCropLog(data.cropLog ?? {}); setCropRewards(data.cropRewards ?? []); if (data.casinoStats) setCasinoStats(data.casinoStats); setNotifyOffWork(data.notifyOffWork ?? false); setBossTheme(data.bossTheme ?? "office"); if (data.weatherPlace) setWeatherPlace(data.weatherPlace); setGachaCollected(data.gachaCollected ?? [...new Set([...(data.placed ?? []), ...(data.warehouse ?? [])].map((item: LegacyItem) => item.id).filter((id: string) => FURNITURE.find(entry => entry.id === id)?.group === "gacha"))]); setDayStart(data.dayStart ?? null); setLastBailout(data.lastBailout ?? null); setPetCare(data.petCare ?? {}); setPetFood(data.petFood ?? {});
         let petIndex = 0;
         const movePetOut = (item: PlacedItem): PlacedItem => (!data.petsInYard && item.pet ? { ...item, story: 0, x: ((petIndex++ % 6) - 2.5) * 0.9, z: room.depth / 2 + 1.3 + Math.floor((petIndex - 1) / 6) * 0.9 } : item);
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
@@ -394,8 +399,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageSlots, harvestMode, market: marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageSlots, harvestMode, marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageCap, produceLocks, harvestMode, market: marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, produce, storageCap, produceLocks, harvestMode, marketState, ordersDone, cropLog, cropRewards, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -948,17 +953,19 @@ export default function Home() {
       next[sale.crop.id] = { n: old.n + 1, best: Math.max(old.best, quality), golden: old.golden + (sale.golden ? 1 : 0), top: Math.max(old.top, sale.amount) }; }); return next; });
     // 창고 보관 모드: 묶음(작물|품질|황금)으로 쌓는다. 새 묶음 자리가 없으면 그 작물만 바로 판다.
     if (harvestMode === "store") {
-      const keys = new Set(Object.keys(produce).filter(key => produce[key] > 0)), stored: Record<string, number> = {};
-      const sold = sales.filter(sale => { const key = produceKey(sale.crop.id, storedQuality(sale.status.quality.id, sale.status.bugMultiplier), sale.golden);
-        if (!keys.has(key) && keys.size >= storageSlots) return true;
-        keys.add(key); stored[key] = (stored[key] ?? 0) + 1; return false; });
+      // 용량은 총 수량. 넘치는 만큼만 바로 판다.
+      let room = Math.max(0, storageCap - Object.values(produce).reduce((sum, n) => sum + n, 0));
+      const stored: Record<string, number> = {};
+      const sold = sales.filter(sale => { if (room <= 0) return true;
+        const key = produceKey(sale.crop.id, storedQuality(sale.status.quality.id, sale.status.bugMultiplier), sale.golden);
+        room--; stored[key] = (stored[key] ?? 0) + 1; return false; });
       const soldRun = priceRun(sold), soldTotal = soldRun.priced.reduce((sum, sale) => sum + sale.amount, 0), storedCount = sales.length - sold.length;
       setProduce(stock => { const next = { ...stock }; Object.entries(stored).forEach(([key, count]) => { next[key] = (next[key] ?? 0) + count; }); return next; });
       if (soldTotal) { setMoney(m => m + soldTotal); setMarketState(soldRun.state); }
       const fxs = sales.map(sale => ({ id: time + sale.i, plotIndex: sale.i, icon: sale.golden ? `✨${sale.crop.icon}` : sale.crop.icon, amount: sold.includes(sale) ? soldRun.priced[sold.indexOf(sale)].amount : 0, stars: sold.includes(sale) ? sale.status.quality.stars : "📦 창고로" }));
       setHarvestFx(items => [...items, ...fxs]); window.setTimeout(() => setHarvestFx(items => items.filter(item => !fxs.some(fx => fx.id === item.id))), 1100);
       playPlop();
-      return setNotice(`📦 ${currentHand.icon} ${storedCount}개를 창고에 넣었어요! (${sales.filter(sale => !sold.includes(sale)).map(sale => sale.crop.icon).join("")})${sold.length ? ` 창고 칸이 모자라 ${sold.length}개는 ${soldTotal.toLocaleString()}원에 바로 팔았어요.` : ""} 시세 좋을 때 창고에서 파세요.`);
+      return setNotice(`📦 ${currentHand.icon} ${storedCount}개를 창고에 넣었어요! (${sales.filter(sale => !sold.includes(sale)).map(sale => sale.crop.icon).join("")})${sold.length ? ` 창고가 꽉 차서 ${sold.length}개는 ${soldTotal.toLocaleString()}원에 바로 팔았어요.` : ""} 시세 좋을 때 창고에서 파세요.`);
     }
     const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
     setMoney(m => m + total); setMarketState(run.state);
@@ -979,13 +986,9 @@ export default function Home() {
     const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId);
     return crop ? Math.round(salePrice(crop) * QUALITIES[quality].multiplier * (golden ? 3 : 1)) : 0;
   }
-  /** 묶음에서 n개를 팔 때 합계(1개씩 팔 때마다 시장 포화로 값이 내려간다). */
-  function produceTotal(key: string, count: number) {
-    const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId);
-    return crop ? sellMany(market, crop.id, basePrice(crop) * QUALITIES[quality].multiplier * (golden ? 3 : 1), count).total : 0;
-  }
+
   function sellProduce(key: string, count: number) {
-    const have = produce[key] ?? 0, n = Math.min(have, count);
+    const n = Math.min(sellableOf(key), count);
     if (n <= 0) return;
     const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId);
     const result = sellMany(market, cropId, (crop ? basePrice(crop) : 0) * QUALITIES[quality].multiplier * (golden ? 3 : 1), n), amount = result.total;
@@ -994,34 +997,51 @@ export default function Home() {
     setMoney(m => m + amount); playCoinSound(n > 1 ? [880, 1100, 1320] : [880, 1320]);
     setNotice(`짤랑~ 창고에서 ${golden ? "✨황금 " : ""}${crop?.icon ?? ""} ${crop?.name ?? "작물"}${QUALITIES[quality].stars ? ` ${QUALITIES[quality].stars}` : ""} ${n}개를 ${amount.toLocaleString()}원에 팔았어요!`);
   }
-  function sellAllProduce() {
-    const entries = Object.entries(produce).filter(([, count]) => count > 0);
-    if (!entries.length) return;
-    // 같은 작물 묶음(품질 다름)은 이어서 팔린 것으로 보고 포화를 누적한다.
-    let amount = 0, state = market;
-    entries.forEach(([key, n]) => { const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId); if (!crop) return;
-      const result = sellMany(state, cropId, basePrice(crop) * QUALITIES[quality].multiplier * (golden ? 3 : 1), n); amount += result.total; state = result.state; });
-    const count = entries.reduce((sum, [, n]) => sum + n, 0);
-    setProduce({}); setMoney(m => m + amount); setMarketState(state); playCoinSound([880, 1100, 1320, 1760]);
-    setNotice(`짤랑짤랑~ 창고의 작물 ${count}개를 모두 ${amount.toLocaleString()}원에 팔았어요!`);
+  /** 창고에서 팔 수 있는 묶음과 개수(잠금·주문 예약분 제외). cropId를 주면 그 작물만. */
+  function sellPlan(cropId?: string) {
+    return Object.keys(produce).filter(key => produce[key] > 0 && (!cropId || parseProduceKey(key).cropId === cropId)).map(key => ({ key, n: sellableOf(key) })).filter(entry => entry.n > 0);
   }
-  /** 농협 일괄 출하: 기준가(시세 변동·버프 없음)의 80%, 포화 없이 창고 전부를 판다. 급할 때 쓰는 안전장치. */
-  const coopUnit = (key: string) => { const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId); return crop ? Math.round(crop.sell * CROP_PRICE_SCALE * COOP_RATE * QUALITIES[quality].multiplier * (golden ? 3 : 1)) : 0; };
-  function coopShipAll() {
-    const entries = Object.entries(produce).filter(([, count]) => count > 0);
-    if (!entries.length) return;
-    const amount = entries.reduce((sum, [key, n]) => sum + coopUnit(key) * n, 0), count = entries.reduce((sum, [, n]) => sum + n, 0);
-    setProduce({}); setMoney(m => m + amount); playCoinSound([660, 880, 1100]);
-    setNotice(`🏦 농협에 창고 작물 ${count}개를 일괄 출하했어요. 기준가의 ${Math.round(COOP_RATE * 100)}%로 ${amount.toLocaleString()}원! (시세·포화와 상관없는 고정 단가)`);
+  /** 시장에 판다(포화 슬롯 적용). */
+  function marketSellPlan(plan: { key: string; n: number }[]) {
+    let amount = 0, state = market;
+    plan.forEach(({ key, n }) => { const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId); if (!crop) return;
+      const result = sellMany(state, cropId, basePrice(crop) * QUALITIES[quality].multiplier * (golden ? 3 : 1), n); amount += result.total; state = result.state; });
+    return { amount, state };
+  }
+  function takeFromProduce(plan: { key: string; n: number }[]) {
+    setProduce(stock => { const next = { ...stock }; plan.forEach(({ key, n }) => { next[key] = (next[key] ?? 0) - n; if (next[key] <= 0) delete next[key]; }); return next; });
+  }
+  function confirmSell() {
+    if (!sellConfirm) return;
+    const plan = sellPlan(sellConfirm.cropId), count = plan.reduce((sum, entry) => sum + entry.n, 0);
+    setSellConfirm(null);
+    if (!count) return;
+    if (sellConfirm.kind === "market") {
+      const { amount, state } = marketSellPlan(plan);
+      takeFromProduce(plan); setMoney(m => m + amount); setMarketState(state); playCoinSound([880, 1100, 1320, 1760]);
+      return setNotice(`짤랑짤랑~ 창고 작물 ${count}개를 ${amount.toLocaleString()}원에 팔았어요! (잠금·주문 예약분은 남겨 뒀어요)`);
+    }
+    const amount = plan.reduce((sum, { key, n }) => sum + coopUnit(key) * n, 0);
+    takeFromProduce(plan); setMoney(m => m + amount); playCoinSound([660, 880, 1100]);
+    setNotice(`🏦 농협에 ${count}개를 일괄 출하했어요. 기준가의 ${Math.round(COOP_RATE * 100)}%로 ${amount.toLocaleString()}원! (잠금·주문 예약분은 남겨 뒀어요)`);
+  }
+  function toggleLock(key: string) {
+    const locked = isLocked(key);
+    setProduceLocks(all => ({ ...all, [key]: !locked }));
   }
 
+  /** 농협 일괄 출하: 기준가(시세 변동·버프 없음)의 80%, 포화 없이 창고 전부를 판다. 급할 때 쓰는 안전장치. */
+  const coopUnit = (key: string) => { const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId); return crop ? Math.round(crop.sell * CROP_PRICE_SCALE * COOP_RATE * QUALITIES[quality].multiplier * (golden ? 3 : 1)) : 0; };
+
+
   function expandStorage() {
-    if (storageSlots >= STORAGE_MAX) return setNotice("창고는 이미 최대 크기예요.");
-    const price = storagePrice(storageSlots);
+    if (storageCap >= STORAGE_MAX) return setNotice("창고는 이미 최대 크기예요.");
+    const price = storagePrice(storageCap);
     if (money < price) return setNotice(`창고를 넓히려면 ${price.toLocaleString()}원이 필요해요.`);
-    setMoney(value => value - price); setStorageSlots(value => value + STORAGE_STEP); playCoinSound([660, 990, 1320]);
-    setNotice(`📦 창고를 ${storageSlots + STORAGE_STEP}칸으로 넓혔어요!`);
+    setMoney(value => value - price); setStorageCap(value => value + STORAGE_STEP); playCoinSound([660, 990, 1320]);
+    setNotice(`📦 창고를 ${(storageCap + STORAGE_STEP).toLocaleString()}개까지 넣을 수 있게 넓혔어요!`);
   }
+
   // ---------- 작물 도감 ----------
   function claimCropReward(target: Season) {
     const id = CROP_BOOK_REWARDS[target], item = FURNITURE.find(entry => entry.id === id);
@@ -1537,19 +1557,44 @@ export default function Home() {
   }
 
   const selectedCropInfo = CROPS.find(c => c.id === selectedCrop) ?? available[0] ?? CROPS[0];
-  const storageUsed = Object.values(produce).filter(count => count > 0).length;
+  const storageUsed = Object.values(produce).reduce((sum, count) => sum + Math.max(0, count), 0);
+  const isLocked = (key: string) => produceLocks[key] ?? parseProduceKey(key).golden;
   const orderDate = now.toDateString(), orders = useMemo(() => dailyOrders(orderDate), [orderDate]);
   const doneToday = ordersDone.date === orderDate ? ordersDone.ids : [];
+  // 오늘 못 끝낸 주문에 필요한 수량을 창고에서 예약해 둔다(낮은 품질·황금 아닌 것부터, 납품 규칙과 같게).
+  const reserved = useMemo(() => {
+    const left = { ...produce }, out: Record<string, number> = {};
+    orders.filter(order => !doneToday.includes(order.id)).forEach(order => order.items.forEach(item => {
+      let need = item.count;
+      Object.keys(left).filter(key => { const info = parseProduceKey(key); return info.cropId === item.cropId && info.quality >= item.minQuality && left[key] > 0; })
+        .sort((a, b) => { const x = parseProduceKey(a), y = parseProduceKey(b); return Number(x.golden) - Number(y.golden) || x.quality - y.quality; })
+        .forEach(key => { const take = Math.min(need, left[key]); left[key] -= take; need -= take; if (take) out[key] = (out[key] ?? 0) + take; });
+    }));
+    return out;
+  }, [produce, orders, doneToday]);
+  const sellableOf = (key: string) => (isLocked(key) ? 0 : Math.max(0, (produce[key] ?? 0) - (reserved[key] ?? 0)));
   const readyOrders = orders.filter(order => !doneToday.includes(order.id) && order.items.every(item => Object.entries(produce).reduce((sum, [key, count]) => { const info = parseProduceKey(key); return info.cropId === item.cropId && info.quality >= item.minQuality ? sum + count : sum; }, 0) >= item.count)).length;
-  // 창고 묶음: 최근 6번(30분)의 시세 흐름을 함께 보여 준다.
-  const storageStacks = Object.entries(produce).filter(([, count]) => count > 0).map(([key, count]) => {
-    const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId);
+  // 창고: 작물별 상자 하나에 품질 묶음을 모은다. 최근 6번(30분) 시세 흐름도 함께.
+  const storageBoxes = Object.values(Object.entries(produce).filter(([, count]) => count > 0).reduce<Record<string, { cropId: string; keys: string[] }>>((acc, [key]) => { const { cropId } = parseProduceKey(key); (acc[cropId] ??= { cropId, keys: [] }).keys.push(key); return acc; }, {})).map(({ cropId, keys }) => {
+    const crop = CROPS.find(c => c.id === cropId);
     if (!crop) return null;
     const history = Array.from({ length: 6 }, (_, i) => marketPrice(crop, marketBucket - 5 + i)), now = history[5], prev = history[4];
     const min = Math.min(...history), max = Math.max(...history), change = Math.round((now / prev - 1) * 100);
     const label = now === max ? "🔥 최근 30분 최고가" : now === min ? "📉 최근 30분 최저가" : change > 0 ? `▲${change}% 오르는 중` : change < 0 ? `▼${Math.abs(change)}% 내리는 중` : "보합";
-    return { key, count, crop, golden, quality: QUALITIES[quality], unit: produceUnitPrice(key), total: produceTotal(key, count), sat: Math.round(saturationOf(market, crop.id) * 100), free: freeLeft(market, crop.id), trend: { history, min, max, label, best: now === max } };
-  }).filter((stack): stack is NonNullable<typeof stack> => Boolean(stack)).sort((a, b) => b.total - a.total);
+    const rows = keys.map(key => { const info = parseProduceKey(key); return { key, quality: QUALITIES[info.quality], qIndex: info.quality, golden: info.golden, count: produce[key], unit: produceUnitPrice(key), locked: isLocked(key), reserved: reserved[key] ?? 0, sellable: sellableOf(key) }; })
+      .sort((a, b) => Number(a.golden) - Number(b.golden) || a.qIndex - b.qIndex);
+    const total = rows.reduce((sum, row) => sum + row.count, 0), sellableCount = rows.reduce((sum, row) => sum + row.sellable, 0);
+    const value = marketSellPlan(rows.filter(row => row.sellable > 0).map(row => ({ key: row.key, n: row.sellable }))).amount;
+    return { crop, rows, total, sellableCount, value, reservedCount: rows.reduce((sum, row) => sum + row.reserved, 0), golden: rows.some(row => row.golden && row.count > 0),
+      sat: Math.round(saturationOf(market, crop.id) * 100), free: freeLeft(market, crop.id), trend: { history, min, max, label, best: now === max } };
+  }).filter((box): box is NonNullable<typeof box> => Boolean(box))
+    .filter(box => storageFilter === "all" || (storageFilter === "order" ? box.reservedCount > 0 : storageFilter === "calm" ? box.sat === 0 : box.golden))
+    .sort((a, b) => storageSort === "name" ? a.crop.name.localeCompare(b.crop.name, "ko") : storageSort === "count" ? b.total - a.total : b.value - a.value);
+  const sellPreview = sellConfirm ? (() => { const plan = sellPlan(sellConfirm.cropId), count = plan.reduce((sum, entry) => sum + entry.n, 0);
+    const amount = sellConfirm.kind === "market" ? marketSellPlan(plan).amount : plan.reduce((sum, { key, n }) => sum + coopUnit(key) * n, 0);
+    const scope = Object.keys(produce).filter(key => produce[key] > 0 && (!sellConfirm.cropId || parseProduceKey(key).cropId === sellConfirm.cropId));
+    const lockedCount = scope.filter(isLocked).reduce((sum, key) => sum + produce[key], 0), reservedCount = scope.filter(key => !isLocked(key)).reduce((sum, key) => sum + Math.min(produce[key], reserved[key] ?? 0), 0);
+    return { count, amount, lockedCount, reservedCount }; })() : null;
   const fieldStats = plots.slice(0, plotCount).reduce((acc, plot) => {
     const crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
     if (!plot || !crop || seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod) return acc;
@@ -1672,7 +1717,7 @@ export default function Home() {
         <aside className="seed-panel panel">
           <div className="side-tabs" role="tablist" aria-label="씨앗과 창고">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗 상자</button>
-            <button role="tab" aria-selected={sidePanel === "storage"} className={sidePanel === "storage" ? "on" : ""} onClick={() => setSidePanel("storage")}>📦 창고 <small>{storageUsed}/{storageSlots}</small></button>
+            <button role="tab" aria-selected={sidePanel === "storage"} className={sidePanel === "storage" ? "on" : ""} onClick={() => setSidePanel("storage")}>📦 창고 <small>{storageUsed}/{storageCap}</small></button>
             <button role="tab" aria-selected={sidePanel === "orders"} className={`${sidePanel === "orders" ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => setSidePanel("orders")}>📜 주문 <small>{doneToday.length}/{orders.length}</small>{readyOrders > 0 && <i className="tab-dot" aria-label={`납품 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
           </div>
           {sidePanel === "seed" ? <>
@@ -1695,19 +1740,32 @@ export default function Home() {
             <div className="harvest-mode" role="group" aria-label="수확한 작물 처리"><span>수확하면</span>
               <button aria-pressed={harvestMode === "sell"} className={harvestMode === "sell" ? "on" : ""} onClick={() => harvestMode !== "sell" && toggleHarvestMode()}>💰 바로 판매</button>
               <button aria-pressed={harvestMode === "store"} className={harvestMode === "store" ? "on" : ""} onClick={() => harvestMode !== "store" && toggleHarvestMode()}>📦 창고 보관</button></div>
-            {storageStacks.length === 0 ? <p className="empty">창고가 비었어요. “📦 창고 보관”을 고르고 수확하면 여기 쌓여요. 보관 중인 작물은 썩지 않으니 시세가 좋을 때 파세요!</p> : <>
-              <div className="storage-list">{storageStacks.map(stack => <div key={stack.key} className={`stack ${stack.golden ? "golden" : ""} ${stack.trend.best ? "best" : ""}`}>
-                <span className="stack-icon">{stack.crop.icon}{stack.golden && <i>✨</i>}</span>
-                <span className="stack-info"><b>{stack.crop.name}{stack.quality.stars ? ` ${stack.quality.stars}` : ""}{stack.golden ? " 황금" : ""} <em>×{stack.count}</em></b><small>개당 {stack.unit.toLocaleString()}원 · {stack.trend.label}{stack.sat > 0 ? <b className="sat-badge"> · 📉 시장 포화 -{stack.sat}%</b> : stack.free < FREE_PER_CYCLE ? <b className="free-badge"> · 정상가 {stack.free}개 남음</b> : null}</small>
-                  <span className="spark" aria-hidden="true">{stack.trend.history.map((value, i) => <i key={i} className={i === stack.trend.history.length - 1 ? "now" : ""} style={{ height: `${20 + ((value - stack.trend.min) / Math.max(1, stack.trend.max - stack.trend.min)) * 80}%` }} />)}</span></span>
-                <span className="stack-actions"><button onClick={() => sellProduce(stack.key, 1)}>1개</button><button className="all" onClick={() => sellProduce(stack.key, stack.count)} title="많이 팔수록 시장 포화로 값이 조금씩 내려가요">전부 {stack.total.toLocaleString()}원</button></span>
+            <div className="storage-cap"><span>📦 {storageUsed.toLocaleString()} / {storageCap.toLocaleString()}개</span><span className="field-meter"><i style={{ width: `${Math.min(100, (storageUsed / storageCap) * 100)}%` }} /></span></div>
+            {storageUsed === 0 ? <p className="empty">창고가 비었어요. “📦 창고 보관”을 고르고 수확하면 여기 쌓여요. 보관 중인 작물은 썩지 않으니 시세가 좋을 때 파세요!</p> : <>
+              <div className="storage-tools">
+                <select value={storageSort} onChange={event => setStorageSort(event.target.value as typeof storageSort)} aria-label="정렬"><option value="value">가치순</option><option value="count">수량순</option><option value="name">이름순</option></select>
+                {([["all", "전체"], ["order", "📜 주문 재료"], ["calm", "📈 포화 아님"], ["golden", "✨ 황금"]] as const).map(([id, label]) => <button key={id} className={storageFilter === id ? "on" : ""} onClick={() => setStorageFilter(id)} aria-pressed={storageFilter === id}>{label}</button>)}
+              </div>
+              <div className="storage-list">{storageBoxes.length === 0 ? <p className="empty">이 조건에 맞는 작물이 없어요.</p> : storageBoxes.map(box => <div key={box.crop.id} className={`crop-box ${box.trend.best ? "best" : ""}`}>
+                <div className="crop-box-head"><span className="stack-icon">{box.crop.icon}</span>
+                  <span className="stack-info"><b>{box.crop.name} <em>×{box.total}</em>{box.reservedCount > 0 && <i className="reserve-tag">📜 주문 예약 {box.reservedCount}</i>}</b>
+                    <small>{box.trend.label}{box.sat > 0 ? <b className="sat-badge"> · 📉 포화 -{box.sat}%</b> : box.free < FREE_PER_CYCLE ? <b className="free-badge"> · 정상가 {box.free}개 남음</b> : null}</small>
+                    <span className="spark" aria-hidden="true">{box.trend.history.map((value, i) => <i key={i} className={i === box.trend.history.length - 1 ? "now" : ""} style={{ height: `${20 + ((value - box.trend.min) / Math.max(1, box.trend.max - box.trend.min)) * 80}%` }} />)}</span></span></div>
+                <ul className="quality-rows">{box.rows.map(row => <li key={row.key} className={`${row.golden ? "golden" : ""} ${row.locked ? "locked" : ""}`}>
+                  <button className="lock" onClick={() => toggleLock(row.key)} aria-pressed={row.locked} title={row.locked ? "잠금 해제(팔 수 있게)" : "잠그기(전부 팔기·농협 출하에서 제외)"}>{row.locked ? "🔒" : "🔓"}</button>
+                  <span className="q-name">{row.golden ? "✨ 황금" : row.quality.name}{row.quality.stars ? ` ${row.quality.stars}` : ""}</span>
+                  <span className="q-count">{row.count}개{row.reserved > 0 && <small> (예약 {row.reserved})</small>}</span>
+                  <span className="q-price">개당 {row.unit.toLocaleString()}원</span>
+                  <span className="q-actions"><button onClick={() => sellProduce(row.key, 1)} disabled={row.sellable < 1}>1개</button><button className="all" onClick={() => sellProduce(row.key, row.sellable)} disabled={row.sellable < 1}>{row.sellable}개 팔기</button></span>
+                </li>)}</ul>
+                <div className="crop-box-foot"><span>팔 수 있는 {box.sellableCount}개 · 약 {box.value.toLocaleString()}원</span><button onClick={() => setSellConfirm({ kind: "coop", cropId: box.crop.id })} disabled={box.sellableCount < 1}>🏦 이 작물만 농협 출하</button></div>
               </div>)}</div>
               <div className="market-slots" aria-label="시장 포화 슬롯">{market.slots.length ? <>📉 포화 중: {market.slots.map(slot => { const crop = CROPS.find(c => c.id === slot.id); return <span key={slot.id}>{crop?.icon} -{Math.round(Math.min(SAT_MAX, slot.units * 0.02) * 100)}%</span>; })}<small>(최대 3종 · 5분마다 오래된 것부터 풀림)</small></> : <>📈 지금 포화된 작물이 없어요 · 작물마다 5분에 {FREE_PER_CYCLE}개까지 정상가</>}</div>
-              <button className="save-button sell-all" onClick={sellAllProduce}>💰 창고 전부 팔기 (약 {storageStacks.reduce((sum, stack) => sum + stack.total, 0).toLocaleString()}원)</button>
-              <button className="ghost-button coop-button" onClick={coopShipAll} title="시세·포화와 상관없이 기준가의 80% 고정 단가">🏦 농협 일괄 출하 · {storageStacks.reduce((sum, stack) => sum + coopUnit(stack.key) * stack.count, 0).toLocaleString()}원 <small>(기준가 {Math.round(COOP_RATE * 100)}%, 포화 없음)</small></button>
+              <button className="save-button sell-all" onClick={() => setSellConfirm({ kind: "market" })}>💰 창고 전부 팔기 <small>(잠금·주문 예약분 제외)</small></button>
+              <button className="ghost-button coop-button" onClick={() => setSellConfirm({ kind: "coop" })}>🏦 농협 일괄 출하 <small>(기준가 {Math.round(COOP_RATE * 100)}%, 포화 없음, 잠금·예약분 제외)</small></button>
             </>}
-            <div className="field-shop"><div><b>📦 창고 넓히기</b><small>{storageSlots >= STORAGE_MAX ? "최대 크기" : `${storagePrice(storageSlots).toLocaleString()}원 · +${STORAGE_STEP}칸 (${storageSlots}/${STORAGE_MAX})`}</small><span className="field-meter"><i style={{ width: `${(storageSlots / STORAGE_MAX) * 100}%` }} /></span></div><button onClick={expandStorage} disabled={storageSlots >= STORAGE_MAX}>구매</button></div>
-            <p className="hint">한 칸에 같은 작물·같은 품질은 몇 개든 들어가요. 벌레 먹은 작물은 품질이 한 단계 낮아져 보관돼요.</p>
+            <div className="field-shop"><div><b>📦 창고 넓히기</b><small>{storageCap >= STORAGE_MAX ? "최대 크기" : `${storagePrice(storageCap).toLocaleString()}원 · +${STORAGE_STEP}개 (${storageCap}/${STORAGE_MAX})`}</small><span className="field-meter"><i style={{ width: `${(storageCap / STORAGE_MAX) * 100}%` }} /></span></div><button onClick={expandStorage} disabled={storageCap >= STORAGE_MAX}>구매</button></div>
+            <p className="hint">용량은 총 보관 수량이에요(작물 종류가 많아도 손해 없음). ✨ 황금 작물은 기본으로 🔒 잠겨 있고, 오늘 주문에 필요한 수량은 📜 예약돼서 전부 팔기·농협 출하에서 빠져요. 벌레 먹은 작물은 품질이 한 단계 낮아져 보관돼요.</p>
           </div>}
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `${fieldPrice(ownedPlots).toLocaleString()}원 · ${ownedPlots}/${MAX_PLOTS}칸`}</small><span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span></div><button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>구매</button></div>
           <div className="tool-shop">
@@ -2033,6 +2091,13 @@ export default function Home() {
         <h3 id="spot-title">{spotConfirm.name}에 입장할까요?</h3>
         <p>입장권 <b>{spotConfirm.price.toLocaleString()}원</b> · {spotConfirm.minutes}분 동안 낚시할 수 있어요.<br />{spotConfirm.note}{SPECIAL_FISH.some(fish => fish.spot === spotConfirm.id) ? ` · 이곳에서만 ${SPECIAL_FISH.find(fish => fish.spot === spotConfirm.id)!.name}이(가) 잡혀요` : ""}</p>
         <div className="spot-modal-actions"><button className="ghost-button" onClick={() => setSpotConfirm(null)}>그만두기</button><button className="save-button" onClick={() => chooseSpot(spotConfirm)} disabled={money < spotConfirm.price}>{money < spotConfirm.price ? "돈이 모자라요" : `🎫 입장권 사고 입장 (${spotConfirm.price.toLocaleString()}원)`}</button></div>
+      </section></div>}
+
+      {sellConfirm && sellPreview && <div className="modal-backdrop"><section className="modal sell-modal" role="dialog" aria-labelledby="sell-title">
+        <h3 id="sell-title">{sellConfirm.kind === "coop" ? "🏦 농협 출하" : "💰 창고 전부 팔기"}{sellConfirm.cropId ? ` · ${CROPS.find(c => c.id === sellConfirm.cropId)?.name ?? ""}` : ""}</h3>
+        {sellPreview.count ? <p><b>{sellPreview.count}개</b>를 약 <b>{sellPreview.amount.toLocaleString()}원</b>에 {sellConfirm.kind === "coop" ? `팔아요(기준가 ${Math.round(COOP_RATE * 100)}%, 포화 없음).` : "시장에 팔아요(포화 슬롯 적용)."}</p> : <p>지금 팔 수 있는 작물이 없어요.</p>}
+        <ul className="sell-keep">{sellPreview.lockedCount > 0 && <li>🔒 잠금 {sellPreview.lockedCount}개는 남겨 둬요</li>}{sellPreview.reservedCount > 0 && <li>📜 오늘 주문 예약 {sellPreview.reservedCount}개는 남겨 둬요</li>}</ul>
+        <div className="spot-modal-actions"><button className="ghost-button" onClick={() => setSellConfirm(null)}>그만두기</button><button className="save-button" onClick={confirmSell} disabled={!sellPreview.count}>{sellConfirm.kind === "coop" ? "출하하기" : "팔기"}</button></div>
       </section></div>}
 
       {showBailout && <div className="modal-backdrop"><section className="modal bailout-modal" role="dialog" aria-labelledby="bailout-title">

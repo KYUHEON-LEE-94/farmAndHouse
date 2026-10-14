@@ -558,3 +558,28 @@ button { color:inherit; }
 .market-slots span{padding:2px 8px;border-radius:999px;background:#fde5dc;color:#a5302a;font-weight:700}
 .market-slots small{color:#8a7c5c}
 .coop-button{width:100%;margin-top:6px}.coop-button small{color:#8a7c5c}
+
+/* 창고 개선: 작물별 상자, 잠금·예약, 정렬·필터, 확인 창 */
+.storage-cap{display:flex;align-items:center;gap:10px;margin-bottom:10px;font:700 12px "Gowun Dodum";color:#4d4433}.storage-cap .field-meter{flex:1;margin:0}
+.storage-tools{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.storage-tools select{border:1px solid var(--line);border-radius:8px;padding:4px 6px;font:700 11px "Gowun Dodum";background:#fffdf8}
+.storage-tools button{border:1px solid var(--line);border-radius:999px;padding:4px 9px;background:#fffdf8;font:700 11px "Gowun Dodum";cursor:pointer}
+.storage-tools button.on{background:#24372b;border-color:#24372b;color:#fff}
+.crop-box{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fffdf8}.crop-box.best{box-shadow:inset 3px 0 0 #e2883a}
+.crop-box-head{display:grid;grid-template-columns:40px 1fr;gap:8px;align-items:center}
+.reserve-tag{margin-left:6px;padding:1px 6px;border-radius:6px;background:#efe7fb;color:#7c56a8;font:700 10px "Gowun Dodum";font-style:normal}
+.quality-rows{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.quality-rows li{display:grid;grid-template-columns:26px 1fr auto;grid-template-areas:"lock name count" "lock price actions";gap:2px 6px;align-items:center;padding:5px 6px;border-radius:8px;background:#f6f2e6;font-size:11.5px}
+.quality-rows li.golden{background:#fff3cf}.quality-rows li.locked{opacity:.8}
+.quality-rows .lock{grid-area:lock;border:0;background:transparent;font-size:15px;cursor:pointer;padding:0}
+.q-name{grid-area:name;font-weight:700}.q-count{grid-area:count;font-weight:700;color:#2f6f90}.q-count small{color:#7c56a8;font-weight:400}
+.q-price{grid-area:price;color:#6b6450;font-size:10.5px}
+.q-actions{grid-area:actions;display:flex;gap:4px;justify-content:flex-end}
+.q-actions button{border:1px solid var(--line);border-radius:7px;padding:3px 8px;background:#fff;font:700 10.5px "Gowun Dodum";cursor:pointer}
+.q-actions button.all{background:#24372b;color:#fff;border-color:#24372b}.q-actions button:disabled{opacity:.4;cursor:default}
+.crop-box-foot{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b6450}
+.crop-box-foot button{margin-left:auto;border:1px solid #c9b98a;border-radius:8px;padding:4px 8px;background:#fbf4e3;font:700 10.5px "Gowun Dodum";cursor:pointer;white-space:nowrap}
+.crop-box-foot button:disabled{opacity:.4;cursor:default}
+.sell-all small,.coop-button small{font-size:10.5px;opacity:.85}
+.sell-modal{max-width:380px;text-align:center}.sell-modal p{line-height:1.6}
+.sell-keep{list-style:none;margin:6px 0 10px;padding:0;font-size:12.5px;color:#7a5a1c}

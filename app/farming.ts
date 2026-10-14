@@ -167,13 +167,15 @@ export function seasonOmen(next: "여름" | "가을" | "겨울", date = new Date
 }
 
 /**
- * 농산물 창고: 작물 × 품질(× 황금) 묶음 단위로 보관한다. 한 묶음은 몇 개든 창고 1칸.
- * 보관 중인 작물은 썩지 않는다. 벌레 피해가 있던 작물은 품질 한 단계 낮춰 보관한다.
+ * 농산물 창고: 저장 키는 작물 × 품질(× 황금)이지만, 용량은 **총 보관 수량**으로 센다(여러 작물을 모아도 불리하지 않게).
+ * 기본 100개, 넓힐 때마다 +50개, 최대 400개. 보관 중인 작물은 썩지 않는다. 벌레 피해가 있던 작물은 품질 한 단계 낮춰 보관한다.
  */
-export const STORAGE_START = 20;
-export const STORAGE_STEP = 10;
-export const STORAGE_MAX = 60;
-export function storagePrice(slots: number) { return 3000 + ((slots - STORAGE_START) / STORAGE_STEP) * 2000; }
+export const STORAGE_START = 100;
+export const STORAGE_STEP = 50;
+export const STORAGE_MAX = 400;
+export function storagePrice(capacity: number) { return 3000 + ((capacity - STORAGE_START) / STORAGE_STEP) * 2000; }
+/** 예전 저장(묶음 칸 20~60)을 수량 용량으로 옮긴다: 20칸 → 100개, 칸 10개마다 +50개. */
+export function migrateStorageSlots(slots: number) { return Math.min(STORAGE_MAX, STORAGE_START + Math.max(0, Math.round((slots - 20) / 10)) * STORAGE_STEP); }
 export function produceKey(cropId: string, quality: number, golden: boolean) { return `${cropId}|${quality}|${golden ? 1 : 0}`; }
 export function parseProduceKey(key: string) {
   const [cropId, quality, golden] = key.split("|");
