@@ -502,3 +502,8 @@ button { color:inherit; }
 .sell-all{width:100%;margin-top:10px}
 .mode-toggle{margin-left:auto;border:1px solid #d9c37a;border-radius:999px;padding:3px 10px;background:#fffdf3;font:700 11px "Gowun Dodum";cursor:pointer}
 .mode-toggle.store{background:#e7f3f9;border-color:#8cc3e0}
+
+/* 시장 포화 */
+.crop-card{position:relative}
+.sat-chip{position:absolute;left:50%;top:-8px;transform:translateX(-50%);padding:1px 8px;border-radius:999px;background:#fde5dc;border:1px solid #e59a7e;color:#a5302a;font:700 10px "Gowun Dodum";white-space:nowrap}
+.sat-badge{font-weight:700;color:#a5302a}

@@ -183,3 +183,23 @@ export function storedQuality(qualityId: string, bugMultiplier: number) {
   const index = Math.max(0, QUALITIES.findIndex(quality => quality.id === qualityId));
   return bugMultiplier < 1 ? Math.max(0, index - 1) : index;
 }
+
+/**
+ * 시장 포화: 같은 작물을 팔수록 그 작물 시세가 잠깐 내려가고(1개당 -2%, 최대 -40%),
+ * 1분에 2%씩 회복한다. 한 작물만 심는 것보다 여러 작물을 섞는 쪽이 유리해진다.
+ * 압력(pressure)은 "최근에 판 개수"이며 1분에 1씩 줄어든다.
+ */
+export const SATURATION_PER_UNIT = 0.02;
+export const SATURATION_MAX = 0.4;
+export const SATURATION_RECOVER_PER_MIN = 1;
+export type MarketPressure = Record<string, { p: number; at: number }>;
+export function pressureNow(entry: { p: number; at: number } | undefined, now: number) {
+  return entry ? Math.max(0, entry.p - ((now - entry.at) / 60000) * SATURATION_RECOVER_PER_MIN) : 0;
+}
+export function saturationFactor(pressure: number) { return 1 - Math.min(SATURATION_MAX, pressure * SATURATION_PER_UNIT); }
+/** 지금 압력 p에서 n개를 연달아 팔 때, 개당 값 unit의 합계(1개 팔 때마다 값이 내려간다). */
+export function saturatedTotal(unit: number, pressure: number, count: number) {
+  let total = 0;
+  for (let k = 0; k < count; k++) total += unit * saturationFactor(pressure + k);
+  return Math.round(total);
+}
