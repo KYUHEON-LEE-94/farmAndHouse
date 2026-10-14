@@ -6,9 +6,11 @@
  * - 요리할 때 타이밍 미니게임(3단계)을 한다. 맞출수록 좋은 등급이 나올 "확률"이 올라간다(확정은 아님).
  */
 import { CROPS } from "./farming";
+import { TEST_MODE } from "./testMode";
 
-/** 주방 공개 스위치. 토벌 기능이 나온 뒤 true로 바꿔 공개한다(그 전에는 유저에게 탭을 보이지 않는다). */
-export const KITCHEN_ENABLED = false;
+/** 주방 공개 여부. 토벌 기능이 나온 뒤 KITCHEN_RELEASED를 true로 바꿔 공개한다. 로컬 테스트 모드에서는 항상 보인다. */
+export const KITCHEN_RELEASED = false;
+export const KITCHEN_ENABLED = KITCHEN_RELEASED || TEST_MODE;
 
 /** 재료: 특정 작물 n개, 또는 아무 물고기 n마리(전설 제외, 싼 것부터). */
 export type Ingredient = { kind: "crop"; id: string; count: number } | { kind: "fish"; count: number };

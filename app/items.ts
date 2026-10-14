@@ -8,12 +8,12 @@
  *   dish:maeuntang:2:0 — 주방 요리(사냥 준비물, 등급 0 보통·1 맛있음·2 일품)
  * 저장은 `inventory`(키 → 개수) 하나. 예전 저장(produce·fishStock·goods)은 migrateInventory로 옮긴다.
  */
-export type ItemCategory = "crop" | "fish" | "goods" | "dish";
+export type ItemCategory = "crop" | "fish" | "goods" | "dish" | "hunt";
 export type ItemRef = { category: ItemCategory; id: string; quality: number; golden: boolean };
 export type Inventory = Record<string, number>;
 
-export const ITEM_CATEGORIES: ItemCategory[] = ["crop", "fish", "goods", "dish"];
-const HAS_QUALITY: Record<ItemCategory, boolean> = { crop: true, fish: false, goods: false, dish: true };
+export const ITEM_CATEGORIES: ItemCategory[] = ["crop", "fish", "goods", "dish", "hunt"];
+const HAS_QUALITY: Record<ItemCategory, boolean> = { crop: true, fish: false, goods: false, dish: true, hunt: false };
 
 export function itemKey(ref: Pick<ItemRef, "category" | "id"> & Partial<ItemRef>) {
   return HAS_QUALITY[ref.category] ? `${ref.category}:${ref.id}:${ref.quality ?? 0}:${ref.golden ? 1 : 0}` : `${ref.category}:${ref.id}`;

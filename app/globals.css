@@ -717,3 +717,62 @@ button { color:inherit; }
 .size-row{flex-basis:100%;width:100%;flex-wrap:wrap}
 .size-row label{white-space:nowrap;display:flex;align-items:center;gap:6px;flex:1;min-width:150px;font:700 12px "Gowun Dodum"}
 .size-row label input{flex:1}
+/* 사냥터(프로토타입) */
+.hunt-weapons{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
+.hunt-weapons button{display:grid;justify-items:center;gap:1px;padding:8px 4px;border:1px solid var(--line);border-radius:12px;background:#fffdf8;cursor:pointer}
+.hunt-weapons button b{font-size:24px}.hunt-weapons button span{font:700 12px "Gowun Dodum"}.hunt-weapons button small{font-size:10px;color:#8a7c5c}
+.hunt-weapons button.on{background:#24372b;border-color:#24372b;color:#fff}.hunt-weapons button.on small{color:#c9d8cb}
+.hunt-arena{position:relative;height:340px;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#cfe7f2 0,#e8f2d8 30%,#b9d68e 31%,#9cc06d 100%);box-shadow:inset 0 0 0 6px #c9a06a,inset 0 0 0 9px #9b7444;touch-action:none;user-select:none;cursor:crosshair}
+.hunt-grass{position:absolute;inset:31% 0 0;background:radial-gradient(circle at 20% 30%,rgba(255,255,255,.35) 0 1.5px,transparent 2.5px) 0 0/30px 30px}
+.hunt-start{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:auto;padding:12px 24px;font-size:16px}
+.hunt-stop{position:absolute;right:12px;top:12px;border:0;border-radius:999px;padding:5px 12px;background:rgba(36,55,43,.75);color:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
+.hunt-trace,.hunt-spot{position:absolute;transform:translate(-50%,-50%);font-size:26px;animation:traceIn .3s ease-out both}
+.hunt-trace em,.hunt-spot em{display:block;font-style:normal;font:700 11px "Gowun Dodum";color:#4d4433;background:rgba(255,255,255,.8);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.hunt-spot{border:2px dashed #7a5a2a;border-radius:50%;background:rgba(255,255,255,.4);width:64px;height:64px;cursor:pointer}
+.hunt-spot:hover{background:rgba(255,236,170,.7)}.hunt-spot.picked{background:#fff1c2;border-style:solid}
+.hunt-animal{position:absolute;transform:translate(-50%,-50%);line-height:1;filter:drop-shadow(0 6px 4px rgba(0,0,0,.25));pointer-events:none}
+.hunt-animal.run-left{transform:translate(-50%,-50%) scaleX(1)}.hunt-animal.run-right{transform:translate(-50%,-50%) scaleX(-1)}
+.hunt-animal.pop{animation:animalPop .25s cubic-bezier(.3,1.6,.5,1) both}
+.hunt-aim{position:absolute;transform:translate(-50%,-50%);border:3px solid #e0533a;border-radius:50%;aspect-ratio:1;pointer-events:none;box-shadow:0 0 0 2px rgba(255,255,255,.7)}
+.hunt-arrow{position:absolute;transform:translate(-50%,-50%);font-size:22px;pointer-events:none;animation:traceIn .2s both}
+.hunt-trap{position:absolute;transform:translate(-50%,-30%);font-size:26px;pointer-events:none}
+.hunt-drag{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.hunt-drag line{stroke:#7a5a2a;stroke-width:.8;stroke-linecap:round;stroke-dasharray:2 1.5}
+.hunt-result{position:absolute;transform:translate(-50%,-110%);display:grid;justify-items:center;gap:1px;padding:6px 12px;border-radius:12px;background:#fffdf8;box-shadow:0 6px 16px rgba(0,0,0,.2);pointer-events:none;animation:traceIn .2s both}
+.hunt-result b{font:700 16px "Gowun Batang"}.hunt-result small{font-size:11px;color:#6b6450}.hunt-result em{font-style:normal;font:700 11px "Gowun Dodum";color:#3f6a24}
+.hunt-result.great b{color:#d49a16}.hunt-result.success b{color:#3f6a24}.hunt-result.escape b{color:#a5302a}
+.hunt-stats{margin:8px 0 0;font-size:12px;color:#4d4433;text-align:center}.hunt-stats small{color:#8a7c5c}
+.hunt-loot{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hunt-loot li{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:#fffdf8}
+.hunt-loot li span{font-size:20px}.hunt-loot li b{font-size:12.5px}.hunt-loot li em{font-style:normal;font-weight:700;color:#2f6f90}
+@keyframes traceIn{from{opacity:0;transform:translate(-50%,-50%) scale(.6)}to{opacity:1}}
+@keyframes animalPop{from{transform:translate(-50%,-20%) scale(.3);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+/* 사냥 2차: 체력바·제한 시간·명중 표시·동물 정보 */
+.hunt-weapons button em{font-style:normal;font:700 10.5px "Gowun Dodum";color:#2f6f90}.hunt-weapons button.on em{color:#c9d8cb}
+.test-flag{color:#7c56a8}
+.hunt-animal{transition:none}.hunt-animal[data-dir="right"]{transform:translate(-50%,-50%) scaleX(-1)}
+.hunt-animal.move-hop{animation:hop .3s ease-in-out infinite alternate}
+.hunt-hp{position:absolute;transform:translate(-50%,-260%);width:46px;height:6px;border-radius:3px;background:rgba(0,0,0,.25);overflow:hidden;pointer-events:none}
+.hunt-hp i{display:block;height:100%;background:linear-gradient(90deg,#e0533a,#f2a23a);transition:width .12s}
+.hunt-timer{position:absolute;left:12px;right:12px;bottom:12px;height:5px;border-radius:3px;background:#f2c33a;transform-origin:left;animation:huntTimer linear forwards;pointer-events:none}
+.hunt-pop{position:absolute;transform:translate(-50%,-50%);font:900 16px "Gowun Batang";pointer-events:none;animation:huntPop .6s ease-out forwards}
+.hunt-pop.hit{color:#e0533a;text-shadow:0 2px 0 #fff}.hunt-pop.miss{color:#6b6450;font-size:12px}
+.hunt-animals{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+.hunt-animals li{display:grid;grid-template-columns:24px 1fr;gap:0 6px;align-items:center;padding:5px 8px;border-radius:8px;background:#f6f2e6;font-size:11.5px}
+.hunt-animals li span{grid-row:1/3;font-size:18px}.hunt-animals li small{color:#6b6450;font-size:10.5px}
+@keyframes hop{from{margin-top:0}to{margin-top:-10px}}
+@keyframes huntTimer{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@keyframes huntPop{from{opacity:1;transform:translate(-50%,-50%)}to{opacity:0;transform:translate(-50%,-160%)}}
+
+/* 로컬 테스트 모드 표시 */
+.topbar{position:relative}
+.test-badge{position:absolute;left:50%;top:-10px;transform:translateX(-50%);z-index:3;padding:2px 10px;border-radius:999px;background:#7c56a8;color:#fff;font:700 11px "Gowun Dodum";box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.hunt-gate{display:grid;justify-items:center;gap:10px;padding:40px 20px;border-radius:18px;background:linear-gradient(180deg,#e8f2d8,#b9d68e);text-align:center}
+.hunt-gate p{margin:0;font-size:13px;color:#4d4433}.hunt-gate .save-button{width:auto;padding:10px 22px}
+
+/* 사냥 소재 판매 */
+.hunt-loot li{grid-template-columns:30px 1fr auto;row-gap:4px}
+.hunt-loot li b small{display:block;font-weight:400;font-size:10.5px;color:#8a7c5c}
+.hunt-sell{grid-column:1/-1;display:flex;gap:4px;font-size:inherit}
+.hunt-sell button{flex:1;border:1px solid var(--line);border-radius:8px;background:#fff;padding:3px 6px;font:700 11px "Gowun Dodum";cursor:pointer}
+.hunt-sell button.all{background:#24372b;border-color:#24372b;color:#fff}
