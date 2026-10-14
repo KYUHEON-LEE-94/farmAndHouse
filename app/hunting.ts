@@ -15,12 +15,12 @@ export type Animal = { id: string; name: string; icon: string; weight: number; s
 export const BASE_SPEED = 56;
 
 export const ANIMALS: Animal[] = [
-  { id: "rabbit", name: "토끼", icon: "🐇", weight: 30, speed: 1, hp: 2, defense: 0, move: "hop", moveName: "지그재그로 깡충", window: 3.5, size: 4.2, loot: { id: "rabbitfur", name: "토끼 털뭉치", icon: "🤍", price: 150 }, rare: { id: "luckyfoot", name: "행운의 털", icon: "🍀", price: 800 } },
-  { id: "fox", name: "여우", icon: "🦊", weight: 15, speed: 1.6, hp: 2, defense: 1, move: "zip", moveName: "번개처럼 튀었다 멈칫", window: 3, size: 4, loot: { id: "foxfur", name: "여우 꼬리털", icon: "🧡", price: 250 }, rare: { id: "foxbead", name: "여우 구슬", icon: "🔮", price: 1200 } },
-  { id: "deer", name: "사슴", icon: "🦌", weight: 22, speed: 1.2, hp: 3, defense: 1, move: "dash", moveName: "곧게 내달림", window: 3.5, size: 4.8, loot: { id: "antler", name: "떨어진 사슴뿔", icon: "🦌", price: 250 }, rare: { id: "goldantler", name: "황금 뿔 조각", icon: "✨", price: 1500 } },
-  { id: "boar", name: "멧돼지", icon: "🐗", weight: 20, speed: 1.15, hp: 5, defense: 2, move: "charge", moveName: "돌진 후 급선회", window: 4, size: 5.2, loot: { id: "boarhair", name: "멧돼지 털", icon: "🧶", price: 350 }, rare: { id: "tusk", name: "엄니 조각", icon: "🦷", price: 1800 } },
-  { id: "bear", name: "곰", icon: "🐻", weight: 10, speed: 0.6, hp: 6, defense: 3, move: "wander", moveName: "느릿느릿 어슬렁", window: 5, size: 6, loot: { id: "bearfur", name: "곰 털뭉치", icon: "🟫", price: 600 }, rare: { id: "honey", name: "야생 꿀", icon: "🍯", price: 2500 } },
-  { id: "tiger", name: "호랑이", icon: "🐅", weight: 3, speed: 0.9, hp: 10, defense: 4, move: "stalk", moveName: "웅크렸다 덮침", window: 6, size: 6.4, loot: { id: "tigerpelt", name: "호랑이 가죽", icon: "🐯", price: 2000 }, rare: { id: "tigerfang", name: "호랑이 송곳니", icon: "🦷", price: 8000 } },
+  { id: "rabbit", name: "토끼", icon: "🐇", weight: 30, speed: 1, hp: 2, defense: 0, move: "hop", moveName: "지그재그로 깡충", window: 3.5, size: 4.2, loot: { id: "rabbitfur", name: "토끼 털뭉치", icon: "🤍", price: 60 }, rare: { id: "luckyfoot", name: "행운의 털", icon: "🍀", price: 300 } },
+  { id: "fox", name: "여우", icon: "🦊", weight: 15, speed: 1.6, hp: 2, defense: 1, move: "zip", moveName: "번개처럼 튀었다 멈칫", window: 3, size: 4, loot: { id: "foxfur", name: "여우 꼬리털", icon: "🧡", price: 100 }, rare: { id: "foxbead", name: "여우 구슬", icon: "🔮", price: 500 } },
+  { id: "deer", name: "사슴", icon: "🦌", weight: 22, speed: 1.2, hp: 3, defense: 1, move: "dash", moveName: "곧게 내달림", window: 3.5, size: 4.8, loot: { id: "antler", name: "떨어진 사슴뿔", icon: "🦌", price: 100 }, rare: { id: "goldantler", name: "황금 뿔 조각", icon: "✨", price: 600 } },
+  { id: "boar", name: "멧돼지", icon: "🐗", weight: 20, speed: 1.15, hp: 5, defense: 2, move: "charge", moveName: "돌진 후 급선회", window: 4, size: 5.2, loot: { id: "boarhair", name: "멧돼지 털", icon: "🧶", price: 140 }, rare: { id: "tusk", name: "엄니 조각", icon: "🦷", price: 700 } },
+  { id: "bear", name: "곰", icon: "🐻", weight: 10, speed: 0.6, hp: 6, defense: 3, move: "wander", moveName: "느릿느릿 어슬렁", window: 5, size: 6, loot: { id: "bearfur", name: "곰 털뭉치", icon: "🟫", price: 240 }, rare: { id: "honey", name: "야생 꿀", icon: "🍯", price: 1000 } },
+  { id: "tiger", name: "호랑이", icon: "🐅", weight: 3, speed: 0.9, hp: 10, defense: 4, move: "stalk", moveName: "웅크렸다 덮침", window: 6, size: 6.4, loot: { id: "tigerpelt", name: "호랑이 가죽", icon: "🐯", price: 800 }, rare: { id: "tigerfang", name: "호랑이 송곳니", icon: "🦷", price: 3000 } },
 ];
 export const ALL_LOOT: Loot[] = ANIMALS.flatMap(animal => [animal.loot, animal.rare]);
 
