@@ -95,7 +95,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   </div>;
   if (running) return <div className="raid-run">
     <RaidGame key={running.id} floor={floor} weapon={stats} evolution={evo} foods={running.foods} gear={gear} pet={petFor(raid)} avatar={avatar} hold={hold} speed={TEST_MODE ? testSpeed : 1} onFinish={finish} onQuit={finish} />
-    <p className="raid-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 🖱 조준 · 클릭(누르고 있기) 공격 · <kbd>Space</kbd> 회피 · 🖱 우클릭 특수 공격(진화 무기) · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 음식 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 보스키</p>
+    <p className="raid-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 🖱 조준 · 공격은 자동 · <kbd>Space</kbd> 회피 · 🖱 우클릭 특수 공격(진화 무기) · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 음식 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 보스키</p>
   </div>;
 
   return <div className="raid-wrap">

@@ -9,6 +9,8 @@ export type AwakenCategory = "basic" | "special" | "auxiliary" | "survival" | "m
 export type AwakenTier = "basic" | "advanced" | "rare";
 /** 등장 조건 키(모두 만족해야 후보) */
 export type AwakenReq = "evo" | "pet" | "food" | "shieldSrc" | "melee" | "ranged" | "area" | "slowTerrain" | "flowers" | "noAux" | "hasAux";
+/** 쾌속: 한 판 보조무기 최대 칸 */
+export const MAX_AUX = 3;
 export type AwakenMeta = { cat: AwakenCategory; tier: AwakenTier; minLevel?: number; req?: AwakenReq[]; excludes?: string[]; weight?: number };
 
 export const CATEGORY_LABEL: Record<AwakenCategory, { icon: string; name: string }> = {
@@ -57,7 +59,6 @@ export const AWAKEN_META: Record<string, AwakenMeta> = {
   "wind-step": { cat: "mobility", tier: "basic" },
   "quick-dash": { cat: "mobility", tier: "basic" },
   "long-dash": { cat: "mobility", tier: "basic" },
-  "wide-gather": { cat: "mobility", tier: "basic" },
   "cutting-trail": { cat: "mobility", tier: "advanced" },
   "terrain-boots": { cat: "terrain", tier: "basic", req: ["slowTerrain"] },
   "opportunity-master": { cat: "terrain", tier: "advanced", req: ["flowers"] },
@@ -70,15 +71,15 @@ export const AWAKEN_META: Record<string, AwakenMeta> = {
   "pet-guard": { cat: "pet", tier: "rare", req: ["pet"] },
   "pet-finisher": { cat: "pet", tier: "rare", req: ["pet", "evo"] },
   // 보조무기 획득(62.2·62.4): 한 판 1개, Lv.3부터
-  "aux-slingshot": { cat: "auxiliary", tier: "basic", minLevel: 3, req: ["noAux"], weight: 35 },
-  "aux-hand-sickle": { cat: "auxiliary", tier: "basic", minLevel: 3, req: ["noAux"], weight: 35 },
-  "aux-seed-bomb": { cat: "auxiliary", tier: "advanced", req: ["noAux"], weight: 20 },
-  "aux-sprinkler": { cat: "auxiliary", tier: "advanced", req: ["noAux"], weight: 20 },
-  "aux-beehive": { cat: "auxiliary", tier: "advanced", req: ["noAux"], weight: 20 },
-  "aux-scarecrow": { cat: "auxiliary", tier: "rare", req: ["noAux"], weight: 10 },
+  "aux-slingshot": { cat: "auxiliary", tier: "basic", req: ["noAux"], weight: 70 },
+  "aux-hand-sickle": { cat: "auxiliary", tier: "basic", req: ["noAux"], weight: 70 },
+  "aux-seed-bomb": { cat: "auxiliary", tier: "advanced", req: ["noAux"], weight: 50 },
+  "aux-sprinkler": { cat: "auxiliary", tier: "advanced", req: ["noAux"], weight: 50 },
+  "aux-beehive": { cat: "auxiliary", tier: "advanced", req: ["noAux"], weight: 50 },
+  "aux-scarecrow": { cat: "auxiliary", tier: "rare", req: ["noAux"], weight: 30 },
   // 보조무기 강화(62.3): 획득한 다음 레벨부터
-  "auxiliary-power": { cat: "auxiliary", tier: "basic", minLevel: 3, req: ["hasAux"], weight: 30 },
-  "auxiliary-range": { cat: "auxiliary", tier: "basic", minLevel: 3, req: ["hasAux"], weight: 30 },
+  "auxiliary-power": { cat: "auxiliary", tier: "basic", minLevel: 3, req: ["hasAux"], weight: 45 },
+  "auxiliary-range": { cat: "auxiliary", tier: "basic", minLevel: 3, req: ["hasAux"], weight: 35 },
   "auxiliary-haste": { cat: "auxiliary", tier: "advanced", req: ["hasAux"], weight: 15 },
   "auxiliary-mastery": { cat: "auxiliary", tier: "rare", req: ["hasAux"], weight: 8 },
 };
@@ -109,14 +110,15 @@ const AREA: AttackMode[] = ["arc", "slam", "spread", "channel", "lob"];
 export type ChoiceContext = {
   level: number; picks: Partial<Record<string, number>>; maxOf: (id: string) => number;
   mode: AttackMode; evo: boolean; pet: boolean; food: boolean; shieldSrc: boolean; slowTerrain: boolean; flowers: boolean;
-  aux: AuxId | null; auxLevel: number; random: () => number;
+  /** 이미 가진 보조무기 수, 첫 보조무기를 얻은 레벨 */
+  auxCount: number; auxLevel: number; random: () => number;
 };
 function reqOk(r: AwakenReq, c: ChoiceContext) {
   switch (r) {
     case "evo": return c.evo; case "pet": return c.pet; case "food": return c.food; case "shieldSrc": return c.shieldSrc;
     case "melee": return MELEE.includes(c.mode); case "ranged": return RANGED.includes(c.mode); case "area": return AREA.includes(c.mode);
     case "slowTerrain": return c.slowTerrain; case "flowers": return c.flowers;
-    case "noAux": return !c.aux; case "hasAux": return Boolean(c.aux) && c.level > c.auxLevel;
+    case "noAux": return c.auxCount < MAX_AUX; case "hasAux": return c.auxCount > 0 && c.level > c.auxLevel;
   }
 }
 /** 지금 레벨에서 제시할 수 있는 카드(중첩 미만·조건 만족·배타 카드 없음). */
@@ -145,7 +147,8 @@ export function rollChoices(c: ChoiceContext, count = 3, extraPool?: string[]) {
   const out: string[] = [];
   const take = (pred: (id: string) => boolean) => {
     if (out.length >= count) return;
-    const cand = pool.filter(id => !out.includes(id) && pred(id) && !(isAuxCard(id) && out.some(isAuxCard)));
+    const acquire = (id: string) => id.startsWith("aux-");
+    const cand = pool.filter(id => !out.includes(id) && pred(id) && !(isAuxCard(id) && out.some(o => isAuxCard(o) && acquire(o) === acquire(id))));
     if (cand.length) out.push(weighted(cand, c.random));
   };
   const cat = (id: string) => AWAKEN_META[id].cat, tier = (id: string) => AWAKEN_META[id].tier;

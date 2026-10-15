@@ -12,11 +12,13 @@ export const RAID_MAX_FLOOR = 10;
 export const ARENA_W = 960, ARENA_H = 540;
 /** 2분 고밀도 웨이브 + 제한 없는 보스전(59절). FLOOR_SECONDS는 훈련장 외에는 쓰지 않는다(보스전 시간 초과 없음). */
 export const FLOOR_SECONDS = 0, BOSS_AT = 120;
+/** 쾌속(2026-10-15): 일반 몹 체력 배율, 일반 몹 투사체 피해 배율·발사 간격 배율, 보조무기 칸·피해 배율 */
+export const FODDER_HP = 0.6, MOB_SHOT_DAMAGE = 0.6, MOB_SHOT_INTERVAL = 1.5, AUX_SLOTS = 3, AUX_POWER = 5;
 /** 생성량 ×1.6, 최대 동시 수 ×1.25(올림), 일반 몬스터 이동속도 +15%(빠른 적 제외), 간접 개입 0:30·1:00·1:30, 정예 40초·80초, 보스전 20초마다 소환. */
-export const SPAWN_MUL = 1.6, MAX_ALIVE_MUL = 1.25, NORMAL_SPEED_MUL = 1.15, INTERVENTION_AT = [30, 60, 90], ELITE_AT = [40, 80], BOSS_SUMMON_EVERY = 20;
+export const SPAWN_MUL = 2.08, MAX_ALIVE_MUL = 1.6, NORMAL_SPEED_MUL = 1.15, INTERVENTION_AT = [30, 60, 90], ELITE_AT = [40, 80], BOSS_SUMMON_EVERY = 20;
 
 // ---------- 플레이어 ----------
-export const PLAYER = { radius: 14, hp: 100, speed: 220, iframes: 0.6, dashCooldown: 2.4, dashTime: 0.16, dashSpeed: 720, critChance: 0.05, critMul: 1.5, absorb: 320, attackSlow: 0.15 };
+export const PLAYER = { radius: 14, hp: 100, speed: 220, iframes: 0.6, dashCooldown: 2.4, dashTime: 0.16, dashSpeed: 720, critChance: 0.05, critMul: 1.5, absorb: 520, attackSlow: 0 };
 
 // ---------- 무기: 토벌 낫(23절) ----------
 import { RAID_WEAPONS, raidWeaponStats, type WeaponStats } from "./weapons";
@@ -72,15 +74,15 @@ export const FLOORS: FloorDef[] = [
 ];
 
 // ---------- 전투 각성(25절) ----------
-export const AWAKEN_XP = [0, 15, 38, 68, 105]; // Lv.1~5 누적(59절). Lv.6부터는 xpForLevel.
+export const AWAKEN_XP = [0, 8, 20, 36, 56]; // Lv.1~5 누적(59절). Lv.6부터는 xpForLevel.
 export const AWAKEN_GUARANTEE = [{ at: 55, level: 3 }, { at: 95, level: 4 }];
 /** 줍지 않은 경험치 구슬 전역 자동 흡수(초), 흡수 반경 안 끌림 속도(59.3절). */
-export const ORB_AUTO = 2, ORB_PULL = 900;
+export const ORB_AUTO = 0.3, ORB_PULL = 1200;
 /** 그 레벨이 되는 데 필요한 누적 경험치. Lv.6부터 다음 레벨까지 45 + 12 × (레벨 − 5). */
 export function xpForLevel(level: number) {
   if (level <= 5) return AWAKEN_XP[Math.max(0, level - 1)];
   let xp = AWAKEN_XP[4];
-  for (let l = 5; l < level; l++) xp += 45 + 12 * (l - 5);
+  for (let l = 5; l < level; l++) xp += 24 + 6 * (l - 5);
   return xp;
 }
 /** 유효 카드가 모자랄 때 채우는 무제한 성장 카드(59.2절). */
@@ -97,7 +99,6 @@ export const AWAKENINGS: Record<string, { name: string; text: string; max: numbe
   "wind-step": { name: "바람걸음", text: "이동속도 +12%", max: 2 },
   "quick-dash": { name: "빠른 회피", text: "회피 대시 재사용시간 −18%", max: 2 },
   "emergency-shield": { name: "비상 보호막", text: "체력 30% 이하가 되면 보호막 25(판당 1회)", max: 1 },
-  "wide-gather": { name: "넓은 수집", text: "경험치 흡수 반경 +45px", max: 2 },
   "pet-training": { name: "전투펫 훈련", text: "전투펫 피해·회복·보호막 +25%", max: 2 },
   eclipse: { name: "월식 참격", text: "네 번째 공격마다 화면 끝까지 가는 180% 참격", max: 1, final: "great-scythe" },
   executioner: { name: "처형자", text: "체력 20% 이하 일반 적 즉사, 보스 피해 +25%", max: 1, final: "great-scythe" },
@@ -269,10 +270,10 @@ export const EVOLUTION_CHANGE = { gold: 30000, need: { "artisan-core": 3 } as Re
 // ---------- 방어구(26절) ----------
 export type ArmorSlot = "head" | "body" | "legs";
 export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2; gold: number; need: Record<string, number>;
-  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; speed?: number; dashCd?: number; startShield?: number }; text: string };
+  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number }; text: string };
 export const ARMORS: ArmorDef[] = [
-  { id: "leather-hood", slot: "head", name: "가죽 두건", icon: "🧢", tier: 1, gold: 2000, need: { rabbitfur: 8, foxfur: 3 }, stats: { crit: 0.05, absorb: 25 }, text: "치명타 +5% · 흡수 반경 +25px" },
-  { id: "reinforced-hood", slot: "head", name: "강화 가죽 두건", icon: "⛑️", tier: 2, gold: 5000, need: { rabbitfur: 12, foxfur: 8, antler: 2, "field-essence": 2 }, stats: { crit: 0.1, absorb: 45 }, text: "치명타 +10% · 흡수 반경 +45px · 상태 이상 −15%" },
+  { id: "leather-hood", slot: "head", name: "가죽 두건", icon: "🧢", tier: 1, gold: 2000, need: { rabbitfur: 8, foxfur: 3 }, stats: { crit: 0.05, xpGain: 0.03 }, text: "치명타 +5% · 경험치 +3%" },
+  { id: "reinforced-hood", slot: "head", name: "강화 가죽 두건", icon: "⛑️", tier: 2, gold: 5000, need: { rabbitfur: 12, foxfur: 8, antler: 2, "field-essence": 2 }, stats: { crit: 0.1, xpGain: 0.05 }, text: "치명타 +10% · 경험치 +5%" },
   { id: "leather-vest", slot: "body", name: "가죽 조끼", icon: "🦺", tier: 1, gold: 2500, need: { boarhair: 8, bearfur: 2 }, stats: { hp: 20, defense: 2 }, text: "최대 체력 +20 · 방어력 +2" },
   { id: "reinforced-vest", slot: "body", name: "강화 가죽 조끼", icon: "🥋", tier: 2, gold: 6000, need: { boarhair: 12, bearfur: 6, tusk: 1, "field-essence": 2 }, stats: { hp: 35, defense: 4, startShield: 15 }, text: "최대 체력 +35 · 방어력 +4 · 시작 보호막 15" },
   { id: "leather-boots", slot: "legs", name: "가죽 장화", icon: "👢", tier: 1, gold: 2000, need: { rabbitfur: 6, foxfur: 3, antler: 2 }, stats: { speed: 0.08, dashCd: 0.1 }, text: "이동속도 +8% · 회피 재사용 −10%" },
@@ -293,7 +294,7 @@ export const EMPTY_RAID: RaidSave = { balanceVersion: RAID_BALANCE_VERSION, high
 
 /** 착용한 방어구 능력 합계. */
 export function gearOf(raid: RaidSave) {
-  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, speed: 0, dashCd: 0, startShield: 0 };
+  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0 };
   for (const slot of ["head", "body", "legs"] as ArmorSlot[]) {
     const a = ARMORS.find(item => item.id === raid.equipped[slot]);
     if (a) for (const [k, v] of Object.entries(a.stats)) g[k as keyof typeof g] += v ?? 0;

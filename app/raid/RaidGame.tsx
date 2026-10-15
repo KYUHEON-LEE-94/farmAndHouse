@@ -396,7 +396,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.restore();
   }
   // 경험치 구슬
-  for (const o of s.orbs) { const r = 3.5 + Math.min(4, o.xp); const g = ctx.createRadialGradient(o.x - 1, o.y - 1, 0, o.x, o.y, r + 2); g.addColorStop(0, "#e9fff0"); g.addColorStop(1, "#38c46a"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, r, 0, Math.PI * 2); ctx.fill(); }
+  for (const o of s.orbs) if (o.heal) { ctx.fillStyle = "#000"; ctx.font = `18px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("🍖", o.x, o.y); ctx.textAlign = "left"; }
+  for (const o of s.orbs.filter(o => !o.heal)) { const r = 3.5 + Math.min(4, o.xp); const g = ctx.createRadialGradient(o.x - 1, o.y - 1, 0, o.x, o.y, r + 2); g.addColorStop(0, "#e9fff0"); g.addColorStop(1, "#38c46a"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, r, 0, Math.PI * 2); ctx.fill(); }
 
   // 돌진 예고
   for (const m of s.monsters) if (m.tele && m.tele.kind === "line") {
@@ -498,12 +499,12 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   const nextXp = xpForLevel(s.level + 1), prevXp = xpForLevel(s.level);
   bar(ctx, 84, 60, 186, 8, (s.xp - prevXp) / Math.max(1, nextXp - prevXp), "#4fd27e");
   ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}`, 84, 75);
-  if (s.aux) {
-    const def = AUX_WEAPONS[s.aux.id], cx = 258, cy = 72, left = Math.max(0, s.aux.readyAt - s.t), ratio = 1 - Math.min(1, left / def.cd);
+  s.auxes.forEach((aux, i) => {
+    const def = AUX_WEAPONS[aux.id], cx = 258 - i * 24, cy = 72, left = Math.max(0, aux.readyAt - s.t), ratio = 1 - Math.min(1, left / def.cd);
     ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fill();
     ctx.beginPath(); ctx.arc(cx, cy, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio); ctx.strokeStyle = ratio >= 1 ? "#e6c38a" : "rgba(230,195,138,.55)"; ctx.lineWidth = 2.5; ctx.stroke();
     ctx.fillStyle = "#000"; ctx.font = `12px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText(def.icon, cx, cy + 1); ctx.textAlign = "left";
-  }
+  });
 
   // 가운데 위: 남은 시간 / 보스 체력
   const left = s.floor.training ? (s.floor.duration ?? 60) - s.t : BOSS_AT - s.t, bossTime = !s.floor.training && s.t >= BOSS_AT;
