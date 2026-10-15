@@ -110,7 +110,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     {ui.choices && <div className="raid-overlay"><div className="raid-choices">
       <span className="raid-ov-eyebrow">AWAKENING</span><b>⚔️ 전투 각성 Lv.{ui.level}</b><small>하나를 고르세요 · 고르는 동안 전투가 멈춰요</small>
       <div>{ui.choices.map((id, i) => <button key={id} onClick={() => choose(id)} className={AWAKENINGS[id].final ? "final" : ""} style={{ animationDelay: `${i * 0.06}s` }}>
-        <i>{AWAKENINGS[id].final ? "🌙" : ["🗡️", "🛡️", "💨"][i % 3]}</i><strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>
+        <i>{AWAKENINGS[id].final ? "✨" : ["🗡️", "🛡️", "💨"][i % 3]}</i><strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>
       </button>)}</div>
     </div></div>}
     {!ui.over && !ui.choices && !ui.paused && <button className="raid-giveup" onClick={() => { if (window.confirm("도전을 포기할까요? 사용한 음식만 사라져요.")) quit(); }}>🏳 포기</button>}
@@ -274,9 +274,9 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   drawAvatar(ctx, art, p.x, p.y, size, flip);
   ctx.globalAlpha = 1;
   if (p.shield > 0) { ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 6, 0, Math.PI * 2); ctx.strokeStyle = `rgba(120,200,255,${0.6 + pulse * 0.3})`; ctx.lineWidth = 3; ctx.stroke(); }
-  // 낫(조준 방향)
+  // 들고 있는 무기(조준 방향)
   ctx.translate(p.x, p.y); ctx.rotate(p.aim);
-  ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.fillText("🌙", size / 2 + 6, 0);
+  ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.fillText(s.weapon.icon ?? "🌙", size / 2 + 6, 0);
   ctx.restore();
   // 조준 범위(아주 옅게)
   ctx.save(); ctx.globalAlpha = 0.16; ctx.strokeStyle = "#fffbe8"; ctx.lineWidth = 2; ctx.setLineDash([4, 6]);

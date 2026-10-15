@@ -121,7 +121,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
 
         <div className={`raid-floor-card ${floor.floor > 5 ? "canal" : "field"}`}>
           <span className="raid-floor-no">{floor.floor}F</span>
-          <div><small>{floor.zone}</small><b>{floor.boss.icon} {floor.boss.name}</b><span>3분 버티고 마지막 60초에 보스(체력 {floor.boss.hp.toLocaleString()}) 처치</span></div>
+          <div><small>{floor.zone}</small><b>{floor.boss.icon} {floor.boss.name}</b><span>2분 버티면 보스 등장(체력 {floor.boss.hp.toLocaleString()}) · 보스전은 시간 제한 없음</span></div>
           {raid.firstClears.includes(floor.floor) ? <em>반복 클리어</em> : <em className="first">첫 클리어 보상</em>}
         </div>
 
@@ -143,7 +143,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
           <small className="raid-food-rule">같은 음식은 한 칸 · 회복 음식 최대 {MAX_HEAL_FOODS}칸 · 쓴 음식만 사라져요{foodOptions.length === 0 ? " · 🍳 주방에서 요리를 만들어 오세요" : ""}</small>
         </div>
 
-        <button className="raid-start" onClick={start}><span>🗼 {floor.floor}층 도전하기</span><small>4분 · 실패해도 장비와 해금 층은 그대로</small></button>
+        <button className="raid-start" onClick={start}><span>🗼 {floor.floor}층 도전하기</span><small>2분 웨이브 + 보스전 · 실패해도 장비와 해금 층은 그대로</small></button>
 
         <div className="raid-bag"><b>🎒 탑 재료</b>
           {Object.keys(RAID_ITEMS).some(id => raidItems[id]) || raid.towerSeals || raid.stabilizers ? <span>
