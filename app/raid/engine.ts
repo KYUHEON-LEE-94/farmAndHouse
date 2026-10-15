@@ -3,7 +3,7 @@
  * 좌표는 논리 해상도 960×540(px), 시간은 초.
  */
 import {
-  ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_GUARANTEE, AWAKEN_XP, BOSS_AT, COMMON_AWAKENINGS, ELITE_AT, FLOOR_SECONDS, INTERVENTION_AT, NORMAL_SPEED_MUL, ORB_AUTO, SPAWN_MUL, MONSTERS, PLAYER,
+  ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_GUARANTEE, AWAKEN_XP, BOSS_AT, BOSS_SUMMON_EVERY, COMMON_AWAKENINGS, ELITE_AT, ENDLESS_AWAKENINGS, INTERVENTION_AT, MAX_ALIVE_MUL, NORMAL_SPEED_MUL, ORB_AUTO, ORB_PULL, SPAWN_MUL, xpForLevel, MONSTERS, PLAYER,
   type AwakenId, type BossDef, type Evolution, type FloorDef, type FoodEffect, type MonsterDef, type WeaponStats,
 } from "./data";
 import { SPECIALS } from "./weapons";
@@ -32,7 +32,7 @@ export type Monster = {
 };
 export type Projectile = { x: number; y: number; vx: number; vy: number; r: number; damage: number; life: number; mine: boolean; pierce: Set<number> | null;
   /** 내 투사체: 남은 관통 수, 폭발, 쏜 자리(먼 거리 보너스), 보스 방어 무시 */
-  left?: number; explode?: number; ox?: number; oy?: number; ignoreDef?: boolean; wave?: boolean; defIgnore?: number; siege?: boolean };
+  left?: number; explode?: number; ox?: number; oy?: number; ignoreDef?: boolean; wave?: boolean; defIgnore?: number; siege?: boolean; debris?: boolean };
 export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "tshock" | "blast" | "pbomb" | "poison" | "net" | "rain" | "frost";
   /** 내 공격 장판: 폭발 배율·독·그물 반지름 등 */
   mine?: { mul: number; poison?: boolean; seedChain?: boolean; big?: boolean }; x: number; y: number; r: number; t: number; tele: number; damage: number; every: number; tick: number; slow: number; dx?: number; dy?: number; len?: number };
@@ -55,7 +55,9 @@ export type RaidState = {
   foods: FoodSlot[]; foodUsed: boolean[];
   level: number; xp: number; picks: Partial<Record<AwakenId, number>>; choices: AwakenId[] | null;
   monsters: Monster[]; projectiles: Projectile[]; zones: Zone[]; orbs: Orb[]; pops: Pop[]; swings: Swing[];
-  spawnAcc: number; nextElite: number; elitesPlaced: number; packAt: number; bossSpawned: boolean; interventions: number; boss: Monster | null;
+  spawnAcc: number; nextElite: number; elitesPlaced: number; packAt: number; bossSummons: number;
+  /** 처치 연출: 최근 처치 시각들(1초 안 5마리 이상이면 연쇄 처치), 화면 흔들림 */
+  killTimes: number[]; shake: number; chainShown: number; bossSpawned: boolean; interventions: number; boss: Monster | null;
   /** 스크롤 전장(50절): 카메라 왼쪽 위(월드 좌표), 지형, 탑의 압박, 정예 예고. */
   cam: { x: number; y: number; lx: number; ly: number }; terrain: Terrain;
   pressure: { x: number; y: number; since: number; stage: number; leftAt: number };
@@ -81,7 +83,7 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
     buffs: [], foods, foodUsed: foods.map(() => false),
     level: 1, xp: 0, picks: {}, choices: null,
     monsters: [], projectiles: [], zones: [], orbs: [], pops: [], swings: [],
-    spawnAcc: 0.9, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSpawned: false, interventions: 0, boss: null,
+    spawnAcc: 0.97, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSummons: 0, killTimes: [], shake: 0, chainShown: 0, bossSpawned: false, interventions: 0, boss: null,
     special: { readyAt: 0, prev: false, moveUntil: 0, moveMul: 1, lockAim: null, stanceUntil: 0, stanceHit: false, cancelable: false, hits: {}, bump: 0 }, actions: [],
     kills: 0, damageTaken: {}, uid: 1, prevDash: false, prevFood: [false, false, false], bossHpAtEnd: 1,
   };
@@ -91,8 +93,8 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
 const pick = (s: RaidState, id: AwakenId) => s.picks[id] ?? 0;
 const buffSum = (s: RaidState, kinds: FoodEffect["kind"][]) => s.buffs.filter(b => b.until > s.t && kinds.includes(b.kind)).reduce((sum, b) => sum + b.value / 100, 0);
 export const derived = (s: RaidState) => ({
-  damageMul: 1 + 0.22 * pick(s, "keen-edge") + buffSum(s, ["attack", "all"]),
-  interval: Math.max(0.25, s.weapon.interval * (1 - 0.14 * pick(s, "quick-grip") - buffSum(s, ["haste", "all"]))),
+  damageMul: 1 + 0.22 * pick(s, "keen-edge") + 0.06 * pick(s, "endless-edge") + buffSum(s, ["attack", "all"]),
+  interval: Math.max(0.25, s.weapon.interval * Math.max(0.65, 1 - 0.14 * pick(s, "quick-grip") - 0.03 * pick(s, "endless-haste") - buffSum(s, ["haste", "all"]))),
   range: s.weapon.range * (1 + 0.22 * pick(s, "long-handle")),
   arc: Math.min(360, s.weapon.angle + 10 * pick(s, "long-handle")),
   knockback: s.weapon.knockback * (1 + 0.5 * pick(s, "heavy-swing")),
@@ -201,6 +203,10 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
 }
 function killMonster(s: RaidState, m: Monster) {
   m.hp = 0; s.kills++;
+  s.shake = Math.max(s.shake, m.boss ? 5 : m.elite ? 3 : 1.5);
+  s.killTimes = [...s.killTimes.filter(t => t > s.t - 1), s.t];
+  if (s.killTimes.length >= 5 && s.t - s.chainShown > 1) { s.chainShown = s.t; s.pops.push({ x: s.player.x, y: s.player.y - 60, text: `⚡ 연쇄 처치 ×${s.killTimes.length}`, t: 0.9, kind: "info" }); }
+  for (let i = 0; i < 5; i++) { const a = rnd() * Math.PI * 2; s.projectiles.push({ x: m.x, y: m.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, r: 2, damage: 0, life: 0.25, mine: true, pierce: new Set([m.uid]), left: 0, wave: true, debris: true } as Projectile); }
   if (m.xp > 0) s.orbs.push({ x: m.x, y: m.y, xp: m.xp, age: 0 });
   if (s.weapon.fx?.spinKill && !m.elite && !m.boss) s.player.swingCd = Math.max(0, s.player.swingCd - s.weapon.interval * 0.1);
   if (m.inNet && s.picks["full-haul"] && m.xp > 0) s.orbs.push({ x: m.x + 6, y: m.y, xp: Math.max(1, Math.round(m.xp * 0.5)), age: 0 });
@@ -381,7 +387,7 @@ function castSpecial(s: RaidState) {
   const p = s.player, sp = s.special, evo = s.evolution, w = s.weapon, D = w.damage;
   if (!evo || !SPECIALS[evo]) return;
   if (s.t < sp.readyAt) { sp.bump = s.t; return; }
-  sp.readyAt = s.t + SPECIALS[evo].cooldown; sp.hits = {}; p.swingCd = Math.max(p.swingCd, 0.18);
+  sp.readyAt = s.t + SPECIALS[evo].cooldown * Math.max(0.65, 1 - 0.02 * pick(s, "endless-haste")); sp.hits = {}; p.swingCd = Math.max(p.swingCd, 0.18);
   const aim = p.aim, tx = clamp(p.tx, 20, WORLD_W - 20), ty = clamp(p.ty, 20, WORLD_H - 20), boss = (m: Monster) => (m.boss ? 0.15 : 0);
   s.pops.push({ x: p.x, y: p.y - 46, text: `${SPECIALS[evo].icon} ${SPECIALS[evo].name}`, t: 0.9, kind: "info" });
   switch (evo) {
@@ -433,17 +439,21 @@ function offerChoices(s: RaidState) {
     const finals = (Object.keys(AWAKENINGS) as AwakenId[]).filter(id => AWAKENINGS[id].final === s.evolution);
     s.choices = [...finals, shuffled[0]].filter(Boolean);
   } else s.choices = shuffled.slice(0, 3);
+  // 유효 카드가 3장보다 적으면 무제한 성장 카드로 채운다(59.2절)
+  const fill = [...ENDLESS_AWAKENINGS].sort(() => rnd() - 0.5);
+  while (s.choices.length < 3 && fill.length) s.choices.push(fill.pop()!);
 }
 export function chooseAwakening(s: RaidState, id: AwakenId) {
   if (!s.choices?.includes(id)) return;
   s.picks[id] = (s.picks[id] ?? 0) + 1;
   if (id === "vitality") { s.player.maxHp += 25; s.player.hp = Math.min(s.player.maxHp, s.player.hp + 25); }
+  if (id === "endless-life") { s.player.maxHp += 10; s.player.hp = Math.min(s.player.maxHp, s.player.hp + 10); }
   s.choices = null;
   checkLevel(s);
 }
 function checkLevel(s: RaidState) {
-  if (s.choices || s.level >= 5) return;
-  if (s.xp >= AWAKEN_XP[s.level]) { s.level++; offerChoices(s); }
+  if (s.choices) return;
+  if (s.xp >= xpForLevel(s.level + 1)) { s.level++; offerChoices(s); }
 }
 
 // ---------- 몬스터 행동 ----------
@@ -645,6 +655,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   else { const sp = d.speed * (inPollen ? 1 - inPollen.slow : 1) * (p.slowUntil > s.t && !s.picks["quick-shot"] ? 1 - (s.weapon.fx?.selfSlow ?? PLAYER.attackSlow) : 1) * (s.special.moveUntil > s.t ? s.special.moveMul : 1) * slowAt(s.terrain, p.x, p.y, true); p.x += mx * sp * dt; p.y += my * sp * dt; }
   { const o = pushOut(p.x, p.y, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; }
   updateWorld(s, dt);
+  s.shake = Math.max(0, s.shake - dt * 30);
   // 예약된 특수 공격 타격
   if (s.actions.length) { const due = s.actions.filter(x => x.at <= s.t); s.actions = s.actions.filter(x => x.at > s.t); for (const x of due) x.run(); }
 
@@ -667,11 +678,11 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   // 웨이브 생성(4분까지)
   if (s.t < BOSS_AT) {
     // 4분 템포: 생성량 ×1.2, 화면에 적이 2마리 이하면 대기시간 절반(전투 공백 보정)
-    const near = s.monsters.filter(m => m.hp > 0 && !m.boss && dist(m.x, m.y, p.x, p.y) < 520).length;
-    s.spawnAcc += s.floor.spawnRate * SPAWN_MUL * dt / Math.pow(0.92, s.pressure.stage) * (near <= 2 ? 2 : 1);
+    const maxAlive = Math.ceil(s.floor.maxAlive * MAX_ALIVE_MUL), aliveNow = s.monsters.filter(m => m.hp > 0 && !m.elite && !m.boss).length;
+    s.spawnAcc += s.floor.spawnRate * SPAWN_MUL * dt / Math.pow(0.92, s.pressure.stage) * (aliveNow <= maxAlive * 0.4 ? 2 : 1);
     if (s.packAt && s.t >= s.packAt) { s.packAt = 0; for (let i = 0; i < 3; i++) { const id = pickSpawn(s); if (id) spawn(s, id); } }
     const alive = s.monsters.filter(m => m.hp > 0 && !m.elite && !m.boss).length;
-    while (s.spawnAcc >= 1) { s.spawnAcc -= 1; if (alive < s.floor.maxAlive) { const id = pickSpawn(s); if (id) spawn(s, id); } }
+    while (s.spawnAcc >= 1) { s.spawnAcc -= 1; if (alive < maxAlive) { const id = pickSpawn(s); if (id) spawn(s, id); } }
     const e = s.floor.elite;
     if (e && s.t >= s.nextElite) {
       // 정예: 50초·120초 고정(주기형 층은 그 뒤로도 주기마다). 예고 3초가 있어 그만큼 먼저 예고한다.
@@ -680,6 +691,10 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
     }
     if (!s.floor.training && s.interventions < 3 && s.t >= INTERVENTION_AT[s.interventions]) { s.interventions++; intervention(s, s.interventions); }
   } else if (!s.bossSpawned && !s.floor.training) spawnBoss(s);
+  else if (s.bossSpawned && s.boss && s.boss.hp > 0 && s.t - BOSS_AT >= BOSS_SUMMON_EVERY * (s.bossSummons + 1)) {
+    s.bossSummons++; const n = 3 + Math.floor(rnd() * 3); for (let i = 0; i < n; i++) { const id = pickSpawn(s); if (id) spawn(s, id); }
+    s.pops.push({ x: s.boss.x, y: s.boss.y - s.boss.r - 20, text: "📣 부하 소환!", t: 1, kind: "info" });
+  }
 
   // 몬스터(강 반대편이면 다리로 돌아간다)
   routeTerrain = s.terrain.deep.length ? s.terrain : null;
@@ -706,7 +721,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
     pr.x = nx; pr.y = ny; pr.life -= dt;
     if (pr.mine) {
       for (const m of s.monsters) {
-        if (m.hp <= 0 || pr.pierce!.has(m.uid) || dist(pr.x, pr.y, m.x, m.y) >= pr.r + m.r || pr.life <= 0) continue;
+        if (pr.debris || m.hp <= 0 || pr.pierce!.has(m.uid) || dist(pr.x, pr.y, m.x, m.y) >= pr.r + m.r || pr.life <= 0) continue;
         pr.pierce!.add(m.uid);
         const far = s.weapon.fx?.far && pr.ox !== undefined && dist(pr.ox, pr.oy!, m.x, m.y) >= 250 ? 1.25 : 1;
         const farSp = pr.defIgnore && pr.ox !== undefined && dist(pr.ox, pr.oy!, m.x, m.y) >= 300 ? 1.25 : 1;
@@ -749,7 +764,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   for (const o of s.orbs) {
     o.age += dt;
     const r = dist(o.x, o.y, p.x, p.y);
-    if (r < d.absorb || o.age > ORB_AUTO) { const k = Math.min(1, (500 * dt) / Math.max(1, r)); o.x += (p.x - o.x) * k; o.y += (p.y - o.y) * k; }
+    if (r < d.absorb || o.age > ORB_AUTO) { const k = Math.min(1, (ORB_PULL * dt) / Math.max(1, r)); o.x += (p.x - o.x) * k; o.y += (p.y - o.y) * k; }
     if (r < PLAYER.radius + 6) { s.xp += o.xp; o.xp = 0; }
   }
   s.orbs = s.orbs.filter(o => o.xp > 0);
@@ -763,7 +778,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   s.swings = s.swings.filter(sw => sw.t > 0);
 
   if (s.boss) s.bossHpAtEnd = Math.max(0, s.boss.hp / s.boss.maxHp);
-  if (!s.over && s.t >= (s.floor.duration ?? FLOOR_SECONDS)) s.over = "timeout";
+  if (!s.over && s.floor.duration && s.t >= s.floor.duration) s.over = "timeout";
 }
 
 export type RaidResult = { floor: number; cleared: boolean; kills: number; usedFoods: number[]; bossHpLeft: number; hpLeft: number; level: number; reason: string[]; abandoned?: boolean };

@@ -294,14 +294,13 @@ function nameOf(id: string) {
 export function RaidCraftView({ forge, onForge }: { forge: ForgeActions; onForge: () => void }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   return <div className="raid-craft">
-    <p className="hint">⚒️ <b>즉시 완성</b> — 누르는 즉시 재료를 쓰고 강화 소재가 통합 창고에 들어가요. 잠금·주문 예약분, 황금 농산물, 전설·신화 물고기, 희귀 사냥 소재는 쓰지 않고 값이 낮은 재료부터 써요. 강화 소재는 팔 수 없어요. <button className="raid-gear-link" onClick={onForge}>⚒️ 대장간으로</button></p>
+    <p className="hint">싼 재료부터 써서 바로 만들어요. 잠금·주문 예약분은 쓰지 않아요. <button className="raid-gear-link" onClick={onForge}>⚒️ 대장간으로</button></p>
     {Object.entries(LIFE_MATS).map(([id, m]) => { const max = forge.lifeMax(id), want = Math.max(1, Math.min(qty[id] ?? 1, Math.max(1, max))), plan = forge.lifePlan(id, want);
       return <div key={id} className="raid-craft-row">
         <span className="raid-armor-icon">{m.icon}</span>
-        <div><b>{m.name} <small>보유 {forge.have[id] ?? 0} · 지금 최대 {max}개</small></b><span>{m.recipe}</span>
-          {(() => { const [use, all] = forge.craftStock[id] ?? [0, 0], per = { "farm-fiber": 5, "fish-oil": 3, "tanned-leather": 3, "artisan-core": 1 }[id] ?? 1, label = { "farm-fiber": "보통 품질 농산물", "fish-oil": "물고기", "tanned-leather": "일반 사냥 소재", "artisan-core": "가공품" }[id];
-            return <span className="raid-stock">{label} 쓸 수 있는 것 <b>{use}</b>개 / 1개 만들 때 {per}개 필요{all > use ? ` · 잠금·주문 예약으로 ${all - use}개 제외` : ""}</span>; })()}
-          {plan ? <span className="raid-plan">{want}개에 쓰일 재료: {plan.join(", ")}</span> : <span className="raid-plan lack">재료가 부족해요</span>}</div>
+        <div><b>{m.name} <small>보유 {forge.have[id] ?? 0}</small></b>
+          <span>{m.recipe}{id !== "artisan-core" && <> · 쓸 수 있는 재료 <em className="raid-stock">{forge.craftStock[id]?.[0] ?? 0}</em>개</>}</span>
+          {plan ? <span className="raid-plan">사용: {plan.join(", ")}</span> : <span className="raid-plan lack">재료 부족</span>}</div>
         <div className="raid-craft-qty">{[1, 5, 10].map(n => <button key={n} className={want === n ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: n }))} disabled={max < n}>{n}개</button>)}<button className={want === max && max > 10 ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: max }))} disabled={max < 1}>최대</button>
           <button className="make" disabled={!plan} onClick={() => forge.craftLife(id, want)}>즉시 완성 ×{want}</button></div>
       </div>; })}

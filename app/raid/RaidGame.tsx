@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_XP, BOSS_AT, FLOOR_SECONDS, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
+import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, type Terrain } from "./terrain";
 import { SPECIALS } from "./weapons";
 import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
@@ -110,9 +110,10 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     {ui.choices && <div className="raid-overlay"><div className="raid-choices">
       <span className="raid-ov-eyebrow">AWAKENING</span><b>⚔️ 전투 각성 Lv.{ui.level}</b><small>하나를 고르세요 · 고르는 동안 전투가 멈춰요</small>
       <div>{ui.choices.map((id, i) => <button key={id} onClick={() => choose(id)} className={AWAKENINGS[id].final ? "final" : ""} style={{ animationDelay: `${i * 0.06}s` }}>
-        <i>{AWAKENINGS[id].final ? "🌙" : ["🗡️", "🛡️", "💨"][i % 3]}</i><strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{(ui.picks[id] ?? 0) + 1}단계</em>}<span>{AWAKENINGS[id].text}</span>
+        <i>{AWAKENINGS[id].final ? "🌙" : ["🗡️", "🛡️", "💨"][i % 3]}</i><strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>
       </button>)}</div>
     </div></div>}
+    {!ui.over && !ui.choices && !ui.paused && <button className="raid-giveup" onClick={() => { if (window.confirm("도전을 포기할까요? 사용한 음식만 사라져요.")) quit(); }}>🏳 포기</button>}
     {ui.over && <div className="raid-end-skip"><button onClick={() => { const s = stateRef.current; if (s && !doneRef.current) { doneRef.current = true; finishRef.current(raidResult(s)); } }}>결과 보기 ▶</button></div>}
     {ui.paused && !ui.over && !ui.choices && <div className="raid-overlay"><div className="raid-pause"><span className="raid-ov-eyebrow">PAUSED</span><b>⏸ 일시정지</b><small>P 또는 계속하기를 누르면 이어서 싸워요</small><button className="save-button" onClick={resume}>▶ 계속하기</button><button className="ghost-button" onClick={quit}>🏳 도전 포기 (사용한 음식만 소모)</button></div></div>}
   </div>;
@@ -170,7 +171,8 @@ function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) 
 function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: number, petIcon = "") {
   const W = ARENA_W, H = ARENA_H, p = s.player, d = derived(s), cam = s.cam, T = s.terrain;
   ctx.fillStyle = "#2a2418"; ctx.fillRect(0, 0, W, H);
-  ctx.save(); ctx.translate(-Math.round(cam.x), -Math.round(cam.y));
+  const sh = s.shake > 0 ? s.shake : 0;
+  ctx.save(); ctx.translate(-Math.round(cam.x) + (sh ? (Math.random() - 0.5) * sh * 2 : 0), -Math.round(cam.y) + (sh ? (Math.random() - 0.5) * sh * 2 : 0));
   ctx.drawImage(art.bg, 0, 0);
   // 수문(닫힘·곧 바뀜 예고)
   const gateSoon = T.gates.some(g => g.moving) && 45 - (s.t % 45) < 2;
@@ -241,7 +243,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   // 투사체
   for (const pr of s.projectiles) {
     ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI * 2);
-    if (pr.mine) { ctx.fillStyle = "rgba(255,226,120,.75)"; ctx.fill(); }
+    if (pr.debris) { ctx.fillStyle = "rgba(255,250,220,.9)"; ctx.fill(); }
+    else if (pr.mine) { ctx.fillStyle = "rgba(255,226,120,.75)"; ctx.fill(); }
     else { const g = ctx.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, pr.r + 2); g.addColorStop(0, "#fbe9ff"); g.addColorStop(1, "#8e44ad"); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 1.5; ctx.stroke(); }
   }
 
@@ -303,22 +306,22 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   bar(ctx, 84, 40, 186, 13, p.hp / p.maxHp, p.hp / p.maxHp < 0.3 ? "#ff5040" : "#ef5a43");
   if (p.shield > 0) bar(ctx, 84, 40, 186, 5, p.shield / p.maxHp, "rgba(140,210,255,.95)", "rgba(0,0,0,0)");
   ctx.font = "700 10px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`♥ ${Math.ceil(p.hp)} / ${p.maxHp}${p.shield > 0 ? `  🛡 ${Math.ceil(p.shield)}` : ""}`, 90, 47);
-  const nextXp = AWAKEN_XP[Math.min(4, s.level)], prevXp = AWAKEN_XP[s.level - 1];
-  bar(ctx, 84, 60, 186, 8, s.level >= 5 ? 1 : (s.xp - prevXp) / Math.max(1, nextXp - prevXp), "#4fd27e");
-  ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}${s.level >= 5 ? " MAX" : ""}`, 84, 75);
+  const nextXp = xpForLevel(s.level + 1), prevXp = xpForLevel(s.level);
+  bar(ctx, 84, 60, 186, 8, (s.xp - prevXp) / Math.max(1, nextXp - prevXp), "#4fd27e");
+  ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}`, 84, 75);
 
   // 가운데 위: 남은 시간 / 보스 체력
-  const left = (s.floor.duration ?? FLOOR_SECONDS) - s.t, bossTime = !s.floor.training && s.t >= BOSS_AT;
+  const left = s.floor.training ? (s.floor.duration ?? 60) - s.t : BOSS_AT - s.t, bossTime = !s.floor.training && s.t >= BOSS_AT;
   if (s.boss && s.boss.hp > 0) {
     const bw = 400, bx = (W - bw) / 2;
     panel(ctx, bx - 10, 12, bw + 20, 46);
     ctx.textAlign = "center"; ctx.font = `700 13px ${UI_FONT}`; ctx.fillStyle = "#ffe19a"; ctx.fillText(`${s.boss.icon} ${s.boss.name}`, W / 2 - 40, 26);
-    ctx.font = "800 13px sans-serif"; ctx.fillStyle = left < 15 ? "#ff7a6a" : "#fff"; ctx.fillText(`⏱ ${fmt(left)}`, W / 2 + 150, 26);
+    ctx.font = "800 13px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`보스전 ${fmt(s.t - BOSS_AT)}`, W / 2 + 140, 26);
     bar(ctx, bx, 38, bw, 10, s.boss.hp / s.boss.maxHp, "#d8432f");
     ctx.textAlign = "left";
   } else {
     panel(ctx, W / 2 - 70, 12, 140, 40);
-    ctx.textAlign = "center"; ctx.font = "800 20px sans-serif"; ctx.fillStyle = bossTime ? "#ff7a6a" : "#fff"; ctx.fillText(fmt(left), W / 2, 30);
+    ctx.textAlign = "center"; ctx.font = "800 20px sans-serif"; ctx.fillStyle = bossTime ? "#ff7a6a" : "#fff"; ctx.fillText(bossTime ? `보스전 ${fmt(s.t - BOSS_AT)}` : fmt(left), W / 2, 30);
     ctx.font = `700 9px ${UI_FONT}`; ctx.fillStyle = "#d9cfae"; ctx.fillText(s.floor.training ? "진화 체험 중" : s.t < BOSS_AT ? `보스까지 ${fmt(BOSS_AT - s.t)}` : "보스 등장!", W / 2, 45);
     ctx.textAlign = "left";
   }

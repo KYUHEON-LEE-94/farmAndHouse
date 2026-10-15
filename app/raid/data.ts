@@ -10,13 +10,13 @@ export const RAID_BALANCE_VERSION = 1;
 export const RAID_MAX_FLOOR = 10;
 
 export const ARENA_W = 960, ARENA_H = 540;
-/** 한 층 4분: 3분까지 웨이브, 마지막 60초 보스(6절, e534f67). */
-export const FLOOR_SECONDS = 240, BOSS_AT = 180;
-/** 4분 템포: 생성량 ×1.2, 일반 몬스터 이동속도 +8%(빠른 적 제외), 간접 개입 시각, 정예 고정 등장 시각(6.1절). */
-export const SPAWN_MUL = 1.2, NORMAL_SPEED_MUL = 1.08, INTERVENTION_AT = [45, 90, 135], ELITE_AT = [50, 120];
+/** 2분 고밀도 웨이브 + 제한 없는 보스전(59절). FLOOR_SECONDS는 훈련장 외에는 쓰지 않는다(보스전 시간 초과 없음). */
+export const FLOOR_SECONDS = 0, BOSS_AT = 120;
+/** 생성량 ×1.6, 최대 동시 수 ×1.25(올림), 일반 몬스터 이동속도 +15%(빠른 적 제외), 간접 개입 0:30·1:00·1:30, 정예 40초·80초, 보스전 20초마다 소환. */
+export const SPAWN_MUL = 1.6, MAX_ALIVE_MUL = 1.25, NORMAL_SPEED_MUL = 1.15, INTERVENTION_AT = [30, 60, 90], ELITE_AT = [40, 80], BOSS_SUMMON_EVERY = 20;
 
 // ---------- 플레이어 ----------
-export const PLAYER = { radius: 14, hp: 100, speed: 190, iframes: 0.6, dashCooldown: 3, dashTime: 0.18, dashSpeed: 650, critChance: 0.05, critMul: 1.5, absorb: 60, attackSlow: 0.15 };
+export const PLAYER = { radius: 14, hp: 100, speed: 220, iframes: 0.6, dashCooldown: 2.4, dashTime: 0.16, dashSpeed: 720, critChance: 0.05, critMul: 1.5, absorb: 320, attackSlow: 0.15 };
 
 // ---------- 무기: 토벌 낫(23절) ----------
 import { RAID_WEAPONS, raidWeaponStats, type WeaponStats } from "./weapons";
@@ -72,10 +72,19 @@ export const FLOORS: FloorDef[] = [
 ];
 
 // ---------- 전투 각성(25절) ----------
-export const AWAKEN_XP = [0, 18, 48, 95, 145]; // Lv.1~5 누적(4분 사양)
-export const AWAKEN_GUARANTEE = [{ at: 105, level: 3 }, { at: 170, level: 4 }];
-/** 줍지 않은 경험치 구슬 자동 흡수(초). */
-export const ORB_AUTO = 5;
+export const AWAKEN_XP = [0, 15, 38, 68, 105]; // Lv.1~5 누적(59절). Lv.6부터는 xpForLevel.
+export const AWAKEN_GUARANTEE = [{ at: 55, level: 3 }, { at: 95, level: 4 }];
+/** 줍지 않은 경험치 구슬 전역 자동 흡수(초), 흡수 반경 안 끌림 속도(59.3절). */
+export const ORB_AUTO = 2, ORB_PULL = 900;
+/** 그 레벨이 되는 데 필요한 누적 경험치. Lv.6부터 다음 레벨까지 45 + 12 × (레벨 − 5). */
+export function xpForLevel(level: number) {
+  if (level <= 5) return AWAKEN_XP[Math.max(0, level - 1)];
+  let xp = AWAKEN_XP[4];
+  for (let l = 5; l < level; l++) xp += 45 + 12 * (l - 5);
+  return xp;
+}
+/** 유효 카드가 모자랄 때 채우는 무제한 성장 카드(59.2절). */
+export const ENDLESS_AWAKENINGS = ["endless-edge", "endless-life", "endless-haste"];
 export type AwakenId = string;
 export const AWAKENINGS: Record<string, { name: string; text: string; max: number; final?: Evolution }> = {
   "keen-edge": { name: "날 세우기", text: "주무기 피해 +22%", max: 2 },
@@ -127,6 +136,10 @@ export const AWAKENINGS: Record<string, { name: string; text: string; max: numbe
   "vital-stab": { name: "급소 찌르기", text: "치명타 피해 200%", max: 1, final: "twin-blades" },
   "whirl-slash": { name: "회오리 베기", text: "네 번째마다 360° 베기", max: 1, final: "greatsword" },
   "iron-wall": { name: "철벽", text: "보스에게 맞는 피해 50% 감소(1초마다 1회)", max: 1, final: "greatsword" },
+  // 59.2절 무제한 성장 카드(중복 제한 없음)
+  "endless-edge": { name: "끝없는 날", text: "주무기 기본·특수 공격 피해 +6%", max: 999 },
+  "endless-life": { name: "끈질긴 생명", text: "최대 체력 +10, 즉시 체력 10 회복", max: 999 },
+  "endless-haste": { name: "멈추지 않는 손", text: "기본 공격 간격 −3% · 특수 공격 재사용 −2%", max: 999 },
 };
 export const COMMON_AWAKENINGS: AwakenId[] = ["keen-edge", "quick-grip", "long-handle", "heavy-swing", "double-cut", "vitality", "hard-leather", "wind-step", "quick-dash", "emergency-shield", "wide-gather", "pet-training"];
 
@@ -164,8 +177,8 @@ export const zoneCommon = (floor: number) => (floor <= 5 ? "pollen-clump" : "can
 
 // ---------- 생활 재료(27절) ----------
 export const LIFE_MATS: Record<string, { name: string; icon: string; recipe: string }> = {
-  "farm-fiber": { name: "튼튼한 농업 섬유", icon: "🧵", recipe: "보통 품질(★ 없음)·황금 아닌 농산물 아무 종류 5개" },
-  "fish-oil": { name: "정제 물고기 기름", icon: "🫗", recipe: "전설·신화가 아닌 물고기 아무 종류 3마리" },
+  "farm-fiber": { name: "튼튼한 농업 섬유", icon: "🧵", recipe: "농산물 5개(황금 제외)" },
+  "fish-oil": { name: "정제 물고기 기름", icon: "🫗", recipe: "물고기 3마리(전설·신화 제외)" },
   "tanned-leather": { name: "무두질 가죽", icon: "🟫", recipe: "일반 사냥 소재 3개(희귀 소재 제외)" },
   "artisan-core": { name: "생활 장인의 핵", icon: "💠", recipe: "농업 섬유 1 · 물고기 기름 1 · 무두질 가죽 1 · 가공품 아무 종류 1" },
 };
