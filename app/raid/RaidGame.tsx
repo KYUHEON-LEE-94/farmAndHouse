@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, segmentHits, type Terrain } from "./terrain";
 import { SPECIALS } from "./weapons";
+import { AUX_WEAPONS, AWAKEN_META, CATEGORY_LABEL } from "./awakenings";
 import { weaponArtUrl } from "./weaponArt";
 import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
@@ -254,9 +255,10 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     {touchMode && !portraitOk && !ui.over && <div className="raid-rotate"><b>📱↻ 가로로 돌려 주세요</b><small>토벌탑은 가로 화면에서 가장 잘 보여요. 돌리는 동안 전투가 멈춰요.</small><button onClick={() => setPortraitOk(true)}>세로로 그냥 할게요</button></div>}
     {ui.choices && <div className="raid-overlay"><div className="raid-choices">
       <span className="raid-ov-eyebrow">AWAKENING</span><b>⚔️ 전투 각성 Lv.{ui.level}</b><small>하나를 고르세요 · 고르는 동안 전투가 멈춰요</small>
-      <div>{ui.choices.map((id, i) => <button key={id} onClick={() => choose(id)} className={AWAKENINGS[id].final ? "final" : ""} style={{ animationDelay: `${i * 0.06}s` }}>
-        <i>{AWAKENINGS[id].final ? "✨" : ["🗡️", "🛡️", "💨"][i % 3]}</i><strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>
-      </button>)}</div>
+      <div>{ui.choices.map((id, i) => { const meta = AWAKEN_META[id], cat = meta ? CATEGORY_LABEL[meta.cat] : null;
+        return <button key={id} onClick={() => choose(id)} className={`${AWAKENINGS[id].final ? "final" : ""} ${meta ? `tier-${meta.tier} cat-${meta.cat}` : ""}`} style={{ animationDelay: `${i * 0.06}s` }}>
+        <i>{AWAKENINGS[id].final ? "✨" : cat?.icon ?? "♾️"}</i>{cat && <small className="aw-cat">{cat.name}{meta!.tier === "advanced" ? " · 고급" : meta!.tier === "rare" ? " · 희귀" : ""}</small>}<strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>
+      </button>; })}</div>
     </div></div>}
     {!ui.over && <button className="raid-sfx" onClick={() => setSfxOn(on => !on)} title="타격 효과음">{sfxOn ? "🔊" : "🔇"}</button>}
     {!touchMode && !ui.over && !ui.choices && !ui.paused && <button className="raid-giveup" onClick={() => { if (window.confirm("도전을 포기할까요? 사용한 음식만 사라져요.")) quit(); }}>🏳 포기</button>}
@@ -387,6 +389,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
       else if (z.kind === "poison") { ctx.fillStyle = `rgba(120,200,60,${0.25 + pulse * 0.1})`; ctx.fill(); ctx.strokeStyle = "rgba(80,160,40,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "net") { ctx.strokeStyle = "rgba(240,230,200,.8)"; ctx.lineWidth = 1.5; ctx.stroke(); ctx.save(); ctx.clip(); for (let k = -z.r; k <= z.r; k += 14) { ctx.beginPath(); ctx.moveTo(z.x + k, z.y - z.r); ctx.lineTo(z.x + k, z.y + z.r); ctx.moveTo(z.x - z.r, z.y + k); ctx.lineTo(z.x + z.r, z.y + k); ctx.stroke(); } ctx.restore(); }
       else if (z.kind === "rain" || z.kind === "blast") { ctx.fillStyle = "rgba(255,230,150,.45)"; ctx.fill(); }
+      else if (z.kind === "spray") { ctx.fillStyle = `rgba(120,200,255,${0.12 + pulse * 0.08})`; ctx.fill(); ctx.setLineDash([3, 6]); ctx.strokeStyle = "rgba(170,225,255,.8)"; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); }
       else if (z.kind === "shock") { ctx.fillStyle = `rgba(140,230,255,${0.35 + pulse * 0.3})`; ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; ctx.stroke(); }
       else { ctx.fillStyle = "rgba(255,245,150,.85)"; ctx.fill(); }
     }
@@ -470,8 +473,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   for (const pop of s.pops) {
     ctx.globalAlpha = Math.min(1, pop.t * 2);
     const life = pop.kind === "crit" ? 0.75 : 0.6, age = life - pop.t, punch = (pop.kind === "hit" || pop.kind === "crit") && age < 0.12 ? 1 + (pop.kind === "crit" ? 0.7 : 0.35) * (1 - age / 0.12) : 1;
-    ctx.font = pop.kind === "info" ? `700 20px ${UI_FONT}` : pop.kind === "crit" ? "900 21px sans-serif" : "800 14px sans-serif";
-    ctx.fillStyle = { hit: "#ffffff", crit: "#ffd84a", hurt: "#ff6b5a", heal: "#7df0a0", info: "#fff6d0" }[pop.kind];
+    ctx.font = pop.kind === "info" ? `700 20px ${UI_FONT}` : pop.kind === "crit" ? "900 21px sans-serif" : pop.kind === "aux" ? "800 11px sans-serif" : "800 14px sans-serif";
+    ctx.fillStyle = { hit: "#ffffff", crit: "#ffd84a", hurt: "#ff6b5a", heal: "#7df0a0", info: "#fff6d0", aux: "#e6c38a" }[pop.kind];
     ctx.save(); ctx.translate(pop.x, pop.y); ctx.scale(punch, punch);
     ctx.strokeStyle = "rgba(30,20,10,.75)"; ctx.lineWidth = 4; ctx.strokeText(pop.text, 0, 0); ctx.fillText(pop.text, 0, 0);
     ctx.restore();
@@ -495,6 +498,12 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   const nextXp = xpForLevel(s.level + 1), prevXp = xpForLevel(s.level);
   bar(ctx, 84, 60, 186, 8, (s.xp - prevXp) / Math.max(1, nextXp - prevXp), "#4fd27e");
   ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}`, 84, 75);
+  if (s.aux) {
+    const def = AUX_WEAPONS[s.aux.id], cx = 258, cy = 72, left = Math.max(0, s.aux.readyAt - s.t), ratio = 1 - Math.min(1, left / def.cd);
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio); ctx.strokeStyle = ratio >= 1 ? "#e6c38a" : "rgba(230,195,138,.55)"; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = "#000"; ctx.font = `12px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText(def.icon, cx, cy + 1); ctx.textAlign = "left";
+  }
 
   // 가운데 위: 남은 시간 / 보스 체력
   const left = s.floor.training ? (s.floor.duration ?? 60) - s.t : BOSS_AT - s.t, bossTime = !s.floor.training && s.t >= BOSS_AT;
