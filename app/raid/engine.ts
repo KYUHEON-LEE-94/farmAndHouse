@@ -72,7 +72,9 @@ export type RaidState = {
   pressure: { x: number; y: number; since: number; stage: number; leftAt: number };
   warns: { x: number; y: number; at: number; id: string }[];
   /** 특수 공격(52절): 준비 시각, 진행 중 효과, 예약된 타격 */
-  special: { readyAt: number; prev: boolean; moveUntil: number; moveMul: number; lockAim: number | null; stanceUntil: number; stanceHit: boolean; cancelable: boolean; hits: Record<number, number>; bump: number };
+  special: { readyAt: number; prev: boolean; moveUntil: number; moveMul: number; lockAim: number | null; stanceUntil: number; stanceHit: boolean; cancelable: boolean; hits: Record<number, number>; bump: number;
+    /** Last cast snapshot used by the renderer for evolution-specific effects. */
+    castAt: number; castX: number; castY: number; castAim: number };
   actions: { at: number; run: () => void; tag?: string }[];
   kills: number; damageTaken: Record<string, number>; uid: number; prevDash: boolean; prevFood: [boolean, boolean, boolean]; bossHpAtEnd: number;
 };
@@ -93,7 +95,7 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
     level: 1, xp: 0, picks: {}, choices: null,
     monsters: [], projectiles: [], zones: [], orbs: [], pops: [], swings: [],
     spawnAcc: 0.97, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSummons: 0, killTimes: [], shake: 0, chainShown: 0, hitstop: 0, lastStop: -1, sparks: [], sfx: { hit: 0, crit: 0, kill: 0, big: 0 }, flow: null, flowAt: 0, flowCell: -1, bossSpawned: false, interventions: 0, boss: null,
-    special: { readyAt: 0, prev: false, moveUntil: 0, moveMul: 1, lockAim: null, stanceUntil: 0, stanceHit: false, cancelable: false, hits: {}, bump: 0 }, actions: [],
+    special: { readyAt: 0, prev: false, moveUntil: 0, moveMul: 1, lockAim: null, stanceUntil: 0, stanceHit: false, cancelable: false, hits: {}, bump: 0, castAt: -99, castX: 0, castY: 0, castAim: 0 }, actions: [],
     kills: 0, damageTaken: {}, uid: 1, prevDash: false, prevFood: [false, false, false], bossHpAtEnd: 1,
   };
 }
@@ -412,6 +414,7 @@ function castSpecial(s: RaidState) {
   if (s.t < sp.readyAt) { sp.bump = s.t; return; }
   sp.readyAt = s.t + SPECIALS[evo].cooldown * Math.max(0.65, 1 - 0.02 * pick(s, "endless-haste")); sp.hits = {}; p.swingCd = Math.max(p.swingCd, 0.18);
   const aim = p.aim, tx = clamp(p.tx, 20, WORLD_W - 20), ty = clamp(p.ty, 20, WORLD_H - 20), boss = (m: Monster) => (m.boss ? 0.15 : 0);
+  sp.castAt = s.t; sp.castX = tx; sp.castY = ty; sp.castAim = aim;
   s.pops.push({ x: p.x, y: p.y - 46, text: `${SPECIALS[evo].icon} ${SPECIALS[evo].name}`, t: 0.9, kind: "info" });
   switch (evo) {
     case "great-scythe": later(s, 0.15, () => lineHit(s, p.x, p.y, aim, 420, 70, D * 3.2, { noCrit: true }, 0, m => hitMonster(s, m, D * 3.2, aim, m.elite || m.boss ? 0 : 100, { noCrit: true, noCombo: true, extra: m.elite || m.boss ? 0.2 : 0 }))); break;

@@ -313,6 +313,38 @@ function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
 }
 function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) { ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(x, y + r * 0.85, r * 0.9, r * 0.32, 0, 0, Math.PI * 2); ctx.fill(); }
 
+/** Evolution specials deliberately use different silhouettes, colors and motion. */
+function drawSpecialCast(ctx: CanvasRenderingContext2D, s: RaidState, clock: number) {
+  const evo = s.evolution, age = s.t - s.special.castAt;
+  if (!evo || age < 0 || age > 2.2) return;
+  const p = s.player, tx = s.special.castX, ty = s.special.castY, aim = s.special.castAim;
+  const fade = Math.max(0, 1 - age / 2.2), pulse = 0.5 + Math.sin(clock * 18) * 0.5;
+  const ring = (x: number, y: number, r: number, color: string, width = 5) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke(); };
+  const ray = (x: number, y: number, len: number, width: number, color: string) => { ctx.save(); ctx.translate(x, y); ctx.rotate(aim); const g = ctx.createLinearGradient(0, 0, len, 0); g.addColorStop(0, "rgba(255,255,255,.9)"); g.addColorStop(1, color); ctx.fillStyle = g; roundRect(ctx, 0, -width / 2, len, width, width / 2); ctx.fill(); ctx.restore(); };
+  ctx.save(); ctx.globalAlpha = Math.min(1, age * 8) * fade;
+  switch (evo) {
+    case "great-scythe": ray(p.x, p.y, 440, 18 + pulse * 18, "rgba(210,55,70,0)"); break;
+    case "harvest-blade": for (let i = 0; i < 3; i++) ring(p.x, p.y, 65 + i * 34 + (age * 95) % 34, `rgba(125,220,95,${.8 - i * .18})`, 7); break;
+    case "quake-hammer": ray(p.x, p.y, 370, 12, "rgba(255,145,45,0)"); for (let i = 0; i < 6; i++) ring(p.x + Math.cos(aim) * (55 + i * 55), p.y + Math.sin(aim) * (55 + i * 55), 12 + pulse * 8, "#ff9a42", 4); break;
+    case "rock-crusher": for (let i = 0; i < 7; i++) { const a = i * 2.4; ring(tx + Math.cos(a) * (25 + i * 7), ty + Math.sin(a) * (25 + i * 7), 8 + pulse * 5, "#c9a06a", 5); } break;
+    case "water-cannon": ray(p.x, p.y, 510, 26 + pulse * 16, "rgba(60,175,255,0)"); break;
+    case "frost-sprayer": ring(tx, ty, 145 + pulse * 8, "#d9f7ff", 7); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + age; ray(tx + Math.cos(a) * 80, ty + Math.sin(a) * 80, 24, 3, "rgba(210,250,255,0)"); } break;
+    case "toxic-sprayer": ring(tx, ty, 115 + pulse * 10, "#91e34c", 8); ring(tx, ty, 60 + pulse * 18, "#b46ce0", 5); break;
+    case "seed-launcher": for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2; ring(tx + Math.cos(a) * 55, ty + Math.sin(a) * 55, 20 + pulse * 14, "#f2b83f", 6); } break;
+    case "trident": { for (let i = -1; i <= 1; i++) { ctx.save(); ctx.translate(-Math.sin(aim) * i * 16, Math.cos(aim) * i * 16); ray(p.x, p.y, 530, 5, "rgba(70,225,235,0)"); ctx.restore(); } break; }
+    case "chain-harpoon": { ctx.strokeStyle = "#d7d3c5"; ctx.lineWidth = 5; ctx.setLineDash([10, 8]); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]); ring(tx, ty, 24 + pulse * 8, "#e7c36a", 5); break; }
+    case "thunder-rod": { ctx.strokeStyle = "#fff16a"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(tx - 20, ty - 180); for (let i = 1; i <= 6; i++) ctx.lineTo(tx + (i % 2 ? 22 : -18), ty - 180 + i * 30); ctx.stroke(); ring(tx, ty, 45 + pulse * 25, "#8be8ff", 4); break; }
+    case "net-launcher": ring(tx, ty, 165, "#eee1bf", 3); for (let i = -4; i <= 4; i++) { ctx.strokeStyle = "rgba(238,225,191,.65)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx - 130, ty + i * 25); ctx.lineTo(tx + 130, ty + i * 25); ctx.stroke(); } break;
+    case "longbow": ray(p.x, p.y, 720, 7 + pulse * 5, "rgba(255,225,90,0)"); ring(p.x, p.y, 28 + pulse * 10, "#ffd95a", 4); break;
+    case "rapid-bow": for (let i = 0; i < 10; i++) { const a = i * 2.4 + age * 3; ring(tx + Math.cos(a) * (35 + i * 8), ty + Math.sin(a) * (35 + i * 8), 3, "#b7ef72", 3); } break;
+    case "rifle": ray(p.x, p.y, 740, 4 + pulse * 3, "rgba(255,90,45,0)"); ring(p.x, p.y, 20 + pulse * 18, "#ffb14a", 4); break;
+    case "siege-crossbow": { const travel = Math.min(1, age * 2.5), x = p.x + Math.cos(aim) * 420 * travel, y = p.y + Math.sin(aim) * 420 * travel; ring(x, y, 24 + pulse * 12, "#ff8345", 7); break; }
+    case "twin-blades": for (let i = 0; i < 4; i++) { const a = aim + i * Math.PI / 2 + age * 8; ctx.strokeStyle = i % 2 ? "#69e4ff" : "#ffffff"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(p.x, p.y, 45 + i * 14, a, a + 1.2); ctx.stroke(); } break;
+    case "greatsword": ring(p.x, p.y, 38 + pulse * 16, "#8fb8ff", 8); ring(p.x, p.y, 65 + pulse * 8, "rgba(255,255,255,.7)", 3); break;
+  }
+  ctx.restore();
+}
+
 // ---------- 그리기 ----------
 function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: number, petIcon = "") {
   const W = ARENA_W, H = ARENA_H, p = s.player, d = derived(s), cam = s.cam, T = s.terrain;
@@ -408,6 +440,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     else { const h = (sw.arc / 2) * Math.PI / 180; ctx.arc(p.x, p.y, sw.range, sw.angle - h, sw.angle + h); ctx.arc(p.x, p.y, sw.range * 0.55, sw.angle + h, sw.angle - h, true); }
     ctx.closePath(); ctx.fill(); ctx.restore();
   }
+  drawSpecialCast(ctx, s, clock);
 
   // 전투펫
   if (s.pet && petIcon) { const pt = s.pet; shadow(ctx, pt.x, pt.y, 10); ctx.save(); ctx.translate(pt.x, pt.y + Math.sin(clock * 6) * 2); if (pt.flash > 0) ctx.scale(1.2, 1.2); ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(petIcon, 0, 0); ctx.restore(); }
