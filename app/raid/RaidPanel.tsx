@@ -9,6 +9,7 @@ import { canPay, nextStep, realDropChance } from "./forge";
 import RaidGame from "./RaidGame";
 import { RAID_WEAPONS, SPECIALS, WEAPON_CRAFT, dps, weaponDef, type WeaponStats } from "./weapons";
 import { WeaponIcon } from "./weaponArt";
+import { ArmorIcon } from "./armorArt";
 
 let runSeq = 0;
 export type RaidOutcome = { result: RaidResult; lines: string[] };
@@ -130,7 +131,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
           <div className="raid-me"><img src={avatar.src} alt="" className={avatar.pixelated ? "pixelated" : ""} /><span><b>{wDef.icon} {wDef.name} +{enh}{evo ? ` · ${EVOLUTIONS[evo].name}` : ""}</b><small>피해 {stats.damage} · 사거리 {stats.range} · {stats.angle}° · {stats.interval}초</small>
             <small>♥ {100 + gear.hp} · 방어 {gear.defense}{gear.speed ? ` · 이속 +${Math.round(gear.speed * 100)}%` : ""}</small></span></div>
           <button className="raid-gear-link" onClick={onOpenGear}>🎒 장비창에서 바꾸기</button>
-          <div className="raid-gear-mini">{(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]); return <span key={slot} className={a ? "on" : ""} title={a ? a.text : `${SLOT_NAME[slot]} 비어 있음`}>{a ? a.icon : "▫️"}<small>{SLOT_NAME[slot]}</small></span>; })}{(() => { const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet); return <span className={p ? "on" : ""} title={p ? p.text : "전투펫 없음"}>{p ? p.icon : "▫️"}<small>전투펫</small></span>; })()}</div>
+          <div className="raid-gear-mini">{(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]); return <span key={slot} className={a ? "on" : ""} title={a ? a.text : `${SLOT_NAME[slot]} 비어 있음`}>{a ? <ArmorIcon id={a.id} size={28} /> : "▫️"}<small>{SLOT_NAME[slot]}</small></span>; })}{(() => { const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet); return <span className={p ? "on" : ""} title={p ? p.text : "전투펫 없음"}>{p ? p.icon : "▫️"}<small>전투펫</small></span>; })()}</div>
         </div>
 
         {KITCHEN_ENABLED && <div className="raid-foods"><b>🍱 음식 3칸</b>
@@ -173,7 +174,7 @@ export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActi
     <div className="raid-slots">
       <div className="raid-slot weapon on"><small>무기</small><b><WeaponIcon id={w.evolution ?? weaponId} size={22} /> {wDef.name} +{w.enhancement}</b><span>{w.evolution ? EVOLUTIONS[w.evolution].name : "진화 전(+10에서 선택)"} · 피해 {stats.damage}</span></div>
       {(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]);
-        return <div key={slot} className={`raid-slot ${a ? "on" : ""}`}><small>{SLOT_NAME[slot]}</small><b>{a ? `${a.icon} ${a.name}` : "비어 있음"}</b><span>{a ? a.text : "오른쪽에서 만들고 착용하세요"}</span>{a && <button onClick={() => forge.equip(slot, null)}>벗기</button>}</div>; })}
+        return <div key={slot} className={`raid-slot ${a ? "on" : ""}`}><small>{SLOT_NAME[slot]}</small><b>{a ? <><ArmorIcon id={a.id} size={24} /> {a.name}</> : "비어 있음"}</b><span>{a ? a.text : "오른쪽에서 만들고 착용하세요"}</span>{a && <button onClick={() => forge.equip(slot, null)}>벗기</button>}</div>; })}
       {(() => { const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet), lv = p ? raid.battlePets?.[p.id]?.level ?? 1 : 0; return <div className={`raid-slot ${p ? "on" : ""}`}><small>전투펫</small><b>{p ? `${p.icon} ${p.name} Lv.${lv}` : "비어 있음"}</b><span>{p ? `${p.text} · 능력 ×${PET_LEVELS[lv - 1].mult}` : "아래 전투펫 뽑기에서 얻어요"}</span>{p && <button onClick={() => forge.equipPet(null)}>빼기</button>}</div>; })()}
       <p className="raid-gear-sum">합계 · 체력 +{gear.hp} · 방어 +{gear.defense} · 치명타 +{Math.round(gear.crit * 100)}% · 이속 +{Math.round(gear.speed * 100)}% · 회피 재사용 −{Math.round(gear.dashCd * 100)}%{gear.startShield ? ` · 시작 보호막 ${gear.startShield}` : ""}</p>
     </div>
@@ -190,7 +191,7 @@ export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActi
     <p className="hint">🐾 전투펫은 <b>펫</b> 탭에서 데려가기·레벨업하고, <b>상점 › 가챠</b>에서 뽑아요.</p>
     <div className="raid-armors">{ARMORS.map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, ok = canPay(a.need, forge.have) && forge.money >= a.gold;
       return <div key={a.id} className={`raid-armor ${worn ? "worn" : owned ? "owned" : ""}`}>
-        <span className="raid-armor-icon">{a.icon}</span>
+        <span className="raid-armor-icon"><ArmorIcon id={a.id} size={48} /></span>
         <div><b>{a.name} <small>{SLOT_NAME[a.slot]} · {a.tier === 1 ? "가죽" : "강화 가죽"}</small></b><span>{a.text}</span>
           {!owned && <span className="raid-cost"><em className={forge.money >= a.gold ? "ok" : "lack"}>💰 {a.gold.toLocaleString()}</em>{Object.entries(a.need).map(([id, n]) => <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</span>}</div>
         {worn ? <button disabled>착용 중</button> : owned ? <button onClick={() => forge.equip(a.slot, a.id)}>착용</button> : <button className="make" disabled={!ok} onClick={() => forge.craftArmor(a.id)}>만들기</button>}
