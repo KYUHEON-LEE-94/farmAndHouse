@@ -196,6 +196,10 @@ function pickSpawn(s: RaidState) {
 // ---------- 피해 ----------
 /** 회피가 끝난 뒤에도 무적이 이어지는 여유 시간(초). */
 const DODGE_GRACE = 0.2;
+/** 플레이어 피해 배율 상한(각성·음식·조건부 합산, 치명타·경직 배율은 따로). 카드 확장 뒤 최대치가 무한히 커지지 않게. */
+const DAMAGE_MUL_CAP = 3;
+/** 방어 1당 계수(방어 4 ≈ 24%, 8 ≈ 39%, 15 ≈ 55% 감소) */
+const DEFENSE_K = 8;
 const HAZARD_SOURCES = ["꽃가루 장판", "감전", "전도성 웅덩이"];
 /** 피해를 실제로 받았으면 true(회피·무적이면 false). */
 function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = false): boolean {
@@ -208,7 +212,8 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   raw *= 1 - Math.min(0.85, (s.weapon.fx?.guard ?? 0) + (s.picks["frost-veil"] && p.holdT > 0 ? 0.25 : 0) + buffSum(s, ["armor"]) + (pick(s, "safe-route") && HAZARD_SOURCES.includes(source) ? 0.3 : 0));
   if (s.special.stanceUntil > s.t) { raw *= 0.2; if (!s.special.stanceHit) { s.special.stanceHit = true; s.special.stanceUntil = 0; counterBlast(s, true); } }
   if (fromBoss && s.picks["iron-wall"] && s.t - p.ironAt >= 1) { p.ironAt = s.t; raw *= 0.5; }
-  let dmg = Math.max(1, Math.round(raw - derived(s).armor));
+  // 방어 비율식(RAID_BALANCE_RESEARCH 6절): 원래 피해 × 100 ÷ (100 + 방어 × 8), 최소 1
+  let dmg = Math.max(1, Math.round(raw * 100 / (100 + Math.max(0, derived(s).armor) * DEFENSE_K)));
   if (p.shield > 0) { const used = Math.min(p.shield, dmg); p.shield -= used; dmg -= used; }
   p.hp -= dmg; p.iframes = PLAYER.iframes; s.damageTaken[source] = (s.damageTaken[source] ?? 0) + dmg;
   if (dmg > 0) s.pops.push({ x: p.x, y: p.y - 24, text: `-${dmg}`, t: 0.8, kind: "hurt" });
@@ -270,6 +275,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   const critChance = d.crit + (fx.crit ?? 0) + (o.critAdd ?? 0) + ((m.elite || m.boss) ? (fx.eliteCrit ?? 0) + (s.picks["weak-aim"] ? 0.2 : 0) : 0);
   const crit = o.forceCrit || (!o.noCrit && rnd() < critChance);
   mul += o.extra ?? 0;
+  mul = Math.min(DAMAGE_MUL_CAP, mul);
   let dmg = base * mul * (crit ? Math.max(s.picks["vital-stab"] ? 2 : 0, PLAYER.critMul + 0.25 * pick(s, "critical-force")) : 1) * (m.state === "stun" ? 1.3 : 1);
   const ignore = m.boss && (o.ignoreDef || (crit && s.picks["vital-pierce"]));
   dmg = Math.max(1, Math.round(dmg - (ignore ? 0 : effDefense(s, m) * (1 - (o.defIgnore ?? 0))) - (m.def.kind === "crab" && m.state !== "dash" ? 3 : 0)));
@@ -559,7 +565,7 @@ function offerChoices(s: RaidState) {
     s.choices = [...finals, ...rollChoices(choiceContext(s), 1)].filter(Boolean);
   } else s.choices = rollChoices(choiceContext(s), 3).filter(id => COMMON_AWAKENINGS.includes(id));
   // 유효 카드가 3장보다 적으면 무제한 성장 카드로 채운다(59.2절)
-  const fill = [...ENDLESS_AWAKENINGS].sort(() => rnd() - 0.5);
+  const fill = ENDLESS_AWAKENINGS.filter(id => pick(s, id) < AWAKENINGS[id].max && !s.choices!.includes(id)).sort(() => rnd() - 0.5);
   while (s.choices.length < 3 && fill.length) s.choices.push(fill.pop()!);
 }
 export function chooseAwakening(s: RaidState, id: AwakenId) {

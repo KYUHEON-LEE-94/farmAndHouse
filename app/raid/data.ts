@@ -60,15 +60,15 @@ export type FloorDef = {
 const z1 = "꽃가루 들판", z2 = "침수된 수로";
 export const FLOORS: FloorDef[] = [
   { floor: 1, zone: z1, monsters: ["pollen-mite"], spawnRate: 0.8, maxAlive: 16, elite: null, boss: { id: "mini", name: "강화 진드기", icon: "🐞", hp: 300, damage: 10, defense: 0, base: "pollen-mite" } },
-  { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 500, damage: 13, defense: 0, base: "thorn-rabbit" } },
-  { floor: 3, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee"], spawnRate: 1.15, maxAlive: 23, elite: { id: "spore-bee", hp: 260, count: 2 }, boss: { id: "mini", name: "포자 여왕", icon: "🐝", hp: 700, damage: 12, defense: 0, base: "spore-bee" } },
-  { floor: 4, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.3, maxAlive: 26, elite: { id: "field-brute", hp: 180, every: 30 }, boss: { id: "mini", name: "난폭종 우두머리", icon: "🦬", hp: 1000, damage: 26, defense: 3, base: "field-brute" } },
-  { floor: 5, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.4, maxAlive: 28, elite: { id: "field-brute", hp: 180, every: 25 }, boss: { id: "pollen-boar", name: "꽃가루 멧돼지", icon: "🐗", hp: 1650, damage: 22, defense: 3 } },
-  { floor: 6, zone: z2, monsters: ["moss-slime"], spawnRate: 0.95, maxAlive: 18, elite: null, boss: { id: "mini", name: "거대 이끼괴물", icon: "🟢", hp: 650, damage: 16, defense: 1, base: "moss-slime" } },
-  { floor: 7, zone: z2, monsters: ["moss-slime", "shock-eel"], spawnRate: 1.1, maxAlive: 21, elite: { id: "shock-eel", hp: 350, count: 2 }, boss: { id: "mini", name: "전기 뱀장어 우두머리", icon: "⚡", hp: 850, damage: 18, defense: 0, base: "shock-eel" } },
-  { floor: 8, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog"], spawnRate: 1.25, maxAlive: 24, elite: { id: "dart-frog", hp: 400, count: 2 }, boss: { id: "mini", name: "물총 개구리왕", icon: "🐸", hp: 1150, damage: 18, defense: 1, base: "dart-frog" } },
-  { floor: 9, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.35, maxAlive: 27, elite: { id: "canal-elite", hp: 300, every: 30 }, boss: { id: "mini", name: "수로 포식자 우두머리", icon: "🐊", hp: 1500, damage: 33, defense: 4, base: "canal-elite" } },
-  { floor: 10, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.5, maxAlive: 30, elite: { id: "canal-elite", hp: 300, every: 25 }, boss: { id: "storm-catfish", name: "폭풍 메기왕", icon: "🐟", hp: 2750, damage: 28, defense: 4 } },
+  { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 500, damage: 12, defense: 0, base: "thorn-rabbit" } },
+  { floor: 3, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee"], spawnRate: 1.15, maxAlive: 23, elite: { id: "spore-bee", hp: 260, count: 2 }, boss: { id: "mini", name: "포자 여왕", icon: "🐝", hp: 700, damage: 14, defense: 0, base: "spore-bee" } },
+  { floor: 4, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.3, maxAlive: 26, elite: { id: "field-brute", hp: 180, every: 30 }, boss: { id: "mini", name: "난폭종 우두머리", icon: "🦬", hp: 1000, damage: 17, defense: 3, base: "field-brute" } },
+  { floor: 5, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.4, maxAlive: 28, elite: { id: "field-brute", hp: 180, every: 25 }, boss: { id: "pollen-boar", name: "꽃가루 멧돼지", icon: "🐗", hp: 1650, damage: 20, defense: 3 } },
+  { floor: 6, zone: z2, monsters: ["moss-slime"], spawnRate: 1.05, maxAlive: 22, elite: null, boss: { id: "mini", name: "거대 이끼괴물", icon: "🟢", hp: 1800, damage: 21, defense: 1, base: "moss-slime" } },
+  { floor: 7, zone: z2, monsters: ["moss-slime", "shock-eel"], spawnRate: 1.1, maxAlive: 21, elite: { id: "shock-eel", hp: 350, count: 2 }, boss: { id: "mini", name: "전기 뱀장어 우두머리", icon: "⚡", hp: 850, damage: 23, defense: 0, base: "shock-eel" } },
+  { floor: 8, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog"], spawnRate: 1.25, maxAlive: 24, elite: { id: "dart-frog", hp: 400, count: 2 }, boss: { id: "mini", name: "물총 개구리왕", icon: "🐸", hp: 1150, damage: 25, defense: 1, base: "dart-frog" } },
+  { floor: 9, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.35, maxAlive: 27, elite: { id: "canal-elite", hp: 300, every: 30 }, boss: { id: "mini", name: "수로 포식자 우두머리", icon: "🐊", hp: 1500, damage: 27, defense: 4, base: "canal-elite" } },
+  { floor: 10, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.5, maxAlive: 30, elite: { id: "canal-elite", hp: 300, every: 25 }, boss: { id: "storm-catfish", name: "폭풍 메기왕", icon: "🐟", hp: 2750, damage: 30, defense: 4 } },
 ];
 
 // ---------- 전투 각성(25절) ----------
@@ -93,7 +93,7 @@ export const AWAKENINGS: Record<string, { name: string; text: string; max: numbe
   "heavy-swing": { name: "묵직한 휘두르기", text: "밀어내기 +50%, 정예 피해 +12%", max: 1 },
   "double-cut": { name: "이중 베기", text: "세 번째 공격마다 55% 피해로 한 번 더", max: 1 },
   vitality: { name: "활력", text: "최대 체력 +25, 즉시 25 회복", max: 2 },
-  "hard-leather": { name: "단단한 가죽", text: "받는 피해 −2(최소 1)", max: 2 },
+  "hard-leather": { name: "단단한 가죽", text: "방어 +2(방어 1마다 받는 피해 약 −7%)", max: 2 },
   "wind-step": { name: "바람걸음", text: "이동속도 +12%", max: 2 },
   "quick-dash": { name: "빠른 회피", text: "회피 대시 재사용시간 −18%", max: 2 },
   "emergency-shield": { name: "비상 보호막", text: "체력 30% 이하가 되면 보호막 25(판당 1회)", max: 1 },
@@ -140,7 +140,7 @@ export const AWAKENINGS: Record<string, { name: string; text: string; max: numbe
   "critical-eye": { name: "매의 눈", text: "치명타 확률 +8%p", max: 2 },
   "critical-force": { name: "치명상", text: "치명타 피해 150% → 175%(2중첩 200%)", max: 2 },
   "boss-hunter": { name: "거인 사냥꾼", text: "정예·보스 피해 +15%", max: 2 },
-  "close-instinct": { name: "근접 본능", text: "110px 안의 적 피해 +18%, 받는 피해 −1", max: 1 },
+  "close-instinct": { name: "근접 본능", text: "110px 안의 적 피해 +18%, 방어 +1", max: 1 },
   "keep-distance": { name: "거리 유지", text: "260px 이상 떨어진 적 피해 +18%", max: 1 },
   "battle-tempo": { name: "전투 박자", text: "처치 시 5초간 공격 간격 −3%(최대 5중첩)", max: 1 },
   "armor-crack": { name: "갑옷 균열", text: "기본 공격 10%로 5초간 적 방어 −1(최대 3)", max: 1 },
@@ -182,9 +182,9 @@ export const AWAKENINGS: Record<string, { name: string; text: string; max: numbe
   "auxiliary-range": { name: "넓은 탐색", text: "보조무기 반경 +15%, 투사체 속도 +10%", max: 1 },
   "auxiliary-mastery": { name: "농가의 잔재주", text: "보조무기 고유 효과 해금", max: 1 },
   // 59.2절 무제한 성장 카드(중복 제한 없음)
-  "endless-edge": { name: "끝없는 날", text: "주무기 기본·특수 공격 피해 +6%", max: 999 },
+  "endless-edge": { name: "끝없는 날", text: "주무기 기본·특수 공격 피해 +6%(최대 10중첩)", max: 10 },
   "endless-life": { name: "끈질긴 생명", text: "최대 체력 +10, 즉시 체력 10 회복", max: 999 },
-  "endless-haste": { name: "멈추지 않는 손", text: "기본 공격 간격 −3% · 특수 공격 재사용 −2%", max: 999 },
+  "endless-haste": { name: "멈추지 않는 손", text: "기본 공격 간격 −3% · 특수 공격 재사용 −2%(최대 10중첩)", max: 10 },
 };
 /** 일반 카드 전체(최종·무제한 제외). 실제 제시는 app/raid/awakenings.ts의 rollChoices가 계열·등급·조건으로 고른다. */
 export const COMMON_AWAKENINGS: AwakenId[] = Object.keys(AWAKENINGS).filter(id => !AWAKENINGS[id].final && !ENDLESS_AWAKENINGS.includes(id));
