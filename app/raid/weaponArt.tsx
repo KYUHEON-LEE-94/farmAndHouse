@@ -71,5 +71,12 @@ export function weaponArtUrl(id: string) {
 }
 /** 무기 아이콘. id는 무기 id 또는 진화 id. */
 export function WeaponIcon({ id, size = 36, className = "" }: { id: string; size?: number; className?: string }) {
-  return <span className={`weapon-icon ${className}`} style={{ width: size, height: size }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: weaponSvg(id) }} />;
+  const route = GLOW[id];
+  return <span
+    className={`weapon-icon ${route ? `evolved route-${route}` : "life-tool"} ${className}`}
+    data-rank={route ? "+10" : undefined}
+    style={{ width: size, height: size }}
+    aria-hidden="true"
+    dangerouslySetInnerHTML={{ __html: weaponSvg(id) }}
+  />;
 }
