@@ -12,8 +12,8 @@ import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
-import RaidPanel, { RaidGearView } from "./raid/RaidPanel";
-import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_MASTERY, EMPTY_RAID, masteryLines, type LifeMastery, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
+import RaidPanel, { RaidCraftView, RaidGearView } from "./raid/RaidPanel";
+import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
 import type { ForgeActions } from "./raid/RaidPanel";
@@ -255,7 +255,7 @@ const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(M
 
 export default function Home() {
   const [now, setNow] = useState(new Date());
-  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid">("farm");
+  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid" | "workshop">("farm");
   const [bookSeason, setBookSeason] = useState<Season | "special" | null>(null);
   const [bet, setBet] = useState(100);
   const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
@@ -323,8 +323,6 @@ export default function Home() {
     const timer = window.setInterval(() => setMoney(value => (value < 50_000_000 ? 99_999_999 : value)), 400);
     return () => window.clearInterval(timer);
   }, []);
-  // 생활 숙련 기록(+10 진화 조건): 좋은 품질 수확·미끼 낚시·동물별 사냥·요리별 완성
-  const [lifeMastery, setLifeMastery] = useState<LifeMastery>(EMPTY_MASTERY);
   const raidItems = useMemo(() => pickCategory(inventory, "raid"), [inventory]), setRaidItems = categorySetter("raid");
   // 사냥 무기: 상점에서 산다(로컬 테스트 중에는 HUNT_TEST_UNLOCK_ALL로 모두 열림).
   const [ownedWeapons, setOwnedWeapons] = useState<string[]>(["hand"]);
@@ -349,6 +347,8 @@ export default function Home() {
   const [sellConfirm, setSellConfirm] = useState<{ kind: "market" | "coop"; cropId?: string } | null>(null);
   const [harvestMode, setHarvestMode] = useState<"sell" | "store">("store");
   const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders" | "workshop" | "kitchen">("seed");
+  // 공방 하위 탭: 생활 가공(시간형·판매) / 강화 가공(즉시·강화 소재)
+  const [workshopView, setWorkshopView] = useState<"life" | "raid">("life");
   // 시장 포화: 작물별로 최근에 판 양(시간이 지나면 회복)
   const [marketState, setMarketState] = useState<MarketState>(EMPTY_MARKET);
   // 오늘의 주문서: 날짜별로 납품한 주문 id
@@ -471,7 +471,7 @@ export default function Home() {
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
         setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
-        setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [], battlePets: data.raid?.battlePets ?? {}, petPity: data.raid?.petPity ?? 0 }); setLifeMastery({ ...EMPTY_MASTERY, ...(data.lifeMastery ?? {}) });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
+        setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [], battlePets: data.raid?.battlePets ?? {}, petPity: data.raid?.petPity ?? 0 });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
         setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? ""); setCoinHoldings(data.coinHoldings ?? {});
       } catch { /* start fresh */ }
@@ -485,10 +485,10 @@ export default function Home() {
   // 저장은 0.4초 모아서 한 번 쓴다(드래그로 여러 칸을 심을 때 매번 전체 저장을 직렬화하지 않게). 숨김·종료·계정 저장 직전에는 바로 쓴다.
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, lifeMastery, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
+    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
     const timer = window.setTimeout(flushSave, 400);
     return () => window.clearTimeout(timer);
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, lifeMastery, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -1109,7 +1109,6 @@ export default function Home() {
     // 작물 도감 기록: 수확 수·최고 품질·황금·최고 판매가(1개 값)
     setCropLog(log => { const next = { ...log }; sales.forEach(sale => { const old = next[sale.crop.id] ?? { n: 0, best: 0, golden: 0, top: 0 }, quality = storedQuality(sale.status.quality.id, 1);
       next[sale.crop.id] = { n: old.n + 1, best: Math.max(old.best, quality), golden: old.golden + (sale.golden ? 1 : 0), top: Math.max(old.top, sale.amount) }; }); return next; });
-    { const good = sales.filter(sale => storedQuality(sale.status.quality.id, 1) >= 1).length; if (good) setLifeMastery(m => ({ ...m, farmGoodHarvests: m.farmGoodHarvests + good })); }
     // 창고 보관 모드: 묶음(작물|품질|황금)으로 쌓는다. 새 묶음 자리가 없으면 그 작물만 바로 판다.
     if (harvestMode === "store") {
       // 용량은 총 수량. 넘치는 만큼만 바로 판다.
@@ -1338,7 +1337,6 @@ export default function Home() {
     const dish = cooking?.dish; if (!dish) return;
     const grade = rollGrade(score), key = `${dish.id}|${grade}|0`;
     setDishStock(stock => ({ ...stock, [key]: (stock[key] ?? 0) + 1 }));
-    setLifeMastery(m => { const old = m.cooking[dish.id] ?? { completed: 0, bestGrade: 0 }; return { ...m, cooking: { ...m.cooking, [dish.id]: { completed: old.completed + 1, bestGrade: Math.max(old.bestGrade, grade) } } }; });
     setCooking(null); setCookResult({ dish, grade, score });
     playCoinSound(grade === 2 ? [523, 659, 784, 1047, 1319] : grade === 1 ? [660, 880, 1100] : [660, 880]);
   }
@@ -1509,7 +1507,6 @@ export default function Home() {
     const price = Math.round(fish.price * (result.perfect ? 1.25 : 1));
     // 신화(숨겨진 물고기)는 도감에 기록하지 않는다.
     if (fish.rarity !== "신화") setFishLog(log => ({ ...log, [fish.id]: (log[fish.id] ?? 0) + 1 }));
-    if (castBait.current && castBait.current.id !== BARE_HAND.id) setLifeMastery(m => ({ ...m, baitCatches: m.baitCatches + 1 }));
     const used = Object.values(produce).reduce((sum, count) => sum + count, 0) + Object.values(fishStock).reduce((sum, count) => sum + count, 0);
     const stored = fishHarvestMode === "store" && used < storageCap;
     if (stored) setFishStock(stock => ({ ...stock, [fish.id]: (stock[fish.id] ?? 0) + 1 }));
@@ -2014,12 +2011,15 @@ export default function Home() {
     if (money < gold) return null;
     return { take, mats, gold };
   };
-  const LIFE_NEED: Record<string, () => Plan | null> = {
-    "farm-fiber": () => { const sources = forgeSources().filter(x => x.tag === "crop0"); let left = 5; const take: Plan["take"] = []; for (const src of sources) { const n = Math.min(left, src.n); if (n) { take.push({ src, n }); left -= n; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; },
-    "fish-oil": () => { const sources = forgeSources().filter(x => x.tag === "fish"); let left = 3; const take: Plan["take"] = []; for (const src of sources) { const n = Math.min(left, src.n); if (n) { take.push({ src, n }); left -= n; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; },
-    "tanned-leather": () => { const sources = forgeSources().filter(x => x.tag === "hunt"); let left = 3; const take: Plan["take"] = []; for (const src of sources) { const n = Math.min(left, src.n); if (n) { take.push({ src, n }); left -= n; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; },
-    "artisan-core": () => planFor({ "farm-fiber": 1, "fish-oil": 1, "tanned-leather": 1, goods: 1 }),
+  /** 강화 가공(51.4): n개를 만들 때 실제로 쓸 재료. 모자라면 null. */
+  const takeTag = (tag: string, count: number): Plan | null => { const sources = forgeSources().filter(x => x.tag === tag); let left = count; const take: Plan["take"] = []; for (const src of sources) { const k = Math.min(left, src.n); if (k) { take.push({ src, n: k }); left -= k; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; };
+  const LIFE_NEED: Record<string, (n: number) => Plan | null> = {
+    "farm-fiber": n => takeTag("crop0", 5 * n),
+    "fish-oil": n => takeTag("fish", 3 * n),
+    "tanned-leather": n => takeTag("hunt", 3 * n),
+    "artisan-core": n => planFor({ "farm-fiber": n, "fish-oil": n, "tanned-leather": n, goods: n }),
   };
+  const lifeMax = (id: string) => { let n = 0; while (n < 999 && LIFE_NEED[id]?.(n + 1)) n++; return n; };
   const describePlan = (plan: Plan) => [...plan.take.map(t => `${t.src.name} ${t.n}`), ...Object.entries(plan.mats).map(([id, n]) => `${ALL_RAID_ITEMS[id]?.icon ?? ""} ${ALL_RAID_ITEMS[id]?.name ?? id} ${n}`)];
   /** 계획대로 재료·돈을 쓴다. */
   function spendPlan(plan: Plan) {
@@ -2036,11 +2036,12 @@ export default function Home() {
   { const src = forgeSources(); forgeHave["rare-hunt"] = src.filter(x => x.tag === "rarehunt").reduce((sum, x) => sum + x.n, 0); forgeHave.goods = src.filter(x => x.tag === "goods").reduce((sum, x) => sum + x.n, 0); forgeHave["good-crop"] = src.filter(x => x.tag === "goodcrop").reduce((sum, x) => sum + x.n, 0); }
   const forge: ForgeActions = {
     have: forgeHave, money,
-    lifePlan: id => { const plan = LIFE_NEED[id]?.(); return plan ? describePlan(plan) : null; },
-    craftLife: id => {
-      const plan = LIFE_NEED[id]?.(); if (!plan) return setNotice("재료가 부족해요.");
-      spendPlan(plan); setRaidItems(view => ({ ...view, [id]: (view[id] ?? 0) + 1 }));
-      playCoinSound([660, 880]); setNotice(`${LIFE_MATS[id].icon} ${LIFE_MATS[id].name}을(를) 만들었어요. (사용: ${describePlan(plan).join(", ")})`);
+    lifePlan: (id, n = 1) => { const plan = LIFE_NEED[id]?.(n); return plan ? describePlan(plan) : null; },
+    lifeMax,
+    craftLife: (id, n = 1) => {
+      const plan = LIFE_NEED[id]?.(n); if (!plan) return setNotice("재료가 부족해요.");
+      spendPlan(plan); setRaidItems(view => ({ ...view, [id]: (view[id] ?? 0) + n }));
+      playCoinSound([660, 880]); setNotice(`⚒️ ${LIFE_MATS[id].icon} ${LIFE_MATS[id].name} ${n}개 즉시 완성! (사용: ${describePlan(plan).join(", ")})`);
     },
     enhance: useStabilizer => {
       const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement);
@@ -2062,11 +2063,9 @@ export default function Home() {
       setRaid(r => ({ ...r, weapons: { ...r.weapons, [r.equipped.weapon]: { ...r.weapons[r.equipped.weapon], unlockedEnhancements: [...r.weapons[r.equipped.weapon].unlockedEnhancements, step.to] } } }));
       playCoinSound([660, 990, 1320]); setNotice(`🔓 +${step.to} 강화 단계를 열었어요!`);
     },
-    mastery: masteryLines(cropLog, fishLog, lifeMastery),
     evolve: (evolution: Evolution) => {
       const w = raid.weapons[raid.equipped.weapon];
       if (w.enhancement < 10 || w.evolution) return;
-      if (!TEST_MODE && !masteryLines(cropLog, fishLog, lifeMastery).every(l => l.cur >= l.need)) return setNotice("진화하려면 생활 숙련 조건을 모두 채워야 해요.");
       setRaid(r => setEvolution(r, r.equipped.weapon, evolution)); playCoinSound([660, 880, 1100, 1320]);
       setNotice(`⚡ ${weaponDef(raid.equipped.weapon).name}이(가) 진화했어요!`);
     },
@@ -2215,6 +2214,7 @@ export default function Home() {
 
       <nav className="tabs" aria-label="게임 공간">
         <button className={tab === "farm" ? "active" : ""} onClick={() => switchTab("farm")}>🌱 텃밭</button>
+        <button className={tab === "workshop" ? "active" : ""} onClick={() => switchTab("workshop")}>🏭 공방{doneJobs > 0 ? ` ✨${doneJobs}` : ""}</button>
         <button className={tab === "fish" ? "active" : ""} onClick={() => switchTab("fish")}>🎣 낚시터</button>
         {HUNT_ENABLED && <button className={tab === "hunt" ? "active" : ""} onClick={() => switchTab("hunt")}>🏹 사냥터</button>}
         {RAID_ENABLED && <button className={tab === "raid" ? "active" : ""} onClick={() => switchTab("raid")}>🗼 토벌탑</button>}
@@ -2281,7 +2281,7 @@ export default function Home() {
           <div className="side-tabs" role="tablist" aria-label="씨앗과 가공">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗</button>
             {KITCHEN_ENABLED && <button role="tab" aria-selected={sidePanel === "kitchen"} className={sidePanel === "kitchen" ? "on" : ""} onClick={() => setSidePanel("kitchen")}>🍳 주방</button>}
-            <button role="tab" aria-selected={sidePanel === "workshop"} className={sidePanel === "workshop" ? "on" : ""} onClick={() => setSidePanel("workshop")}>🏺 가공 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot" aria-label={`다 된 가공 ${doneJobs}건`}>{doneJobs}</i>}</button>
+            <button className="side-workshop-link" onClick={() => switchTab("workshop")}>🏭 공방 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot">{doneJobs}</i>}</button>
           </div>
           {sidePanel === "seed" ? <>
           <div className="panel-heading"><div><span className="eyebrow">SEED BOX · 5분 시세</span><h3>{season} 씨앗 상자</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
@@ -2289,23 +2289,7 @@ export default function Home() {
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
           </> : KITCHEN_ENABLED && sidePanel === "kitchen" ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} dishStock={dishStock} onCook={startCooking} />
-          : sidePanel === "workshop" ? <div className="workshop-view">
-            <div className="panel-heading"><div><span className="eyebrow">WORKSHOP · 절임 항아리</span><h3>가공 공방</h3></div><span className="plot-count">항아리 {workshop.slots}개</span></div>
-            <p className="hint">창고 작물을 담가 비싼 가공품으로 만들어요. <b>여러 작물을 섞을수록 배율이 높아요</b>(단일 ×1.25 → 4종 ×1.9). 가공품은 시세·포화와 상관없는 고정가예요. 잠금·주문 예약분은 쓰지 않아요.</p>
-            <div className="jar-row">{Array.from({ length: workshop.slots }).map((_, i) => { const job = workshop.jobs[i], recipe = job && RECIPES.find(r => r.id === job.recipeId);
-              if (!job || !recipe) return <div key={i} className="jar empty"><span>🏺</span><small>비어 있어요</small></div>;
-              const left = Math.max(0, Math.ceil((job.doneAt - nowMs) / 1000)), total = recipe.minutes * 60, done = left <= 0;
-              return <div key={i} className={`jar ${done ? "done" : ""}`}><span>{recipe.icon}</span><b>{recipe.name}</b>{done ? <button onClick={() => collectJob(i)}>꺼내기 ✨</button> : <><span className="jar-bar"><i style={{ width: `${(1 - left / total) * 100}%` }} /></span><small>{formatClock(left)} 남음</small></>}</div>; })}
-              {workshop.slots < WORKSHOP_MAX_SLOTS && <button className="jar add" onClick={buyWorkshopSlot}><span>＋</span><small>항아리 추가<br />{workshopSlotPrice(workshop.slots).toLocaleString()}원</small></button>}</div>
-            <div className="recipe-list">{RECIPES.map(recipe => { const ok = recipe.inputs.every(input => usableOf(input.cropId) >= input.count), price = goodsPrice(recipe), raw = rawValue(recipe);
-              return <div key={recipe.id} className={`recipe ${ok ? "ready" : ""} ${recipe.inputs.length > 1 ? "mix" : ""}`}>
-                <div className="recipe-head"><span className="recipe-icon">{recipe.icon}</span><span><b>{recipe.name}</b><small>⏱ {recipe.minutes}분 · 💰 {price.toLocaleString()}원 <em>(재료 기준가 {raw.toLocaleString()}원보다 +{Math.round((price / raw - 1) * 100)}%)</em></small></span></div>
-                <ul className="recipe-inputs">{recipe.inputs.map(input => { const crop = CROPS.find(c => c.id === input.cropId)!, have = usableOf(input.cropId);
-                  return <li key={input.cropId} className={have >= input.count ? "ok" : ""}>{crop.icon} {crop.name} <b>{Math.min(have, input.count)}/{input.count}</b><small>{crop.seasons.join("·")}</small></li>; })}</ul>
-                <button onClick={() => startRecipe(recipe)} disabled={!ok || workshop.jobs.length >= workshop.slots}>{workshop.jobs.length >= workshop.slots ? "항아리 가득" : ok ? "🏺 담그기" : "재료 모으는 중"}</button>
-              </div>; })}</div>
-            <div className="goods-list"><b className="tool-shop-sub">🎁 만든 가공품</b>{Object.keys(goods).filter(id => goods[id] > 0).length === 0 ? <p className="empty">아직 만든 가공품이 없어요.</p> : RECIPES.filter(recipe => (goods[recipe.id] ?? 0) > 0).map(recipe => <div key={recipe.id} className="goods-item"><span>{recipe.icon}</span><b>{recipe.name} ×{goods[recipe.id]}</b><small>개당 {goodsPrice(recipe).toLocaleString()}원</small><button onClick={() => sellGoods(recipe, 1)}>1개</button><button className="all" onClick={() => sellGoods(recipe, goods[recipe.id])}>전부 {(goodsPrice(recipe) * goods[recipe.id]).toLocaleString()}원</button></div>)}</div>
-          </div> : null}
+          : null}
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `${fieldPrice(ownedPlots).toLocaleString()}원 · ${ownedPlots}/${MAX_PLOTS}칸`}</small><span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span></div><button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>구매</button></div>
           <div className="tool-shop">
             <div className="tool-shop-tabs" role="tablist" aria-label="도구 상점">{([["seed", "🌱 심기"], ["hand", "🧺 수확"], ["water", "🚿 물"], ["fert", "🌿 거름"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={toolShop === id} className={toolShop === id ? "on" : ""} onClick={() => setToolShop(id)}>{label}</button>)}</div>
@@ -2429,9 +2413,31 @@ export default function Home() {
             </article>; })}</div>}
         </section>; })()}
 
+      {tab === "workshop" && <section className="panel workshop-panel">
+        <div className="panel-heading"><div><span className="eyebrow">WORKSHOP</span><h3>🏭 공방</h3></div>
+          <div className="shop-tabs" role="tablist">{([["life", "🏺 생활 가공"], ...(RAID_ENABLED ? [["raid", "⚒️ 강화 가공"]] as const : [])] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={workshopView === id} className={workshopView === id ? "active" : ""} onClick={() => setWorkshopView(id)}>{label}</button>)}</div></div>
+        {workshopView === "raid" && RAID_ENABLED ? <RaidCraftView forge={forge} onForge={() => switchTab("raid")} /> : <div className="workshop-view">
+            <div className="panel-heading"><div><span className="eyebrow">WORKSHOP · 절임 항아리</span><h3>가공 공방</h3></div><span className="plot-count">항아리 {workshop.slots}개</span></div>
+            <p className="hint">창고 작물을 담가 비싼 가공품으로 만들어요. <b>여러 작물을 섞을수록 배율이 높아요</b>(단일 ×1.25 → 4종 ×1.9). 가공품은 시세·포화와 상관없는 고정가예요. 잠금·주문 예약분은 쓰지 않아요.</p>
+            <div className="jar-row">{Array.from({ length: workshop.slots }).map((_, i) => { const job = workshop.jobs[i], recipe = job && RECIPES.find(r => r.id === job.recipeId);
+              if (!job || !recipe) return <div key={i} className="jar empty"><span>🏺</span><small>비어 있어요</small></div>;
+              const left = Math.max(0, Math.ceil((job.doneAt - nowMs) / 1000)), total = recipe.minutes * 60, done = left <= 0;
+              return <div key={i} className={`jar ${done ? "done" : ""}`}><span>{recipe.icon}</span><b>{recipe.name}</b>{done ? <button onClick={() => collectJob(i)}>꺼내기 ✨</button> : <><span className="jar-bar"><i style={{ width: `${(1 - left / total) * 100}%` }} /></span><small>{formatClock(left)} 남음</small></>}</div>; })}
+              {workshop.slots < WORKSHOP_MAX_SLOTS && <button className="jar add" onClick={buyWorkshopSlot}><span>＋</span><small>항아리 추가<br />{workshopSlotPrice(workshop.slots).toLocaleString()}원</small></button>}</div>
+            <div className="recipe-list">{RECIPES.map(recipe => { const ok = recipe.inputs.every(input => usableOf(input.cropId) >= input.count), price = goodsPrice(recipe), raw = rawValue(recipe);
+              return <div key={recipe.id} className={`recipe ${ok ? "ready" : ""} ${recipe.inputs.length > 1 ? "mix" : ""}`}>
+                <div className="recipe-head"><span className="recipe-icon">{recipe.icon}</span><span><b>{recipe.name}</b><small>⏱ {recipe.minutes}분 · 💰 {price.toLocaleString()}원 <em>(재료 기준가 {raw.toLocaleString()}원보다 +{Math.round((price / raw - 1) * 100)}%)</em></small></span></div>
+                <ul className="recipe-inputs">{recipe.inputs.map(input => { const crop = CROPS.find(c => c.id === input.cropId)!, have = usableOf(input.cropId);
+                  return <li key={input.cropId} className={have >= input.count ? "ok" : ""}>{crop.icon} {crop.name} <b>{Math.min(have, input.count)}/{input.count}</b><small>{crop.seasons.join("·")}</small></li>; })}</ul>
+                <button onClick={() => startRecipe(recipe)} disabled={!ok || workshop.jobs.length >= workshop.slots}>{workshop.jobs.length >= workshop.slots ? "항아리 가득" : ok ? "🏺 담그기" : "재료 모으는 중"}</button>
+              </div>; })}</div>
+            <div className="goods-list"><b className="tool-shop-sub">🎁 만든 가공품</b>{Object.keys(goods).filter(id => goods[id] > 0).length === 0 ? <p className="empty">아직 만든 가공품이 없어요.</p> : RECIPES.filter(recipe => (goods[recipe.id] ?? 0) > 0).map(recipe => <div key={recipe.id} className="goods-item"><span>{recipe.icon}</span><b>{recipe.name} ×{goods[recipe.id]}</b><small>개당 {goodsPrice(recipe).toLocaleString()}원</small><button onClick={() => sellGoods(recipe, 1)}>1개</button><button className="all" onClick={() => sellGoods(recipe, goods[recipe.id])}>전부 {(goodsPrice(recipe) * goods[recipe.id]).toLocaleString()}원</button></div>)}</div>
+          </div>}
+      </section>}
+
       {RAID_ENABLED && tab === "raid" && <section className="panel raid-panel">
         <div className="panel-heading"><div><span className="eyebrow">TOWER RAID · 로컬 테스트</span><h3>월루탑 토벌</h3></div><span className="plot-count">최고 {raid.highestFloor}층 · 1~{RAID_MAX_FLOOR}층 개방</span></div>
-        <RaidPanel raid={raid} dishStock={dishStock} raidItems={raidItems} hold={bossMode || tab !== "raid"} avatar={avatar} forge={forge} onResult={applyRaidResult} onOpenGear={() => switchTab("equipment")} />
+        <RaidPanel raid={raid} dishStock={dishStock} raidItems={raidItems} hold={bossMode || tab !== "raid"} avatar={avatar} forge={forge} onResult={applyRaidResult} onOpenGear={() => switchTab("equipment")} onOpenWorkshop={() => { setWorkshopView("raid"); switchTab("workshop"); }} />
       </section>}
 
       {HUNT_ENABLED && tab === "hunt" && <div className="game-grid">
@@ -2441,7 +2447,7 @@ export default function Home() {
           {HUNT_TEST_UNLOCK_ALL && <p className="hint test-flag">🧪 로컬 테스트: 무기가 모두 열려 있어요(HUNT_TEST_UNLOCK_ALL).</p>}
           {huntTicket <= nowMs ? <div className="hunt-gate"><p>사냥터는 <b>입장권 {HUNT_TICKET_PRICE.toLocaleString()}원</b>을 내고 <b>{HUNT_TICKET_MINUTES}분</b> 동안 이용해요.{TEST_MODE ? " (테스트 모드: 무료)" : ""}</p><button className="save-button" onClick={buyHuntTicket} disabled={!TEST_MODE && money < HUNT_TICKET_PRICE}>🎫 입장하기 ({TEST_MODE ? "무료" : `${HUNT_TICKET_PRICE.toLocaleString()}원`})</button></div> :
           <HuntingGround effectId={equipment.hunt} weapon={WEAPONS.find(item => item.id === weaponId) ?? WEAPONS[0]} paused={bossMode || tab !== "hunt" || huntTicket <= nowMs} petCatch={pets.has("dog") ? PET_BASE.dogCatch : pets.has("cat") ? PET_BASE.catCatch : 0} petName={pets.has("dog") ? "강아지" : "고양이"} lootName={id => { const loot = ALL_LOOT.find(item => item.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }}
-            onLoot={(loot, outcome, animal) => { setLifeMastery(m => { const old = m.hunt[animal.id] ?? { caught: 0, great: 0, escaped: 0 }; return { ...m, hunt: { ...m.hunt, [animal.id]: { caught: old.caught + (outcome === "escape" ? 0 : 1), great: old.great + (outcome === "great" ? 1 : 0), escaped: old.escaped + (outcome === "escape" ? 1 : 0) } } }; }); if (!Object.keys(loot).length) return; setHuntStock(stock => { const next = { ...stock }; Object.entries(loot).forEach(([id, n]) => { next[id] = (next[id] ?? 0) + n; }); return next; }); playCoinSound([660, 990]); }} />}
+            onLoot={loot => { if (!Object.keys(loot).length) return; setHuntStock(stock => { const next = { ...stock }; Object.entries(loot).forEach(([id, n]) => { next[id] = (next[id] ?? 0) + n; }); return next; }); playCoinSound([660, 990]); }} />}
         </section>
         <aside className="panel hunt-bag">
           <div className="panel-heading"><div><span className="eyebrow">LOOT</span><h3>사냥 소재</h3></div></div>

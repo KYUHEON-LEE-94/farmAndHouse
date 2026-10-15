@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DISHES, DISH_GRADES } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, masteryDone, weaponStats, type ArmorSlot, type Evolution, type MasteryLine, type RaidSave } from "./data";
+import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -18,15 +18,15 @@ export type ForgeActions = {
   /** 재료 보유량(탑 재료 · 생활 재료 · 사냥 소재 · 특수 키 rare-hunt/goods/good-crop). */
   have: Record<string, number>; money: number;
   /** 생활 재료 만들 때 실제로 쓰일 재료 목록(모자라면 null). */
-  lifePlan: (id: string) => string[] | null;
-  craftLife: (id: string) => void;
+  lifePlan: (id: string, n?: number) => string[] | null;
+  craftLife: (id: string, n?: number) => void;
+  /** 지금 재료로 만들 수 있는 최대 개수 */
+  lifeMax: (id: string) => number;
   enhance: (useStabilizer: boolean) => void;
   openStep: () => void;
   evolve: (evolution: Evolution) => void;
   craftArmor: (id: string) => void;
   equip: (slot: ArmorSlot, id: string | null) => void;
-  /** 생활 숙련(+10 진화 조건) 진행. */
-  mastery: MasteryLine[];
   /** 전투펫 뽑기(생활펫 뽑기와 같은 방식, 1회) — 결과 펫 id 목록. */
   drawPets: (count: number) => string[];
   /** 진화 변경(30,000골드 + 생활 장인의 핵 3, +13 이상은 미궁 호박 2 추가). */
@@ -40,11 +40,13 @@ export type ForgeActions = {
 };
 
 /** 월루탑: 탑(층·음식·입장) · 장비 · 대장간. */
-export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, forge, onResult, onOpenGear }: {
+export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, forge, onResult, onOpenGear, onOpenWorkshop }: {
   raid: RaidSave; dishStock: Record<string, number>; raidItems: Record<string, number>; hold: boolean; avatar: Avatar; forge: ForgeActions;
   onResult: (result: RaidResult, foods: FoodSlot[]) => string[];
   /** 메인 🎒 장비창으로 이동 */
   onOpenGear: () => void;
+  /** 🏭 공방 강화 가공으로 이동 */
+  onOpenWorkshop: () => void;
 }) {
   const [view, setView] = useState<"tower" | "forge">("tower");
   const [floorNo, setFloorNo] = useState(Math.min(raid.unlockedFloor, RAID_MAX_FLOOR));
@@ -153,7 +155,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
       </div>
     </div>}
 
-    {view === "forge" && <>{outcome && outcome.result.floor === 0 && <div className="raid-result clear"><b>{outcome.lines[0]}</b><span>두 진화를 모두 체험해 보고 골라 보세요.</span></div>}<ForgeView raid={raid} forge={forge} onTrain={train} /></>}
+    {view === "forge" && <>{outcome && outcome.result.floor === 0 && <div className="raid-result clear"><b>{outcome.lines[0]}</b><span>두 진화를 모두 체험해 보고 골라 보세요.</span></div>}<ForgeView raid={raid} forge={forge} onTrain={train} onOpenWorkshop={onOpenWorkshop} /></>}
   </div>;
 }
 
@@ -224,7 +226,7 @@ function PetView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
 }
 
 // ---------- 대장간 ----------
-function ForgeView({ raid, forge, onTrain }: { raid: RaidSave; forge: ForgeActions; onTrain: (evolution: Evolution) => void }) {
+function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; forge: ForgeActions; onTrain: (evolution: Evolution) => void; onOpenWorkshop: () => void }) {
   const [useStab, setUseStab] = useState(false);
   const weaponId = raid.equipped.weapon, wDef = weaponDef(weaponId), w = raid.weapons[weaponId] ?? { enhancement: 0, evolution: null, unlockedEnhancements: [] }, step = nextStep(w.enhancement);
   const needsOpen = !!step?.open && !w.unlockedEnhancements.includes(step.to);
@@ -243,8 +245,7 @@ function ForgeView({ raid, forge, onTrain }: { raid: RaidSave; forge: ForgeActio
         <span>간격<b>{stats.interval}초</b>{next && !needEvolution && step!.to <= 10 && <i>→ {next.interval}초</i>}</span>
       </div>
       {needEvolution ? <div className="raid-evolve"><b>⚡ +10 진화 방향을 고르세요 (첫 선택 무료)</b>
-        {!masteryDone(forge.mastery) && <small className="raid-evolve-lock">{TEST_MODE ? "🧪 테스트 모드라 생활 숙련 조건 없이 고를 수 있어요." : "🔒 아래 생활 숙련 조건을 모두 채우면 진화할 수 있어요."}</small>}
-        <div>{wDef.evos.map(e => e.id).map(id => <div key={id} className="raid-evo-card"><button disabled={!TEST_MODE && !masteryDone(forge.mastery)} onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small></button><button className="raid-try" onClick={() => onTrain(id)}>🎯 {TRAINING_SECONDS}초 체험</button></div>)}</div></div>
+        <div>{wDef.evos.map(e => e.id).map(id => <div key={id} className="raid-evo-card"><button onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small></button><button className="raid-try" onClick={() => onTrain(id)}>🎯 {TRAINING_SECONDS}초 체험</button></div>)}</div></div>
         : !step ? <p className="raid-max">최대 강화(+15)에 도달했어요!</p>
         : <>
           <div className="raid-odds">
@@ -252,7 +253,7 @@ function ForgeView({ raid, forge, onTrain }: { raid: RaidSave; forge: ForgeActio
             <span>실패 후 하락<b>{pct(step.drop)}</b></span><span>이번 시도 실제 하락<b className="bad">{pct(realDropChance(step))}</b></span>
           </div>
           {needsOpen && <p className="raid-open-note">🔓 +{step.to} 단계는 처음 한 번 <b>개방</b>해야 해요(보스 재료). 개방한 뒤에는 실패·하락해도 다시 내지 않아요.</p>}
-          <div className="raid-cost big"><em className={forge.money >= cost!.gold ? "ok" : "lack"}>💰 {cost!.gold.toLocaleString()}원</em>{Object.entries(cost!.need).map(([id, n]) => <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</div>
+          <div className="raid-cost big"><em className={forge.money >= cost!.gold ? "ok" : "lack"}>💰 {cost!.gold.toLocaleString()}원</em>{Object.entries(cost!.need).map(([id, n]) => LIFE_MATS[id] && (forge.have[id] ?? 0) < n ? <button key={id} className="raid-cost-link" onClick={onOpenWorkshop} title="공방에서 만들기">{nameOf(id)} {forge.have[id] ?? 0}/{n} ↗</button> : <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</div>
           {!needsOpen && step.drop > 0 && <label className="raid-stab"><input type="checkbox" checked={useStab} onChange={event => setUseStab(event.target.checked)} disabled={raid.stabilizers < 1} /> 🪨 안정화석 사용 (실제로 하락할 때만 1개 소모 · 보유 {raid.stabilizers})</label>}
           <button className="raid-hammer" disabled={!affordable} onClick={() => (needsOpen ? forge.openStep() : forge.enhance(useStab))}>{needsOpen ? `🔓 +${step.to} 단계 개방` : `🔨 +${step.to} 강화하기`}</button>
           {w.enhancement >= 10 && <small className="raid-floor-note">+10에 한 번 도달하면 +9 아래로는 내려가지 않아요.</small>}
@@ -264,13 +265,8 @@ function ForgeView({ raid, forge, onTrain }: { raid: RaidSave; forge: ForgeActio
       </div>}
     </div>
 
-    <div className="raid-mastery"><b>📜 생활 숙련 <small>+10 진화 조건 · {forge.mastery.filter(l => l.cur >= l.need).length}/{forge.mastery.length}</small></b>
-      <ul>{forge.mastery.map(l => <li key={l.label} className={l.cur >= l.need ? "done" : ""}><span>{l.icon} {l.group} · {l.label}</span><em>{Math.min(l.cur, l.need)}/{l.need}</em><i style={{ width: `${Math.min(100, (l.cur / l.need) * 100)}%` }} /></li>)}</ul>
-    </div>
-
-    <div className="raid-life"><b>🧺 생활 재료 만들기</b><small>값이 낮은 재료부터, 잠금·주문 예약분은 빼고 써요. 실제로 쓰일 재료를 미리 보여 줘요.</small>
-      {Object.entries(LIFE_MATS).map(([id, m]) => { const plan = forge.lifePlan(id);
-        return <div key={id} className="raid-life-row"><span className="raid-armor-icon">{m.icon}</span><div><b>{m.name} <small>보유 {forge.have[id] ?? 0}</small></b><span>{m.recipe}</span>{plan ? <span className="raid-plan">쓰일 재료: {plan.join(", ")}</span> : <span className="raid-plan lack">재료가 부족해요</span>}</div><button disabled={!plan} onClick={() => forge.craftLife(id)}>만들기</button></div>; })}
+    <div className="raid-life"><b>🧺 강화 소재</b><small>강화 소재는 🏭 공방의 ⚒️ 강화 가공에서 즉시 만들어요.</small>
+      {Object.entries(LIFE_MATS).map(([id, m]) => <div key={id} className="raid-life-row"><span className="raid-armor-icon">{m.icon}</span><div><b>{m.name} <small>보유 {forge.have[id] ?? 0}</small></b><span>{m.recipe}</span></div><button onClick={onOpenWorkshop}>공방에서 만들기</button></div>)}
     </div>
 
     <details className="raid-table"><summary>강화표 전체 보기</summary><table><thead><tr><th>목표</th><th>성공</th><th>하락</th><th>골드</th><th>재료</th></tr></thead><tbody>
@@ -290,3 +286,21 @@ function nameOf(id: string) {
   const item = ALL_RAID_ITEMS[id] ?? HUNT_NAMES[id];
   return item ? `${item.icon} ${item.name}` : id;
 }
+
+// ---------- 공방: 강화 가공(51.4) ----------
+/** 강화 소재 즉시 제작: 1·5·10·최대, 실제로 쓰일 재료를 보여 주고 누르는 즉시 완성. */
+export function RaidCraftView({ forge, onForge }: { forge: ForgeActions; onForge: () => void }) {
+  const [qty, setQty] = useState<Record<string, number>>({});
+  return <div className="raid-craft">
+    <p className="hint">⚒️ <b>즉시 완성</b> — 누르는 즉시 재료를 쓰고 강화 소재가 통합 창고에 들어가요. 잠금·주문 예약분, 황금 농산물, 전설·신화 물고기, 희귀 사냥 소재는 쓰지 않고 값이 낮은 재료부터 써요. 강화 소재는 팔 수 없어요. <button className="raid-gear-link" onClick={onForge}>⚒️ 대장간으로</button></p>
+    {Object.entries(LIFE_MATS).map(([id, m]) => { const max = forge.lifeMax(id), want = Math.max(1, Math.min(qty[id] ?? 1, Math.max(1, max))), plan = forge.lifePlan(id, want);
+      return <div key={id} className="raid-craft-row">
+        <span className="raid-armor-icon">{m.icon}</span>
+        <div><b>{m.name} <small>보유 {forge.have[id] ?? 0} · 지금 최대 {max}개</small></b><span>{m.recipe}</span>
+          {plan ? <span className="raid-plan">{want}개에 쓰일 재료: {plan.join(", ")}</span> : <span className="raid-plan lack">재료가 부족해요</span>}</div>
+        <div className="raid-craft-qty">{[1, 5, 10].map(n => <button key={n} className={want === n ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: n }))} disabled={max < n}>{n}개</button>)}<button className={want === max && max > 10 ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: max }))} disabled={max < 1}>최대</button>
+          <button className="make" disabled={!plan} onClick={() => forge.craftLife(id, want)}>즉시 완성 ×{want}</button></div>
+      </div>; })}
+  </div>;
+}
+

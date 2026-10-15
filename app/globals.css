@@ -1051,3 +1051,16 @@ button { color:inherit; }
 .equipment-raid{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line);display:grid;gap:10px}
 .raid-gear-link{border:1px solid var(--line);border-radius:10px;padding:7px 12px;background:#fff;font:700 12px "Gowun Dodum";cursor:pointer;color:#5a4a2a}
 .raid-gear-link:hover{background:#fff6dc}
+
+/* 공방 */
+.workshop-panel{grid-column:1/-1}
+.side-workshop-link{border:0;background:transparent;font:inherit;cursor:pointer;padding:6px 10px;border-radius:999px;color:#5a4a2a}
+.side-workshop-link:hover{background:#fff6dc}
+.raid-craft{display:grid;gap:8px}
+.raid-craft-row{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#fffaf0;border:1px solid var(--line)}
+.raid-craft-row b{display:block;font-size:14px}.raid-craft-row b small{font-weight:400;color:#7a7060;font-size:11px}.raid-craft-row span{display:block;font-size:12px;color:#5a5244}
+.raid-craft-qty{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:260px}
+.raid-craft-qty button{border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:#fff;font:700 11.5px "Gowun Dodum";cursor:pointer}
+.raid-craft-qty button.on{background:#2c2418;color:#ffe19a;border-color:#2c2418}.raid-craft-qty button:disabled{opacity:.4;cursor:default}
+.raid-craft-qty button.make{background:#e8a530;border-color:#e8a530;color:#2c1a08;width:100%}
+.raid-cost-link{border:0;border-radius:999px;padding:4px 10px;font-size:12.5px;background:#fbe3dc;color:#a0402a;cursor:pointer;font-family:inherit;text-decoration:underline}

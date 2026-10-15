@@ -238,32 +238,7 @@ export function gearOf(raid: RaidSave) {
 /** 모든 재료 이름(탑·생활·상위). */
 export const ALL_RAID_ITEMS: Record<string, { name: string; icon: string }> = { ...RAID_ITEMS, ...UPPER_ITEMS, ...Object.fromEntries(Object.entries(LIFE_MATS).map(([id, m]) => [id, { name: m.name, icon: m.icon }])) };
 
-// ---------- 생활 숙련(12·30절): +10 진화 전 조건 ----------
-export type LifeMastery = {
-  farmGoodHarvests: number; baitCatches: number;
-  hunt: Record<string, { caught: number; great: number; escaped: number }>;
-  cooking: Record<string, { completed: number; bestGrade: number }>;
-};
-export const EMPTY_MASTERY: LifeMastery = { farmGoodHarvests: 0, baitCatches: 0, hunt: {}, cooking: {} };
-export type MasteryLine = { group: string; icon: string; label: string; cur: number; need: number };
-/** 작물·물고기는 기존 도감 기록(cropLog·fishLog)을 쓰고, 나머지는 LifeMastery 카운터를 쓴다. */
-export function masteryLines(cropLog: Record<string, { n: number }>, fishLog: Record<string, number>, m: LifeMastery): MasteryLine[] {
-  const crops = Object.values(cropLog), fishes = Object.entries(fishLog).filter(([, n]) => n > 0), hunts = Object.values(m.hunt), cooks = Object.values(m.cooking);
-  return [
-    { group: "농사", icon: "🌱", label: "서로 다른 작물", cur: crops.filter(c => c.n > 0).length, need: 3 },
-    { group: "농사", icon: "🌱", label: "총 수확", cur: crops.reduce((sum, c) => sum + c.n, 0), need: 30 },
-    { group: "농사", icon: "🌱", label: "좋은 품질 이상 수확", cur: m.farmGoodHarvests, need: 5 },
-    { group: "낚시", icon: "🎣", label: "서로 다른 물고기", cur: fishes.length, need: 3 },
-    { group: "낚시", icon: "🎣", label: "총 포획", cur: fishes.reduce((sum, [, n]) => sum + n, 0), need: 10 },
-    { group: "낚시", icon: "🎣", label: "미끼 쓴 낚시 성공", cur: m.baitCatches, need: 5 },
-    { group: "사냥", icon: "🏹", label: "서로 다른 동물", cur: hunts.filter(h => h.caught > 0).length, need: 3 },
-    { group: "사냥", icon: "🏹", label: "총 사냥", cur: hunts.reduce((sum, h) => sum + h.caught, 0), need: 10 },
-    { group: "사냥", icon: "🏹", label: "대성공", cur: hunts.reduce((sum, h) => sum + h.great, 0), need: 2 },
-    { group: "주방", icon: "🍳", label: "서로 다른 요리", cur: cooks.filter(c => c.completed > 0).length, need: 3 },
-    { group: "주방", icon: "🍳", label: "총 요리 완성", cur: cooks.reduce((sum, c) => sum + c.completed, 0), need: 5 },
-  ];
-}
-export const masteryDone = (lines: MasteryLine[]) => lines.every(l => l.cur >= l.need);
+// 생활 숙련(+10 진화 조건)은 51.7절에 따라 제거했다. 예전 저장의 lifeMastery는 무시한다.
 
 // ---------- 전투펫(31·40절, 2026-10-15 사용자 결정으로 뽑기 방식 변경) ----------
 /** 등급: 보통 · 희귀 · 전설. 뽑기는 생활펫 뽑기와 같은 확률·방식(1회 GACHA_PRICE원, 전설 0.1% · 희귀 10% · 보통 나머지). */
