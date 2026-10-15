@@ -164,8 +164,8 @@ export const zoneCommon = (floor: number) => (floor <= 5 ? "pollen-clump" : "can
 
 // ---------- 생활 재료(27절) ----------
 export const LIFE_MATS: Record<string, { name: string; icon: string; recipe: string }> = {
-  "farm-fiber": { name: "튼튼한 농업 섬유", icon: "🧵", recipe: "일반 품질 농산물 아무 종류 5개" },
-  "fish-oil": { name: "정제 물고기 기름", icon: "🫗", recipe: "전설이 아닌 물고기 아무 종류 3마리" },
+  "farm-fiber": { name: "튼튼한 농업 섬유", icon: "🧵", recipe: "보통 품질(★ 없음)·황금 아닌 농산물 아무 종류 5개" },
+  "fish-oil": { name: "정제 물고기 기름", icon: "🫗", recipe: "전설·신화가 아닌 물고기 아무 종류 3마리" },
   "tanned-leather": { name: "무두질 가죽", icon: "🟫", recipe: "일반 사냥 소재 3개(희귀 소재 제외)" },
   "artisan-core": { name: "생활 장인의 핵", icon: "💠", recipe: "농업 섬유 1 · 물고기 기름 1 · 무두질 가죽 1 · 가공품 아무 종류 1" },
 };

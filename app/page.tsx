@@ -2033,11 +2033,20 @@ export default function Home() {
     if (plan.gold) setMoney(value => value - plan.gold);
   }
   const forgeHave: Record<string, number> = { ...huntStock, ...raidItems };
+  /** 강화 가공 재료 현황: [쓸 수 있는 수, 가진 수(잠금·주문 예약 포함)] */
+  const craftStock: Record<string, [number, number]> = (() => {
+    const src = forgeSources(), sum = (tag: string) => src.filter(x => x.tag === tag).reduce((total, x) => total + x.n, 0);
+    let crop0 = 0, fish = 0;
+    for (const [key, n] of Object.entries(produce)) { const q = parseProduceKey(key); if (q.quality === 0 && !q.golden) crop0 += n; }
+    for (const [id, n] of Object.entries(fishStock)) { const f = ALL_FISH.find(x => x.id === id); if (f && f.rarity !== "전설" && f.rarity !== "신화") fish += n; }
+    const hunt = HUNT_COMMON_LOOT.reduce((total, id) => total + (huntStock[id] ?? 0), 0);
+    return { "farm-fiber": [sum("crop0"), crop0], "fish-oil": [sum("fish"), fish], "tanned-leather": [sum("hunt"), hunt], "artisan-core": [sum("goods"), Object.values(goods).reduce((t, n) => t + n, 0)] };
+  })();
   { const src = forgeSources(); forgeHave["rare-hunt"] = src.filter(x => x.tag === "rarehunt").reduce((sum, x) => sum + x.n, 0); forgeHave.goods = src.filter(x => x.tag === "goods").reduce((sum, x) => sum + x.n, 0); forgeHave["good-crop"] = src.filter(x => x.tag === "goodcrop").reduce((sum, x) => sum + x.n, 0); }
   const forge: ForgeActions = {
     have: forgeHave, money,
     lifePlan: (id, n = 1) => { const plan = LIFE_NEED[id]?.(n); return plan ? describePlan(plan) : null; },
-    lifeMax,
+    lifeMax, craftStock,
     craftLife: (id, n = 1) => {
       const plan = LIFE_NEED[id]?.(n); if (!plan) return setNotice("재료가 부족해요.");
       spendPlan(plan); setRaidItems(view => ({ ...view, [id]: (view[id] ?? 0) + n }));

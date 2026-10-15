@@ -22,6 +22,8 @@ export type ForgeActions = {
   craftLife: (id: string, n?: number) => void;
   /** 지금 재료로 만들 수 있는 최대 개수 */
   lifeMax: (id: string) => number;
+  /** 강화 가공 재료 현황: [쓸 수 있는 수, 가진 수(잠금·주문 예약 포함)] */
+  craftStock: Record<string, [number, number]>;
   enhance: (useStabilizer: boolean) => void;
   openStep: () => void;
   evolve: (evolution: Evolution) => void;
@@ -297,6 +299,8 @@ export function RaidCraftView({ forge, onForge }: { forge: ForgeActions; onForge
       return <div key={id} className="raid-craft-row">
         <span className="raid-armor-icon">{m.icon}</span>
         <div><b>{m.name} <small>보유 {forge.have[id] ?? 0} · 지금 최대 {max}개</small></b><span>{m.recipe}</span>
+          {(() => { const [use, all] = forge.craftStock[id] ?? [0, 0], per = { "farm-fiber": 5, "fish-oil": 3, "tanned-leather": 3, "artisan-core": 1 }[id] ?? 1, label = { "farm-fiber": "보통 품질 농산물", "fish-oil": "물고기", "tanned-leather": "일반 사냥 소재", "artisan-core": "가공품" }[id];
+            return <span className="raid-stock">{label} 쓸 수 있는 것 <b>{use}</b>개 / 1개 만들 때 {per}개 필요{all > use ? ` · 잠금·주문 예약으로 ${all - use}개 제외` : ""}</span>; })()}
           {plan ? <span className="raid-plan">{want}개에 쓰일 재료: {plan.join(", ")}</span> : <span className="raid-plan lack">재료가 부족해요</span>}</div>
         <div className="raid-craft-qty">{[1, 5, 10].map(n => <button key={n} className={want === n ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: n }))} disabled={max < n}>{n}개</button>)}<button className={want === max && max > 10 ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: max }))} disabled={max < 1}>최대</button>
           <button className="make" disabled={!plan} onClick={() => forge.craftLife(id, want)}>즉시 완성 ×{want}</button></div>
