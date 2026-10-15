@@ -43,6 +43,11 @@ export const FISH: Fish[] = [
   { id: "mandarinfish", name: "쏘가리", icon: "🐠", season: "봄", rarity: "희귀", price: 220, note: "맑은 여울의 귀한 손님." },
   { id: "lenok", name: "열목어", icon: "🐠", season: "봄", rarity: "희귀", price: 260, note: "차고 깨끗한 물에만 사는 천연기념물." },
   { id: "legend-spring", name: "벚꽃 잉어왕", icon: "🌸", season: "봄", rarity: "전설", price: 30000, note: "벚꽃잎이 비늘이 되었다는 연못의 주인." },
+  { id: "rose-bitterling", name: "각시붕어", icon: "🐟", season: "봄", rarity: "흔함", price: 35, note: "봄빛 무지갯빛 혼인색이 고와요." },
+  { id: "chamaja", name: "버들붕어", icon: "🐠", season: "봄", rarity: "보통", price: 85, note: "지느러미가 화려한 논두렁의 투사." },
+  { id: "kkeokjeogi", name: "꺽저기", icon: "🐠", season: "봄", rarity: "희귀", price: 250, note: "남쪽 맑은 하천에만 사는 귀한 손님." },
+  { id: "miyugi", name: "미유기", icon: "🐡", season: "봄", rarity: "희귀", price: 260, note: "계곡 바위 밑에 숨어 사는 작은 메기." },
+  { id: "legend-spring-2", name: "황금 쏘가리 대왕", icon: "👑", season: "봄", rarity: "전설", price: 30000, note: "봄 여울을 다스린다는 금빛 비늘의 왕." },
   { id: "sweetfish", name: "은어", icon: "🐟", season: "여름", rarity: "흔함", price: 45, note: "수박 향이 나는 여름 물고기." },
   { id: "darkchub", name: "갈겨니", icon: "🐟", season: "여름", rarity: "흔함", price: 35, note: "여울에서 반짝이며 뛰어올라요." },
   { id: "gudgeon", name: "모래무지", icon: "🐟", season: "여름", rarity: "흔함", price: 40, note: "모래 속에 몸을 숨겨요." },
@@ -52,6 +57,11 @@ export const FISH: Fish[] = [
   { id: "eel", name: "민물장어", icon: "🐍", season: "여름", rarity: "희귀", price: 260, note: "여름 보양식의 대명사." },
   { id: "snakehead", name: "가물치", icon: "🐊", season: "여름", rarity: "희귀", price: 240, note: "연못의 무법자." },
   { id: "legend-summer", name: "천둥 메기", icon: "⚡", season: "여름", rarity: "전설", price: 30000, note: "천둥이 칠 때만 수면에 오른다는 거대 메기." },
+  { id: "julmolgae", name: "줄몰개", icon: "🐟", season: "여름", rarity: "흔함", price: 35, note: "옆구리에 검은 줄무늬가 선명해요." },
+  { id: "mitten-crab", name: "참게", icon: "🦀", season: "여름", rarity: "보통", price: 95, note: "털 난 집게발로 낚싯줄을 꽉 붙잡아요." },
+  { id: "softshell-turtle", name: "자라", icon: "🐢", season: "여름", rarity: "희귀", price: 300, note: "한번 물면 천둥이 쳐야 놓는대요." },
+  { id: "river-puffer", name: "황복", icon: "🐡", season: "여름", rarity: "희귀", price: 320, note: "봄여름 강을 거슬러 오르는 귀한 복어." },
+  { id: "legend-summer-2", name: "반딧불 은장어", icon: "🌟", season: "여름", rarity: "전설", price: 30000, note: "여름밤 반딧불이 모여 빛나는 장어가 되었대요." },
   { id: "dace", name: "황어", icon: "🐟", season: "가을", rarity: "흔함", price: 40, note: "가을 물살을 거슬러 올라요." },
   { id: "bitterling", name: "납자루", icon: "🐟", season: "가을", rarity: "흔함", price: 30, note: "조개 속에 알을 낳는 작은 물고기." },
   { id: "pondsmelt", name: "참붕어", icon: "🐟", season: "가을", rarity: "흔함", price: 35, note: "저수지 어디에나 있어요." },
@@ -61,6 +71,11 @@ export const FISH: Fish[] = [
   { id: "salmon", name: "연어", icon: "🍣", season: "가을", rarity: "희귀", price: 280, note: "고향 강으로 돌아온 연어." },
   { id: "geumgang", name: "금강모치", icon: "🐠", season: "가을", rarity: "희귀", price: 250, note: "깊은 산골 계곡에서만 만나요." },
   { id: "legend-autumn", name: "황금 연어", icon: "🏆", season: "가을", rarity: "전설", price: 30000, note: "단풍빛 비늘을 두른 전설 속 연어." },
+  { id: "dolgogi", name: "긴몰개", icon: "🐟", season: "가을", rarity: "흔함", price: 35, note: "가늘고 긴 몸으로 물풀 사이를 누벼요." },
+  { id: "stickleback", name: "가시고기", icon: "🐟", season: "가을", rarity: "보통", price: 80, note: "아빠 물고기가 알을 지키는 걸로 유명해요." },
+  { id: "kkochi-bagrid", name: "꼬치동자개", icon: "🐡", season: "가을", rarity: "희귀", price: 280, note: "깨끗한 여울에만 남은 멸종위기 물고기." },
+  { id: "white-sand-gudgeon", name: "흰수마자", icon: "🐠", season: "가을", rarity: "희귀", price: 300, note: "고운 모래 바닥에서만 사는 수줍은 물고기." },
+  { id: "legend-autumn-2", name: "천년 자라 대왕", icon: "🐢", season: "가을", rarity: "전설", price: 30000, note: "등딱지에 단풍잎 무늬가 새겨진 천 년 묵은 자라." },
   { id: "smelt", name: "빙어", icon: "🐟", season: "겨울", rarity: "흔함", price: 30, note: "얼음 구멍 낚시의 단골." },
   { id: "loach", name: "미꾸라지", icon: "🐟", season: "겨울", rarity: "흔함", price: 35, note: "진흙 속에서 겨울잠을 자다 깼어요." },
   { id: "sleeper", name: "동사리", icon: "🐟", season: "겨울", rarity: "흔함", price: 40, note: "돌 밑에 꼼짝 않고 숨어 있어요." },
@@ -70,6 +85,11 @@ export const FISH: Fish[] = [
   { id: "masu", name: "산천어", icon: "🐠", season: "겨울", rarity: "희귀", price: 240, note: "계곡 얼음 밑의 보석." },
   { id: "golden-mandarin", name: "황쏘가리", icon: "🐠", season: "겨울", rarity: "희귀", price: 300, note: "온몸이 금빛인 천연기념물." },
   { id: "legend-winter", name: "얼음 용왕 철갑상어", icon: "🐉", season: "겨울", rarity: "전설", price: 30000, note: "언 강 깊은 곳에서 백 년을 산 수호자." },
+  { id: "chamjonggae", name: "참종개", icon: "🐟", season: "겨울", rarity: "흔함", price: 35, note: "모래 속에 숨어 겨울을 나요." },
+  { id: "dolly-varden", name: "곤들매기", icon: "🐠", season: "겨울", rarity: "보통", price: 95, note: "차가운 산골 호수의 붉은 점박이." },
+  { id: "lamprey", name: "칠성장어", icon: "🐍", season: "겨울", rarity: "희귀", price: 280, note: "몸에 일곱 개의 구멍이 별처럼 박혀 있어요." },
+  { id: "yeonjunmochi", name: "연준모치", icon: "🐠", season: "겨울", rarity: "희귀", price: 290, note: "얼음장 같은 계곡 상류에만 살아요." },
+  { id: "legend-winter-2", name: "설산 백룡어", icon: "❄️", season: "겨울", rarity: "전설", price: 30000, note: "눈보라 치는 밤에만 얼음 아래서 빛난다는 흰 용 물고기." },
   { id: "stone-moroko", name: "돌고기", icon: "🐟", season: "봄", rarity: "흔함", price: 40, note: "봄 낚시 도감의 새로운 수집 대상이에요." },
   { id: "striped-shiner", name: "줄납자루", icon: "🐟", season: "봄", rarity: "보통", price: 85, note: "봄 낚시 도감의 새로운 수집 대상이에요." },
   { id: "korean-spined-loach", name: "수수미꾸리", icon: "🐟", season: "봄", rarity: "희귀", price: 240, note: "봄 낚시 도감의 새로운 수집 대상이에요." },
@@ -89,7 +109,8 @@ export const FISH: Fish[] = [
 export function rollFish(season: Season, boost: { normal?: number; rare?: number; legend?: number } = {}, random = Math.random): Fish {
   const pool = FISH.filter(fish => fish.season === season);
   if (boost.legend !== 0 && random() < HIDDEN_CHANCE) return HIDDEN_FISH[Math.floor(random() * HIDDEN_FISH.length)];
-  if (boost.legend !== 0 && random() < LEGEND_CHANCE) return pool.find(fish => fish.rarity === "전설")!;
+  // 전설은 계절마다 여러 종: 1% 판정 뒤 그 계절 전설 중 하나를 고른다.
+  if (boost.legend !== 0 && random() < LEGEND_CHANCE) { const legends = pool.filter(fish => fish.rarity === "전설"); return legends[Math.floor(random() * legends.length)]; }
   const multiplier = { 흔함: 1, 보통: boost.normal ?? 1, 희귀: boost.rare ?? 1 };
   const weights = pool.filter(fish => fish.rarity !== "전설" && fish.rarity !== "신화").map(fish => {
     const rarity = fish.rarity as keyof typeof RARITY_WEIGHT;

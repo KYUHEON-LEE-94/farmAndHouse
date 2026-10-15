@@ -8,13 +8,13 @@ async function load(name) {
 }
 const farm = await load('farming'), fish = await load('fishing');
 const seasons = ['봄', '여름', '가을', '겨울'];
-test('catalogs have unique IDs, twelve seasonal fish and exactly one limited crop per season', () => {
+test('catalogs have unique IDs, seventeen seasonal fish and exactly one limited crop per season', () => {
   assert.equal(farm.CROPS.length, 37);
   assert.equal(new Set(farm.CROPS.map(x => x.id)).size, 37);
   assert.equal(new Set(fish.ALL_FISH.map(x => x.id)).size, fish.ALL_FISH.length);
   for (const season of seasons) {
-    assert.equal(fish.FISH.filter(x => x.season === season).length, 12);
-    assert.equal(fish.FISH.filter(x => x.season === season && x.rarity === '전설').length, 1);
+    assert.equal(fish.FISH.filter(x => x.season === season).length, 17);
+    assert.equal(fish.FISH.filter(x => x.season === season && x.rarity === '전설').length, 2);
     const limited = farm.CROPS.filter(x => x.seasons.includes(season) && x.seasonalLimit);
     assert.equal(limited.length, 1); assert.equal(limited[0].seasonalLimit, 30);
   }
@@ -56,6 +56,6 @@ test('every new fish can be rolled; bare-hand mode still excludes rare fish', ()
       caught.add(result.id);
       assert.ok(['흔함', '보통'].includes(fish.rollFish(season, {legend:0, rare:0}, () => (i + .5) / 1000).rarity));
     }
-    assert.equal(caught.size, 11);
+    assert.equal(caught.size, 15);
   }
 });
