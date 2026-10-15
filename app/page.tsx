@@ -420,7 +420,7 @@ export default function Home() {
   const [showAvatar, setShowAvatar] = useState(false);
   const [notice, setNotice] = useState("오늘도 월급은 들어오고, 흙은 정직해요. 씨앗을 심어볼까요?");
   const [musicUrl, setMusicUrl] = useState("");
-  const [musicId, setMusicId] = useState("");
+  const [musicId, setMusicId] = useState("VRfbFDUybRU");
   const [showSettings, setShowSettings] = useState(false);
   const [bossMode, setBossMode] = useState(false);
   const [bossTheme, setBossTheme] = useState<BossMode>("office");
@@ -490,7 +490,7 @@ export default function Home() {
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
         setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [], battlePets: data.raid?.battlePets ?? {}, petPity: data.raid?.petPity ?? 0 });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
-        setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? ""); setCoinHoldings(data.coinHoldings ?? {});
+        setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId || "VRfbFDUybRU"); setCoinHoldings(data.coinHoldings ?? {});
       } catch { /* start fresh */ }
     }
     try { const stored = localStorage.getItem(AVATAR_STORAGE_KEY); if (stored) setAvatar(JSON.parse(stored)); } catch { /* keep default */ }
