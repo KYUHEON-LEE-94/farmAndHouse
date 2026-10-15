@@ -46,7 +46,7 @@ export function HuntingGround({ effectId, weapon, paused, petCatch, petName, loo
     let final = outcome, line = text;
     if (outcome === "escape" && petCatch > 0 && rnd() < petCatch) { final = "success"; line = `${petName}이(가) 쫓아가 붙잡았어요!`; }
     const loot = rollLoot(r.animal, final);
-    if (Object.keys(loot).length) onLoot(loot, final, r.animal);
+    onLoot(loot, final, r.animal);
     setStats(s => ({ ...s, [final]: s[final] + 1 }));
     const m = motion.current;
     setResult({ outcome: final, text: line, loot, x: m?.x ?? 50, y: m?.y ?? 60 }); setPhase("result"); phaseRef.current = "result";

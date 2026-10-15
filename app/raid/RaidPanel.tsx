@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DISHES, DISH_GRADES } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { ALL_RAID_ITEMS, ARMORS, ENHANCE, EVOLUTIONS, FLOORS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave } from "./data";
+import { ALL_RAID_ITEMS, ARMORS, ENHANCE, EVOLUTIONS, FLOORS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, masteryDone, weaponStats, type ArmorSlot, type Evolution, type MasteryLine, type RaidSave } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -24,6 +24,8 @@ export type ForgeActions = {
   evolve: (evolution: Evolution) => void;
   craftArmor: (id: string) => void;
   equip: (slot: ArmorSlot, id: string | null) => void;
+  /** 생활 숙련(+10 진화 조건) 진행. */
+  mastery: MasteryLine[];
 };
 
 /** 월루탑: 탑(층·음식·입장) · 장비 · 대장간. */
@@ -177,7 +179,8 @@ function ForgeView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
         <span>간격<b>{stats.interval}초</b>{next && !needEvolution && step!.to <= 10 && <i>→ {next.interval}초</i>}</span>
       </div>
       {needEvolution ? <div className="raid-evolve"><b>⚡ +10 진화 방향을 고르세요 (첫 선택 무료)</b>
-        <div>{(Object.keys(EVOLUTIONS) as Evolution[]).map(id => <button key={id} onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small></button>)}</div></div>
+        {!masteryDone(forge.mastery) && <small className="raid-evolve-lock">{TEST_MODE ? "🧪 테스트 모드라 생활 숙련 조건 없이 고를 수 있어요." : "🔒 아래 생활 숙련 조건을 모두 채우면 진화할 수 있어요."}</small>}
+        <div>{(Object.keys(EVOLUTIONS) as Evolution[]).map(id => <button key={id} disabled={!TEST_MODE && !masteryDone(forge.mastery)} onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small></button>)}</div></div>
         : !step ? <p className="raid-max">최대 강화(+15)에 도달했어요!</p>
         : <>
           <div className="raid-odds">
@@ -190,6 +193,10 @@ function ForgeView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
           <button className="raid-hammer" disabled={!affordable} onClick={() => (needsOpen ? forge.openStep() : forge.enhance(useStab))}>{needsOpen ? `🔓 +${step.to} 단계 개방` : `🔨 +${step.to} 강화하기`}</button>
           {w.enhancement >= 10 && <small className="raid-floor-note">+10에 한 번 도달하면 +9 아래로는 내려가지 않아요.</small>}
         </>}
+    </div>
+
+    <div className="raid-mastery"><b>📜 생활 숙련 <small>+10 진화 조건 · {forge.mastery.filter(l => l.cur >= l.need).length}/{forge.mastery.length}</small></b>
+      <ul>{forge.mastery.map(l => <li key={l.label} className={l.cur >= l.need ? "done" : ""}><span>{l.icon} {l.group} · {l.label}</span><em>{Math.min(l.cur, l.need)}/{l.need}</em><i style={{ width: `${Math.min(100, (l.cur / l.need) * 100)}%` }} /></li>)}</ul>
     </div>
 
     <div className="raid-life"><b>🧺 생활 재료 만들기</b><small>값이 낮은 재료부터, 잠금·주문 예약분은 빼고 써요. 실제로 쓰일 재료를 미리 보여 줘요.</small>

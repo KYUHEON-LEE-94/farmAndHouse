@@ -988,3 +988,15 @@ button { color:inherit; }
 .raid-table table{width:100%;border-collapse:collapse;margin-top:8px}.raid-table th,.raid-table td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
 .raid-table tr.now{background:#fff6dc;font-weight:700}.raid-table tr.done{color:#9a9080}
 @media (max-width:860px){.raid-lobby,.raid-gear,.raid-forge{grid-template-columns:1fr}.raid-tower{grid-template-columns:repeat(5,1fr)}.raid-tower-top,.raid-tower-base{grid-column:1/-1}.raid-storey{grid-template-columns:1fr;justify-items:center;text-align:center}.raid-storey span{display:none}.raid-anvil-stats,.raid-odds{grid-template-columns:repeat(2,1fr)}}
+
+/* 생활 숙련 */
+.raid-mastery{display:grid;gap:6px;padding:12px 14px;border-radius:14px;background:#fffaf0;border:1px solid var(--line)}
+.raid-mastery>b small{font-weight:400;color:#7a7060;font-size:11.5px;margin-left:4px}
+.raid-mastery ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.raid-mastery li{position:relative;overflow:hidden;display:flex;justify-content:space-between;gap:6px;padding:6px 9px;border-radius:9px;background:#f1e7d2;font-size:11.5px}
+.raid-mastery li i{position:absolute;left:0;bottom:0;height:3px;background:#e0b450}
+.raid-mastery li em{font-style:normal;font-weight:700}
+.raid-mastery li.done{background:#e6f0d8;color:#3f6a24}.raid-mastery li.done i{background:#6aa84f}
+.raid-evolve-lock{text-align:center;color:#ffd9a0;font-size:12px}
+.raid-evolve button:disabled{opacity:.45;cursor:default}
+@media (max-width:860px){.raid-mastery ul{grid-template-columns:1fr}}

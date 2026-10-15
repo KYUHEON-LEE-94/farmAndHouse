@@ -162,7 +162,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
       ctx.setLineDash([12, 8]); ctx.strokeStyle = "#ff6b4a"; ctx.lineWidth = 2; ctx.strokeRect(-2, z.y - z.r, W + 4, z.r * 2);
     } else {
       ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
-      if (z.tele > 0) { ctx.fillStyle = `rgba(220,60,40,${0.1 + pulse * 0.14})`; ctx.fill(); ctx.setLineDash([9, 6]); ctx.strokeStyle = "#ff6b4a"; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(z.kind === "bolt" ? "⚡" : "!", z.x, z.y); }
+      if (z.tele > 0) { ctx.fillStyle = `rgba(220,60,40,${0.1 + pulse * 0.14})`; ctx.fill(); ctx.setLineDash([9, 6]); ctx.strokeStyle = "#ff6b4a"; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#c0392b"; ctx.font = `bold 16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(z.kind === "bolt" ? "⚡" : "!", z.x, z.y); }
       else if (z.kind === "pollen") { const g = ctx.createRadialGradient(z.x, z.y, 4, z.x, z.y, z.r); g.addColorStop(0, "rgba(255,230,90,.55)"); g.addColorStop(1, "rgba(240,200,60,.2)"); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(200,160,30,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "puddle") { const g = ctx.createRadialGradient(z.x, z.y, 4, z.x, z.y, z.r); g.addColorStop(0, "rgba(90,160,220,.45)"); g.addColorStop(1, "rgba(60,120,190,.22)"); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(200,235,255,.5)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "shock") { ctx.fillStyle = `rgba(140,230,255,${0.35 + pulse * 0.3})`; ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; ctx.stroke(); }
@@ -190,9 +190,10 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.save(); ctx.translate(m.x, m.y + bob);
     if (m.dir.x > 0.1 && m.def.kind !== "slime") ctx.scale(-1, 1);
     if (m.flash > 0) ctx.filter = "brightness(2.2)";
-    ctx.font = `${Math.round(m.r * 1.9)}px ${EMOJI_FONT}`; ctx.fillText(m.icon, 0, 1);
+    // 컬러 이모지도 fillStyle의 투명도를 따라가므로 불투명색으로 그린다.
+    ctx.fillStyle = "#000"; ctx.font = `${Math.round(m.r * 1.9)}px ${EMOJI_FONT}`; ctx.fillText(m.icon, 0, 1);
     ctx.restore();
-    if (m.state === "stun") { ctx.font = `16px ${EMOJI_FONT}`; ctx.fillText("💫", m.x, m.y - m.r - 12); }
+    if (m.state === "stun") { ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.fillText("💫", m.x, m.y - m.r - 12); }
     if (!m.boss && (m.elite || m.hp < m.maxHp)) bar(ctx, m.x - m.r, m.y - m.r - 10, m.r * 2, 4, m.hp / m.maxHp, m.elite ? "#f0a030" : "#ef5a43");
   }
   // 투사체
@@ -225,7 +226,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   if (p.shield > 0) { ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 6, 0, Math.PI * 2); ctx.strokeStyle = `rgba(120,200,255,${0.6 + pulse * 0.3})`; ctx.lineWidth = 3; ctx.stroke(); }
   // 낫(조준 방향)
   ctx.translate(p.x, p.y); ctx.rotate(p.aim);
-  ctx.font = `22px ${EMOJI_FONT}`; ctx.fillText("🌙", size / 2 + 6, 0);
+  ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.fillText("🌙", size / 2 + 6, 0);
   ctx.restore();
   // 조준 범위(아주 옅게)
   ctx.save(); ctx.globalAlpha = 0.16; ctx.strokeStyle = "#fffbe8"; ctx.lineWidth = 2; ctx.setLineDash([4, 6]);
@@ -280,13 +281,13 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   panel(ctx, 12, by, 64, 50);
   const ready = p.dashCd <= 0, cdRatio = ready ? 1 : 1 - p.dashCd / d.dashCd;
   ctx.beginPath(); ctx.arc(44, by + 21, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cdRatio); ctx.strokeStyle = ready ? "#9fe8ff" : "rgba(160,200,220,.6)"; ctx.lineWidth = 3; ctx.stroke();
-  ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("💨", 44, by + 21);
+  ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("💨", 44, by + 21);
   ctx.font = "700 9px sans-serif"; ctx.fillStyle = ready ? "#fff" : "#aaa"; ctx.fillText(ready ? "SPACE" : p.dashCd.toFixed(1), 44, by + 43);
   s.foods.forEach((f, i) => {
     const x = 84 + i * 58, used = !f || s.foodUsed[i];
     panel(ctx, x, by, 50, 50);
     ctx.globalAlpha = used ? 0.3 : 1;
-    ctx.font = `24px ${EMOJI_FONT}`; ctx.fillText(f ? f.icon : "·", x + 25, by + 24);
+    ctx.fillStyle = f ? "#000" : "#ccc"; ctx.font = `24px ${EMOJI_FONT}`; ctx.fillText(f ? f.icon : "·", x + 25, by + 24);
     ctx.globalAlpha = 1;
     roundRect(ctx, x + 34, by + 34, 14, 14, 4); ctx.fillStyle = used ? "rgba(255,255,255,.2)" : "#ffd84a"; ctx.fill();
     ctx.font = "800 10px sans-serif"; ctx.fillStyle = "#2a2010"; ctx.fillText(String(i + 1), x + 41, by + 42);
@@ -304,6 +305,6 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
 function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, flip: boolean) {
   ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
   if (art.avatar) { ctx.imageSmoothingEnabled = !art.pixelated; ctx.drawImage(art.avatar, -size / 2, -size / 2, size, size); }
-  else { ctx.beginPath(); ctx.arc(0, 0, PLAYER.radius, 0, Math.PI * 2); ctx.fillStyle = "#fff3d6"; ctx.fill(); ctx.font = `20px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🧑‍🌾", 0, 1); }
+  else { ctx.beginPath(); ctx.arc(0, 0, PLAYER.radius, 0, Math.PI * 2); ctx.fillStyle = "#fff3d6"; ctx.fill(); ctx.fillStyle = "#000"; ctx.font = `20px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🧑‍🌾", 0, 1); }
   ctx.restore();
 }
