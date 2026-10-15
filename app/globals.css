@@ -1034,3 +1034,15 @@ button { color:inherit; }
 .raid-evo-change{display:grid;gap:8px;padding-top:10px;border-top:1px dashed rgba(255,255,255,.18)}.raid-evo-change>small{color:#d6b98a;font-size:11.5px}
 .raid-evo-change-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .raid-hammer.small{font-size:13px;padding:10px}
+
+/* 토벌 무기 목록 */
+.raid-weapons{display:grid;gap:8px}.raid-weapons>b small{font-weight:400;color:#7a7060;font-size:11.5px;margin-left:6px}
+.raid-weapons>div{display:grid;gap:6px}
+.raid-weapon{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:#f4efe6;border:1px solid var(--line);opacity:.8}
+.raid-weapon.owned{opacity:1;background:#fffaf0}.raid-weapon.worn{opacity:1;border-color:#e0b450;background:#fff6dc}
+.raid-weapon b{display:block;font-size:13.5px}.raid-weapon b small{font-weight:400;color:#7a7060;font-size:11px}.raid-weapon span{display:block;font-size:12px;color:#5a5244}
+.raid-weapon button{border:0;border-radius:10px;padding:8px 14px;font:700 12px "Gowun Dodum";background:#2c2418;color:#ffe19a;cursor:pointer}.raid-weapon button:disabled{opacity:.4;cursor:default}
+
+/* 토벌 끝 연출 건너뛰기 */
+.raid-end-skip{position:absolute;right:14px;bottom:14px}
+.raid-end-skip button{border:0;border-radius:999px;padding:9px 16px;font:700 13px "Gowun Dodum";background:rgba(255,255,255,.9);color:#2c2418;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3)}

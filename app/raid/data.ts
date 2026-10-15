@@ -16,35 +16,14 @@ export const FLOOR_SECONDS = 300, BOSS_AT = 240;
 export const PLAYER = { radius: 14, hp: 100, speed: 190, iframes: 0.6, dashCooldown: 3, dashTime: 0.18, dashSpeed: 650, critChance: 0.05, critMul: 1.5, absorb: 60, attackSlow: 0.15 };
 
 // ---------- 무기: 토벌 낫(23절) ----------
-export type WeaponStats = { damage: number; range: number; angle: number; interval: number; knockback: number };
-export const SCYTHE: WeaponStats[] = [
-  { damage: 12, range: 90, angle: 100, interval: 0.65, knockback: 35 },
-  { damage: 13, range: 90, angle: 100, interval: 0.65, knockback: 35 },
-  { damage: 14, range: 90, angle: 100, interval: 0.65, knockback: 35 },
-  { damage: 15, range: 94, angle: 100, interval: 0.65, knockback: 35 },
-  { damage: 16, range: 94, angle: 105, interval: 0.65, knockback: 35 },
-  { damage: 18, range: 98, angle: 105, interval: 0.62, knockback: 35 },
-  { damage: 19, range: 98, angle: 105, interval: 0.62, knockback: 35 },
-  { damage: 20, range: 102, angle: 110, interval: 0.62, knockback: 35 },
-  { damage: 22, range: 102, angle: 110, interval: 0.60, knockback: 35 },
-  { damage: 24, range: 106, angle: 110, interval: 0.60, knockback: 35 },
-  { damage: 27, range: 110, angle: 115, interval: 0.58, knockback: 35 },
-];
-export type Evolution = "great-scythe" | "harvest-blade";
-export const EVOLUTIONS: Record<Evolution, { name: string; stats: WeaponStats[]; eliteBonus: number; note: string }> = {
-  // stats[0] = +10, 이후 +11~+15(33.5절)
-  "great-scythe": { name: "전투 대낫", eliteBonus: 0.2, note: "정예·보스 피해 +20%, 강한 밀어내기", stats: [
-    { damage: 34, range: 125, angle: 120, interval: 0.72, knockback: 60 }, { damage: 38, range: 128, angle: 120, interval: 0.70, knockback: 60 },
-    { damage: 42, range: 130, angle: 120, interval: 0.69, knockback: 60 }, { damage: 47, range: 134, angle: 120, interval: 0.67, knockback: 60 },
-    { damage: 53, range: 137, angle: 120, interval: 0.66, knockback: 60 }, { damage: 60, range: 140, angle: 130, interval: 0.64, knockback: 60 }] },
-  "harvest-blade": { name: "회전 수확날", eliteBonus: 0, note: "주변 전체 공격, 일반 몬스터 처치 시 다음 공격 간격 −10%", stats: [
-    { damage: 22, range: 105, angle: 360, interval: 0.48, knockback: 30 }, { damage: 24, range: 107, angle: 360, interval: 0.47, knockback: 30 },
-    { damage: 26, range: 109, angle: 360, interval: 0.45, knockback: 30 }, { damage: 29, range: 112, angle: 360, interval: 0.43, knockback: 30 },
-    { damage: 32, range: 115, angle: 360, interval: 0.41, knockback: 30 }, { damage: 36, range: 118, angle: 360, interval: 0.38, knockback: 30 }] },
-};
-export function weaponStats(enhancement: number, evolution: Evolution | null): WeaponStats {
-  if (evolution && enhancement >= 10) return EVOLUTIONS[evolution].stats[Math.min(5, enhancement - 10)];
-  return SCYTHE[Math.max(0, Math.min(10, enhancement))];
+import { RAID_WEAPONS, raidWeaponStats, type WeaponStats } from "./weapons";
+export type { WeaponStats };
+/** 진화 id(무기마다 두 갈래). */
+export type Evolution = string;
+/** 모든 무기의 진화 이름·설명·+10/+15 수치. */
+export const EVOLUTIONS: Record<string, { name: string; note: string; weapon: string; stats: WeaponStats[] }> = Object.fromEntries(RAID_WEAPONS.flatMap(w => w.evos.map(e => [e.id, { name: e.name, note: e.note, weapon: w.id, stats: [e.s10, e.s15] }])));
+export function weaponStats(enhancement: number, evolution: Evolution | null, weaponId = "raid-scythe"): WeaponStats {
+  return raidWeaponStats(weaponId, enhancement, evolution);
 }
 
 // ---------- 몬스터(24절) ----------
@@ -92,9 +71,8 @@ export const FLOORS: FloorDef[] = [
 // ---------- 전투 각성(25절) ----------
 export const AWAKEN_XP = [0, 20, 55, 110, 170]; // Lv.1~5 누적
 export const AWAKEN_GUARANTEE = [{ at: 150, level: 3 }, { at: 230, level: 4 }];
-export type AwakenId = "keen-edge" | "quick-grip" | "long-handle" | "heavy-swing" | "double-cut" | "vitality" | "hard-leather" | "wind-step" | "quick-dash" | "emergency-shield" | "wide-gather" | "pet-training"
-  | "eclipse" | "executioner" | "harvest-storm" | "chain-harvest";
-export const AWAKENINGS: Record<AwakenId, { name: string; text: string; max: number; final?: Evolution }> = {
+export type AwakenId = string;
+export const AWAKENINGS: Record<string, { name: string; text: string; max: number; final?: Evolution }> = {
   "keen-edge": { name: "날 세우기", text: "주무기 피해 +22%", max: 2 },
   "quick-grip": { name: "빠른 손잡이", text: "공격 간격 −14%", max: 2 },
   "long-handle": { name: "긴 자루", text: "사거리 +22%, 공격각 +10도", max: 2 },
@@ -111,6 +89,39 @@ export const AWAKENINGS: Record<AwakenId, { name: string; text: string; max: num
   executioner: { name: "처형자", text: "체력 20% 이하 일반 적 즉사, 보스 피해 +25%", max: 1, final: "great-scythe" },
   "harvest-storm": { name: "수확 폭풍", text: "다섯 번째 공격이 2초 동안 0.25초마다 주변 공격", max: 1, final: "harvest-blade" },
   "chain-harvest": { name: "연쇄 수확", text: "적 처치 시 35% 확률로 추가 회전(초당 최대 2회)", max: 1, final: "harvest-blade" },
+  // 48.2절 무기별 Lv.5 최종 각성(일부는 근사, HUNTING_RAID.md 53절)
+  "earth-split": { name: "대지 가르기", text: "세 번째 지진의 반지름이 160px로", max: 1, final: "quake-hammer" },
+  topple: { name: "무너뜨리기", text: "경직된 적이 받는 피해 +30%", max: 1, final: "quake-hammer" },
+  "rock-rain": { name: "돌 소나기", text: "파편 6개", max: 1, final: "rock-crusher" },
+  "crush-combo": { name: "분쇄 연타", text: "같은 적을 연속으로 치면 피해 +8%씩(최대 5중첩)", max: 1, final: "rock-crusher" },
+  tsunami: { name: "해일", text: "6초마다 앞으로 거대한 물결(물줄기 1.5초분 피해)", max: 1, final: "water-cannon" },
+  "hydro-focus": { name: "수압 집중", text: "1초 이상 계속 쏘면 피해 +40%", max: 1, final: "water-cannon" },
+  permafrost: { name: "영구 동토", text: "빙결이 주변 60px로 번짐", max: 1, final: "frost-sprayer" },
+  "frost-veil": { name: "서리 장막", text: "뿌리는 동안 받는 피해 −25%", max: 1, final: "frost-sprayer" },
+  "plague-field": { name: "역병 들판", text: "독 장판 피해 ×1.5", max: 1, final: "toxic-sprayer" },
+  "manure-blast": { name: "거름 폭발", text: "독 장판에서 적이 죽으면 작은 폭발(40%)", max: 1, final: "toxic-sprayer" },
+  "chain-sprout": { name: "연쇄 발아", text: "폭발한 자리에서 30% 확률로 씨앗 1개 추가", max: 1, final: "seed-launcher" },
+  "giant-seed": { name: "대왕 씨앗", text: "다섯 번째 투척은 반지름·피해 2배", max: 1, final: "seed-launcher" },
+  "sea-god": { name: "해신의 일격", text: "네 번째 찌르기는 길이 2배·피해 200%", max: 1, final: "trident" },
+  "vital-pierce": { name: "급소 꿰기", text: "치명타가 보스 방어를 무시", max: 1, final: "trident" },
+  gather: { name: "끌어모으기", text: "최대 3마리를 끌어옴", max: 1, final: "chain-harpoon" },
+  "chain-spin": { name: "사슬 회전", text: "다섯 번째마다 몸 주변 120px 회전 공격", max: 1, final: "chain-harpoon" },
+  thundercloud: { name: "뇌운", text: "다섯 번째 던지기마다 화면의 적 5마리에 번개", max: 1, final: "thunder-rod" },
+  "big-catch": { name: "대어 낚기", text: "보스를 맞힐 때마다 피해 +3%씩(최대 30%)", max: 1, final: "thunder-rod" },
+  trawl: { name: "저인망", text: "그물 반지름 2배", max: 1, final: "net-launcher" },
+  "full-haul": { name: "만선", text: "그물 속 적이 죽으면 경험치 +50%", max: 1, final: "net-launcher" },
+  "pierce-snipe": { name: "관통 저격", text: "다섯 번째 화살은 무한 관통·250% 피해", max: 1, final: "longbow" },
+  "weak-aim": { name: "약점 조준", text: "정예·보스 치명타 확률 +20%", max: 1, final: "longbow" },
+  "arrow-rain": { name: "화살비", text: "6초마다 커서 주변 반지름 90에 화살비(200%)", max: 1, final: "rapid-bow" },
+  "quick-shot": { name: "속사", text: "공격속도 +15%, 쏘는 동안 이동 감속 없음", max: 1, final: "rapid-bow" },
+  "ap-round": { name: "철갑탄", text: "세 번째 탄마다 보스 방어 무시", max: 1, final: "rifle" },
+  marksman: { name: "명사수", text: "움직이지 않을 때 피해 +25%", max: 1, final: "rifle" },
+  "chain-blast": { name: "연쇄 폭발", text: "폭발이 한 번 더", max: 1, final: "siege-crossbow" },
+  shrapnel: { name: "파편탄", text: "폭발 시 파편 4개(35%)", max: 1, final: "siege-crossbow" },
+  "gale-dance": { name: "질풍 난무", text: "회피 대시 경로의 적에게 200% 피해", max: 1, final: "twin-blades" },
+  "vital-stab": { name: "급소 찌르기", text: "치명타 피해 200%", max: 1, final: "twin-blades" },
+  "whirl-slash": { name: "회오리 베기", text: "네 번째마다 360° 베기", max: 1, final: "greatsword" },
+  "iron-wall": { name: "철벽", text: "보스에게 맞는 피해 50% 감소(1초마다 1회)", max: 1, final: "greatsword" },
 };
 export const COMMON_AWAKENINGS: AwakenId[] = ["keen-edge", "quick-grip", "long-handle", "heavy-swing", "double-cut", "vitality", "hard-leather", "wind-step", "quick-dash", "emergency-shield", "wide-gather", "pet-training"];
 

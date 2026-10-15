@@ -15,6 +15,7 @@ import { HuntingGround } from "./HuntingGround";
 import RaidPanel from "./raid/RaidPanel";
 import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_MASTERY, EMPTY_RAID, masteryLines, type LifeMastery, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
+import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
 import type { ForgeActions } from "./raid/RaidPanel";
 import type { FoodSlot, RaidResult } from "./raid/engine";
 import CoinGame from "./CoinGame";
@@ -2042,32 +2043,32 @@ export default function Home() {
       playCoinSound([660, 880]); setNotice(`${LIFE_MATS[id].icon} ${LIFE_MATS[id].name}을(를) 만들었어요. (사용: ${describePlan(plan).join(", ")})`);
     },
     enhance: useStabilizer => {
-      const w = raid.weapons["raid-scythe"], step = nextStep(w.enhancement);
+      const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement);
       if (!step || (w.enhancement >= 10 && !w.evolution) || (step.open && !w.unlockedEnhancements.includes(step.to))) return;
       const plan = planFor(step.need, step.gold); if (!plan) return setNotice("강화 재료나 돈이 모자라요.");
       spendPlan(plan);
       const roll = rollEnhance(w.enhancement, step, useStabilizer, raid.stabilizers);
-      setRaid(r => applyEnhance(r, "raid-scythe", roll));
-      if (roll.success) { playCoinSound([660, 880, 1100, 1320, 1760]); setNotice(`🔨✨ 강화 성공! 토벌 낫 +${step.to}${step.to === 10 ? " — 이제 진화 방향을 고를 수 있어요!" : ""}`); }
+      setRaid(r => applyEnhance(r, r.equipped.weapon, roll));
+      if (roll.success) { playCoinSound([660, 880, 1100, 1320, 1760]); setNotice(`🔨✨ 강화 성공! ${weaponDef(raid.equipped.weapon).name} +${step.to}${step.to === 10 ? " — 이제 진화 방향을 고를 수 있어요!" : ""}`); }
       else if (roll.dropped) { playSadTrombone(); setNotice(`💥 강화 실패… 단계가 내려가 +${w.enhancement - 1}이 됐어요.`); }
       else if (roll.saved) { playCoinSound([440, 660]); setNotice("🪨 강화 실패! 하락할 뻔했지만 안정화석이 막아 줬어요(1개 소모)."); }
       else { playCoinSound([440, 330]); setNotice(`🔨 강화 실패… +${w.enhancement} 그대로예요. (재료와 돈은 사용됐어요)`); }
     },
     openStep: () => {
-      const w = raid.weapons["raid-scythe"], step = nextStep(w.enhancement);
+      const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement);
       if (!step?.open || w.unlockedEnhancements.includes(step.to)) return;
       const plan = planFor(step.open.need, step.open.gold); if (!plan) return setNotice("개방 재료나 돈이 모자라요.");
       spendPlan(plan);
-      setRaid(r => ({ ...r, weapons: { ...r.weapons, "raid-scythe": { ...r.weapons["raid-scythe"], unlockedEnhancements: [...r.weapons["raid-scythe"].unlockedEnhancements, step.to] } } }));
+      setRaid(r => ({ ...r, weapons: { ...r.weapons, [r.equipped.weapon]: { ...r.weapons[r.equipped.weapon], unlockedEnhancements: [...r.weapons[r.equipped.weapon].unlockedEnhancements, step.to] } } }));
       playCoinSound([660, 990, 1320]); setNotice(`🔓 +${step.to} 강화 단계를 열었어요!`);
     },
     mastery: masteryLines(cropLog, fishLog, lifeMastery),
     evolve: (evolution: Evolution) => {
-      const w = raid.weapons["raid-scythe"];
+      const w = raid.weapons[raid.equipped.weapon];
       if (w.enhancement < 10 || w.evolution) return;
       if (!TEST_MODE && !masteryLines(cropLog, fishLog, lifeMastery).every(l => l.cur >= l.need)) return setNotice("진화하려면 생활 숙련 조건을 모두 채워야 해요.");
-      setRaid(r => setEvolution(r, "raid-scythe", evolution)); playCoinSound([660, 880, 1100, 1320]);
-      setNotice(`⚡ 토벌 낫이 진화했어요!`);
+      setRaid(r => setEvolution(r, r.equipped.weapon, evolution)); playCoinSound([660, 880, 1100, 1320]);
+      setNotice(`⚡ ${weaponDef(raid.equipped.weapon).name}이(가) 진화했어요!`);
     },
     craftArmor: id => {
       const armor = ARMORS.find(a => a.id === id); if (!armor || raid.armorOwned.includes(id)) return;
@@ -2090,14 +2091,23 @@ export default function Home() {
       return got;
     },
     changeEvolution: (evolution: Evolution) => {
-      const w = raid.weapons["raid-scythe"];
+      const w = raid.weapons[raid.equipped.weapon];
       if (!w.evolution || w.evolution === evolution) return;
       const plan = planFor({ ...EVOLUTION_CHANGE.need, ...(w.enhancement >= 13 ? EVOLUTION_CHANGE.upper : {}) }, EVOLUTION_CHANGE.gold);
       if (!plan) return setNotice("진화를 바꿀 재료나 돈이 모자라요.");
-      spendPlan(plan); setRaid(r => setEvolution(r, "raid-scythe", evolution)); playCoinSound([660, 880, 1100, 1320]);
-      setNotice("🔁 토벌 낫의 진화를 바꿨어요! 강화 단계는 그대로예요.");
+      spendPlan(plan); setRaid(r => setEvolution(r, r.equipped.weapon, evolution)); playCoinSound([660, 880, 1100, 1320]);
+      setNotice(`🔁 ${weaponDef(raid.equipped.weapon).name}의 진화를 바꿨어요! 강화 단계는 그대로예요.`);
     },
     equipPet: id => setRaid(r => ({ ...r, equipped: { ...r.equipped, battlePet: id } })),
+    craftWeapon: id => {
+      const def = weaponDef(id); if (!def.craft || raid.weapons[id]) return;
+      if (!TEST_MODE && !raid.firstClears.includes(WEAPON_CRAFT.needFloor)) return setNotice(`${WEAPON_CRAFT.needFloor}층을 처음 클리어하면 만들 수 있어요.`);
+      const plan = planFor({ "artisan-core": WEAPON_CRAFT.core, [def.craft.lifeMat]: WEAPON_CRAFT.mat }, WEAPON_CRAFT.gold); if (!plan) return setNotice("무기를 만들 재료나 돈이 모자라요.");
+      spendPlan(plan);
+      setRaid(r => ({ ...r, weapons: { ...r.weapons, [id]: { enhancement: 0, evolution: null, unlockedEnhancements: [] } }, equipped: { ...r.equipped, weapon: id } }));
+      playCoinSound([660, 880, 1100, 1320]); setNotice(`${def.icon} ${def.name}을(를) 만들었어요!`);
+    },
+    equipWeapon: id => setRaid(r => ({ ...r, weapons: r.weapons[id] ? r.weapons : { ...r.weapons, [id]: { enhancement: 0, evolution: null, unlockedEnhancements: [] } }, equipped: { ...r.equipped, weapon: id } })),
     levelPet: id => {
       const lv = raid.battlePets?.[id]?.level ?? 0, next = PET_LEVELS[lv];
       if (!lv || !next || raid.contractShards < next.shards) return;

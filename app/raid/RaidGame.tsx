@@ -6,6 +6,7 @@ import { WORLD_H, WORLD_W, type Terrain } from "./terrain";
 import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
 const STEP = 1 / 60;
+const END_FX_MS = 2400;
 const fmt = (sec: number) => { const s = Math.max(0, Math.ceil(sec)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 const UI_FONT = '"Gowun Dodum", "Pretendard", sans-serif';
@@ -27,7 +28,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<RaidState | null>(null);
   const inputRef = useRef<Input>({ up: false, down: false, left: false, right: false, aimX: ARENA_W / 2, aimY: 0, attack: false, dash: false, food: [false, false, false] });
-  const holdRef = useRef(hold), speedRef = useRef(speed), finishRef = useRef(onFinish), doneRef = useRef(false);
+  const holdRef = useRef(hold), speedRef = useRef(speed), finishRef = useRef(onFinish), doneRef = useRef(false), overAtRef = useRef(0);
   const [ui, setUi] = useState<Ui>({ choices: null, paused: false, over: null, level: 1, picks: {} });
   useEffect(() => { holdRef.current = hold; speedRef.current = speed; finishRef.current = onFinish; });
 
@@ -52,9 +53,14 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
         while (acc >= STEP) { stepRaid(s, STEP, inputRef.current); acc -= STEP; if (s.over || s.choices) { acc = 0; break; } }
       } else { acc = 0; stepRaid(s, 0, inputRef.current); }
       draw(ctx, s, art, now / 1000, petIcon);
+      if (s.over && overAtRef.current) drawEnd(ctx, s, art, Math.min(1, (now - overAtRef.current) / END_FX_MS), now / 1000);
       const key = `${s.choices?.join(",") ?? ""}|${s.paused}|${s.over ?? ""}`;
       if (key !== uiKey) { uiKey = key; setUi({ choices: s.choices ? [...s.choices] : null, paused: s.paused, over: s.over, level: s.level, picks: { ...s.picks } }); }
-      if (s.over && !doneRef.current) { doneRef.current = true; finishRef.current(raidResult(s)); }
+      // 끝나면 바로 넘기지 않고 쓰러짐·성공 연출을 2.4초 보여 준다(결과 보기로 건너뛸 수 있음).
+      if (s.over && !doneRef.current) {
+        if (!overAtRef.current) overAtRef.current = now;
+        if (now - overAtRef.current >= END_FX_MS) { doneRef.current = true; finishRef.current(raidResult(s)); }
+      }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -106,6 +112,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
         <i>{AWAKENINGS[id].final ? "🌙" : ["🗡️", "🛡️", "💨"][i % 3]}</i><strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{(ui.picks[id] ?? 0) + 1}단계</em>}<span>{AWAKENINGS[id].text}</span>
       </button>)}</div>
     </div></div>}
+    {ui.over && <div className="raid-end-skip"><button onClick={() => { const s = stateRef.current; if (s && !doneRef.current) { doneRef.current = true; finishRef.current(raidResult(s)); } }}>결과 보기 ▶</button></div>}
     {ui.paused && !ui.over && !ui.choices && <div className="raid-overlay"><div className="raid-pause"><span className="raid-ov-eyebrow">PAUSED</span><b>⏸ 일시정지</b><small>P 또는 계속하기를 누르면 이어서 싸워요</small><button className="save-button" onClick={resume}>▶ 계속하기</button><button className="ghost-button" onClick={quit}>🏳 도전 포기 (사용한 음식만 소모)</button></div></div>}
   </div>;
 }
@@ -193,6 +200,10 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
       if (z.tele > 0) { ctx.fillStyle = `rgba(220,60,40,${0.1 + pulse * 0.14})`; ctx.fill(); ctx.setLineDash([9, 6]); ctx.strokeStyle = "#ff6b4a"; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#c0392b"; ctx.font = `bold 16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(z.kind === "bolt" ? "⚡" : "!", z.x, z.y); }
       else if (z.kind === "pollen") { const g = ctx.createRadialGradient(z.x, z.y, 4, z.x, z.y, z.r); g.addColorStop(0, "rgba(255,230,90,.55)"); g.addColorStop(1, "rgba(240,200,60,.2)"); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(200,160,30,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "puddle") { const g = ctx.createRadialGradient(z.x, z.y, 4, z.x, z.y, z.r); g.addColorStop(0, "rgba(90,160,220,.45)"); g.addColorStop(1, "rgba(60,120,190,.22)"); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(200,235,255,.5)"; ctx.lineWidth = 2; ctx.stroke(); }
+      else if (z.kind === "pbomb") { ctx.strokeStyle = "#e0a030"; ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🧴", z.x, z.y); }
+      else if (z.kind === "poison") { ctx.fillStyle = `rgba(120,200,60,${0.25 + pulse * 0.1})`; ctx.fill(); ctx.strokeStyle = "rgba(80,160,40,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
+      else if (z.kind === "net") { ctx.strokeStyle = "rgba(240,230,200,.8)"; ctx.lineWidth = 1.5; ctx.stroke(); ctx.save(); ctx.clip(); for (let k = -z.r; k <= z.r; k += 14) { ctx.beginPath(); ctx.moveTo(z.x + k, z.y - z.r); ctx.lineTo(z.x + k, z.y + z.r); ctx.moveTo(z.x - z.r, z.y + k); ctx.lineTo(z.x + z.r, z.y + k); ctx.stroke(); } ctx.restore(); }
+      else if (z.kind === "rain" || z.kind === "blast") { ctx.fillStyle = "rgba(255,230,150,.45)"; ctx.fill(); }
       else if (z.kind === "shock") { ctx.fillStyle = `rgba(140,230,255,${0.35 + pulse * 0.3})`; ctx.fill(); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; ctx.stroke(); }
       else { ctx.fillStyle = "rgba(255,245,150,.85)"; ctx.fill(); }
     }
@@ -235,6 +246,9 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   // 낫 휘두르기: 초승달 모양 잔상
   for (const sw of s.swings) {
     const a = Math.min(1, sw.t / 0.18);
+    if (sw.kind === "circle") { ctx.save(); ctx.globalAlpha = a * 0.6; const g = ctx.createRadialGradient(sw.x!, sw.y!, 0, sw.x!, sw.y!, sw.range); g.addColorStop(0, "rgba(255,240,200,.2)"); g.addColorStop(0.7, "rgba(255,210,120,.6)"); g.addColorStop(1, "rgba(255,255,255,.9)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sw.x!, sw.y!, sw.range, 0, Math.PI * 2); ctx.fill(); ctx.restore(); continue; }
+    if (sw.kind === "line") { ctx.save(); ctx.globalAlpha = a * 0.75; ctx.translate(sw.x ?? p.x, sw.y ?? p.y); ctx.rotate(sw.angle); const wd = sw.width ?? 20; const g = ctx.createLinearGradient(0, 0, sw.range, 0); g.addColorStop(0, "rgba(255,255,255,.3)"); g.addColorStop(1, "rgba(200,240,255,.95)"); ctx.fillStyle = g; roundRect(ctx, 0, -wd / 2, sw.range, wd, Math.min(wd / 2, 10)); ctx.fill(); ctx.restore(); continue; }
+    if (sw.kind === "cone") { ctx.save(); ctx.globalAlpha = 0.35; const h = (sw.arc / 2) * Math.PI / 180, g = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, sw.range); g.addColorStop(0, "rgba(160,220,255,.8)"); g.addColorStop(1, "rgba(160,220,255,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, sw.range, sw.angle - h, sw.angle + h); ctx.closePath(); ctx.fill(); ctx.restore(); continue; }
     ctx.save(); ctx.globalAlpha = a * 0.55;
     const g = ctx.createRadialGradient(p.x, p.y, sw.range * 0.35, p.x, p.y, sw.range);
     g.addColorStop(0, "rgba(255,250,230,0)"); g.addColorStop(0.75, "rgba(255,246,208,.9)"); g.addColorStop(1, "rgba(255,255,255,1)");
@@ -357,6 +371,33 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.font = `700 12px ${UI_FONT}`; const w = ctx.measureText(text).width + 24;
     panel(ctx, 262, by + 10, w, 30); ctx.fillStyle = "#ffe19a"; ctx.fillText(text, 274, by + 26);
   }
+}
+
+/** 끝 연출: 쓰러짐(회색·붉은 테두리·쓰러지는 캐릭터)·시간 초과·토벌 성공(빛·색종이). k는 0→1 진행도. */
+function drawEnd(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, k: number, clock: number) {
+  const W = ARENA_W, H = ARENA_H, p = s.player, sx = p.x - s.cam.x, sy = p.y - s.cam.y;
+  ctx.save();
+  if (s.over === "clear") {
+    ctx.fillStyle = `rgba(255,236,170,${0.25 * k})`; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 46; i++) { const x = (i * 211) % W, y = ((i * 97) % H) * 0.3 + k * H * (0.6 + (i % 5) * 0.12); ctx.fillStyle = ["#ffd84a", "#ff8a8a", "#8ad1ff", "#9fe8a6", "#ffffff"][i % 5]; ctx.save(); ctx.translate(x, y % H); ctx.rotate(clock * 4 + i); ctx.fillRect(-4, -2, 8, 4); ctx.restore(); }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `800 ${40 + 12 * Math.min(1, k * 3)}px "Gowun Batang", serif`; ctx.lineWidth = 8; ctx.strokeStyle = "rgba(60,40,10,.8)"; ctx.fillStyle = "#ffd84a";
+    ctx.strokeText("🎉 토벌 성공!", W / 2, H / 2 - 20); ctx.fillText("🎉 토벌 성공!", W / 2, H / 2 - 20);
+    ctx.font = `700 16px ${UI_FONT}`; ctx.lineWidth = 4; ctx.strokeText(`${s.floor.floor}층 돌파 · 처치 ${s.kills}`, W / 2, H / 2 + 24); ctx.fillStyle = "#fff"; ctx.fillText(`${s.floor.floor}층 돌파 · 처치 ${s.kills}`, W / 2, H / 2 + 24);
+  } else {
+    // 화면이 잿빛으로 가라앉고 붉은 테두리, 캐릭터가 쓰러진다.
+    ctx.fillStyle = `rgba(30,20,20,${0.55 * k})`; ctx.fillRect(0, 0, W, H);
+    const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, W * 0.65); v.addColorStop(0, "rgba(120,0,0,0)"); v.addColorStop(1, `rgba(150,10,10,${0.6 * k})`); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+    if (s.over === "dead") {
+      ctx.save(); ctx.translate(sx, sy + 10 * k); ctx.rotate(-Math.PI / 2 * Math.min(1, k * 2)); ctx.globalAlpha = 1 - k * 0.4; drawAvatar(ctx, art, 0, 0, 44, false); ctx.restore();
+      ctx.fillStyle = "#000"; ctx.font = `${28 + 10 * k}px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("💫", sx, sy - 40 - 10 * k);
+    }
+    ctx.globalAlpha = Math.min(1, k * 2.5); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `800 44px "Gowun Batang", serif`; ctx.lineWidth = 8; ctx.strokeStyle = "rgba(0,0,0,.75)"; ctx.fillStyle = "#ff8a7a";
+    const title = s.floor.training ? "🎯 체험 끝" : s.over === "dead" ? "쓰러졌다…" : "시간 초과…";
+    ctx.strokeText(title, W / 2, H / 2 - 20); ctx.fillText(title, W / 2, H / 2 - 20);
+    ctx.font = `700 15px ${UI_FONT}`; ctx.lineWidth = 4; const sub = s.floor.training ? `처치 ${s.kills}` : s.over === "dead" ? "체력이 다 떨어졌어요" : s.boss && s.boss.hp > 0 ? `보스 체력 ${Math.round((s.boss.hp / s.boss.maxHp) * 100)}% 남음` : "5분 안에 보스를 쓰러뜨리지 못했어요";
+    ctx.strokeText(sub, W / 2, H / 2 + 22); ctx.fillStyle = "#fff"; ctx.fillText(sub, W / 2, H / 2 + 22);
+  }
+  ctx.restore();
 }
 
 function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, flip: boolean) {
