@@ -1046,3 +1046,8 @@ button { color:inherit; }
 /* 토벌 끝 연출 건너뛰기 */
 .raid-end-skip{position:absolute;right:14px;bottom:14px}
 .raid-end-skip button{border:0;border-radius:999px;padding:9px 16px;font:700 13px "Gowun Dodum";background:rgba(255,255,255,.9);color:#2c2418;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+
+/* 장비창 안 토벌 장비 */
+.equipment-raid{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line);display:grid;gap:10px}
+.raid-gear-link{border:1px solid var(--line);border-radius:10px;padding:7px 12px;background:#fff;font:700 12px "Gowun Dodum";cursor:pointer;color:#5a4a2a}
+.raid-gear-link:hover{background:#fff6dc}

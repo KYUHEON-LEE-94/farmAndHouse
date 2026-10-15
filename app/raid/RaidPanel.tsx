@@ -40,11 +40,13 @@ export type ForgeActions = {
 };
 
 /** 월루탑: 탑(층·음식·입장) · 장비 · 대장간. */
-export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, forge, onResult }: {
+export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, forge, onResult, onOpenGear }: {
   raid: RaidSave; dishStock: Record<string, number>; raidItems: Record<string, number>; hold: boolean; avatar: Avatar; forge: ForgeActions;
   onResult: (result: RaidResult, foods: FoodSlot[]) => string[];
+  /** 메인 🎒 장비창으로 이동 */
+  onOpenGear: () => void;
 }) {
-  const [view, setView] = useState<"tower" | "gear" | "forge">("tower");
+  const [view, setView] = useState<"tower" | "forge">("tower");
   const [floorNo, setFloorNo] = useState(Math.min(raid.unlockedFloor, RAID_MAX_FLOOR));
   const [slots, setSlots] = useState<(string | null)[]>([null, null, null]);
   const [running, setRunning] = useState<{ foods: FoodSlot[]; id: number; training?: Evolution } | null>(null);
@@ -88,7 +90,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   </div>;
 
   return <div className="raid-wrap">
-    <div className="raid-tabs" role="tablist">{([["tower", "🗼 탑"], ["gear", "🎽 장비"], ["forge", "⚒️ 대장간"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={view === id} className={view === id ? "on" : ""} onClick={() => setView(id)}>{label}</button>)}</div>
+    <div className="raid-tabs" role="tablist">{([["tower", "🗼 탑"], ["forge", "⚒️ 대장간"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={view === id} className={view === id ? "on" : ""} onClick={() => setView(id)}>{label}</button>)}</div>
 
     {view === "tower" && <div className="raid-lobby">
       {/* 탑: 아래가 1층, 위로 올라간다 */}
@@ -112,13 +114,14 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
 
         <div className={`raid-floor-card ${floor.floor > 5 ? "canal" : "field"}`}>
           <span className="raid-floor-no">{floor.floor}F</span>
-          <div><small>{floor.zone}</small><b>{floor.boss.icon} {floor.boss.name}</b><span>5분 버티고 마지막 60초에 보스(체력 {floor.boss.hp.toLocaleString()}) 처치</span></div>
+          <div><small>{floor.zone}</small><b>{floor.boss.icon} {floor.boss.name}</b><span>3분 버티고 마지막 60초에 보스(체력 {floor.boss.hp.toLocaleString()}) 처치</span></div>
           {raid.firstClears.includes(floor.floor) ? <em>반복 클리어</em> : <em className="first">첫 클리어 보상</em>}
         </div>
 
         <div className="raid-loadout">
           <div className="raid-me"><img src={avatar.src} alt="" className={avatar.pixelated ? "pixelated" : ""} /><span><b>{wDef.icon} {wDef.name} +{enh}{evo ? ` · ${EVOLUTIONS[evo].name}` : ""}</b><small>피해 {stats.damage} · 사거리 {stats.range} · {stats.angle}° · {stats.interval}초</small>
             <small>♥ {100 + gear.hp} · 방어 {gear.defense}{gear.speed ? ` · 이속 +${Math.round(gear.speed * 100)}%` : ""}</small></span></div>
+          <button className="raid-gear-link" onClick={onOpenGear}>🎒 장비창에서 바꾸기</button>
           <div className="raid-gear-mini">{(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]); return <span key={slot} className={a ? "on" : ""} title={a ? a.text : `${SLOT_NAME[slot]} 비어 있음`}>{a ? a.icon : "▫️"}<small>{SLOT_NAME[slot]}</small></span>; })}{(() => { const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet); return <span className={p ? "on" : ""} title={p ? p.text : "전투펫 없음"}>{p ? p.icon : "▫️"}<small>전투펫</small></span>; })()}</div>
         </div>
 
@@ -133,7 +136,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
           <small className="raid-food-rule">같은 음식은 한 칸 · 회복 음식 최대 {MAX_HEAL_FOODS}칸 · 쓴 음식만 사라져요{foodOptions.length === 0 ? " · 🍳 주방에서 요리를 만들어 오세요" : ""}</small>
         </div>
 
-        <button className="raid-start" onClick={start}><span>🗼 {floor.floor}층 도전하기</span><small>5분 · 실패해도 장비와 해금 층은 그대로</small></button>
+        <button className="raid-start" onClick={start}><span>🗼 {floor.floor}층 도전하기</span><small>4분 · 실패해도 장비와 해금 층은 그대로</small></button>
 
         <div className="raid-bag"><b>🎒 탑 재료</b>
           {Object.keys(RAID_ITEMS).some(id => raidItems[id]) || raid.towerSeals || raid.stabilizers ? <span>
@@ -150,13 +153,13 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
       </div>
     </div>}
 
-    {view === "gear" && <GearView raid={raid} forge={forge} />}
     {view === "forge" && <>{outcome && outcome.result.floor === 0 && <div className="raid-result clear"><b>{outcome.lines[0]}</b><span>두 진화를 모두 체험해 보고 골라 보세요.</span></div>}<ForgeView raid={raid} forge={forge} onTrain={train} /></>}
   </div>;
 }
 
 // ---------- 장비 ----------
-function GearView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
+/** 토벌 장비(무기·방어구·전투펫). 메인 🎒 장비창 안에 들어간다. */
+export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
   const gear = gearOf(raid), weaponId = raid.equipped.weapon, wDef = weaponDef(weaponId), w = raid.weapons[weaponId] ?? { enhancement: 0, evolution: null, unlockedEnhancements: [] }, stats = weaponStats(w.enhancement, w.evolution, weaponId);
   const canCraft = TEST_MODE || raid.firstClears.includes(WEAPON_CRAFT.needFloor);
   return <div className="raid-gear">

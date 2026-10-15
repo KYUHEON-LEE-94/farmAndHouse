@@ -10,7 +10,10 @@ export const RAID_BALANCE_VERSION = 1;
 export const RAID_MAX_FLOOR = 10;
 
 export const ARENA_W = 960, ARENA_H = 540;
-export const FLOOR_SECONDS = 300, BOSS_AT = 240;
+/** 한 층 4분: 3분까지 웨이브, 마지막 60초 보스(6절, e534f67). */
+export const FLOOR_SECONDS = 240, BOSS_AT = 180;
+/** 4분 템포: 생성량 ×1.2, 일반 몬스터 이동속도 +8%(빠른 적 제외), 간접 개입 시각, 정예 고정 등장 시각(6.1절). */
+export const SPAWN_MUL = 1.2, NORMAL_SPEED_MUL = 1.08, INTERVENTION_AT = [45, 90, 135], ELITE_AT = [50, 120];
 
 // ---------- 플레이어 ----------
 export const PLAYER = { radius: 14, hp: 100, speed: 190, iframes: 0.6, dashCooldown: 3, dashTime: 0.18, dashSpeed: 650, critChance: 0.05, critMul: 1.5, absorb: 60, attackSlow: 0.15 };
@@ -69,8 +72,10 @@ export const FLOORS: FloorDef[] = [
 ];
 
 // ---------- 전투 각성(25절) ----------
-export const AWAKEN_XP = [0, 20, 55, 110, 170]; // Lv.1~5 누적
-export const AWAKEN_GUARANTEE = [{ at: 150, level: 3 }, { at: 230, level: 4 }];
+export const AWAKEN_XP = [0, 18, 48, 95, 145]; // Lv.1~5 누적(4분 사양)
+export const AWAKEN_GUARANTEE = [{ at: 105, level: 3 }, { at: 170, level: 4 }];
+/** 줍지 않은 경험치 구슬 자동 흡수(초). */
+export const ORB_AUTO = 5;
 export type AwakenId = string;
 export const AWAKENINGS: Record<string, { name: string; text: string; max: number; final?: Evolution }> = {
   "keen-edge": { name: "날 세우기", text: "주무기 피해 +22%", max: 2 },

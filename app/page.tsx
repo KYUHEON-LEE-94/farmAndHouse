@@ -12,7 +12,7 @@ import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
-import RaidPanel from "./raid/RaidPanel";
+import RaidPanel, { RaidGearView } from "./raid/RaidPanel";
 import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_MASTERY, EMPTY_RAID, masteryLines, type LifeMastery, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
@@ -2359,7 +2359,7 @@ export default function Home() {
         </aside>
       </div>}
 
-      {tab === "equipment" && <EquipmentPanel owned={ownedEffects} equipment={equipment} onEquip={(slot, id) => setEquipment(current => equipEffect(current, ownedEffects, slot, id))} onShop={() => { setShopMain("gacha"); switchTab("gacha"); }} />}
+      {tab === "equipment" && <EquipmentPanel raid={RAID_ENABLED ? <RaidGearView raid={raid} forge={forge} /> : undefined} owned={ownedEffects} equipment={equipment} onEquip={(slot, id) => setEquipment(current => equipEffect(current, ownedEffects, slot, id))} onShop={() => { setShopMain("gacha"); switchTab("gacha"); }} />}
       {tab === "gacha" && <div className="shop-main-tabs" role="tablist" aria-label="상점">{([["gacha", "🎁 가챠"], ["food", "🦴 펫 먹이"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={shopMain === id} className={shopMain === id ? "on" : ""} onClick={() => setShopMain(id)}>{label}</button>)}</div>}
       {tab === "gacha" && shopMain === "food" && <section className="panel food-shop">
         <div className="panel-heading"><div><span className="eyebrow">PET FOOD</span><h3>펫 먹이</h3></div><button className="ghost-button small" onClick={() => switchTab("pets")}>🐾 펫 돌보러 가기</button></div>
@@ -2431,7 +2431,7 @@ export default function Home() {
 
       {RAID_ENABLED && tab === "raid" && <section className="panel raid-panel">
         <div className="panel-heading"><div><span className="eyebrow">TOWER RAID · 로컬 테스트</span><h3>월루탑 토벌</h3></div><span className="plot-count">최고 {raid.highestFloor}층 · 1~{RAID_MAX_FLOOR}층 개방</span></div>
-        <RaidPanel raid={raid} dishStock={dishStock} raidItems={raidItems} hold={bossMode || tab !== "raid"} avatar={avatar} forge={forge} onResult={applyRaidResult} />
+        <RaidPanel raid={raid} dishStock={dishStock} raidItems={raidItems} hold={bossMode || tab !== "raid"} avatar={avatar} forge={forge} onResult={applyRaidResult} onOpenGear={() => switchTab("equipment")} />
       </section>}
 
       {HUNT_ENABLED && tab === "hunt" && <div className="game-grid">

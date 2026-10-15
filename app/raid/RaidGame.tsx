@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_XP, FLOOR_SECONDS, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
+import { ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_XP, BOSS_AT, FLOOR_SECONDS, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, type Terrain } from "./terrain";
 import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
@@ -306,7 +306,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}${s.level >= 5 ? " MAX" : ""}`, 84, 75);
 
   // 가운데 위: 남은 시간 / 보스 체력
-  const left = (s.floor.duration ?? FLOOR_SECONDS) - s.t, bossTime = !s.floor.training && s.t >= 240;
+  const left = (s.floor.duration ?? FLOOR_SECONDS) - s.t, bossTime = !s.floor.training && s.t >= BOSS_AT;
   if (s.boss && s.boss.hp > 0) {
     const bw = 400, bx = (W - bw) / 2;
     panel(ctx, bx - 10, 12, bw + 20, 46);
@@ -317,7 +317,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   } else {
     panel(ctx, W / 2 - 70, 12, 140, 40);
     ctx.textAlign = "center"; ctx.font = "800 20px sans-serif"; ctx.fillStyle = bossTime ? "#ff7a6a" : "#fff"; ctx.fillText(fmt(left), W / 2, 30);
-    ctx.font = `700 9px ${UI_FONT}`; ctx.fillStyle = "#d9cfae"; ctx.fillText(s.floor.training ? "진화 체험 중" : s.t < 240 ? `보스까지 ${fmt(240 - s.t)}` : "보스 등장!", W / 2, 45);
+    ctx.font = `700 9px ${UI_FONT}`; ctx.fillStyle = "#d9cfae"; ctx.fillText(s.floor.training ? "진화 체험 중" : s.t < BOSS_AT ? `보스까지 ${fmt(BOSS_AT - s.t)}` : "보스 등장!", W / 2, 45);
     ctx.textAlign = "left";
   }
   // 오른쪽 위: 처치 수 · 미니맵(플레이어·정예·보스·주요 지형만)

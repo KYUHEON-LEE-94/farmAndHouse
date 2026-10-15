@@ -3,7 +3,7 @@
  * 좌표는 논리 해상도 960×540(px), 시간은 초.
  */
 import {
-  ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_GUARANTEE, AWAKEN_XP, BOSS_AT, COMMON_AWAKENINGS, FLOOR_SECONDS, MONSTERS, PLAYER,
+  ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_GUARANTEE, AWAKEN_XP, BOSS_AT, COMMON_AWAKENINGS, ELITE_AT, FLOOR_SECONDS, INTERVENTION_AT, NORMAL_SPEED_MUL, ORB_AUTO, SPAWN_MUL, MONSTERS, PLAYER,
   type AwakenId, type BossDef, type Evolution, type FloorDef, type FoodEffect, type MonsterDef, type WeaponStats,
 } from "./data";
 import { START, WORLD_H, WORLD_W, blockedAt, blockers, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, type Terrain } from "./terrain";
@@ -52,7 +52,7 @@ export type RaidState = {
   foods: FoodSlot[]; foodUsed: boolean[];
   level: number; xp: number; picks: Partial<Record<AwakenId, number>>; choices: AwakenId[] | null;
   monsters: Monster[]; projectiles: Projectile[]; zones: Zone[]; orbs: Orb[]; pops: Pop[]; swings: Swing[];
-  spawnAcc: number; nextElite: number; elitesPlaced: number; bossSpawned: boolean; interventions: number; boss: Monster | null;
+  spawnAcc: number; nextElite: number; elitesPlaced: number; packAt: number; bossSpawned: boolean; interventions: number; boss: Monster | null;
   /** 스크롤 전장(50절): 카메라 왼쪽 위(월드 좌표), 지형, 탑의 압박, 정예 예고. */
   cam: { x: number; y: number; lx: number; ly: number }; terrain: Terrain;
   pressure: { x: number; y: number; since: number; stage: number; leftAt: number };
@@ -75,7 +75,7 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
     buffs: [], foods, foodUsed: foods.map(() => false),
     level: 1, xp: 0, picks: {}, choices: null,
     monsters: [], projectiles: [], zones: [], orbs: [], pops: [], swings: [],
-    spawnAcc: 0, nextElite: floor.elite?.every ?? 70, elitesPlaced: 0, bossSpawned: false, interventions: 0, boss: null,
+    spawnAcc: 0.9, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSpawned: false, interventions: 0, boss: null,
     kills: 0, damageTaken: {}, uid: 1, prevDash: false, prevFood: [false, false, false], bossHpAtEnd: 1,
   };
 }
@@ -110,7 +110,7 @@ function spawnPoint(s: RaidState) {
   return { x: p.x < WORLD_W / 2 ? WORLD_W - 30 : 30, y: p.y };
 }
 function makeMonster(s: RaidState, def: MonsterDef, at = spawnPoint(s), opts: Partial<Monster> = {}): Monster {
-  return { uid: s.uid++, def, name: def.name, icon: def.icon, x: at.x, y: at.y, r: def.radius, hp: def.hp, maxHp: def.hp, damage: def.damage, defense: def.defense, speed: def.speed,
+  return { uid: s.uid++, def, name: def.name, icon: def.icon, x: at.x, y: at.y, r: def.radius, hp: def.hp, maxHp: def.hp, damage: def.damage, defense: def.defense, speed: def.speed * (def.kind === "hop" || def.kind === "eel" ? 1 : NORMAL_SPEED_MUL),
     elite: def.kind === "elite" || def.kind === "canal-elite", boss: null, xp: def.xp, timer: 1 + rnd() * 1.5, state: "move", stateT: 0, dir: { x: 1, y: 0 }, tele: null,
     rate: 1, split: false, summoned: false, flash: 0, shots: 0, t2: 4, t3: 6, t4: 8, markUntil: 0, slowUntil: 0, slowMul: 1, expose: 0, frozenUntil: 0, takenUntil: 0, takenBonus: 0, combo: 0, inNet: false, ...opts };
 }
@@ -197,6 +197,7 @@ function killMonster(s: RaidState, m: Monster) {
   if (m.inNet && s.picks["full-haul"] && m.xp > 0) s.orbs.push({ x: m.x + 6, y: m.y, xp: Math.max(1, Math.round(m.xp * 0.5)), age: 0 });
   if (s.picks["manure-blast"] && s.zones.some(z => z.kind === "poison" && dist(z.x, z.y, m.x, m.y) < z.r)) blastAt(s, m.x, m.y, 40, s.weapon.damage * 0.4);
   if (s.picks["chain-harvest"] && rnd() < 0.35) { const p = s.player; p.chainAt = p.chainAt.filter(at => at > s.t - 1); if (p.chainAt.length < 2) { p.chainAt.push(s.t); swingHit(s, 0, 1, true); } }
+  if (m.elite && !m.boss && s.t < BOSS_AT) s.packAt = s.t + 0.5;
   if (m === s.boss) { s.bossHpAtEnd = 0; s.over = "clear"; }
 }
 
@@ -593,15 +594,19 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
 
   // 웨이브 생성(4분까지)
   if (s.t < BOSS_AT) {
-    s.spawnAcc += s.floor.spawnRate * dt / Math.pow(0.92, s.pressure.stage);
+    // 4분 템포: 생성량 ×1.2, 화면에 적이 2마리 이하면 대기시간 절반(전투 공백 보정)
+    const near = s.monsters.filter(m => m.hp > 0 && !m.boss && dist(m.x, m.y, p.x, p.y) < 520).length;
+    s.spawnAcc += s.floor.spawnRate * SPAWN_MUL * dt / Math.pow(0.92, s.pressure.stage) * (near <= 2 ? 2 : 1);
+    if (s.packAt && s.t >= s.packAt) { s.packAt = 0; for (let i = 0; i < 3; i++) { const id = pickSpawn(s); if (id) spawn(s, id); } }
     const alive = s.monsters.filter(m => m.hp > 0 && !m.elite && !m.boss).length;
     while (s.spawnAcc >= 1) { s.spawnAcc -= 1; if (alive < s.floor.maxAlive) { const id = pickSpawn(s); if (id) spawn(s, id); } }
     const e = s.floor.elite;
     if (e && s.t >= s.nextElite) {
-      if (e.every) { warnElite(s); s.nextElite += e.every; }
-      else if (s.elitesPlaced < (e.count ?? 0)) { warnElite(s); s.elitesPlaced++; s.nextElite += 90; }
+      // 정예: 50초·120초 고정(주기형 층은 그 뒤로도 주기마다). 예고 3초가 있어 그만큼 먼저 예고한다.
+      if (e.every) { warnElite(s); s.elitesPlaced++; s.nextElite = s.elitesPlaced < ELITE_AT.length ? ELITE_AT[s.elitesPlaced] : s.nextElite + e.every; }
+      else if (s.elitesPlaced < (e.count ?? 0)) { warnElite(s); s.elitesPlaced++; s.nextElite = ELITE_AT[Math.min(ELITE_AT.length - 1, s.elitesPlaced)] + (s.elitesPlaced >= ELITE_AT.length ? 9999 : 0); }
     }
-    if (!s.floor.training && s.t >= 60 * (s.interventions + 1) && s.interventions < 3) { s.interventions++; intervention(s, s.interventions); }
+    if (!s.floor.training && s.interventions < 3 && s.t >= INTERVENTION_AT[s.interventions]) { s.interventions++; intervention(s, s.interventions); }
   } else if (!s.bossSpawned && !s.floor.training) spawnBoss(s);
 
   // 몬스터(강 반대편이면 다리로 돌아간다)
@@ -669,7 +674,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   for (const o of s.orbs) {
     o.age += dt;
     const r = dist(o.x, o.y, p.x, p.y);
-    if (r < d.absorb || o.age > 8) { const k = Math.min(1, (500 * dt) / Math.max(1, r)); o.x += (p.x - o.x) * k; o.y += (p.y - o.y) * k; }
+    if (r < d.absorb || o.age > ORB_AUTO) { const k = Math.min(1, (500 * dt) / Math.max(1, r)); o.x += (p.x - o.x) * k; o.y += (p.y - o.y) * k; }
     if (r < PLAYER.radius + 6) { s.xp += o.xp; o.xp = 0; }
   }
   s.orbs = s.orbs.filter(o => o.xp > 0);
