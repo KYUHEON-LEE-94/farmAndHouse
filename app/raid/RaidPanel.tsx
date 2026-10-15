@@ -169,7 +169,6 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
 /** 토벌 장비(무기·방어구·전투펫). 메인 🎒 장비창 안에 들어간다. */
 export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
   const gear = gearOf(raid), weaponId = raid.equipped.weapon, wDef = weaponDef(weaponId), w = raid.weapons[weaponId] ?? { enhancement: 0, evolution: null, unlockedEnhancements: [] }, stats = weaponStats(w.enhancement, w.evolution, weaponId);
-  const canCraft = TEST_MODE || raid.firstClears.includes(WEAPON_CRAFT.needFloor);
   return <div className="raid-gear">
     <div className="raid-slots">
       <div className="raid-slot weapon on"><small>무기</small><b><WeaponIcon id={w.evolution ?? weaponId} size={22} /> {wDef.name} +{w.enhancement}</b><span>{w.evolution ? EVOLUTIONS[w.evolution].name : "진화 전(+10에서 선택)"} · 피해 {stats.damage}</span></div>
@@ -179,13 +178,13 @@ export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActi
       <p className="raid-gear-sum">합계 · 체력 +{gear.hp} · 방어 +{gear.defense} · 치명타 +{Math.round(gear.crit * 100)}% · 이속 +{Math.round(gear.speed * 100)}% · 회피 재사용 −{Math.round(gear.dashCd * 100)}%{gear.startShield ? ` · 시작 보호막 ${gear.startShield}` : ""}</p>
     </div>
     <div className="raid-gear-right">
-    <div className="raid-weapons"><b>⚔️ 토벌 무기 <small>{canCraft ? `대장간 제작: ${WEAPON_CRAFT.gold.toLocaleString()}원 + 생활 장인의 핵 ${WEAPON_CRAFT.core} + 생활 재료 ${WEAPON_CRAFT.mat}` : `${WEAPON_CRAFT.needFloor}층을 처음 클리어하면 다른 무기를 만들 수 있어요`}</small></b>
+    <div className="raid-weapons"><b>⚔️ 토벌 무기 <small>{`대장간 제작: ${WEAPON_CRAFT.gold.toLocaleString()}원 + 생활 장인의 핵 ${WEAPON_CRAFT.core} + 생활 재료 ${WEAPON_CRAFT.mat}`}</small></b>
       <div>{RAID_WEAPONS.map(def => { const own = TEST_MODE || Boolean(raid.weapons[def.id]), cur = raid.weapons[def.id], st = weaponStats(cur?.enhancement ?? 0, cur?.evolution ?? null, def.id), worn = def.id === weaponId;
         return <div key={def.id} className={`raid-weapon ${worn ? "worn" : own ? "owned" : ""}`}>
           <span className="raid-armor-icon"><WeaponIcon id={cur?.evolution ?? def.id} size={40} /></span>
           <div><b>{def.name}{cur ? ` +${cur.enhancement}` : ""} <small>{def.difficulty} · {def.style}</small></b><span>피해 {st.damage}{st.pellets ? `×${st.pellets}` : ""} · {st.interval}초 · 초당 약 {dps(st)}{cur?.evolution ? ` · ${EVOLUTIONS[cur.evolution].name}` : ` · 진화: ${def.evos.map(e => e.name).join(" / ")}`}</span>
-            {!own && def.craft && <span className="raid-cost">{!canCraft && <em className="lack">🗼 {WEAPON_CRAFT.needFloor}층 첫 클리어</em>}<em className={forge.money >= WEAPON_CRAFT.gold ? "ok" : "lack"}>💰 {WEAPON_CRAFT.gold.toLocaleString()}</em><em className={(forge.have["artisan-core"] ?? 0) >= WEAPON_CRAFT.core ? "ok" : "lack"}>{nameOf("artisan-core")} {forge.have["artisan-core"] ?? 0}/{WEAPON_CRAFT.core}</em><em className={(forge.have[def.craft.lifeMat] ?? 0) >= WEAPON_CRAFT.mat ? "ok" : "lack"}>{nameOf(def.craft.lifeMat)} {forge.have[def.craft.lifeMat] ?? 0}/{WEAPON_CRAFT.mat}</em></span>}</div>
-          {worn ? <button disabled>사용 중</button> : own ? <button onClick={() => forge.equipWeapon(def.id)}>들기</button> : <button className="make" disabled={!canCraft} onClick={() => forge.craftWeapon(def.id)}>{canCraft ? "만들기" : `🔒 ${WEAPON_CRAFT.needFloor}층 클리어 필요`}</button>}
+            {!own && def.craft && <span className="raid-cost"><em className={forge.money >= WEAPON_CRAFT.gold ? "ok" : "lack"}>💰 {WEAPON_CRAFT.gold.toLocaleString()}</em><em className={(forge.have["artisan-core"] ?? 0) >= WEAPON_CRAFT.core ? "ok" : "lack"}>{nameOf("artisan-core")} {forge.have["artisan-core"] ?? 0}/{WEAPON_CRAFT.core}</em><em className={(forge.have[def.craft.lifeMat] ?? 0) >= WEAPON_CRAFT.mat ? "ok" : "lack"}>{nameOf(def.craft.lifeMat)} {forge.have[def.craft.lifeMat] ?? 0}/{WEAPON_CRAFT.mat}</em></span>}</div>
+          {worn ? <button disabled>사용 중</button> : own ? <button onClick={() => forge.equipWeapon(def.id)}>들기</button> : <button className="make" disabled={forge.money < WEAPON_CRAFT.gold || (forge.have["artisan-core"] ?? 0) < WEAPON_CRAFT.core || (forge.have[def.craft?.lifeMat ?? ""] ?? 0) < WEAPON_CRAFT.mat} onClick={() => forge.craftWeapon(def.id)}>만들기</button>}
         </div>; })}</div>
     </div>
     <p className="hint">🐾 전투펫은 <b>펫</b> 탭에서 데려가기·레벨업하고, <b>상점 › 가챠</b>에서 뽑아요.</p>

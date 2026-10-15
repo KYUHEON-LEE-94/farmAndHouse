@@ -2163,7 +2163,6 @@ export default function Home() {
     equipPet: id => setRaid(r => ({ ...r, equipped: { ...r.equipped, battlePet: id } })),
     craftWeapon: id => {
       const def = weaponDef(id); if (!def.craft || raid.weapons[id]) return;
-      if (!TEST_MODE && !raid.firstClears.includes(WEAPON_CRAFT.needFloor)) return setNotice(`${WEAPON_CRAFT.needFloor}층을 처음 클리어하면 만들 수 있어요.`);
       const plan = planFor({ "artisan-core": WEAPON_CRAFT.core, [def.craft.lifeMat]: WEAPON_CRAFT.mat }, WEAPON_CRAFT.gold); if (!plan) return setNotice("무기를 만들 재료나 돈이 모자라요.");
       spendPlan(plan);
       setRaid(r => ({ ...r, weapons: { ...r.weapons, [id]: { enhancement: 0, evolution: null, unlockedEnhancements: [] } }, equipped: { ...r.equipped, weapon: id } }));
@@ -2777,7 +2776,7 @@ export default function Home() {
       {showStorage && <div className="modal-backdrop storage-backdrop"><section className="modal storage-modal" role="dialog" aria-modal="true" aria-labelledby="storage-title">
         <button className="modal-close" onClick={() => setShowStorage(false)} aria-label="창고 닫기 (E)">×</button>
         <div className="storage-view big">
-            <div className="panel-heading"><div><span className="eyebrow">GLOBAL STORAGE · E</span><h3 id="storage-title">농사·낚시 통합 창고</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
+            <div className="panel-heading"><div><span className="eyebrow">GLOBAL STORAGE · E</span><h3 id="storage-title">농사·낚시·사냥 통합 창고</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
             <div className="harvest-mode" role="group" aria-label="수확한 작물 처리"><span>🌾 농사</span>
               <button aria-pressed={harvestMode === "sell"} className={harvestMode === "sell" ? "on" : ""} onClick={() => harvestMode !== "sell" && toggleHarvestMode()}>💰 바로 판매</button>
               <button aria-pressed={harvestMode === "store"} className={harvestMode === "store" ? "on" : ""} onClick={() => harvestMode !== "store" && toggleHarvestMode()}>📦 창고 보관</button></div>
@@ -2785,6 +2784,9 @@ export default function Home() {
               <button aria-pressed={fishHarvestMode === "sell"} className={fishHarvestMode === "sell" ? "on" : ""} onClick={() => setFishHarvestMode("sell")}>💰 바로 판매</button>
               <button aria-pressed={fishHarvestMode === "store"} className={fishHarvestMode === "store" ? "on" : ""} onClick={() => setFishHarvestMode("store")}>📦 창고 보관</button></div>
             <div className="storage-cap"><span>📦 {storageUsed.toLocaleString()} / {storageCap.toLocaleString()}개</span><span className="field-meter"><i style={{ width: `${Math.min(100, (storageUsed / storageCap) * 100)}%` }} /></span></div>
+            {/* 사냥 소재: 같은 통합 인벤토리(hunt:)에 있고 보관 수량은 따로(창고 용량을 쓰지 않음) */}
+            {ALL_LOOT.some(loot => (huntStock[loot.id] ?? 0) > 0) && <div className="fish-store hunt-store"><b className="tool-shop-sub">🏹 사냥 소재 · {ALL_LOOT.reduce((sum, loot) => sum + (huntStock[loot.id] ?? 0), 0)}개 <small>(창고 용량을 쓰지 않아요)</small></b>
+              <ul className="hunt-loot">{ALL_LOOT.filter(loot => (huntStock[loot.id] ?? 0) > 0).map(loot => <li key={loot.id}><span>{loot.icon}</span><b>{loot.name}<small>{loot.price.toLocaleString()}원</small></b><em>×{huntStock[loot.id]}</em><span className="hunt-sell"><button onClick={() => sellLoot(loot.id, 1)}>1개</button><button className="all" onClick={() => sellLoot(loot.id, huntStock[loot.id] ?? 0)}>전부 {(loot.price * (huntStock[loot.id] ?? 0)).toLocaleString()}원</button></span></li>)}</ul></div>}
             {storageUsed === 0 ? <p className="empty">창고가 비었어요. “📦 창고 보관”을 고르고 수확하면 여기 쌓여요. 보관 중인 작물은 썩지 않으니 시세가 좋을 때 파세요!</p> : <>
               {Object.entries(fishStock).filter(([, count]) => count > 0).length > 0 && (() => { const stored = Object.entries(fishStock).filter(([, count]) => count > 0).map(([id, count]) => ({ fish: ALL_FISH.find(item => item.id === id), id, count, reserved: fishReserved[id] ?? 0 })).filter(entry => entry.fish).sort((a, b) => b.fish!.price * b.count - a.fish!.price * a.count);
                 return <div className="fish-store"><b className="tool-shop-sub">🎣 보관한 물고기 · {stored.reduce((sum, entry) => sum + entry.count, 0)}마리</b><div className="fish-grid">{stored.map(({ fish, id, count, reserved }) => { const free = count - reserved;

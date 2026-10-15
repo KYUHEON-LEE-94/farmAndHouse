@@ -99,7 +99,8 @@ export function raidWeaponStats(weaponId: string, enhancement: number, evolution
 /** 단일 대상 초당 피해(표시용). */
 export function dps(st: WeaponStats) { return Math.round((st.damage * (st.pellets ?? 1) * (st.fx?.double ? 2 : 1)) / st.interval); }
 /** 다른 무기 제작(48.3 초안): 5층 첫 클리어 후, 5,000골드 + 생활 장인의 핵 2 + 무기별 생활 재료 3. */
-export const WEAPON_CRAFT = { gold: 5000, core: 2, mat: 3, needFloor: 5 };
+/** 다른 토벌 무기 제작 비용(층 조건 없음 — 돈과 재료만). */
+export const WEAPON_CRAFT = { gold: 5000, core: 2, mat: 3 };
 
 /** +10 진화 우클릭 특수 공격(52절). 피해 배율은 현재 진화 무기 피해 기준. */
 export type WeaponSpecial = { id: string; name: string; icon: string; cooldown: number; text: string };
