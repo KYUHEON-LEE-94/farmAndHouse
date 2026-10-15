@@ -1,4 +1,5 @@
 "use client";
+import { hasArmorPrerequisite } from "./raid/armorRequirements";
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme, isResizable, RUG_SCALE } from "./house";
@@ -2135,6 +2136,10 @@ export default function Home() {
     },
     craftArmor: id => {
       const armor = ARMORS.find(a => a.id === id); if (!armor || raid.armorOwned.includes(id)) return;
+      if (!hasArmorPrerequisite(armor, raid.armorOwned)) {
+        const previous = ARMORS.find(a => a.id === armor.prerequisite);
+        return setNotice(`${previous?.name ?? "이전 단계 방어구"}을(를) 먼저 보유해야 만들 수 있어요.`);
+      }
       const plan = planFor(armor.need, armor.gold); if (!plan) return setNotice("방어구 재료나 돈이 모자라요.");
       spendPlan(plan);
       setRaid(r => ({ ...r, armorOwned: [...r.armorOwned, id], equipped: r.equipped[armor.slot] ? r.equipped : { ...r.equipped, [armor.slot]: id } }));
