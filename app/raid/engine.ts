@@ -7,7 +7,7 @@ import {
   type AwakenId, type BossDef, type Evolution, type FloorDef, type FoodEffect, type MonsterDef, type WeaponStats,
 } from "./data";
 import { SPECIALS } from "./weapons";
-import { START, WORLD_H, WORLD_W, blockedAt, blockers, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, type Terrain } from "./terrain";
+import { FLOW_CELL, START, WORLD_H, WORLD_W, blockedAt, blockers, buildFlow, clearLine, flowNext, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, type Flow, type Terrain } from "./terrain";
 
 export type Input = { up: boolean; down: boolean; left: boolean; right: boolean; aimX: number; aimY: number; attack: boolean; dash: boolean; food: [boolean, boolean, boolean];
   /** 우클릭 특수 공격(누른 순간 한 번) */
@@ -24,6 +24,8 @@ export type Monster = {
   /** 행동 타이머·상태 */
   timer: number; state: "move" | "tele" | "dash" | "stun"; stateT: number; dir: { x: number; y: number }; tele: Telegraph | null;
   rate: number; split: boolean; summoned: boolean; flash: number; shots: number;
+  /** 맞고 밀려나는 속도(px/s, 서서히 줄어든다) */
+  kvx: number; kvy: number;
   /** 무기 효과: 둔화·빙결 노출·받는 피해 증가·연속 타격 */
   slowUntil: number; slowMul: number; expose: number; frozenUntil: number; takenUntil: number; takenBonus: number; combo: number; inNet: boolean;
   t2: number; t3: number; t4: number;
@@ -37,6 +39,7 @@ export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "ts
   /** 내 공격 장판: 폭발 배율·독·그물 반지름 등 */
   mine?: { mul: number; poison?: boolean; seedChain?: boolean; big?: boolean }; x: number; y: number; r: number; t: number; tele: number; damage: number; every: number; tick: number; slow: number; dx?: number; dy?: number; len?: number };
 export type Orb = { x: number; y: number; xp: number; age: number };
+export type Spark = { x: number; y: number; vx: number; vy: number; t: number; life: number; color: string; size: number };
 export type Pop = { x: number; y: number; text: string; t: number; kind: "hit" | "crit" | "hurt" | "heal" | "info" };
 export type Swing = { angle: number; range: number; arc: number; t: number;
   /** 낫 외 공격 연출: circle(내려찍기·폭발)·line(찌르기·물대포·낚싯줄)·cone(물줄기) */
@@ -57,7 +60,11 @@ export type RaidState = {
   monsters: Monster[]; projectiles: Projectile[]; zones: Zone[]; orbs: Orb[]; pops: Pop[]; swings: Swing[];
   spawnAcc: number; nextElite: number; elitesPlaced: number; packAt: number; bossSummons: number;
   /** 처치 연출: 최근 처치 시각들(1초 안 5마리 이상이면 연쇄 처치), 화면 흔들림 */
-  killTimes: number[]; shake: number; chainShown: number; bossSpawned: boolean; interventions: number; boss: Monster | null;
+  killTimes: number[]; shake: number; chainShown: number;
+  /** 타격감: 잠깐 느려지기(초), 마지막 히트스톱 시각, 맞은 자리 불꽃, 효과음 카운터(화면이 보고 소리를 낸다) */
+  hitstop: number; lastStop: number; sparks: Spark[]; sfx: { hit: number; crit: number; kill: number; big: number };
+  /** 몬스터 길찾기 흐름장(플레이어 칸 기준, 0.25초마다 갱신) */
+  flow: Flow | null; flowAt: number; flowCell: number; bossSpawned: boolean; interventions: number; boss: Monster | null;
   /** 스크롤 전장(50절): 카메라 왼쪽 위(월드 좌표), 지형, 탑의 압박, 정예 예고. */
   cam: { x: number; y: number; lx: number; ly: number }; terrain: Terrain;
   pressure: { x: number; y: number; since: number; stage: number; leftAt: number };
@@ -83,7 +90,7 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
     buffs: [], foods, foodUsed: foods.map(() => false),
     level: 1, xp: 0, picks: {}, choices: null,
     monsters: [], projectiles: [], zones: [], orbs: [], pops: [], swings: [],
-    spawnAcc: 0.97, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSummons: 0, killTimes: [], shake: 0, chainShown: 0, bossSpawned: false, interventions: 0, boss: null,
+    spawnAcc: 0.97, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSummons: 0, killTimes: [], shake: 0, chainShown: 0, hitstop: 0, lastStop: -1, sparks: [], sfx: { hit: 0, crit: 0, kill: 0, big: 0 }, flow: null, flowAt: 0, flowCell: -1, bossSpawned: false, interventions: 0, boss: null,
     special: { readyAt: 0, prev: false, moveUntil: 0, moveMul: 1, lockAim: null, stanceUntil: 0, stanceHit: false, cancelable: false, hits: {}, bump: 0 }, actions: [],
     kills: 0, damageTaken: {}, uid: 1, prevDash: false, prevFood: [false, false, false], bossHpAtEnd: 1,
   };
@@ -121,7 +128,7 @@ function spawnPoint(s: RaidState) {
 function makeMonster(s: RaidState, def: MonsterDef, at = spawnPoint(s), opts: Partial<Monster> = {}): Monster {
   return { uid: s.uid++, def, name: def.name, icon: def.icon, x: at.x, y: at.y, r: def.radius, hp: def.hp, maxHp: def.hp, damage: def.damage, defense: def.defense, speed: def.speed * (def.kind === "hop" || def.kind === "eel" ? 1 : NORMAL_SPEED_MUL),
     elite: def.kind === "elite" || def.kind === "canal-elite", boss: null, xp: def.xp, timer: 1 + rnd() * 1.5, state: "move", stateT: 0, dir: { x: 1, y: 0 }, tele: null,
-    rate: 1, split: false, summoned: false, flash: 0, shots: 0, t2: 4, t3: 6, t4: 8, markUntil: 0, slowUntil: 0, slowMul: 1, expose: 0, frozenUntil: 0, takenUntil: 0, takenBonus: 0, combo: 0, inNet: false, ...opts };
+    rate: 1, split: false, summoned: false, flash: 0, shots: 0, kvx: 0, kvy: 0, t2: 4, t3: 6, t4: 8, markUntil: 0, slowUntil: 0, slowMul: 1, expose: 0, frozenUntil: 0, takenUntil: 0, takenBonus: 0, combo: 0, inNet: false, ...opts };
 }
 function spawn(s: RaidState, id: string, opts: Partial<Monster> = {}, at?: { x: number; y: number }) {
   const m = makeMonster(s, MONSTERS[id], at, opts);
@@ -172,6 +179,15 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   if (p.hp <= 0) { if (s.floor.training) p.hp = 1; else { p.hp = 0; s.over = "dead"; } }
 }
 type HitOpts = { critAdd?: number; ignoreDef?: boolean; noCombo?: boolean; noCrit?: boolean; forceCrit?: boolean; defIgnore?: number; extra?: number };
+function burst(s: RaidState, x: number, y: number, n: number, color: string, speed: number, ang?: number) {
+  for (let i = 0; i < n; i++) {
+    const a = ang === undefined ? rnd() * Math.PI * 2 : ang + (rnd() - 0.5) * 1.6, v = speed * (0.5 + rnd() * 0.7);
+    s.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0.22 + rnd() * 0.12, life: 0.34, color, size: 1.6 + rnd() * 1.8 });
+  }
+  if (s.sparks.length > 160) s.sparks.splice(0, s.sparks.length - 160);
+}
+/** 히트스톱: 아주 잠깐 느려져 묵직한 손맛을 준다(너무 자주 걸리지 않게 간격 제한). */
+function hitStop(s: RaidState, sec: number) { if (s.t - s.lastStop < 0.18) return; s.lastStop = s.t; s.hitstop = Math.max(s.hitstop, sec); }
 function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: number, o: HitOpts = {}) {
   if (m.hp <= 0) return;
   const d = derived(s), fx = s.weapon.fx ?? {}, p = s.player;
@@ -194,9 +210,13 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   const ignore = m.boss && (o.ignoreDef || (crit && s.picks["vital-pierce"]));
   dmg = Math.max(1, Math.round(dmg - (ignore ? 0 : m.defense * (1 - (o.defIgnore ?? 0))) - (m.def.kind === "crab" && m.state !== "dash" ? 3 : 0)));
   if (s.picks.executioner && !m.boss && !m.elite && m.hp - dmg <= m.maxHp * 0.2) dmg = m.hp;
-  m.hp -= dmg; m.flash = 0.1;
-  s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.6, kind: crit ? "crit" : "hit" });
-  if (!m.boss && knock) { m.x += Math.cos(ang) * knock; m.y += Math.sin(ang) * knock; }
+  m.hp -= dmg; m.flash = 0.12;
+  s.pops.push({ x: m.x + (rnd() - 0.5) * 10, y: m.y - m.r, text: crit ? `${dmg}!` : String(dmg), t: crit ? 0.75 : 0.6, kind: crit ? "crit" : "hit" });
+  // 타격감: 맞은 쪽 불꽃, 치명타는 금빛 불꽃·작은 흔들림·히트스톱, 밀려나기는 순간이동 대신 미끄러지듯
+  const hx = m.x - Math.cos(ang) * m.r * 0.6, hy = m.y - Math.sin(ang) * m.r * 0.6;
+  burst(s, hx, hy, crit ? 7 : 3, crit ? "#ffd84a" : "#fff4d6", crit ? 260 : 170, ang);
+  if (crit) { s.shake = Math.max(s.shake, 2.2); hitStop(s, 0.05); s.sfx.crit++; } else s.sfx.hit++;
+  if (!m.boss && knock) { const k = (m.elite ? 0.5 : 1) * knock * 12; m.kvx += Math.cos(ang) * k; m.kvy += Math.sin(ang) * k; }
   if (fx.stagger && !m.boss && !m.elite && m.state === "move") { m.state = "stun"; m.stateT = fx.stagger; }
   if (m.def.kind === "slime" && !m.split && !m.boss && rnd() < 0.2 && m.hp > 0) { m.split = true; spawn(s, "moss-slime", { hp: 14, maxHp: 14, r: 9, xp: 0, split: true }, { x: m.x + 12, y: m.y + 12 }); }
   if (m.hp <= 0) killMonster(s, m);
@@ -206,7 +226,8 @@ function killMonster(s: RaidState, m: Monster) {
   s.shake = Math.max(s.shake, m.boss ? 5 : m.elite ? 3 : 1.5);
   s.killTimes = [...s.killTimes.filter(t => t > s.t - 1), s.t];
   if (s.killTimes.length >= 5 && s.t - s.chainShown > 1) { s.chainShown = s.t; s.pops.push({ x: s.player.x, y: s.player.y - 60, text: `⚡ 연쇄 처치 ×${s.killTimes.length}`, t: 0.9, kind: "info" }); }
-  for (let i = 0; i < 5; i++) { const a = rnd() * Math.PI * 2; s.projectiles.push({ x: m.x, y: m.y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160, r: 2, damage: 0, life: 0.25, mine: true, pierce: new Set([m.uid]), left: 0, wave: true, debris: true } as Projectile); }
+  burst(s, m.x, m.y, m.boss ? 30 : m.elite ? 18 : 8, m.boss || m.elite ? "#ffcf6a" : "#f4ead2", m.boss ? 320 : 220);
+  if (m.boss || m.elite) { hitStop(s, m.boss ? 0.18 : 0.1); s.sfx.big++; } else s.sfx.kill++;
   if (m.xp > 0) s.orbs.push({ x: m.x, y: m.y, xp: m.xp, age: 0 });
   if (s.weapon.fx?.spinKill && !m.elite && !m.boss) s.player.swingCd = Math.max(0, s.player.swingCd - s.weapon.interval * 0.1);
   if (m.inNet && s.picks["full-haul"] && m.xp > 0) s.orbs.push({ x: m.x + 6, y: m.y, xp: Math.max(1, Math.round(m.xp * 0.5)), age: 0 });
@@ -467,7 +488,11 @@ function checkLevel(s: RaidState) {
 // ---------- 몬스터 행동 ----------
 function aimAt(m: Monster, x: number, y: number) { const d = Math.hypot(x - m.x, y - m.y) || 1; m.dir = { x: (x - m.x) / d, y: (y - m.y) / d }; }
 let routeTerrain: Terrain | null = null;
-function moveToward(m: Monster, x: number, y: number, speed: number, dt: number, slow: number) { if (routeTerrain && speed > 0) { const t = routeTarget(routeTerrain, m.x, m.y, x, y); x = t.x; y = t.y; } aimAt(m, x, y); m.x += m.dir.x * speed * dt * slow; m.y += m.dir.y * speed * dt * slow; }
+let routeFlow: { flow: Flow; terrain: Terrain; px: number; py: number } | null = null;
+function moveToward(m: Monster, x: number, y: number, speed: number, dt: number, slow: number) {
+  // 플레이어 쪽으로 갈 때 벽·강에 막혀 있으면 흐름장을 따라 돌아간다(트여 있으면 곧장).
+  if (routeFlow && speed > 0 && Math.hypot(x - routeFlow.px, y - routeFlow.py) < 90 && !clearLine(routeFlow.terrain, m.x, m.y, x, y, Math.min(14, m.r * 0.7))) { const n = flowNext(routeFlow.flow, m.x, m.y); if (n) { x = n.x; y = n.y; } }
+  else if (routeTerrain && speed > 0) { const t = routeTarget(routeTerrain, m.x, m.y, x, y); x = t.x; y = t.y; } aimAt(m, x, y); m.x += m.dir.x * speed * dt * slow; m.y += m.dir.y * speed * dt * slow; }
 function shoot(s: RaidState, m: Monster, spread: number[], speed = 150, damage = m.damage) {
   const base = Math.atan2(s.player.y - m.y, s.player.x - m.x);
   for (const off of spread) s.projectiles.push({ x: m.x, y: m.y, vx: Math.cos(base + off) * speed, vy: Math.sin(base + off) * speed, r: 6, damage, life: 6, mine: false, pierce: null });
@@ -481,6 +506,7 @@ function zoneAt(s: RaidState, z: Omit<Zone, "tick">) { s.zones.push({ ...z, tick
 function updateMonster(s: RaidState, m: Monster, dt: number) {
   const p = s.player, rate = m.rate;
   m.flash = Math.max(0, m.flash - dt);
+  if (m.kvx || m.kvy) { m.x += m.kvx * dt; m.y += m.kvy * dt; const f = Math.exp(-12 * dt); m.kvx *= f; m.kvy *= f; if (Math.abs(m.kvx) + Math.abs(m.kvy) < 4) { m.kvx = 0; m.kvy = 0; } }
   // 상태 진행(예고 → 돌진 → 이동)
   if (m.state === "tele") { m.stateT -= dt; if (m.stateT <= 0) { m.state = "dash"; m.stateT = m.boss === "pollen-boar" ? 1.4 : m.boss === "storm-catfish" ? 1.1 : 0.6; m.tele = null; } return; }
   if (m.state === "stun") { m.stateT -= dt; if (m.stateT <= 0) m.state = "move"; return; }
@@ -630,6 +656,7 @@ function updateWorld(s: RaidState, dt: number) {
 // ---------- 한 스텝 ----------
 export function stepRaid(s: RaidState, dt: number, input: Input) {
   if (s.over || s.paused || s.choices) { s.prevDash = input.dash; s.prevFood = input.food; s.special.prev = Boolean(input.special); return; }
+  if (s.hitstop > 0) { s.hitstop -= dt; dt *= 0.15; }
   s.t += dt;
   const p = s.player, d = derived(s);
 
@@ -706,8 +733,11 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
 
   // 몬스터(강 반대편이면 다리로 돌아간다)
   routeTerrain = s.terrain.deep.length ? s.terrain : null;
+  const cell = Math.floor(p.x / FLOW_CELL) + Math.floor(p.y / FLOW_CELL) * 1000;
+  if (!s.flow || (s.t >= s.flowAt && cell !== s.flowCell) || s.t >= s.flowAt + 1) { s.flow = buildFlow(s.terrain, p.x, p.y); s.flowAt = s.t + 0.25; s.flowCell = cell; }
+  routeFlow = { flow: s.flow, terrain: s.terrain, px: p.x, py: p.y };
   for (const m of s.monsters) if (m.hp > 0) updateMonster(s, m, dt);
-  routeTerrain = null;
+  routeTerrain = null; routeFlow = null;
   updatePet(s, dt);
   // 몸끼리 살짝 밀어내기(겹침 완화, 인접만)
   for (let i = 0; i < s.monsters.length; i++) {
@@ -781,6 +811,8 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   // 정리
   s.monsters = s.monsters.filter(m => m.hp > 0);
   for (const pop of s.pops) { pop.t -= dt; pop.y -= 30 * dt; }
+  for (const sp of s.sparks) { sp.t -= dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vx *= 0.9; sp.vy *= 0.9; }
+  s.sparks = s.sparks.filter(sp => sp.t > 0);
   s.pops = s.pops.filter(pop => pop.t > 0).slice(-40);
   for (const sw of s.swings) sw.t -= dt;
   s.swings = s.swings.filter(sw => sw.t > 0);

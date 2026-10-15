@@ -8,6 +8,31 @@ import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSl
 
 const STEP = 1 / 60;
 const END_FX_MS = 2400;
+
+// ---------- 타격 효과음(WebAudio로 짧게 합성, 파일 없음) ----------
+const SFX_KEY = "wolru-raid-sfx";
+let audio: AudioContext | null = null, lastHitSfx = 0;
+function readSfxOn() { try { return localStorage.getItem(SFX_KEY) !== "off"; } catch { return true; } }
+function sfx(kind: "hit" | "crit" | "kill" | "big") {
+  const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return;
+  audio ??= new AudioCtx();
+  const ctx = audio, now = ctx.currentTime;
+  if (kind === "hit" || kind === "crit") { if (now - lastHitSfx < 0.045) return; lastHitSfx = now; }
+  const out = ctx.createGain(); out.connect(ctx.destination);
+  const vol = { hit: 0.05, crit: 0.08, kill: 0.06, big: 0.12 }[kind], len = { hit: 0.06, crit: 0.09, kill: 0.1, big: 0.28 }[kind];
+  out.gain.setValueAtTime(vol, now); out.gain.exponentialRampToValueAtTime(0.0001, now + len);
+  // 퍽: 짧은 잡음(필터) + 낮게 떨어지는 음
+  const noise = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * len), ctx.sampleRate), data = noise.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const src = ctx.createBufferSource(), filter = ctx.createBiquadFilter();
+  src.buffer = noise; filter.type = "lowpass"; filter.frequency.value = kind === "crit" ? 3200 : kind === "big" ? 900 : 1800;
+  src.connect(filter); filter.connect(out); src.start(now);
+  const osc = ctx.createOscillator(); osc.type = kind === "crit" ? "triangle" : "sine";
+  const f0 = { hit: 220, crit: 520, kill: 300, big: 140 }[kind], f1 = { hit: 90, crit: 180, kill: 90, big: 40 }[kind];
+  osc.frequency.setValueAtTime(f0, now); osc.frequency.exponentialRampToValueAtTime(f1, now + len);
+  osc.connect(out); osc.start(now); osc.stop(now + len + 0.02);
+}
 const fmt = (sec: number) => { const s = Math.max(0, Math.ceil(sec)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 const UI_FONT = '"Gowun Dodum", "Pretendard", sans-serif';
@@ -30,6 +55,8 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   const stateRef = useRef<RaidState | null>(null);
   const inputRef = useRef<Input>({ up: false, down: false, left: false, right: false, aimX: ARENA_W / 2, aimY: 0, attack: false, dash: false, food: [false, false, false] });
   const holdRef = useRef(hold), speedRef = useRef(speed), finishRef = useRef(onFinish), doneRef = useRef(false), overAtRef = useRef(0);
+  const [sfxOn, setSfxOn] = useState(readSfxOn), sfxOnRef = useRef(sfxOn);
+  useEffect(() => { sfxOnRef.current = sfxOn; try { localStorage.setItem(SFX_KEY, sfxOn ? "on" : "off"); } catch { /* 저장 불가 */ } }, [sfxOn]);
   const [ui, setUi] = useState<Ui>({ choices: null, paused: false, over: null, level: 1, picks: {} });
   useEffect(() => { holdRef.current = hold; speedRef.current = speed; finishRef.current = onFinish; });
 
@@ -45,6 +72,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     const art: Art = { bg: paintWorld(stateRef.current.terrain), avatar: null, pixelated: avatar.pixelated };
     const img = new Image(); img.onload = () => { art.avatar = img; }; img.src = avatar.src;
     let raf = 0, last = performance.now(), acc = 0, uiKey = "";
+    const heard = { ...stateRef.current.sfx };
     const frame = (now: number) => {
       const s = stateRef.current!;
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -53,6 +81,9 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
         acc += dt * speedRef.current;
         while (acc >= STEP) { stepRaid(s, STEP, inputRef.current); acc -= STEP; if (s.over || s.choices) { acc = 0; break; } }
       } else { acc = 0; stepRaid(s, 0, inputRef.current); }
+      // 이번 프레임에 생긴 타격만큼 소리(가장 센 것 하나)
+      if (sfxOnRef.current && !holdRef.current) { const f = s.sfx; const kind = f.big > heard.big ? "big" : f.crit > heard.crit ? "crit" : f.kill > heard.kill ? "kill" : f.hit > heard.hit ? "hit" : null; if (kind) sfx(kind); }
+      Object.assign(heard, s.sfx);
       draw(ctx, s, art, now / 1000, petIcon);
       if (s.over && overAtRef.current) drawEnd(ctx, s, art, Math.min(1, (now - overAtRef.current) / END_FX_MS), now / 1000);
       const key = `${s.choices?.join(",") ?? ""}|${s.paused}|${s.over ?? ""}`;
@@ -113,6 +144,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
         <i>{AWAKENINGS[id].final ? "✨" : ["🗡️", "🛡️", "💨"][i % 3]}</i><strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>
       </button>)}</div>
     </div></div>}
+    {!ui.over && <button className="raid-sfx" onClick={() => setSfxOn(on => !on)} title="타격 효과음">{sfxOn ? "🔊" : "🔇"}</button>}
     {!ui.over && !ui.choices && !ui.paused && <button className="raid-giveup" onClick={() => { if (window.confirm("도전을 포기할까요? 사용한 음식만 사라져요.")) quit(); }}>🏳 포기</button>}
     {ui.over && <div className="raid-end-skip"><button onClick={() => { const s = stateRef.current; if (s && !doneRef.current) { doneRef.current = true; finishRef.current(raidResult(s)); } }}>결과 보기 ▶</button></div>}
     {ui.paused && !ui.over && !ui.choices && <div className="raid-overlay"><div className="raid-pause"><span className="raid-ov-eyebrow">PAUSED</span><b>⏸ 일시정지</b><small>P 또는 계속하기를 누르면 이어서 싸워요</small><button className="save-button" onClick={resume}>▶ 계속하기</button><button className="ghost-button" onClick={quit}>🏳 도전 포기 (사용한 음식만 소모)</button></div></div>}
@@ -232,7 +264,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     const bob = m.state === "move" ? Math.sin(clock * 9 + m.uid) * 1.5 : 0;
     ctx.save(); ctx.translate(m.x, m.y + bob);
     if (m.dir.x > 0.1 && m.def.kind !== "slime") ctx.scale(-1, 1);
-    if (m.flash > 0) ctx.filter = "brightness(2.2)";
+    if (m.flash > 0) { ctx.filter = "brightness(2.4)"; const k = m.flash / 0.12; ctx.scale(1 + 0.18 * k, 1 - 0.14 * k); }
     // 컬러 이모지도 fillStyle의 투명도를 따라가므로 불투명색으로 그린다.
     ctx.fillStyle = "#000"; ctx.font = `${Math.round(m.r * 1.9)}px ${EMOJI_FONT}`; ctx.fillText(m.icon, 0, 1);
     ctx.restore();
@@ -282,13 +314,19 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.save(); ctx.globalAlpha = 0.16; ctx.strokeStyle = "#fffbe8"; ctx.lineWidth = 2; ctx.setLineDash([4, 6]);
   const ha = (Math.min(359.9, d.arc) / 2) * Math.PI / 180; ctx.beginPath(); ctx.arc(p.x, p.y, d.range, p.aim - ha, p.aim + ha); ctx.stroke(); ctx.restore();
 
-  // 피해 숫자
+  // 맞은 자리 불꽃
+  for (const sp of s.sparks) { ctx.globalAlpha = Math.min(1, sp.t / sp.life * 1.6); ctx.strokeStyle = sp.color; ctx.lineWidth = sp.size; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(sp.x - sp.vx * 0.03, sp.y - sp.vy * 0.03); ctx.stroke(); }
+  ctx.globalAlpha = 1; ctx.lineCap = "butt";
+  // 피해 숫자(나올 때 톡 튀어나온다, 치명타는 더 크게)
   ctx.textAlign = "center";
   for (const pop of s.pops) {
     ctx.globalAlpha = Math.min(1, pop.t * 2);
-    ctx.font = pop.kind === "info" ? `700 20px ${UI_FONT}` : pop.kind === "crit" ? "900 19px sans-serif" : "800 14px sans-serif";
+    const life = pop.kind === "crit" ? 0.75 : 0.6, age = life - pop.t, punch = (pop.kind === "hit" || pop.kind === "crit") && age < 0.12 ? 1 + (pop.kind === "crit" ? 0.7 : 0.35) * (1 - age / 0.12) : 1;
+    ctx.font = pop.kind === "info" ? `700 20px ${UI_FONT}` : pop.kind === "crit" ? "900 21px sans-serif" : "800 14px sans-serif";
     ctx.fillStyle = { hit: "#ffffff", crit: "#ffd84a", hurt: "#ff6b5a", heal: "#7df0a0", info: "#fff6d0" }[pop.kind];
-    ctx.strokeStyle = "rgba(30,20,10,.75)"; ctx.lineWidth = 4; ctx.strokeText(pop.text, pop.x, pop.y); ctx.fillText(pop.text, pop.x, pop.y);
+    ctx.save(); ctx.translate(pop.x, pop.y); ctx.scale(punch, punch);
+    ctx.strokeStyle = "rgba(30,20,10,.75)"; ctx.lineWidth = 4; ctx.strokeText(pop.text, 0, 0); ctx.fillText(pop.text, 0, 0);
+    ctx.restore();
   }
   ctx.globalAlpha = 1;
 

@@ -113,3 +113,64 @@ export function routeTarget(t: Terrain, fromX: number, fromY: number, toX: numbe
   const cx = pick.x + pick.w / 2;
   return Math.abs(fromX - cx) > pick.w / 2 - 10 ? { x: cx, y: a < 0 ? top - 20 : bottom + 20 } : { x: cx, y: b < 0 ? top - 30 : bottom + 30 };
 }
+
+// ---------- 몬스터 길찾기: 흐름장(flow field) ----------
+/** 격자 한 칸 크기(px). 플레이어 칸에서 모든 칸까지의 최단 거리를 구해 두고, 몬스터는 거리가 줄어드는 이웃 칸으로 간다. */
+export const FLOW_CELL = 30;
+export type Flow = { cols: number; rows: number; dist: Float32Array; blocked: Uint8Array; tc: number };
+const FLOW_DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]] as const;
+/** 벽·깊은 물·닫힌 수문을 피해 (tx, ty)까지 가는 거리 지도. 대각선은 양옆 칸이 열려 있을 때만(모서리 끼임 방지). */
+export function buildFlow(t: Terrain, tx: number, ty: number, pad = 12): Flow {
+  const cols = Math.ceil(WORLD_W / FLOW_CELL), rows = Math.ceil(WORLD_H / FLOW_CELL), n = cols * rows, rects = blockers(t);
+  const blocked = new Uint8Array(n), dist = new Float32Array(n).fill(Infinity);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const x = (c + 0.5) * FLOW_CELL, y = (r + 0.5) * FLOW_CELL; if (rects.some(b => inside(b, x, y, pad))) blocked[r * cols + c] = 1; }
+  const tc = Math.min(cols - 1, Math.max(0, Math.floor(tx / FLOW_CELL))) + Math.min(rows - 1, Math.max(0, Math.floor(ty / FLOW_CELL))) * cols;
+  // 작은 이진 힙 다익스트라
+  const heap: number[] = [], key = (i: number) => dist[i];
+  const push = (i: number) => { heap.push(i); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (key(heap[p]) <= key(heap[k])) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && key(heap[l]) < key(heap[m])) m = l; if (r < heap.length && key(heap[r]) < key(heap[m])) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  dist[tc] = 0; push(tc);
+  const done = new Uint8Array(n);
+  while (heap.length) {
+    const i = pop(); if (done[i]) continue; done[i] = 1;
+    const c = i % cols, r = (i - c) / cols;
+    for (const [dx, dy, cost] of FLOW_DIRS) {
+      const nc = c + dx, nr = r + dy; if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const j = nr * cols + nc; if (blocked[j]) continue;
+      if (dx && dy && (blocked[r * cols + nc] || blocked[nr * cols + c])) continue;
+      const nd = dist[i] + cost; if (nd < dist[j]) { dist[j] = nd; push(j); }
+    }
+  }
+  return { cols, rows, dist, blocked, tc };
+}
+/** (x, y)에서 목표 쪽으로 가는 다음 지점. 몇 칸 앞을 내다보고 막힌 데가 없으면 그 칸으로 곧장(움직임이 덜 각진다). 길이 없으면 null. */
+export function flowNext(f: Flow, x: number, y: number) {
+  let c = Math.min(f.cols - 1, Math.max(0, Math.floor(x / FLOW_CELL))), r = Math.min(f.rows - 1, Math.max(0, Math.floor(y / FLOW_CELL)));
+  let i = r * f.cols + c;
+  if (!Number.isFinite(f.dist[i])) {
+    // 벽 가장자리에 걸친 칸: 가까운 열린 이웃에서 시작
+    let best = -1;
+    for (const [dx, dy] of FLOW_DIRS) { const nc = c + dx, nr = r + dy; if (nc < 0 || nr < 0 || nc >= f.cols || nr >= f.rows) continue; const j = nr * f.cols + nc; if (Number.isFinite(f.dist[j]) && (best < 0 || f.dist[j] < f.dist[best])) best = j; }
+    if (best < 0) return null;
+    return { x: (best % f.cols + 0.5) * FLOW_CELL, y: (Math.floor(best / f.cols) + 0.5) * FLOW_CELL };
+  }
+  if (i === f.tc) return null;
+  for (let step = 0; step < 3 && i !== f.tc; step++) {
+    let best = i;
+    for (const [dx, dy] of FLOW_DIRS) {
+      const nc = c + dx, nr = r + dy; if (nc < 0 || nr < 0 || nc >= f.cols || nr >= f.rows) continue;
+      const j = nr * f.cols + nc; if (f.blocked[j] || (dx && dy && (f.blocked[r * f.cols + nc] || f.blocked[nr * f.cols + c]))) continue;
+      if (f.dist[j] < f.dist[best]) best = j;
+    }
+    if (best === i) break;
+    i = best; c = i % f.cols; r = (i - c) / f.cols;
+  }
+  return { x: (c + 0.5) * FLOW_CELL, y: (r + 0.5) * FLOW_CELL };
+}
+/** 두 점 사이가 막힘 없이 트였는지(16px 간격 검사, pad만큼 여유). */
+export function clearLine(t: Terrain, x1: number, y1: number, x2: number, y2: number, pad = 0) {
+  const rects = blockers(t), len = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.ceil(len / 16));
+  for (let k = 1; k <= n; k++) { const px = x1 + (x2 - x1) * k / n, py = y1 + (y2 - y1) * k / n; if (rects.some(b => inside(b, px, py, pad))) return false; }
+  return true;
+}
+

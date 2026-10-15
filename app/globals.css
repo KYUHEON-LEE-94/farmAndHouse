@@ -1081,3 +1081,5 @@ button { color:inherit; }
 
 .equipment-views{grid-template-columns:repeat(2,minmax(110px,1fr))!important;margin:0!important;min-width:250px}
 .equipment-panel .equipment-raid{margin-top:4px;padding-top:0;border-top:0}
+
+.raid-sfx{position:absolute;right:14px;top:130px;border:0;border-radius:999px;width:30px;height:30px;font-size:14px;background:rgba(24,28,20,.6);cursor:pointer}
