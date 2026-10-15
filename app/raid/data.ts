@@ -13,7 +13,7 @@ export const ARENA_W = 960, ARENA_H = 540;
 export const FLOOR_SECONDS = 300, BOSS_AT = 240;
 
 // ---------- 플레이어 ----------
-export const PLAYER = { radius: 14, hp: 100, speed: 180, iframes: 0.6, dashCooldown: 3, dashTime: 0.16, dashSpeed: 620, critChance: 0.05, critMul: 1.5, absorb: 60, attackSlow: 0.15 };
+export const PLAYER = { radius: 14, hp: 100, speed: 190, iframes: 0.6, dashCooldown: 3, dashTime: 0.18, dashSpeed: 650, critChance: 0.05, critMul: 1.5, absorb: 60, attackSlow: 0.15 };
 
 // ---------- 무기: 토벌 낫(23절) ----------
 export type WeaponStats = { damage: number; range: number; angle: number; interval: number; knockback: number };
