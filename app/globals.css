@@ -1168,3 +1168,13 @@ button { color:inherit; }
 .hunt-chip{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:6px;padding:6px 8px;border-radius:10px;background:#fff;border:1px solid var(--line)}
 .hunt-chip-icon{font-size:20px;text-align:center}.hunt-chip-info{min-width:0}.hunt-chip-info b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hunt-chip-info small{font-size:10.5px;color:#7a6a4a}
 .hunt-chip-sell{display:flex;gap:3px}.hunt-chip-sell button{border:1px solid var(--line);border-radius:7px;padding:4px 7px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}.hunt-chip-sell button.all{background:#24352a;color:#fff;border-color:#24352a}
+
+/* 펫 탭: 생활펫 | 전투펫 구분, 전투펫은 카드 격자 */
+.pet-kind-tabs{margin-bottom:12px}
+.battle-pet-panel{margin-top:0!important}
+.battle-pet-panel .raid-pet-list{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.battle-pet-panel .raid-pet{grid-template-columns:52px 1fr;grid-template-rows:auto auto;align-items:start;padding:12px;border-radius:14px}
+.battle-pet-panel .raid-pet .raid-armor-icon{font-size:34px;grid-row:span 1}
+.battle-pet-panel .raid-pet-actions{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:6px}
+.battle-pet-panel .raid-pet-actions button{flex:1}
+.battle-pet-panel .raid-pet.tier-희귀{border-color:#9cbfe6}.battle-pet-panel .raid-pet.tier-전설{border-color:#e0b040;background:#fff7e0}

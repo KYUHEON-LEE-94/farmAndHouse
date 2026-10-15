@@ -363,6 +363,7 @@ export default function Home() {
   const [harvestMode, setHarvestMode] = useState<"sell" | "store">("store");
   const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders" | "workshop" | "kitchen">("seed");
   // 공방 하위 탭: 생활 가공(시간형·판매) / 강화 가공(즉시·강화 소재)
+  const [petKind, setPetKind] = useState<"life" | "battle">("life");
   const [workshopView, setWorkshopView] = useState<"life" | "raid" | "cook">("life");
   // 시장 포화: 작물별로 최근에 판 양(시간이 지나면 회복)
   const [marketState, setMarketState] = useState<MarketState>(EMPTY_MARKET);
@@ -2457,13 +2458,14 @@ export default function Home() {
         </section>}
       </div>}
 
-      {tab === "pets" && RAID_ENABLED && <section className="panel battle-pet-panel">
+      {tab === "pets" && RAID_ENABLED && <div className="shop-main-tabs pet-kind-tabs" role="tablist" aria-label="펫 종류">{([["life", `🐾 생활펫 · ${new Set([...placed, ...warehouse].filter(item => item.pet).map(item => item.id)).size}`], ["battle", `⚔️ 전투펫 · ${Object.keys(raid.battlePets ?? {}).length}/${BATTLE_PETS.length}`]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={petKind === id} className={petKind === id ? "active" : ""} onClick={() => setPetKind(id)}>{label}</button>)}</div>}
+      {tab === "pets" && RAID_ENABLED && petKind === "battle" && <section className="panel battle-pet-panel">
         <div className="panel-heading"><div><span className="eyebrow">BATTLE PETS</span><h3>⚔️ 전투펫</h3></div><span className="plot-count">{Object.keys(raid.battlePets ?? {}).length} / {BATTLE_PETS.length}</span></div>
         <p className="hint">토벌탑에 한 마리 데려가요. 중복으로 모은 📜 계약 조각으로 레벨업하거나 희귀·전설 펫과 교환해요. <button className="ghost-button small" onClick={() => { setShopMain("gacha"); switchTab("gacha"); }}>🥚 전투펫 뽑으러 가기</button></p>
         <BattlePetRoster raid={raid} forge={forge} />
       </section>}
 
-      {tab === "pets" && (() => { const ids = [...new Set([...placed, ...warehouse].filter(item => item.pet).map(item => item.id))];
+      {tab === "pets" && (!RAID_ENABLED || petKind === "life") && (() => { const ids = [...new Set([...placed, ...warehouse].filter(item => item.pet).map(item => item.id))];
         return <section className="panel pet-care-panel">
           <div className="panel-heading"><div><span className="eyebrow">PET CARE</span><h3>펫 돌보기</h3></div><span className="plot-count">{ids.length}마리</span></div>
           <p className="hint">🍽️ 먹이·🦮 산책·🤗 교감으로 애정도를 채우면 레벨업해요(최대 Lv{PET_MAX_LEVEL}). 기본 능력은 레벨당 0.1%씩 조금씩 강해져요. 일반 펫 판매 보너스는 레벨당 +0.01%p예요. 능력은 집에 둔 펫만 적용돼요.</p>
