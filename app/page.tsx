@@ -19,7 +19,7 @@ import { DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rollGrade, 
 import { migrateInventory, pickCategory, replaceCategory, type Inventory, type ItemCategory } from "./items";
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
-import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, MARKET_DEMAND, OVERFLOW_RATE, SAT_MAX, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
+import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_BASE, petBugPenalty, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session, readCloudBase, writeCloudBase } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
@@ -2465,8 +2465,6 @@ export default function Home() {
                 </li>)}</ul>
                 <div className="crop-box-foot"><span>팔 수 있는 {box.sellableCount}개 · 약 {box.value.toLocaleString()}원</span><button onClick={() => setSellConfirm({ kind: "coop", cropId: box.crop.id })} disabled={box.sellableCount < 1}>🏦 이 작물만 농협 출하</button></div>
               </div>)}</div>
-              <div className="market-slots" aria-label="시장 포화 슬롯">{market.slots.length ? <>📉 포화 중: {market.slots.map(slot => { const crop = CROPS.find(c => c.id === slot.id); return <span key={slot.id}>{crop?.icon} -{Math.round(Math.min(SAT_MAX, slot.units * 0.02) * 100)}%</span>; })}<small>(최대 3종 · 5분마다 오래된 것부터 풀림)</small></> : <>📈 지금 포화된 작물이 없어요 · 작물마다 5분에 {FREE_PER_CYCLE}개까지 정상가</>}</div>
-              <div className="market-slots" aria-label="시장 전체 수요">🛒 이번 5분 시장 수요 <b>{demandLeft(market)}/{MARKET_DEMAND}개</b> 남음<small>(넘으면 농협이 시세의 {Math.round(OVERFLOW_RATE * 100)}%에 매입 · 미션 납품·가공은 상관없음)</small></div>
               <button className="save-button sell-all" onClick={() => setSellConfirm({ kind: "market" })}>💰 창고 전부 팔기 <small>(잠금·주문 예약분 제외)</small></button>
               <button className="ghost-button coop-button" onClick={() => setSellConfirm({ kind: "coop" })}>🏦 농협 일괄 출하 <small>(시세의 {Math.round(COOP_RATE * 100)}%, 포화 없음, 잠금·예약분 제외)</small></button>
             </>}
