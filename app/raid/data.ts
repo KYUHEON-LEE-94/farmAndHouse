@@ -144,7 +144,7 @@ export const AWAKENINGS: Record<string, { name: string; text: string; max: numbe
 export const COMMON_AWAKENINGS: AwakenId[] = ["keen-edge", "quick-grip", "long-handle", "heavy-swing", "double-cut", "vitality", "hard-leather", "wind-step", "quick-dash", "emergency-shield", "wide-gather", "pet-training"];
 
 // ---------- 음식(29절): 주방 요리 id → 탑 효과(등급별 수치) ----------
-export type FoodEffect = { kind: "attack" | "heal" | "speed" | "shield" | "all" | "regen" | "haste"; heal: boolean; seconds: number; values: [number, number, number]; text: (v: number) => string };
+export type FoodEffect = { kind: "attack" | "heal" | "speed" | "shield" | "all" | "regen" | "haste" | "crit" | "armor"; heal: boolean; seconds: number; values: [number, number, number]; text: (v: number) => string };
 export const FOOD_EFFECTS: Record<string, FoodEffect> = {
   maeuntang: { kind: "attack", heal: false, seconds: 60, values: [10, 15, 22], text: v => `60초 공격력 +${v}%` },
   jorim: { kind: "heal", heal: true, seconds: 0, values: [25, 35, 50], text: v => `체력 ${v} 즉시 회복` },
@@ -153,6 +153,10 @@ export const FOOD_EFFECTS: Record<string, FoodEffect> = {
   dosirak: { kind: "all", heal: false, seconds: 45, values: [6, 9, 13], text: v => `45초 공격력·공격속도·이동속도 +${v}%` },
   "herb-stew": { kind: "regen", heal: true, seconds: 20, values: [2, 3, 4], text: v => `20초간 초당 체력 ${v} 회복` },
   skewer: { kind: "haste", heal: false, seconds: 60, values: [12, 18, 25], text: v => `60초 공격속도 +${v}%` },
+  "rabbit-stew": { kind: "regen", heal: true, seconds: 40, values: [1, 2, 3], text: v => `40초간 초당 체력 ${v} 회복` },
+  "venison-steak": { kind: "crit", heal: false, seconds: 60, values: [8, 12, 18], text: v => `60초 치명타 확률 +${v}%p` },
+  "bear-hotpot": { kind: "armor", heal: false, seconds: 60, values: [12, 18, 25], text: v => `60초 받는 피해 −${v}%` },
+  "bbq-platter": { kind: "all", heal: false, seconds: 60, values: [8, 12, 17], text: v => `60초 공격력·공격속도·이동속도 +${v}%` },
 };
 export const MAX_HEAL_FOODS = 2;
 

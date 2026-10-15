@@ -571,7 +571,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.textAlign = "left";
   const buffs = s.buffs.filter(b => b.until > s.t);
   if (buffs.length) {
-    const text = buffs.map(b => `${{ attack: "⚔ 공격", speed: "👟 이속", haste: "⚡ 공속", all: "🌟 전체", heal: "", shield: "", regen: "" }[b.kind]} +${b.value}% · ${Math.ceil(b.until - s.t)}s`).join("   ");
+    const text = buffs.map(b => `${{ attack: "⚔ 공격", speed: "👟 이속", haste: "⚡ 공속", all: "🌟 전체", heal: "", shield: "", regen: "", crit: "🎯 치명", armor: "🛡 경감" }[b.kind]} +${b.value}% · ${Math.ceil(b.until - s.t)}s`).join("   ");
     ctx.font = `700 12px ${UI_FONT}`; const w = ctx.measureText(text).width + 24;
     panel(ctx, 332, by + 10, w, 30); ctx.fillStyle = "#ffe19a"; ctx.fillText(text, 344, by + 26);
   }

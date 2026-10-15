@@ -113,7 +113,7 @@ export const derived = (s: RaidState) => ({
   dashCd: PLAYER.dashCooldown * Math.max(0.3, 1 - 0.18 * pick(s, "quick-dash") - s.gear.dashCd),
   absorb: PLAYER.absorb + 45 * pick(s, "wide-gather") + s.gear.absorb,
   armor: 2 * pick(s, "hard-leather") + s.gear.defense,
-  crit: PLAYER.critChance + s.gear.crit,
+  crit: PLAYER.critChance + s.gear.crit + buffSum(s, ["crit"]),
 });
 
 // ---------- 생성 ----------
@@ -172,7 +172,7 @@ function pickSpawn(s: RaidState) {
 function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = false) {
   const p = s.player;
   if (p.iframes > 0 || p.dashT > 0 || s.over) return;
-  raw *= 1 - (s.weapon.fx?.guard ?? 0) - (s.picks["frost-veil"] && p.holdT > 0 ? 0.25 : 0);
+  raw *= 1 - (s.weapon.fx?.guard ?? 0) - (s.picks["frost-veil"] && p.holdT > 0 ? 0.25 : 0) - buffSum(s, ["armor"]);
   if (s.special.stanceUntil > s.t) { raw *= 0.2; if (!s.special.stanceHit) { s.special.stanceHit = true; s.special.stanceUntil = 0; counterBlast(s, true); } }
   if (fromBoss && s.picks["iron-wall"] && s.t - p.ironAt >= 1) { p.ironAt = s.t; raw *= 0.5; }
   let dmg = Math.max(1, Math.round(raw - derived(s).armor));

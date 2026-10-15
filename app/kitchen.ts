@@ -10,7 +10,7 @@ import { TEST_MODE } from "./testMode";
 import { FOOD_EFFECTS } from "./raid/data";
 
 /** 주방 공개 여부. 토벌 기능이 나온 뒤 KITCHEN_RELEASED를 true로 바꿔 공개한다. 로컬 테스트 모드에서는 항상 보인다. */
-export const KITCHEN_RELEASED = false;
+export const KITCHEN_RELEASED = true; // 2026-10-15 운영 공개
 // 2026-10-15 사용자 요청: 토벌탑 베타는 공개하되 요리는 따로 개발 후 공개한다(그때까지 로컬 테스트에서만).
 export const KITCHEN_ENABLED = KITCHEN_RELEASED || TEST_MODE;
 
@@ -36,7 +36,12 @@ export const DISHES: Dish[] = [
   { id: "gui", name: "생선구이 정식", icon: "🐟", ingredients: [{ kind: "fish", count: 1 }, { kind: "crop", id: "greenonion", count: 1 }, { kind: "crop", id: "cabbage", count: 1 }], stat: "dodge", values: [1, 1, 2], note: "든든한 기운이 몸을 감싸요" },
   { id: "dosirak", name: "산해진미 도시락", icon: "🍱", ingredients: [{ kind: "fish", count: 2 }, { kind: "crop", id: "tomato", count: 1 }, { kind: "crop", id: "corn", count: 1 }, { kind: "crop", id: "sweetpotato", count: 1 }, { kind: "crop", id: "apple", count: 1 }], stat: "all", values: [5, 8, 12], note: "사계절 재료를 모은 특별 도시락" },
   // HUNTING_RAID.md 29절: 사냥 소재(멧돼지고기)를 쓰는 신규 레시피
-  { id: "herb-stew", name: "약초 고기찜", icon: "🍖", ingredients: [{ kind: "crop", id: "ginger", count: 1 }, { kind: "crop", id: "pinemushroom", count: 1 }, { kind: "hunt", id: "boarmeat", count: 1 }], stat: "heal", values: [2, 3, 4], note: "약초 향이 은은하게 몸을 데워요" },
+  { id: "herb-stew", name: "약초 고기찜", icon: "🍗", ingredients: [{ kind: "crop", id: "ginger", count: 1 }, { kind: "crop", id: "pinemushroom", count: 1 }, { kind: "hunt", id: "boarmeat", count: 1 }], stat: "heal", values: [2, 3, 4], note: "약초 향이 은은하게 몸을 데워요" },
+  // 동물별 고기 요리(2026-10-15): 토끼·사슴·곰 고기와 모둠 바비큐
+  { id: "rabbit-stew", name: "토끼고기 스튜", icon: "🍲", ingredients: [{ kind: "hunt", id: "rabbitmeat", count: 1 }, { kind: "crop", id: "potato", count: 1 }, { kind: "crop", id: "carrot", count: 1 }], stat: "heal", values: [1, 2, 3], note: "뭉근히 끓여 오래 기운이 나요" },
+  { id: "venison-steak", name: "사슴고기 스테이크", icon: "🥩", ingredients: [{ kind: "hunt", id: "venison", count: 1 }, { kind: "crop", id: "garlic", count: 1 }, { kind: "crop", id: "asparagus", count: 1 }], stat: "attack", values: [8, 12, 18], note: "날렵한 고기라 급소가 잘 보여요" },
+  { id: "bear-hotpot", name: "곰고기 전골", icon: "🫕", ingredients: [{ kind: "hunt", id: "bearmeat", count: 1 }, { kind: "crop", id: "napa", count: 1 }, { kind: "crop", id: "radish", count: 1 }, { kind: "crop", id: "greenonion", count: 1 }], stat: "heal", values: [12, 18, 25], note: "든든해서 웬만한 공격은 버텨요" },
+  { id: "bbq-platter", name: "모둠 바비큐", icon: "🍖", ingredients: [{ kind: "hunt", id: "rabbitmeat", count: 1 }, { kind: "hunt", id: "venison", count: 1 }, { kind: "hunt", id: "boarmeat", count: 1 }, { kind: "hunt", id: "bearmeat", count: 1 }, { kind: "crop", id: "lettuce", count: 1 }], stat: "all", values: [8, 12, 17], note: "사냥터 고기를 다 모은 잔치 한 상" },
   { id: "skewer", name: "꼬치구이", icon: "🍢", ingredients: [{ kind: "crop", id: "pepper", count: 1 }, { kind: "crop", id: "greenonion", count: 1 }, { kind: "hunt", id: "boarmeat", count: 1 }], stat: "attack", values: [12, 18, 25], note: "매콤하게 구워 손이 빨라져요" },
 ];
 
