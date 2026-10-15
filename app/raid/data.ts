@@ -198,11 +198,12 @@ export const SLOT_NAME: Record<ArmorSlot, string> = { head: "머리", body: "몸
 export type RaidSave = {
   balanceVersion: number; highestFloor: number; unlockedFloor: number; firstClears: number[];
   weapons: Record<string, { enhancement: number; evolution: Evolution | null; unlockedEnhancements: number[] }>;
-  equipped: { weapon: string; head: string | null; body: string | null; legs: string | null };
+  equipped: { weapon: string; head: string | null; body: string | null; legs: string | null; battlePet?: string | null };
+  battlePets?: Record<string, { level: number }>; petPity?: number;
   armorOwned: string[];
   stabilizers: number; towerSeals: number; contractShards: number;
 };
-export const EMPTY_RAID: RaidSave = { balanceVersion: RAID_BALANCE_VERSION, highestFloor: 0, unlockedFloor: 1, firstClears: [], weapons: { "raid-scythe": { enhancement: 0, evolution: null, unlockedEnhancements: [] } }, equipped: { weapon: "raid-scythe", head: null, body: null, legs: null }, armorOwned: [], stabilizers: 0, towerSeals: 0, contractShards: 0 };
+export const EMPTY_RAID: RaidSave = { balanceVersion: RAID_BALANCE_VERSION, highestFloor: 0, unlockedFloor: 1, firstClears: [], weapons: { "raid-scythe": { enhancement: 0, evolution: null, unlockedEnhancements: [] } }, equipped: { weapon: "raid-scythe", head: null, body: null, legs: null, battlePet: null }, battlePets: {}, petPity: 0, armorOwned: [], stabilizers: 0, towerSeals: 0, contractShards: 0 };
 
 /** 착용한 방어구 능력 합계. */
 export function gearOf(raid: RaidSave) {
@@ -242,3 +243,31 @@ export function masteryLines(cropLog: Record<string, { n: number }>, fishLog: Re
   ];
 }
 export const masteryDone = (lines: MasteryLine[]) => lines.every(l => l.cur >= l.need);
+
+// ---------- 전투펫(31·40절) ----------
+export type BattlePetDef = { id: string; name: string; icon: string; tier: "일반" | "희귀" | "전설"; role: string; text: string };
+export const BATTLE_PETS: BattlePetDef[] = [
+  { id: "battle-hedgehog", name: "가시 고슴도치", icon: "🦔", tier: "일반", role: "공격", text: "1.4초마다 가까운 적에게 피해 7" },
+  { id: "battle-turtle", name: "방패 거북", icon: "🐢", tier: "일반", role: "방어", text: "22초마다 보호막 10(최대 1중첩)" },
+  { id: "battle-sprite", name: "치유 요정", icon: "🧚", tier: "희귀", role: "회복", text: "16초마다 체력 4 회복" },
+  { id: "battle-foxfire", name: "여우불", icon: "🦊", tier: "희귀", role: "지원", text: "8초마다 적 하나에 5초 표식(받는 피해 +10%)" },
+  { id: "battle-hawk", name: "사냥매", icon: "🦅", tier: "희귀", role: "공격", text: "2.2초마다 가장 강한 적에게 피해 16" },
+  { id: "battle-tiger", name: "백호의 혼", icon: "🐯", tier: "전설", role: "공격·방어", text: "5초마다 앞쪽 범위 피해 28, 체력 30% 이하에서 판당 1회 보호막 30" },
+];
+export const PET_TIER_RATE = { 일반: 0.7, 희귀: 0.25, 전설: 0.05 } as const;
+/** 뽑기 1회: 탑의 인장 10개 또는 8,000골드. 10회 뽑기는 희귀 이상 1마리 보장, 40회째 전설 보장(천장, 골드·인장 공유). */
+export const PET_GACHA = { seals: 10, gold: 8000, pity: 40 };
+/** 중복 → 계약 조각, 조각으로 원하는 펫 교환·레벨업. */
+export const DUPLICATE_SHARDS = { 일반: 1, 희귀: 4, 전설: 15 } as const;
+export const PET_EXCHANGE = { 희귀: 30, 전설: 100 } as const;
+export const PET_LEVELS = [{ level: 1, shards: 0, mult: 1 }, { level: 2, shards: 5, mult: 1.15 }, { level: 3, shards: 10, mult: 1.3 }, { level: 4, shards: 20, mult: 1.5 }, { level: 5, shards: 35, mult: 1.75 }];
+
+/** 뽑기 한 번(천장 반영). guaranteeRare면 일반이 나와도 희귀로 올린다. */
+export function rollBattlePet(pity: number, guaranteeRare: boolean, random = Math.random) {
+  let tier: BattlePetDef["tier"];
+  if (pity + 1 >= PET_GACHA.pity) tier = "전설";
+  else { const r = random(); tier = r < PET_TIER_RATE.전설 ? "전설" : r < PET_TIER_RATE.전설 + PET_TIER_RATE.희귀 ? "희귀" : "일반"; }
+  if (guaranteeRare && tier === "일반") tier = "희귀";
+  const pool = BATTLE_PETS.filter(p => p.tier === tier);
+  return { pet: pool[Math.floor(random() * pool.length)], pity: tier === "전설" ? 0 : pity + 1 };
+}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DISHES, DISH_GRADES } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { ALL_RAID_ITEMS, ARMORS, ENHANCE, EVOLUTIONS, FLOORS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, masteryDone, weaponStats, type ArmorSlot, type Evolution, type MasteryLine, type RaidSave } from "./data";
+import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, FLOORS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, masteryDone, weaponStats, type ArmorSlot, type Evolution, type MasteryLine, type RaidSave } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -26,6 +26,11 @@ export type ForgeActions = {
   equip: (slot: ArmorSlot, id: string | null) => void;
   /** 생활 숙련(+10 진화 조건) 진행. */
   mastery: MasteryLine[];
+  /** 전투펫 뽑기(count 1 또는 10, pay "seal"|"gold") — 결과 펫 id 목록. */
+  drawPets: (count: number, pay: "seal" | "gold") => string[];
+  equipPet: (id: string | null) => void;
+  levelPet: (id: string) => void;
+  exchangePet: (id: string) => void;
 };
 
 /** 월루탑: 탑(층·음식·입장) · 장비 · 대장간. */
@@ -66,7 +71,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   };
 
   if (running) return <div className="raid-run">
-    <RaidGame key={running.id} floor={floor} weapon={stats} evolution={evo} foods={running.foods} gear={gear} avatar={avatar} hold={hold} speed={TEST_MODE ? testSpeed : 1} onFinish={finish} onQuit={finish} />
+    <RaidGame key={running.id} floor={floor} weapon={stats} evolution={evo} foods={running.foods} gear={gear} pet={petFor(raid)} avatar={avatar} hold={hold} speed={TEST_MODE ? testSpeed : 1} onFinish={finish} onQuit={finish} />
     <p className="raid-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 🖱 조준 · 클릭(누르고 있기) 공격 · <kbd>Space</kbd> 회피 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 음식 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 보스키</p>
   </div>;
 
@@ -102,7 +107,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
         <div className="raid-loadout">
           <div className="raid-me"><img src={avatar.src} alt="" className={avatar.pixelated ? "pixelated" : ""} /><span><b>🌙 토벌 낫 +{enh}{evo ? ` · ${EVOLUTIONS[evo].name}` : ""}</b><small>피해 {stats.damage} · 사거리 {stats.range} · {stats.angle}° · {stats.interval}초</small>
             <small>♥ {100 + gear.hp} · 방어 {gear.defense}{gear.speed ? ` · 이속 +${Math.round(gear.speed * 100)}%` : ""}</small></span></div>
-          <div className="raid-gear-mini">{(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]); return <span key={slot} className={a ? "on" : ""} title={a ? a.text : `${SLOT_NAME[slot]} 비어 있음`}>{a ? a.icon : "▫️"}<small>{SLOT_NAME[slot]}</small></span>; })}</div>
+          <div className="raid-gear-mini">{(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]); return <span key={slot} className={a ? "on" : ""} title={a ? a.text : `${SLOT_NAME[slot]} 비어 있음`}>{a ? a.icon : "▫️"}<small>{SLOT_NAME[slot]}</small></span>; })}{(() => { const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet); return <span className={p ? "on" : ""} title={p ? p.text : "전투펫 없음"}>{p ? p.icon : "▫️"}<small>전투펫</small></span>; })()}</div>
         </div>
 
         <div className="raid-foods"><b>🍱 음식 3칸</b>
@@ -146,15 +151,53 @@ function GearView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
       <div className="raid-slot weapon on"><small>무기</small><b>🌙 토벌 낫 +{w.enhancement}</b><span>{w.evolution ? EVOLUTIONS[w.evolution].name : "진화 전(+10에서 선택)"} · 피해 {stats.damage}</span></div>
       {(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]);
         return <div key={slot} className={`raid-slot ${a ? "on" : ""}`}><small>{SLOT_NAME[slot]}</small><b>{a ? `${a.icon} ${a.name}` : "비어 있음"}</b><span>{a ? a.text : "오른쪽에서 만들고 착용하세요"}</span>{a && <button onClick={() => forge.equip(slot, null)}>벗기</button>}</div>; })}
-      <div className="raid-slot pet"><small>전투펫</small><b>🔒 준비 중</b><span>전투펫은 다음 단계에서 열려요</span></div>
+      {(() => { const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet), lv = p ? raid.battlePets?.[p.id]?.level ?? 1 : 0; return <div className={`raid-slot ${p ? "on" : ""}`}><small>전투펫</small><b>{p ? `${p.icon} ${p.name} Lv.${lv}` : "비어 있음"}</b><span>{p ? `${p.text} · 능력 ×${PET_LEVELS[lv - 1].mult}` : "아래 전투펫 뽑기에서 얻어요"}</span>{p && <button onClick={() => forge.equipPet(null)}>빼기</button>}</div>; })()}
       <p className="raid-gear-sum">합계 · 체력 +{gear.hp} · 방어 +{gear.defense} · 치명타 +{Math.round(gear.crit * 100)}% · 이속 +{Math.round(gear.speed * 100)}% · 회피 재사용 −{Math.round(gear.dashCd * 100)}%{gear.startShield ? ` · 시작 보호막 ${gear.startShield}` : ""}</p>
     </div>
+    <div className="raid-gear-right">
+    <PetView raid={raid} forge={forge} />
     <div className="raid-armors">{ARMORS.map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, ok = canPay(a.need, forge.have) && forge.money >= a.gold;
       return <div key={a.id} className={`raid-armor ${worn ? "worn" : owned ? "owned" : ""}`}>
         <span className="raid-armor-icon">{a.icon}</span>
         <div><b>{a.name} <small>{SLOT_NAME[a.slot]} · {a.tier === 1 ? "가죽" : "강화 가죽"}</small></b><span>{a.text}</span>
           {!owned && <span className="raid-cost"><em className={forge.money >= a.gold ? "ok" : "lack"}>💰 {a.gold.toLocaleString()}</em>{Object.entries(a.need).map(([id, n]) => <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</span>}</div>
         {worn ? <button disabled>착용 중</button> : owned ? <button onClick={() => forge.equip(a.slot, a.id)}>착용</button> : <button className="make" disabled={!ok} onClick={() => forge.craftArmor(a.id)}>만들기</button>}
+      </div>; })}</div>
+    </div>
+  </div>;
+}
+
+// ---------- 전투펫 ----------
+export function petFor(raid: RaidSave) {
+  const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet); if (!p) return null;
+  const lv = raid.battlePets?.[p.id]?.level ?? 1;
+  return { id: p.id, mult: PET_LEVELS[lv - 1].mult, icon: p.icon };
+}
+function PetView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
+  const [last, setLast] = useState<string[]>([]);
+  const pets = raid.battlePets ?? {}, pity = raid.petPity ?? 0, shards = raid.contractShards;
+  const draw = (count: number, pay: "seal" | "gold") => setLast(forge.drawPets(count, pay));
+  return <div className="raid-pets">
+    <div className="raid-pet-gacha">
+      <b>🥚 전투펫 뽑기</b>
+      <small>일반 {PET_TIER_RATE.일반 * 100}% · 희귀 {PET_TIER_RATE.희귀 * 100}% · 전설 {PET_TIER_RATE.전설 * 100}% · 10회 뽑기는 희귀 이상 1마리 보장 · 전설 천장 {pity}/{PET_GACHA.pity}</small>
+      <div>
+        <button onClick={() => draw(1, "seal")} disabled={raid.towerSeals < PET_GACHA.seals}>🔖 인장 {PET_GACHA.seals}개 · 1회</button>
+        <button onClick={() => draw(10, "seal")} disabled={raid.towerSeals < PET_GACHA.seals * 10}>🔖 인장 {PET_GACHA.seals * 10}개 · 10회</button>
+        <button onClick={() => draw(1, "gold")} disabled={forge.money < PET_GACHA.gold}>💰 {PET_GACHA.gold.toLocaleString()}원 · 1회</button>
+      </div>
+      {last.length > 0 && <div className="raid-pet-last">{last.map((id, i) => { const p = BATTLE_PETS.find(x => x.id === id)!; return <span key={i} className={`tier-${p.tier}`} style={{ animationDelay: `${i * 0.05}s` }}>{p.icon}<small>{p.tier}</small></span>; })}</div>}
+      <small>보유: 🔖 탑의 인장 {raid.towerSeals} · 📜 계약 조각 {shards} (중복 일반 {DUPLICATE_SHARDS.일반} · 희귀 {DUPLICATE_SHARDS.희귀} · 전설 {DUPLICATE_SHARDS.전설}개)</small>
+    </div>
+    <div className="raid-pet-list">{BATTLE_PETS.map(p => { const own = pets[p.id], lv = own?.level ?? 0, next = PET_LEVELS[lv], worn = raid.equipped.battlePet === p.id, cost = p.tier === "일반" ? 0 : PET_EXCHANGE[p.tier];
+      return <div key={p.id} className={`raid-pet ${own ? "owned" : ""} ${worn ? "worn" : ""} tier-${p.tier}`}>
+        <span className="raid-armor-icon">{own ? p.icon : "❔"}</span>
+        <div><b>{p.name} <small>{p.tier} · {p.role}{own ? ` · Lv.${lv}` : ""}</small></b><span>{p.text}</span></div>
+        <div className="raid-pet-actions">
+          {own ? <>{worn ? <button disabled>데려가는 중</button> : <button onClick={() => forge.equipPet(p.id)}>데려가기</button>}
+            {next ? <button onClick={() => forge.levelPet(p.id)} disabled={shards < next.shards}>Lv.{next.level} (조각 {next.shards})</button> : <button disabled>최대 Lv</button>}</>
+            : cost ? <button onClick={() => forge.exchangePet(p.id)} disabled={shards < cost}>조각 {cost}개 교환</button> : <button disabled>뽑기로 얻기</button>}
+        </div>
       </div>; })}</div>
   </div>;
 }

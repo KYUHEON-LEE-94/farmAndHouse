@@ -13,7 +13,7 @@ import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel from "./raid/RaidPanel";
-import { ALL_RAID_ITEMS, ARMORS, EMPTY_MASTERY, EMPTY_RAID, masteryLines, type LifeMastery, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
+import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_MASTERY, EMPTY_RAID, masteryLines, type LifeMastery, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
 import type { ForgeActions } from "./raid/RaidPanel";
 import type { FoodSlot, RaidResult } from "./raid/engine";
@@ -464,7 +464,7 @@ export default function Home() {
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
         setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
-        setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [] }); setLifeMastery({ ...EMPTY_MASTERY, ...(data.lifeMastery ?? {}) });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
+        setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [], battlePets: data.raid?.battlePets ?? {}, petPity: data.raid?.petPity ?? 0 }); setLifeMastery({ ...EMPTY_MASTERY, ...(data.lifeMastery ?? {}) });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
         setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? ""); setCoinHoldings(data.coinHoldings ?? {});
       } catch { /* start fresh */ }
@@ -2071,6 +2071,35 @@ export default function Home() {
       playCoinSound([660, 880, 1100]); setNotice(`${armor.icon} ${armor.name}을(를) 만들었어요!`);
     },
     equip: (slot: ArmorSlot, id: string | null) => setRaid(r => ({ ...r, equipped: { ...r.equipped, [slot]: id } })),
+    drawPets: (count, pay) => {
+      const cost = pay === "seal" ? PET_GACHA.seals * count : PET_GACHA.gold * count;
+      if (pay === "seal" ? raid.towerSeals < cost : money < cost) { setNotice("뽑기 재화가 모자라요."); return []; }
+      let pity = raid.petPity ?? 0, shards = 0; const got: string[] = [], pets = { ...(raid.battlePets ?? {}) };
+      for (let i = 0; i < count; i++) {
+        const guarantee = count === 10 && i === count - 1 && !got.some(id => BATTLE_PETS.find(p => p.id === id)!.tier !== "일반");
+        const r = rollBattlePet(pity, guarantee); pity = r.pity; got.push(r.pet.id);
+        if (pets[r.pet.id]) shards += DUPLICATE_SHARDS[r.pet.tier]; else pets[r.pet.id] = { level: 1 };
+      }
+      if (pay === "gold") setMoney(value => value - cost);
+      setRaid(r => ({ ...r, towerSeals: r.towerSeals - (pay === "seal" ? cost : 0), petPity: pity, contractShards: r.contractShards + shards, battlePets: pets, equipped: { ...r.equipped, battlePet: r.equipped.battlePet ?? got[0] } }));
+      const best = got.map(id => BATTLE_PETS.find(p => p.id === id)!).sort((a, b) => ["일반", "희귀", "전설"].indexOf(b.tier) - ["일반", "희귀", "전설"].indexOf(a.tier))[0];
+      playCoinSound(best.tier === "전설" ? [523, 659, 784, 1047, 1319] : best.tier === "희귀" ? [660, 880, 1100] : [660, 880]);
+      setNotice(`🥚 전투펫 뽑기 ${count}회: ${got.map(id => BATTLE_PETS.find(p => p.id === id)!.icon).join(" ")}${shards ? ` · 중복은 계약 조각 ${shards}개로` : ""}`);
+      return got;
+    },
+    equipPet: id => setRaid(r => ({ ...r, equipped: { ...r.equipped, battlePet: id } })),
+    levelPet: id => {
+      const lv = raid.battlePets?.[id]?.level ?? 0, next = PET_LEVELS[lv];
+      if (!lv || !next || raid.contractShards < next.shards) return;
+      setRaid(r => ({ ...r, contractShards: r.contractShards - next.shards, battlePets: { ...(r.battlePets ?? {}), [id]: { level: next.level } } }));
+      playCoinSound([660, 880, 1100]); setNotice(`${BATTLE_PETS.find(p => p.id === id)?.icon} 전투펫이 Lv.${next.level}이 됐어요!`);
+    },
+    exchangePet: id => {
+      const pet = BATTLE_PETS.find(p => p.id === id); if (!pet || pet.tier === "일반" || raid.battlePets?.[id]) return;
+      const cost = PET_EXCHANGE[pet.tier]; if (raid.contractShards < cost) return;
+      setRaid(r => ({ ...r, contractShards: r.contractShards - cost, battlePets: { ...(r.battlePets ?? {}), [id]: { level: 1 } } }));
+      playCoinSound([660, 880, 1100, 1320]); setNotice(`${pet.icon} ${pet.name}을(를) 계약 조각으로 데려왔어요!`);
+    },
   };
   const readyOrders = orders.filter(order => !doneToday.includes(order.id) && order.items.every(item => depositedFor(order, item) + orderHave(item) >= item.count)).length;
   // 창고: 작물별 상자 하나에 품질 묶음을 모은다. 최근 6번(30분) 시세 흐름도 함께.

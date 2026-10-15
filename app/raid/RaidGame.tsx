@@ -17,8 +17,8 @@ type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; pixelated: 
  * 탑 토벌 전투 화면. canvas + requestAnimationFrame 고정 스텝 루프로 그리고,
  * React 상태는 각성 선택·일시정지·결과처럼 바뀔 때만 갱신한다. 캐릭터는 유저가 고른 아바타로 그린다.
  */
-export default function RaidGame({ floor, weapon, evolution, foods, gear, avatar, hold, speed = 1, autoPause = true, onFinish, onQuit }: {
-  floor: FloorDef; weapon: WeaponStats; evolution: Evolution | null; foods: FoodSlot[]; gear?: Gear; avatar: Avatar;
+export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = null, avatar, hold, speed = 1, autoPause = true, onFinish, onQuit }: {
+  floor: FloorDef; weapon: WeaponStats; evolution: Evolution | null; foods: FoodSlot[]; gear?: Gear; pet?: { id: string; mult: number; icon: string } | null; avatar: Avatar;
   /** 보스키·다른 탭 등 바깥에서 멈춰야 할 때 true. */
   hold: boolean; speed?: number; autoPause?: boolean;
   onFinish: (result: RaidResult) => void; onQuit: (result: RaidResult) => void;
@@ -32,7 +32,8 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, avatar
 
   // 전투 시작(한 번)
   useEffect(() => {
-    stateRef.current = createRaid(floor, weapon, evolution, foods, gear);
+    stateRef.current = createRaid(floor, weapon, evolution, foods, gear, pet ? { id: pet.id, mult: pet.mult } : null);
+    const petIcon = pet?.icon ?? "";
     doneRef.current = false;
     const canvas = canvasRef.current!, ctx = canvas.getContext("2d")!;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -49,7 +50,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, avatar
         acc += dt * speedRef.current;
         while (acc >= STEP) { stepRaid(s, STEP, inputRef.current); acc -= STEP; if (s.over || s.choices) { acc = 0; break; } }
       } else { acc = 0; stepRaid(s, 0, inputRef.current); }
-      draw(ctx, s, art, now / 1000);
+      draw(ctx, s, art, now / 1000, petIcon);
       const key = `${s.choices?.join(",") ?? ""}|${s.paused}|${s.over ?? ""}`;
       if (key !== uiKey) { uiKey = key; setUi({ choices: s.choices ? [...s.choices] : null, paused: s.paused, over: s.over, level: s.level, picks: { ...s.picks } }); }
       if (s.over && !doneRef.current) { doneRef.current = true; finishRef.current(raidResult(s)); }
@@ -149,7 +150,7 @@ function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
 function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) { ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(x, y + r * 0.85, r * 0.9, r * 0.32, 0, 0, Math.PI * 2); ctx.fill(); }
 
 // ---------- 그리기 ----------
-function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: number) {
+function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: number, petIcon = "") {
   const W = ARENA_W, H = ARENA_H, p = s.player, d = derived(s);
   ctx.drawImage(art.bg, 0, 0);
 
@@ -193,6 +194,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     // 컬러 이모지도 fillStyle의 투명도를 따라가므로 불투명색으로 그린다.
     ctx.fillStyle = "#000"; ctx.font = `${Math.round(m.r * 1.9)}px ${EMOJI_FONT}`; ctx.fillText(m.icon, 0, 1);
     ctx.restore();
+    if (m.markUntil > s.t) { ctx.save(); ctx.strokeStyle = "#ff9a3a"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 8, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); ctx.fillStyle = "#000"; ctx.font = `12px ${EMOJI_FONT}`; ctx.fillText("🔥", m.x + m.r, m.y - m.r); }
     if (m.state === "stun") { ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.fillText("💫", m.x, m.y - m.r - 12); }
     if (!m.boss && (m.elite || m.hp < m.maxHp)) bar(ctx, m.x - m.r, m.y - m.r - 10, m.r * 2, 4, m.hp / m.maxHp, m.elite ? "#f0a030" : "#ef5a43");
   }
@@ -215,6 +217,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.closePath(); ctx.fill(); ctx.restore();
   }
 
+  // 전투펫
+  if (s.pet && petIcon) { const pt = s.pet; shadow(ctx, pt.x, pt.y, 10); ctx.save(); ctx.translate(pt.x, pt.y + Math.sin(clock * 6) * 2); if (pt.flash > 0) ctx.scale(1.2, 1.2); ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(petIcon, 0, 0); ctx.restore(); }
   // 플레이어(내 아바타)
   const size = 44, flip = Math.cos(p.aim) < 0;
   ctx.save();

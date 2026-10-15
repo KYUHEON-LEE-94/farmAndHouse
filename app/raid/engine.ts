@@ -21,6 +21,8 @@ export type Monster = {
   timer: number; state: "move" | "tele" | "dash" | "stun"; stateT: number; dir: { x: number; y: number }; tele: Telegraph | null;
   rate: number; split: boolean; summoned: boolean; flash: number; shots: number;
   t2: number; t3: number; t4: number;
+  /** 여우불 표식: 이 시각까지 받는 피해 +10% */
+  markUntil: number;
 };
 export type Projectile = { x: number; y: number; vx: number; vy: number; r: number; damage: number; life: number; mine: boolean; pierce: Set<number> | null };
 export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line"; x: number; y: number; r: number; t: number; tele: number; damage: number; every: number; tick: number; slow: number; dx?: number; dy?: number; len?: number };
@@ -31,6 +33,7 @@ export type Swing = { angle: number; range: number; arc: number; t: number };
 export type RaidState = {
   floor: FloorDef; t: number; over: null | "clear" | "dead" | "timeout"; paused: boolean;
   weapon: WeaponStats; evolution: Evolution | null; gear: Gear;
+  pet: { id: string; mult: number; x: number; y: number; timer: number; shieldUsed: boolean; flash: number } | null;
   player: { x: number; y: number; hp: number; maxHp: number; shield: number; shieldUntil: number; iframes: number; dashCd: number; dashT: number; dashDir: { x: number; y: number }; swingCd: number; windup: number; aim: number; attacks: number; slowUntil: number; emergencyUsed: boolean; stormUntil: number; stormTick: number; chainAt: number[] };
   buffs: { kind: FoodEffect["kind"]; value: number; until: number }[];
   foods: FoodSlot[]; foodUsed: boolean[];
@@ -45,9 +48,10 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
 const angDiff = (a: number, b: number) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
 
-export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evolution | null, foods: FoodSlot[], gear: Gear = NO_GEAR): RaidState {
+export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evolution | null, foods: FoodSlot[], gear: Gear = NO_GEAR, pet: { id: string; mult: number } | null = null): RaidState {
   return {
     floor, t: 0, over: null, paused: false, weapon, evolution, gear,
+    pet: pet ? { ...pet, x: ARENA_W / 2 - 30, y: ARENA_H / 2, timer: 2, shieldUsed: false, flash: 0 } : null,
     player: { x: ARENA_W / 2, y: ARENA_H / 2, hp: PLAYER.hp + gear.hp, maxHp: PLAYER.hp + gear.hp, shield: gear.startShield, shieldUntil: 0, iframes: 1, dashCd: 0, dashT: 0, dashDir: { x: 1, y: 0 }, swingCd: 0, windup: -1, aim: 0, attacks: 0, slowUntil: 0, emergencyUsed: false, stormUntil: 0, stormTick: 0, chainAt: [] },
     buffs: [], foods, foodUsed: foods.map(() => false),
     level: 1, xp: 0, picks: {}, choices: null,
@@ -84,7 +88,7 @@ function edgePoint() {
 function makeMonster(s: RaidState, def: MonsterDef, at = edgePoint(), opts: Partial<Monster> = {}): Monster {
   return { uid: s.uid++, def, name: def.name, icon: def.icon, x: at.x, y: at.y, r: def.radius, hp: def.hp, maxHp: def.hp, damage: def.damage, defense: def.defense, speed: def.speed,
     elite: def.kind === "elite" || def.kind === "canal-elite", boss: null, xp: def.xp, timer: 1 + rnd() * 1.5, state: "move", stateT: 0, dir: { x: 1, y: 0 }, tele: null,
-    rate: 1, split: false, summoned: false, flash: 0, shots: 0, t2: 4, t3: 6, t4: 8, ...opts };
+    rate: 1, split: false, summoned: false, flash: 0, shots: 0, t2: 4, t3: 6, t4: 8, markUntil: 0, ...opts };
 }
 function spawn(s: RaidState, id: string, opts: Partial<Monster> = {}, at?: { x: number; y: number }) {
   const m = makeMonster(s, MONSTERS[id], at, opts);
@@ -135,6 +139,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   let mul = d.damageMul;
   if (m.elite || m.boss) mul += 0.12 * pick(s, "heavy-swing") + (s.evolution ? EVOLUTIONS[s.evolution].eliteBonus : 0);
   if (m.boss && s.picks.executioner) mul += 0.25;
+  if (m.markUntil > s.t) mul += 0.1;
   const crit = rnd() < d.crit;
   let dmg = base * mul * (crit ? PLAYER.critMul : 1) * (m.state === "stun" ? 1.3 : 1);
   dmg = Math.max(1, Math.round(dmg - m.defense - (m.def.kind === "crab" && m.state !== "dash" ? 3 : 0)));
@@ -180,7 +185,7 @@ function useFood(s: RaidState, i: number) {
 
 // ---------- 각성 ----------
 function offerChoices(s: RaidState) {
-  const pool = COMMON_AWAKENINGS.filter(id => id !== "pet-training" && pick(s, id) < AWAKENINGS[id].max);
+  const pool = COMMON_AWAKENINGS.filter(id => (id !== "pet-training" || s.pet) && pick(s, id) < AWAKENINGS[id].max);
   const shuffled = [...pool].sort(() => rnd() - 0.5);
   if (s.level === 5 && s.evolution) {
     const finals = (Object.keys(AWAKENINGS) as AwakenId[]).filter(id => AWAKENINGS[id].final === s.evolution);
@@ -298,6 +303,34 @@ function intervention(s: RaidState, n: number) {
   s.pops.push({ x: ARENA_W / 2, y: 60, text: `⚠ ${s.floor.boss.name}의 기척!`, t: 1.8, kind: "info" });
 }
 
+// ---------- 전투펫(31절) ----------
+function petHit(s: RaidState, m: Monster, raw: number) {
+  if (m.hp <= 0) return;
+  const dmg = Math.max(1, Math.round(raw * (m.markUntil > s.t ? 1.1 : 1) - m.defense));
+  m.hp -= dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.5, kind: "hit" });
+  if (m.hp <= 0) killMonster(s, m);
+}
+function updatePet(s: RaidState, dt: number) {
+  const pet = s.pet; if (!pet) return;
+  const p = s.player, mult = pet.mult * (1 + 0.25 * pick(s, "pet-training"));
+  // 플레이어 뒤쪽을 따라다닌다.
+  const tx = p.x - Math.cos(p.aim) * 34, ty = p.y - Math.sin(p.aim) * 34 - 10;
+  pet.x += (tx - pet.x) * Math.min(1, dt * 6); pet.y += (ty - pet.y) * Math.min(1, dt * 6);
+  pet.flash = Math.max(0, pet.flash - dt);
+  const alive = s.monsters.filter(m => m.hp > 0);
+  if (pet.id === "battle-tiger" && !pet.shieldUsed && p.hp > 0 && p.hp <= p.maxHp * 0.3) { pet.shieldUsed = true; p.shield += Math.round(30 * mult); p.shieldUntil = s.t + 60; s.pops.push({ x: p.x, y: p.y - 44, text: "🐯 백호의 가호!", t: 1.2, kind: "info" }); }
+  pet.timer -= dt; if (pet.timer > 0) return;
+  pet.flash = 0.25;
+  switch (pet.id) {
+    case "battle-hedgehog": { pet.timer = 1.4; const near = alive.filter(m => dist(m.x, m.y, pet.x, pet.y) < 220).sort((a, b) => dist(a.x, a.y, pet.x, pet.y) - dist(b.x, b.y, pet.x, pet.y))[0]; if (near) petHit(s, near, 7 * mult); break; }
+    case "battle-turtle": pet.timer = 22; if (p.shield < 10 * mult) { p.shield = Math.round(10 * mult); p.shieldUntil = s.t + 22; } break;
+    case "battle-sprite": pet.timer = 16; { const v = Math.round(4 * mult); p.hp = Math.min(p.maxHp, p.hp + v); s.pops.push({ x: p.x, y: p.y - 30, text: `+${v}`, t: 0.8, kind: "heal" }); } break;
+    case "battle-foxfire": { pet.timer = 8; const target = alive.filter(m => m.markUntil <= s.t).sort((a, b) => b.maxHp - a.maxHp)[0]; if (target) target.markUntil = s.t + 5; break; }
+    case "battle-hawk": { pet.timer = 2.2; const strong = [...alive].sort((a, b) => b.hp - a.hp)[0]; if (strong) petHit(s, strong, 16 * mult); break; }
+    case "battle-tiger": { pet.timer = 5; for (const m of alive) { const a = Math.atan2(m.y - p.y, m.x - p.x); if (dist(m.x, m.y, p.x, p.y) < 120 + m.r && angDiff(a, p.aim) < Math.PI / 3) petHit(s, m, 28 * mult); } s.swings.push({ angle: p.aim, range: 120, arc: 120, t: 0.18 }); break; }
+  }
+}
+
 // ---------- 한 스텝 ----------
 export function stepRaid(s: RaidState, dt: number, input: Input) {
   if (s.over || s.paused || s.choices) { s.prevDash = input.dash; s.prevFood = input.food; return; }
@@ -354,6 +387,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
 
   // 몬스터
   for (const m of s.monsters) if (m.hp > 0) updateMonster(s, m, dt);
+  updatePet(s, dt);
   // 몸끼리 살짝 밀어내기(겹침 완화, 인접만)
   for (let i = 0; i < s.monsters.length; i++) {
     const a = s.monsters[i]; if (a.hp <= 0 || a.boss) continue;
