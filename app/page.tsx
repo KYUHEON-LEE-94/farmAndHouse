@@ -12,6 +12,11 @@ import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
+import RaidPanel from "./raid/RaidPanel";
+import { ALL_RAID_ITEMS, ARMORS, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
+import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
+import type { ForgeActions } from "./raid/RaidPanel";
+import type { FoodSlot, RaidResult } from "./raid/engine";
 import CoinGame from "./CoinGame";
 import { COIN_ENABLED, COIN_MIN_BUY, coinBoard, settleCoin, type CoinHoldings } from "./coin";
 import { ALL_LOOT, HUNT_ENABLED, HUNT_TEST_UNLOCK_ALL, HUNT_TICKET_MINUTES, HUNT_TICKET_PRICE, WEAPONS, type Weapon } from "./hunting";
@@ -249,7 +254,7 @@ const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(M
 
 export default function Home() {
   const [now, setNow] = useState(new Date());
-  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment">("farm");
+  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid">("farm");
   const [bookSeason, setBookSeason] = useState<Season | "special" | null>(null);
   const [bet, setBet] = useState(100);
   const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
@@ -309,6 +314,9 @@ export default function Home() {
   const setProduce = categorySetter("crop"), setFishStock = categorySetter("fish"), setGoods = categorySetter("goods");
   const dishStock = useMemo(() => pickCategory(inventory, "dish"), [inventory]), setDishStock = categorySetter("dish");
   const huntStock = useMemo(() => pickCategory(inventory, "hunt"), [inventory]), setHuntStock = categorySetter("hunt");
+  // 탑 토벌: 진행 저장과 탑 재료(통합 인벤토리 raid 분류)
+  const [raid, setRaid] = useState<RaidSave>(EMPTY_RAID);
+  const raidItems = useMemo(() => pickCategory(inventory, "raid"), [inventory]), setRaidItems = categorySetter("raid");
   // 사냥 무기: 상점에서 산다(로컬 테스트 중에는 HUNT_TEST_UNLOCK_ALL로 모두 열림).
   const [ownedWeapons, setOwnedWeapons] = useState<string[]>(["hand"]);
   const [weaponId, setWeaponId] = useState("hand");
@@ -454,7 +462,7 @@ export default function Home() {
         setPlaced([...(version < 5 ? starterItems(room) : []), ...hydrate(data.placed)].map(movePetOut).map(item => fitToRoom(item, room, yard)));
         setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
-        setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0);  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
+        setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [] });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
         setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? ""); setCoinHoldings(data.coinHoldings ?? {});
       } catch { /* start fresh */ }
@@ -468,10 +476,10 @@ export default function Home() {
   // 저장은 0.4초 모아서 한 번 쓴다(드래그로 여러 칸을 심을 때 매번 전체 저장을 직렬화하지 않게). 숨김·종료·계정 저장 직전에는 바로 쓴다.
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
+    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
     const timer = window.setTimeout(flushSave, 400);
     return () => window.clearTimeout(timer);
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -545,7 +553,7 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || showMissions || tab === "hunt" || Boolean(cooking) || Boolean(cookResult) || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
+  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || showMissions || tab === "hunt" || tab === "raid" || Boolean(cooking) || Boolean(cookResult) || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
   useEffect(() => {
     if (!loaded) return;
     const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
@@ -1255,6 +1263,39 @@ export default function Home() {
     setNotice(`🎫 사냥터에 들어왔어요! ${HUNT_TICKET_MINUTES}분 동안 사냥할 수 있어요.${TEST_MODE ? " (테스트 모드: 무료)" : ""}`);
   }
 
+  /** 탑 토벌 결과 반영: 쓴 음식 소모, 클리어 상자(첫/반복), 실패 시 처치 수 보상. 받은 것 목록을 돌려준다. */
+  function applyRaidResult(result: RaidResult, foods: FoodSlot[]) {
+    const lines: string[] = [];
+    const used = result.usedFoods.map(i => foods[i]).filter((f): f is NonNullable<FoodSlot> => Boolean(f));
+    if (used.length) {
+      setDishStock(stock => { const next = { ...stock }; used.forEach(f => { next[f.key] = (next[f.key] ?? 0) - 1; if (next[f.key] <= 0) delete next[f.key]; }); return next; });
+      lines.push(`🍱 사용한 음식: ${used.map(f => `${f.icon} ${f.name}`).join(", ")}`);
+    }
+    if (result.abandoned) return lines;
+    const gain: Record<string, number> = {};
+    const roll = (drops: Drop[]) => drops.forEach(([id, min, max, chance]) => { if (Math.random() < (chance ?? 1)) gain[id] = (gain[id] ?? 0) + min + Math.floor(Math.random() * (max - min + 1)); });
+    let gold = 0, seals = 0, stabilizer = 0;
+    if (result.cleared) {
+      const reward = FLOOR_REWARDS[result.floor], first = !raid.firstClears.includes(result.floor);
+      if (first) { gold = reward.firstGold; roll(reward.first); seals = 2 + (result.floor % 5 === 0 ? 5 : 0); } else { roll(reward.repeat); seals = 1; }
+      if (Math.random() < reward.stabilizer) stabilizer = 1;
+      lines.push(first ? "🎁 첫 클리어 상자를 열었어요!" : "📦 반복 클리어 상자");
+      setRaid(r => ({ ...r, firstClears: first ? [...r.firstClears, result.floor] : r.firstClears, highestFloor: Math.max(r.highestFloor, result.floor), unlockedFloor: Math.max(r.unlockedFloor, Math.min(RAID_MAX_FLOOR, result.floor + 1)), towerSeals: r.towerSeals + seals, stabilizers: r.stabilizers + stabilizer }));
+    } else {
+      const n = Math.min(3, Math.floor(result.kills / 20));
+      if (n) gain[zoneCommon(result.floor)] = n;
+    }
+    if (gold) { setMoney(value => value + gold); lines.push(`💰 ${gold.toLocaleString()}원`); }
+    if (Object.keys(gain).length) {
+      setRaidItems(stock => { const next = { ...stock }; Object.entries(gain).forEach(([id, n]) => { next[id] = (next[id] ?? 0) + n; }); return next; });
+      Object.entries(gain).forEach(([id, n]) => lines.push(`${RAID_ITEMS[id].icon} ${RAID_ITEMS[id].name} ×${n}`));
+    }
+    if (seals) lines.push(`🔖 탑의 인장 ×${seals}`);
+    if (stabilizer) lines.push("🪨 안정화석 ×1 (행운!)");
+    if (result.cleared) playCoinSound([660, 880, 1100, 1320]);
+    return lines;
+  }
+
   /** 사냥 소재 판매. */
   function sellLoot(id: string, count: number) {
     const loot = ALL_LOOT.find(item => item.id === id), n = Math.min(count, huntStock[id] ?? 0);
@@ -1911,6 +1952,113 @@ export default function Home() {
     return out;
   }, [fishStock, orders, doneToday, ordersDone, orderDate]);
   const sellableOf = (key: string) => (isLocked(key) ? 0 : Math.max(0, (produce[key] ?? 0) - (reserved[key] ?? 0)));
+
+  // ---------- 토벌 장비·대장간 ----------
+  /** 대장간에 쓸 수 있는 재료(잠금·주문 예약분 제외). value가 낮은 것부터 쓴다. */
+  type Source = { kind: "crop" | "fish" | "hunt" | "goods"; id: string; n: number; value: number; name: string; tag: string };
+  const forgeSources = (): Source[] => {
+    const list: Source[] = [];
+    for (const key of Object.keys(produce)) {
+      const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId), n = sellableOf(key);
+      if (!crop || n <= 0 || golden) continue;
+      list.push({ kind: "crop", id: key, n, value: crop.sell * QUALITIES[quality].multiplier, name: `${crop.icon} ${crop.name}${QUALITIES[quality].stars}`, tag: quality === 0 ? "crop0" : "goodcrop" });
+    }
+    for (const [id, count] of Object.entries(fishStock)) {
+      const fish = ALL_FISH.find(f => f.id === id), n = fishLocks[id] ? 0 : Math.max(0, count - (fishReserved[id] ?? 0));
+      if (fish && n > 0 && fish.rarity !== "전설" && fish.rarity !== "신화") list.push({ kind: "fish", id, n, value: fish.price, name: `${fish.icon} ${fish.name}`, tag: "fish" });
+    }
+    for (const [id, n] of Object.entries(huntStock)) {
+      const loot = ALL_LOOT.find(l => l.id === id);
+      if (loot && n > 0) list.push({ kind: "hunt", id, n, value: loot.price, name: `${loot.icon} ${loot.name}`, tag: HUNT_COMMON_LOOT.includes(id) ? "hunt" : HUNT_RARE_LOOT.includes(id) ? "rarehunt" : "other" });
+    }
+    for (const [id, n] of Object.entries(goods)) {
+      const recipe = RECIPES.find(r => r.id === id);
+      if (n > 0) list.push({ kind: "goods", id, n, value: recipe ? goodsPrice(recipe) : 0, name: recipe ? `${recipe.icon} ${recipe.name}` : id, tag: "goods" });
+    }
+    return list.sort((a, b) => a.value - b.value);
+  };
+  type Plan = { take: { src: Source; n: number }[]; mats: Record<string, number>; gold: number };
+  /** need(재료 id·특수 키 → 개수)를 실제로 쓸 목록으로 바꾼다. 모자라면 null. */
+  const planFor = (need: Record<string, number>, gold = 0): Plan | null => {
+    const sources = forgeSources(), take: Plan["take"] = [], mats: Record<string, number> = {};
+    const grab = (tag: string, count: number) => {
+      let left = count;
+      for (const src of sources.filter(x => x.tag === tag)) { const used = take.filter(t => t.src === src).reduce((sum, t) => sum + t.n, 0); const n = Math.min(left, src.n - used); if (n > 0) { take.push({ src, n }); left -= n; } if (!left) break; }
+      return left === 0;
+    };
+    for (const [id, n] of Object.entries(need)) {
+      if (id === "good-crop") { if (!grab("goodcrop", n)) return null; }
+      else if (id === "rare-hunt") { if (!grab("rarehunt", n)) return null; }
+      else if (id === "goods") { if (!grab("goods", n)) return null; }
+      else if (huntStock[id] !== undefined || ALL_LOOT.some(l => l.id === id)) { if ((huntStock[id] ?? 0) < n) return null; const src = sources.find(x => x.kind === "hunt" && x.id === id)!; take.push({ src, n }); }
+      else { if ((raidItems[id] ?? 0) < n) return null; mats[id] = n; }
+    }
+    if (money < gold) return null;
+    return { take, mats, gold };
+  };
+  const LIFE_NEED: Record<string, () => Plan | null> = {
+    "farm-fiber": () => { const sources = forgeSources().filter(x => x.tag === "crop0"); let left = 5; const take: Plan["take"] = []; for (const src of sources) { const n = Math.min(left, src.n); if (n) { take.push({ src, n }); left -= n; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; },
+    "fish-oil": () => { const sources = forgeSources().filter(x => x.tag === "fish"); let left = 3; const take: Plan["take"] = []; for (const src of sources) { const n = Math.min(left, src.n); if (n) { take.push({ src, n }); left -= n; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; },
+    "tanned-leather": () => { const sources = forgeSources().filter(x => x.tag === "hunt"); let left = 3; const take: Plan["take"] = []; for (const src of sources) { const n = Math.min(left, src.n); if (n) { take.push({ src, n }); left -= n; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; },
+    "artisan-core": () => planFor({ "farm-fiber": 1, "fish-oil": 1, "tanned-leather": 1, goods: 1 }),
+  };
+  const describePlan = (plan: Plan) => [...plan.take.map(t => `${t.src.name} ${t.n}`), ...Object.entries(plan.mats).map(([id, n]) => `${ALL_RAID_ITEMS[id]?.icon ?? ""} ${ALL_RAID_ITEMS[id]?.name ?? id} ${n}`)];
+  /** 계획대로 재료·돈을 쓴다. */
+  function spendPlan(plan: Plan) {
+    const by = (kind: Source["kind"]) => plan.take.filter(t => t.src.kind === kind);
+    const minus = (view: Record<string, number>, items: { src: Source; n: number }[]) => { const next = { ...view }; items.forEach(t => { next[t.src.id] = (next[t.src.id] ?? 0) - t.n; if (next[t.src.id] <= 0) delete next[t.src.id]; }); return next; };
+    if (by("crop").length) setProduce(view => minus(view, by("crop")));
+    if (by("fish").length) setFishStock(view => minus(view, by("fish")));
+    if (by("hunt").length) setHuntStock(view => minus(view, by("hunt")));
+    if (by("goods").length) setGoods(view => minus(view, by("goods")));
+    if (Object.keys(plan.mats).length) setRaidItems(view => { const next = { ...view }; Object.entries(plan.mats).forEach(([id, n]) => { next[id] = (next[id] ?? 0) - n; if (next[id] <= 0) delete next[id]; }); return next; });
+    if (plan.gold) setMoney(value => value - plan.gold);
+  }
+  const forgeHave: Record<string, number> = { ...huntStock, ...raidItems };
+  { const src = forgeSources(); forgeHave["rare-hunt"] = src.filter(x => x.tag === "rarehunt").reduce((sum, x) => sum + x.n, 0); forgeHave.goods = src.filter(x => x.tag === "goods").reduce((sum, x) => sum + x.n, 0); forgeHave["good-crop"] = src.filter(x => x.tag === "goodcrop").reduce((sum, x) => sum + x.n, 0); }
+  const forge: ForgeActions = {
+    have: forgeHave, money,
+    lifePlan: id => { const plan = LIFE_NEED[id]?.(); return plan ? describePlan(plan) : null; },
+    craftLife: id => {
+      const plan = LIFE_NEED[id]?.(); if (!plan) return setNotice("재료가 부족해요.");
+      spendPlan(plan); setRaidItems(view => ({ ...view, [id]: (view[id] ?? 0) + 1 }));
+      playCoinSound([660, 880]); setNotice(`${LIFE_MATS[id].icon} ${LIFE_MATS[id].name}을(를) 만들었어요. (사용: ${describePlan(plan).join(", ")})`);
+    },
+    enhance: useStabilizer => {
+      const w = raid.weapons["raid-scythe"], step = nextStep(w.enhancement);
+      if (!step || (w.enhancement >= 10 && !w.evolution) || (step.open && !w.unlockedEnhancements.includes(step.to))) return;
+      const plan = planFor(step.need, step.gold); if (!plan) return setNotice("강화 재료나 돈이 모자라요.");
+      spendPlan(plan);
+      const roll = rollEnhance(w.enhancement, step, useStabilizer, raid.stabilizers);
+      setRaid(r => applyEnhance(r, "raid-scythe", roll));
+      if (roll.success) { playCoinSound([660, 880, 1100, 1320, 1760]); setNotice(`🔨✨ 강화 성공! 토벌 낫 +${step.to}${step.to === 10 ? " — 이제 진화 방향을 고를 수 있어요!" : ""}`); }
+      else if (roll.dropped) { playSadTrombone(); setNotice(`💥 강화 실패… 단계가 내려가 +${w.enhancement - 1}이 됐어요.`); }
+      else if (roll.saved) { playCoinSound([440, 660]); setNotice("🪨 강화 실패! 하락할 뻔했지만 안정화석이 막아 줬어요(1개 소모)."); }
+      else { playCoinSound([440, 330]); setNotice(`🔨 강화 실패… +${w.enhancement} 그대로예요. (재료와 돈은 사용됐어요)`); }
+    },
+    openStep: () => {
+      const w = raid.weapons["raid-scythe"], step = nextStep(w.enhancement);
+      if (!step?.open || w.unlockedEnhancements.includes(step.to)) return;
+      const plan = planFor(step.open.need, step.open.gold); if (!plan) return setNotice("개방 재료나 돈이 모자라요.");
+      spendPlan(plan);
+      setRaid(r => ({ ...r, weapons: { ...r.weapons, "raid-scythe": { ...r.weapons["raid-scythe"], unlockedEnhancements: [...r.weapons["raid-scythe"].unlockedEnhancements, step.to] } } }));
+      playCoinSound([660, 990, 1320]); setNotice(`🔓 +${step.to} 강화 단계를 열었어요!`);
+    },
+    evolve: (evolution: Evolution) => {
+      const w = raid.weapons["raid-scythe"];
+      if (w.enhancement < 10 || w.evolution) return;
+      setRaid(r => setEvolution(r, "raid-scythe", evolution)); playCoinSound([660, 880, 1100, 1320]);
+      setNotice(`⚡ 토벌 낫이 진화했어요!`);
+    },
+    craftArmor: id => {
+      const armor = ARMORS.find(a => a.id === id); if (!armor || raid.armorOwned.includes(id)) return;
+      const plan = planFor(armor.need, armor.gold); if (!plan) return setNotice("방어구 재료나 돈이 모자라요.");
+      spendPlan(plan);
+      setRaid(r => ({ ...r, armorOwned: [...r.armorOwned, id], equipped: r.equipped[armor.slot] ? r.equipped : { ...r.equipped, [armor.slot]: id } }));
+      playCoinSound([660, 880, 1100]); setNotice(`${armor.icon} ${armor.name}을(를) 만들었어요!`);
+    },
+    equip: (slot: ArmorSlot, id: string | null) => setRaid(r => ({ ...r, equipped: { ...r.equipped, [slot]: id } })),
+  };
   const readyOrders = orders.filter(order => !doneToday.includes(order.id) && order.items.every(item => depositedFor(order, item) + orderHave(item) >= item.count)).length;
   // 창고: 작물별 상자 하나에 품질 묶음을 모은다. 최근 6번(30분) 시세 흐름도 함께.
   const storageBoxes = !showStorage ? [] : Object.values(Object.entries(produce).filter(([, count]) => count > 0).reduce<Record<string, { cropId: string; keys: string[] }>>((acc, [key]) => { const { cropId } = parseProduceKey(key); (acc[cropId] ??= { cropId, keys: [] }).keys.push(key); return acc; }, {})).map(({ cropId, keys }) => {
@@ -2007,6 +2155,7 @@ export default function Home() {
         <button className={tab === "farm" ? "active" : ""} onClick={() => switchTab("farm")}>🌱 텃밭</button>
         <button className={tab === "fish" ? "active" : ""} onClick={() => switchTab("fish")}>🎣 낚시터</button>
         {HUNT_ENABLED && <button className={tab === "hunt" ? "active" : ""} onClick={() => switchTab("hunt")}>🏹 사냥터</button>}
+        {RAID_ENABLED && <button className={tab === "raid" ? "active" : ""} onClick={() => switchTab("raid")}>🗼 토벌탑</button>}
         <button className={tab === "book" ? "active" : ""} onClick={() => switchTab("book")}>📖 도감</button>
         <button className={tab === "home" ? "active" : ""} onClick={() => switchTab("home")}>🏡 나의 집</button>
         <button className={tab === "pets" ? "active" : ""} onClick={() => switchTab("pets")}>🐾 펫</button>
@@ -2217,6 +2366,11 @@ export default function Home() {
               {petFx?.id === id && <span key={petFx.at} className={`pet-fx ${petFx.level ? "level" : ""}`} aria-hidden="true">{petFx.text}</span>}
             </article>; })}</div>}
         </section>; })()}
+
+      {RAID_ENABLED && tab === "raid" && <section className="panel raid-panel">
+        <div className="panel-heading"><div><span className="eyebrow">TOWER RAID · 로컬 테스트</span><h3>월루탑 토벌</h3></div><span className="plot-count">최고 {raid.highestFloor}층 · 1~{RAID_MAX_FLOOR}층 개방</span></div>
+        <RaidPanel raid={raid} dishStock={dishStock} raidItems={raidItems} hold={bossMode || tab !== "raid"} avatar={avatar} forge={forge} onResult={applyRaidResult} />
+      </section>}
 
       {HUNT_ENABLED && tab === "hunt" && <div className="game-grid">
         <section className="panel hunt-panel">
