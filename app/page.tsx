@@ -12,6 +12,8 @@ import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
+import CoinGame from "./CoinGame";
+import { COIN_ENABLED, COIN_MIN_BUY, coinBoard, settleCoin, type CoinHoldings } from "./coin";
 import { ALL_LOOT, HUNT_ENABLED, HUNT_TEST_UNLOCK_ALL, HUNT_TICKET_MINUTES, HUNT_TICKET_PRICE, WEAPONS, type Weapon } from "./hunting";
 import { TEST_MODE, ownsItem } from "./testMode";
 import { KitchenPanel } from "./KitchenPanel";
@@ -253,7 +255,9 @@ export default function Home() {
   const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
   const [lastRoll, setLastRoll] = useState<Roll | null>(null);
   const [rollHistory, setRollHistory] = useState<Roll[]>([]);
-  const [casinoGame, setCasinoGame] = useState<"parity" | "slot" | "blackjack">("parity");
+  const [casinoGame, setCasinoGame] = useState<"parity" | "slot" | "blackjack" | "coin">("parity");
+  // 도박장 코인 보유분("자리:회차" → 개수·들인 돈). 끝난 코인은 다음 시계 틱에 정산한다.
+  const [coinHoldings, setCoinHoldings] = useState<CoinHoldings>({});
   const [bj, setBj] = useState<{ phase: "idle" | "player" | "dealer" | "done"; player: Card[]; dealer: Card[]; bet: number; outcome?: BlackjackOutcome; payout?: number }>({ phase: "idle", player: [], dealer: [], bet: 0 });
   const [slotReels, setSlotReels] = useState(["🍒", "⭐", "7️⃣"]);
   const [slotSpinning, setSlotSpinning] = useState(0);
@@ -452,7 +456,7 @@ export default function Home() {
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
         setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0);  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
-        setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? "");
+        setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId ?? ""); setCoinHoldings(data.coinHoldings ?? {});
       } catch { /* start fresh */ }
     }
     try { const stored = localStorage.getItem(AVATAR_STORAGE_KEY); if (stored) setAvatar(JSON.parse(stored)); } catch { /* keep default */ }
@@ -464,10 +468,10 @@ export default function Home() {
   // 저장은 0.4초 모아서 한 번 쓴다(드래그로 여러 칸을 심을 때 매번 전체 저장을 직렬화하지 않게). 숨김·종료·계정 저장 직전에는 바로 쓴다.
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
     const timer = window.setTimeout(flushSave, 400);
     return () => window.clearTimeout(timer);
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -1482,6 +1486,35 @@ export default function Home() {
     }, 1200);
   }
 
+  // ---------- 도박장 코인 ----------
+  useEffect(() => {
+    const done = Object.entries(coinHoldings).map(([key, own]) => ({ key, own, result: settleCoin(key, own.units, nowMs) })).filter(entry => entry.result);
+    if (!done.length) return;
+    const timer = window.setTimeout(() => {
+      const payout = done.reduce((sum, entry) => sum + entry.result!.payout, 0);
+      setCoinHoldings(all => { const next = { ...all }; done.forEach(entry => delete next[entry.key]); return next; });
+      if (payout > 0) { setMoney(value => value + payout); playCoinSound([880, 1100, 1320]); }
+      setNotice(done.map(({ own, result }) => result!.coin ? (result!.coin.delisted ? `💀 ${result!.coin.icon} ${result!.coin.name} 상장 폐지… ${own.spent.toLocaleString()}원어치가 휴지조각` : `🎉 ${result!.coin.icon} ${result!.coin.name} 만기 정산 ${result!.payout.toLocaleString()}원`) : "").filter(Boolean).join(" · "));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [coinHoldings, nowMs]);
+  function buyCoin(key: string, amount: number) {
+    const quote = coinBoard(Date.now()).quotes.find(item => item.key === key);
+    if (!quote) return setNotice("방금 시세가 바뀌었어요. 다시 골라 주세요.");
+    if (amount < COIN_MIN_BUY || money < amount || quote.price <= 0) return setNotice(`코인은 ${COIN_MIN_BUY}원부터 살 수 있어요.`);
+    setMoney(value => value - amount); playCoinSound([660, 880]);
+    setCoinHoldings(all => ({ ...all, [key]: { units: (all[key]?.units ?? 0) + amount / quote.price, spent: (all[key]?.spent ?? 0) + amount } }));
+    setNotice(`${quote.coin.icon} ${quote.coin.name}을(를) ${amount.toLocaleString()}원어치 샀어요. (개당 ${quote.price.toLocaleString()}원)`);
+  }
+  function sellCoin(key: string, fraction: number) {
+    const quote = coinBoard(Date.now()).quotes.find(item => item.key === key), own = coinHoldings[key];
+    if (!quote || !own) return;
+    const units = own.units * fraction, payout = Math.floor(units * quote.price), spent = Math.round(own.spent * fraction);
+    setMoney(value => value + payout); playCoinSound(payout >= spent ? [880, 1100, 1320] : [440, 330]);
+    setCoinHoldings(all => { const next = { ...all }; if (fraction >= 1) delete next[key]; else next[key] = { units: own.units - units, spent: own.spent - spent }; return next; });
+    setNotice(`${quote.coin.icon} ${quote.coin.name} ${fraction >= 1 ? "전부" : `${fraction * 100}%`}를 ${payout.toLocaleString()}원에 팔았어요. (${payout >= spent ? "+" : ""}${(payout - spent).toLocaleString()}원)`);
+  }
+
   function recordCasino(amount: number, payout: number) {
     const win = payout > 0;
     setCasinoStats(stats => { const streak = win ? Math.max(1, stats.streak + 1) : Math.min(-1, stats.streak - 1); return { wins: stats.wins + (win ? 1 : 0), losses: stats.losses + (win ? 0 : 1), net: stats.net + payout - amount, streak, best: Math.max(stats.best, streak) }; });
@@ -2203,7 +2236,7 @@ export default function Home() {
 
       {tab === "casino" && <div className="game-grid">
         <section className="panel casino-panel">
-          <div className="panel-heading"><div><span className="eyebrow">BACK ALLEY</span><h3>뒷골목 도박장</h3></div><div className="shop-tabs casino-tabs" role="tablist">{([["parity", "🎲 홀짝"], ["slot", "🎰 슬롯"], ["blackjack", "🃏 블랙잭"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => setCasinoGame(id)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>{label}</button>)}</div></div>
+          <div className="panel-heading"><div><span className="eyebrow">BACK ALLEY</span><h3>뒷골목 도박장</h3></div><div className="shop-tabs casino-tabs" role="tablist">{([["parity", "🎲 홀짝"], ["slot", "🎰 슬롯"], ["blackjack", "🃏 블랙잭"], ...(COIN_ENABLED ? [["coin", "🪙 코인"]] as const : [])] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => setCasinoGame(id)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>{label}</button>)}</div></div>
           <div className={`dealer ${casinoFx?.kind ?? "idle"}`} key={`dealer-${casinoFx?.id ?? 0}`}>
             <span className="dealer-face">🦝{casinoFx && <em className="dealer-mood">{{ win: "😤", jackpot: "😭", lose: "🤣", near: "😝" }[casinoFx.kind]}</em>}</span>
             <div className="bubble-wrap"><p className="bubble">{casinoFx?.line ?? dealerIdle}</p>{casinoFx && (casinoFx.kind === "lose" || casinoFx.kind === "near") && <p className="laugh-line">{laughter(Math.max(1, -casinoStats.streak)).split("").map((char, i) => <span key={i} style={{ animationDelay: `${i * 0.05}s` }}>{char}</span>)}</p>}</div>
@@ -2222,7 +2255,7 @@ export default function Home() {
             {casinoFx.kind === "jackpot" && <strong className="jackpot">JACKPOT!!</strong>}
           </div>}
           <div className={casinoFx && (casinoFx.kind === "lose" || casinoFx.kind === "near") ? "fx-shake" : ""} key={`table-${casinoFx?.id ?? 0}`}>
-          {casinoGame === "blackjack" ? <div className={`bj-table ${bj.outcome ?? ""}`}>
+          {casinoGame === "coin" ? <CoinGame nowMs={nowMs} money={money} holdings={coinHoldings} onBuy={buyCoin} onSell={sellCoin} /> : casinoGame === "blackjack" ? <div className={`bj-table ${bj.outcome ?? ""}`}>
             {(() => { const hide = bj.phase === "player"; const cards = (list: Card[], hideSecond: boolean) => list.map((card, i) => hideSecond && i === 1 ? <span key={i} className="card back" /> : <span key={`${i}-${card.rank}${card.suit}`} className={`card ${card.suit === "♥" || card.suit === "♦" ? "red" : ""}`} style={{ animationDelay: `${i * 0.08}s` }}><b>{cardLabel(card)}</b><i>{card.suit}</i></span>);
               return <>
                 <div className="bj-hand"><small>딜러 {bj.dealer.length ? (hide ? `${handValue([bj.dealer[0]]).total} + ?` : handValue(bj.dealer).total) : ""}</small><div>{bj.dealer.length ? cards(bj.dealer, hide) : <span className="card back" />}</div></div>
@@ -2266,9 +2299,9 @@ export default function Home() {
             <button className={`lever-button ${lastSlot && lastSlot.payout < lastSlot.bet ? "revenge" : ""}`} onClick={pullLever} disabled={slotSpinning > 0 || money < bet}>{lastSlot && lastSlot.payout < lastSlot.bet ? "🔥 복수의 레버" : "🎰 레버 당기기"} · {bet.toLocaleString()}원</button>
             <div className="slot-paytable">{SLOT_SYMBOLS.map(symbol => <span key={symbol.icon}>{symbol.icon}{symbol.icon}{symbol.icon}<b>×{symbol.triple}</b></span>)}<span>🍒🍒 + 아무거나<b>×{CHERRY_PAIR}</b></span></div>
           </>}
-          {(() => { const [win, lose] = casinoGame === "parity" ? [PARITY_WIN_CHANCE, 1 - PARITY_WIN_CHANCE] : casinoGame === "slot" ? [slotOdds().anyWin, 1 - slotOdds().anyWin] : [BLACKJACK_ODDS.win, BLACKJACK_ODDS.lose];
+          {casinoGame !== "coin" && (() => { const [win, lose] = casinoGame === "parity" ? [PARITY_WIN_CHANCE, 1 - PARITY_WIN_CHANCE] : casinoGame === "slot" ? [slotOdds().anyWin, 1 - slotOdds().anyWin] : [BLACKJACK_ODDS.win, BLACKJACK_ODDS.lose];
             return <p className="odds-line" aria-label="확률">🎲 이길 확률 <b className="win">{Math.round(win * 100)}%</b> · 질 확률 <b className="lose">{Math.round(lose * 100)}%</b>{casinoGame === "blackjack" && <> · 무승부 {Math.round(BLACKJACK_ODDS.push * 100)}%</>}</p>; })()}
-          <p className="hint">⚠ 게임 속 돈으로만 하는 놀이예요. {casinoGame === "blackjack" ? "블랙잭은 딜러가 마지막에 카드를 받아 조금 유리해서" : casinoGame === "slot" ? `슬롯의 기대 환수율은 약 ${Math.round(slotReturnRate() * 100)}%라` : `홀짝은 이길 확률 ${Math.round(PARITY_WIN_CHANCE * 100)}% · 질 확률 ${100 - Math.round(PARITY_WIN_CHANCE * 100)}%에 배당 ×${PAYOUT}라`} 오래 하면 조금씩 잃게 돼요. 판돈은 {MIN_BET.toLocaleString()}원부터 가진 돈 전부까지 자유롭게 걸 수 있어요(올인 주의!).</p>
+          {casinoGame !== "coin" && <p className="hint">⚠ 게임 속 돈으로만 하는 놀이예요. {casinoGame === "blackjack" ? "블랙잭은 딜러가 마지막에 카드를 받아 조금 유리해서" : casinoGame === "slot" ? `슬롯의 기대 환수율은 약 ${Math.round(slotReturnRate() * 100)}%라` : `홀짝은 이길 확률 ${Math.round(PARITY_WIN_CHANCE * 100)}% · 질 확률 ${100 - Math.round(PARITY_WIN_CHANCE * 100)}%에 배당 ×${PAYOUT}라`} 오래 하면 조금씩 잃게 돼요. 판돈은 {MIN_BET.toLocaleString()}원부터 가진 돈 전부까지 자유롭게 걸 수 있어요(올인 주의!).</p>}
         </section>
         <aside className="panel casino-side">
           <div className="panel-heading"><div><span className="eyebrow">RECORD</span><h3>전적</h3></div></div>
