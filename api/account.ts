@@ -21,7 +21,7 @@ const ITERATIONS = 100_000;
 const MAX_FAILS = 10;
 
 type Account = { salt: string; hash: string; iterations: number; save: string | null; createdAt: number; updatedAt: number };
-type Body = { action?: string; id?: unknown; password?: unknown; token?: unknown; save?: unknown };
+type Body = { action?: string; id?: unknown; password?: unknown; token?: unknown; save?: unknown; baseAt?: unknown; force?: unknown };
 
 // Windows 위젯(file://)에서도 부를 수 있게 CORS를 연다. 인증은 토큰으로 한다.
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type" };
@@ -109,6 +109,11 @@ export async function POST(request: Request) {
         if (!account) return json({ error: "계정을 찾을 수 없어요." }, 404);
         if (body.action === "load") return json({ id: owner, save: account.save, updatedAt: account.updatedAt });
         if (!save) return json({ error: "저장할 데이터가 없어요." }, 400);
+        // 덮어쓰기 방지: 이 기기가 알고 있는 계정 저장(baseAt)보다 더 새 저장이 있으면(다른 기기에서 진행) 거절하고 그 저장을 돌려준다.
+        // baseAt이 없는 예전 클라이언트, force(사용자가 덮어쓰기를 직접 고름)는 검사하지 않는다.
+        const baseAt = Number(body.baseAt) || 0;
+        if (baseAt && !body.force && account.updatedAt && account.updatedAt > baseAt && account.save !== save)
+          return json({ error: "다른 기기에서 더 최근에 저장한 게임이 있어요.", save: account.save, updatedAt: account.updatedAt }, 409);
         account.save = save;
         account.updatedAt = Date.now();
         await redis("SET", `wolru:user:${owner}`, JSON.stringify(account));

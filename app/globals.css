@@ -831,3 +831,8 @@ button { color:inherit; }
 .special-crop-limit { grid-column:1/-1; font-size:11px; color:#89601d; background:#f8edcd; padding:6px 8px; border-radius:8px; }
 .special-crop-limit small { display:block; font-size:10px; margin-top:3px; color:#837457; }
 .crop-card:disabled { opacity:.6; cursor:not-allowed; }
+
+/* 설정: 계정 수동 저장 */
+.settings-save{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px;margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fffdf7}
+.settings-save b{grid-column:1/-1;font-size:13px}.settings-save small{color:#6b6450;font-size:11.5px}
+.settings-save button{width:auto;padding:7px 14px;margin:0}

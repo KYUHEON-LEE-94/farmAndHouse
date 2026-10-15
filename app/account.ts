@@ -16,7 +16,16 @@ type Reply = { id?: string; token?: string; save?: string | null; updatedAt?: nu
 const API = typeof location !== "undefined" && location.hostname.endsWith("vercel.app") ? "/api/account" : "https://farm-and-house.vercel.app/api/account";
 
 export class AccountError extends Error {
-  constructor(message: string, public status: number) { super(message); }
+  constructor(message: string, public status: number, public reply?: Reply) { super(message); }
+}
+
+/** 이 기기가 마지막으로 맞춘 계정 저장 시각(서버 updatedAt). 다른 기기의 더 새 저장을 덮어쓰지 않게 쓴다. */
+const CLOUD_BASE_KEY = "wolru-farm-cloud-base";
+export function readCloudBase(id: string) {
+  try { const raw = JSON.parse(localStorage.getItem(CLOUD_BASE_KEY) ?? "null") as { id: string; at: number } | null; return raw && raw.id === id ? raw.at : 0; } catch { return 0; }
+}
+export function writeCloudBase(id: string, at: number) {
+  try { localStorage.setItem(CLOUD_BASE_KEY, JSON.stringify({ id, at })); } catch { /* 저장 불가 */ }
 }
 
 export async function accountCall(body: Record<string, unknown>): Promise<Reply> {
@@ -27,7 +36,7 @@ export async function accountCall(body: Record<string, unknown>): Promise<Reply>
     throw new AccountError("서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.", 0);
   }
   const data = (await response.json().catch(() => ({}))) as Reply;
-  if (!response.ok) throw new AccountError(data.error ?? `서버 오류(${response.status})`, response.status);
+  if (!response.ok) throw new AccountError(data.error ?? `서버 오류(${response.status})`, response.status, data);
   return data;
 }
 

@@ -21,7 +21,7 @@ import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
 import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, MARKET_DEMAND, OVERFLOW_RATE, SAT_MAX, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_BASE, petBugPenalty, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
-import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session } from "./account";
+import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session, readCloudBase, writeCloudBase } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
 import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
@@ -404,9 +404,11 @@ export default function Home() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState("");
   const [cloudAt, setCloudAt] = useState<number | null>(null);
-  const [pendingLoad, setPendingLoad] = useState<{ save: string; updatedAt: number; session: Session } | null>(null);
+  const [pendingLoad, setPendingLoad] = useState<{ save: string; updatedAt: number; session: Session; conflict?: boolean } | null>(null);
   const suspendSave = useRef(false);
   const lastSynced = useRef("");
+  // 계정 충돌 방지: cloudChecked = 시작할 때 계정 저장과 비교를 마쳤는지, cloudConflict = 다른 기기의 더 새 저장이 있어 자동 저장을 멈췄는지.
+  const cloudChecked = useRef(false), cloudConflict = useRef(false);
   const offGate = useRef({ isWorkTime: false, secondsLeft: -1, money: 0, notify: false, dayStart: null as { date: string; money: number } | null, endHour: 18, seasonIndex: -1, seasonLeft: 0 });
   const [loaded, setLoaded] = useState(false);
   const fishTimer = useRef<number | undefined>(undefined);
@@ -688,19 +690,46 @@ export default function Home() {
   /** 바뀐 진행 상황이 있으면 계정에 올린다. */
   async function syncCloud(force = false) {
     if (!session || suspendSave.current || TEST_MODE) return; // 로컬 테스트 상태가 실제 계정에 올라가지 않게
+    // 시작 비교 전이거나 다른 기기 저장과 충돌 중이면 자동 저장하지 않는다(수동 저장은 서버가 다시 비교해 충돌 창을 띄운다).
+    if (!force && (!cloudChecked.current || cloudConflict.current)) return;
     const save = packSave();
     if (!force && save === lastSynced.current) return;
     try {
-      const reply = await accountCall({ action: "save", token: session.token, save });
-      lastSynced.current = save; setCloudAt(reply.updatedAt ?? Date.now());
+      const reply = await accountCall({ action: "save", token: session.token, save, baseAt: readCloudBase(session.id) });
+      lastSynced.current = save; setCloudAt(reply.updatedAt ?? Date.now()); writeCloudBase(session.id, reply.updatedAt ?? Date.now());
+      cloudChecked.current = true; cloudConflict.current = false;
       if (force) setNotice("☁️ 계정에 지금 진행 상황을 저장했어요.");
     } catch (error) {
-      if (error instanceof AccountError && error.status === 401) { writeSession(null); setSession(null); setNotice("☁️ 로그인이 만료됐어요. 👤 계정에서 다시 로그인해 주세요."); }
+      if (error instanceof AccountError && error.status === 409 && error.reply?.save) showCloudConflict(error.reply.save, error.reply.updatedAt ?? 0);
+      else if (error instanceof AccountError && error.status === 401) { writeSession(null); setSession(null); setNotice("☁️ 로그인이 만료됐어요. 👤 계정에서 다시 로그인해 주세요."); }
       else if (force) setNotice(`☁️ 저장하지 못했어요: ${(error as Error).message}`);
     }
   }
+  /** 다른 기기에서 더 최근에 저장한 게임이 있다: 자동 저장을 멈추고 불러올지 덮어쓸지 고르게 한다. */
+  function showCloudConflict(save: string, updatedAt: number) {
+    if (!session) return;
+    cloudConflict.current = true;
+    setPendingLoad({ save, updatedAt, session, conflict: true }); setShowAccount(true);
+    setNotice("☁️ 다른 기기에서 더 최근에 저장한 게임이 있어요. 덮어쓰지 않도록 자동 저장을 멈췄어요.");
+  }
   const syncRef = useRef(syncCloud);
   useEffect(() => { syncRef.current = syncCloud; });
+  const showCloudConflictRef = useRef(showCloudConflict);
+  useEffect(() => { showCloudConflictRef.current = showCloudConflict; });
+  // 로그인 상태로 시작하면 먼저 계정 저장과 비교한다. 이 기기가 모르는 더 새 저장이 있으면 덮어쓰지 않고 물어본다.
+  useEffect(() => {
+    if (!session || TEST_MODE) return;
+    cloudChecked.current = false; cloudConflict.current = false;
+    let alive = true;
+    accountCall({ action: "load", token: session.token }).then(reply => {
+      if (!alive) return;
+      const base = readCloudBase(session.id), at = reply.updatedAt ?? 0, local = packSave();
+      cloudChecked.current = true;
+      if (reply.save && reply.save === local) { lastSynced.current = local; writeCloudBase(session.id, at); return; }
+      if (reply.save && at > base) showCloudConflictRef.current(reply.save, at);
+    }).catch(error => { if (alive && error instanceof AccountError && error.status === 401) { writeSession(null); setSession(null); setNotice("☁️ 로그인이 만료됐어요. 👤 계정에서 다시 로그인해 주세요."); } });
+    return () => { alive = false; };
+  }, [session]);
   useEffect(() => {
     if (!session) return;
     const timer = setInterval(() => syncRef.current(), CLOUD_SYNC_SECONDS * 1000);
@@ -710,8 +739,9 @@ export default function Home() {
   }, [session]);
 
   /** 계정의 저장을 이 기기에 덮어쓰고 새로 시작한다. */
-  function applyCloudSave(save: string, next: Session) {
+  function applyCloudSave(save: string, next: Session, updatedAt: number) {
     suspendSave.current = true;
+    writeCloudBase(next.id, updatedAt);
     // 덮어쓰기 전에 이 기기의 게임을 따로 백업해 둔다(혹시 모를 실수 대비).
     try { localStorage.setItem("four-seasons-farm-before-cloud", packSave()); } catch { /* 공간 부족: 백업 없이 진행 */ }
     if (!unpackSave(save)) { suspendSave.current = false; return setAccountError("저장 데이터를 읽지 못했어요."); }
@@ -728,7 +758,7 @@ export default function Home() {
       if (accountMode === "register") {
         const save = packSave();
         const reply = await accountCall({ action: "register", id, password: accountForm.password, save });
-        const next = { id, token: reply.token! }; writeSession(next); setSession(next);
+        const next = { id, token: reply.token! }; writeCloudBase(id, reply.updatedAt ?? Date.now()); writeSession(next); setSession(next);
         lastSynced.current = save; setCloudAt(reply.updatedAt ?? Date.now());
         setAccountForm({ id: "", password: "", confirm: "" }); setShowAccount(false);
         setNotice(`👤 ${id} 계정을 만들었어요! 지금 진행 상황을 계정에 저장했어요. 다른 기기에서 같은 아이디로 불러올 수 있어요.`);
@@ -2475,12 +2505,12 @@ export default function Home() {
         <button className="modal-close" onClick={() => { setShowAccount(false); setPendingLoad(null); }} aria-label="닫기">×</button>
         <span className="eyebrow">ACCOUNT</span><h3 id="account-title">{pendingLoad ? "저장된 게임 불러오기" : session ? `👤 ${session.id}` : "계정"}</h3>
         {pendingLoad ? <>
-          <p>이 계정에 저장된 게임이 있어요.<br /><b>마지막 저장 {new Date(pendingLoad.updatedAt).toLocaleString("ko-KR")}</b>{saveSummary(pendingLoad.save) ? ` · 보유 자금 ${saveSummary(pendingLoad.save)!.money.toLocaleString()}원` : ""}</p>
+          <p>{pendingLoad.conflict ? <><b>⚠️ 계정에 저장된 게임이 이 기기의 게임과 달라요.</b> 다른 기기에서 진행했을 수 있어서, 덮어쓰지 않도록 자동 저장을 멈췄어요. 어느 쪽으로 할지 골라 주세요.</> : "이 계정에 저장된 게임이 있어요."}<br /><b>마지막 저장 {new Date(pendingLoad.updatedAt).toLocaleString("ko-KR")}</b>{saveSummary(pendingLoad.save) ? ` · 보유 자금 ${saveSummary(pendingLoad.save)!.money.toLocaleString()}원` : ""}</p>
           <p className="account-warn">불러오면 이 기기의 지금 진행 상황(보유 자금 {money.toLocaleString()}원)은 계정의 게임으로 바뀌어요. (이 기기 게임은 백업해 둬요)</p>
           <div className="account-actions">
-            <button className="save-button" onClick={() => applyCloudSave(pendingLoad.save, pendingLoad.session)}>☁️ 계정 게임 불러오기</button>
-            <button className="ghost-button" onClick={() => { if (!window.confirm(`계정에 저장된 게임(보유 자금 ${(saveSummary(pendingLoad.save)?.money ?? 0).toLocaleString()}원)을 지우고 이 기기의 게임으로 바꿀까요? 되돌릴 수 없어요.`)) return; const next = pendingLoad.session; writeSession(next); setSession(next); setPendingLoad(null); setShowAccount(false); accountCall({ action: "save", token: next.token, save: packSave() }).then(reply => { lastSynced.current = packSave(); setCloudAt(reply.updatedAt ?? Date.now()); setNotice("☁️ 이 기기의 게임을 계정에 저장했어요."); }).catch(error => setNotice(`☁️ 저장하지 못했어요: ${(error as Error).message}`)); }}>이 기기 게임을 계정에 덮어쓰기</button>
-            <button className="ghost-button" onClick={() => { setPendingLoad(null); if (!session) setShowAccount(false); }}>{session ? "취소" : "취소 (로그인 안 함)"}</button>
+            <button className="save-button" onClick={() => applyCloudSave(pendingLoad.save, pendingLoad.session, pendingLoad.updatedAt)}>☁️ 계정 게임 불러오기</button>
+            <button className="ghost-button" onClick={() => { if (!window.confirm(`계정에 저장된 게임(보유 자금 ${(saveSummary(pendingLoad.save)?.money ?? 0).toLocaleString()}원)을 지우고 이 기기의 게임으로 바꿀까요? 되돌릴 수 없어요.`)) return; const next = pendingLoad.session; writeSession(next); setSession(next); setPendingLoad(null); setShowAccount(false); accountCall({ action: "save", token: next.token, save: packSave(), force: true }).then(reply => { lastSynced.current = packSave(); setCloudAt(reply.updatedAt ?? Date.now()); writeCloudBase(next.id, reply.updatedAt ?? Date.now()); cloudChecked.current = true; cloudConflict.current = false; setNotice("☁️ 이 기기의 게임을 계정에 저장했어요."); }).catch(error => setNotice(`☁️ 저장하지 못했어요: ${(error as Error).message}`)); }}>이 기기 게임을 계정에 덮어쓰기</button>
+            <button className="ghost-button" onClick={() => { setPendingLoad(null); if (!session) setShowAccount(false); }}>{pendingLoad.conflict ? "나중에 고르기 (자동 저장 멈춤)" : session ? "취소" : "취소 (로그인 안 함)"}</button>
           </div>
         </> : session ? <>
           <p>로그인 중이에요. 진행 상황이 {CLOUD_SYNC_SECONDS}초마다 계정에 자동 저장돼요.<br />다른 기기(웹·위젯)에서 같은 아이디로 로그인하면 이어서 할 수 있어요.</p>
@@ -2517,7 +2547,7 @@ export default function Home() {
         <div className="avatar-actions"><button className="save-button" onClick={() => avatarInput.current?.click()}>🖼️ 내 캐릭터 PNG 올리기</button><button className="ghost-button" onClick={resetAvatar} disabled={avatar.src === DEFAULT_AVATAR}>기본 검은 고양이로</button></div>
       </section></div>}
 
-      {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setShowSettings(false)}>×</button><span className="eyebrow">TIME SETTINGS</span><h3>농장 운영 시간</h3><p>운영 시간을 네 구간으로 나눠 봄·여름·가을·겨울이 흘러가요. 시간을 바꾸면 계절 구간이 달라져 심어 둔 작물이 시들 수 있어요.</p><label>시작 시간 <strong>{startHour}:00</strong><input type="range" min="0" max="20" value={startHour} onChange={e => { const v = Number(e.target.value); setStartHour(v); if (endHour <= v + 4) setEndHour(Math.min(24, v + 4)); }} /></label><label>종료 시간 <strong>{endHour}:00</strong><input type="range" min="4" max="24" value={endHour} onChange={e => setEndHour(Math.max(startHour + 4, Number(e.target.value)))} /></label><div className="time-preview">{SEASONS.map((s, i) => <span key={s}>{SEASON_ICON[s]} {s}<b>{toClock(startHour + (endHour-startHour)/4*i)}—{toClock(startHour + (endHour-startHour)/4*(i+1))}</b></span>)}</div><div className="boss-theme"><b>🙈 ESC 위장 화면</b><div>{BOSS_MODES.map(mode => <button key={mode.id} className={bossTheme === mode.id ? "on" : ""} onClick={() => setBossTheme(mode.id)}><span>{mode.icon}</span>{mode.name}<small>{mode.id === "office" ? "엑셀 실적표" : mode.id === "dev" ? "코드 에디터 + 터미널" : "디자인 툴 캔버스"}</small></button>)}</div></div><label className="notify-toggle"><input type="checkbox" checked={notifyOffWork} onChange={event => toggleOffWorkNotify(event.target.checked)} /><span>🔔 퇴근 시간(종료 {endHour}:00)과 10분 전에 <b>브라우저 알림</b>으로도 알려 주기<small>화면 안의 &ldquo;월루~~&rdquo; 퇴근 팝업은 항상 떠요</small></span></label><button className="ghost-button guide-replay" onClick={() => { setShowSettings(false); goGuide(0); }}>📖 기능 가이드 다시 보기</button><button className="save-button" onClick={() => setShowSettings(false)}>이 시간으로 농사짓기</button></section></div>}
+      {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><section className="modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setShowSettings(false)}>×</button><span className="eyebrow">TIME SETTINGS</span><h3>농장 운영 시간</h3><p>운영 시간을 네 구간으로 나눠 봄·여름·가을·겨울이 흘러가요. 시간을 바꾸면 계절 구간이 달라져 심어 둔 작물이 시들 수 있어요.</p><label>시작 시간 <strong>{startHour}:00</strong><input type="range" min="0" max="20" value={startHour} onChange={e => { const v = Number(e.target.value); setStartHour(v); if (endHour <= v + 4) setEndHour(Math.min(24, v + 4)); }} /></label><label>종료 시간 <strong>{endHour}:00</strong><input type="range" min="4" max="24" value={endHour} onChange={e => setEndHour(Math.max(startHour + 4, Number(e.target.value)))} /></label><div className="time-preview">{SEASONS.map((s, i) => <span key={s}>{SEASON_ICON[s]} {s}<b>{toClock(startHour + (endHour-startHour)/4*i)}—{toClock(startHour + (endHour-startHour)/4*(i+1))}</b></span>)}</div><div className="boss-theme"><b>🙈 ESC 위장 화면</b><div>{BOSS_MODES.map(mode => <button key={mode.id} className={bossTheme === mode.id ? "on" : ""} onClick={() => setBossTheme(mode.id)}><span>{mode.icon}</span>{mode.name}<small>{mode.id === "office" ? "엑셀 실적표" : mode.id === "dev" ? "코드 에디터 + 터미널" : "디자인 툴 캔버스"}</small></button>)}</div></div><label className="notify-toggle"><input type="checkbox" checked={notifyOffWork} onChange={event => toggleOffWorkNotify(event.target.checked)} /><span>🔔 퇴근 시간(종료 {endHour}:00)과 10분 전에 <b>브라우저 알림</b>으로도 알려 주기<small>화면 안의 &ldquo;월루~~&rdquo; 퇴근 팝업은 항상 떠요</small></span></label><div className="settings-save"><b>☁️ 계정 저장</b>{TEST_MODE ? <small>로컬 테스트 모드에서는 계정에 저장하지 않아요.</small> : session ? <><small>{session.id} · {CLOUD_SYNC_SECONDS}초마다 바뀐 내용을 자동 저장 · {cloudAt ? `마지막 저장 ${new Date(cloudAt).toLocaleTimeString("ko-KR")}` : "이번 접속에서 아직 저장 전"}</small><button className="save-button" onClick={() => syncRef.current(true)}>💾 지금 저장</button></> : <><small>로그인하지 않으면 이 기기(브라우저)에만 저장돼요.</small><button className="ghost-button" onClick={() => { setShowSettings(false); setShowAccount(true); }}>👤 로그인하기</button></>}</div><button className="ghost-button guide-replay" onClick={() => { setShowSettings(false); goGuide(0); }}>📖 기능 가이드 다시 보기</button><button className="save-button" onClick={() => setShowSettings(false)}>이 시간으로 농사짓기</button></section></div>}
       {guideStep !== null && GUIDE_STEPS[guideStep] && (() => { const step = GUIDE_STEPS[guideStep], last = guideStep === GUIDE_STEPS.length - 1;
         return <aside className={`guide-card ${step.target ? "" : "center"}`} role="dialog" aria-labelledby="guide-title" aria-live="polite">
           <div className="guide-head"><span className="guide-icon">{step.icon}</span><span className="guide-count">{guideStep + 1} / {GUIDE_STEPS.length}</span><button className="guide-skip" onClick={closeGuide}>건너뛰기 ✕</button></div>
