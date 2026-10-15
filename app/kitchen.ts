@@ -7,12 +7,11 @@
  */
 import { CROPS } from "./farming";
 import { TEST_MODE } from "./testMode";
-import { RAID_RELEASED } from "./raid/data";
 
 /** 주방 공개 여부. 토벌 기능이 나온 뒤 KITCHEN_RELEASED를 true로 바꿔 공개한다. 로컬 테스트 모드에서는 항상 보인다. */
 export const KITCHEN_RELEASED = false;
-// 주방은 토벌과 동시에 공개한다(HUNTING_RAID.md 30절).
-export const KITCHEN_ENABLED = KITCHEN_RELEASED || RAID_RELEASED || TEST_MODE;
+// 2026-10-15 사용자 요청: 토벌탑 베타는 공개하되 요리는 따로 개발 후 공개한다(그때까지 로컬 테스트에서만).
+export const KITCHEN_ENABLED = KITCHEN_RELEASED || TEST_MODE;
 
 /** 재료: 특정 작물 n개, 또는 아무 물고기 n마리(전설 제외, 싼 것부터). */
 export type Ingredient = { kind: "crop"; id: string; count: number } | { kind: "fish"; count: number };

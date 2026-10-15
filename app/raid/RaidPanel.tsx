@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DISHES, DISH_GRADES } from "../kitchen";
+import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
 import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
@@ -132,7 +132,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
           <div className="raid-gear-mini">{(["head", "body", "legs"] as ArmorSlot[]).map(slot => { const a = ARMORS.find(item => item.id === raid.equipped[slot]); return <span key={slot} className={a ? "on" : ""} title={a ? a.text : `${SLOT_NAME[slot]} 비어 있음`}>{a ? a.icon : "▫️"}<small>{SLOT_NAME[slot]}</small></span>; })}{(() => { const p = BATTLE_PETS.find(x => x.id === raid.equipped.battlePet); return <span className={p ? "on" : ""} title={p ? p.text : "전투펫 없음"}>{p ? p.icon : "▫️"}<small>전투펫</small></span>; })()}</div>
         </div>
 
-        <div className="raid-foods"><b>🍱 음식 3칸</b>
+        {KITCHEN_ENABLED && <div className="raid-foods"><b>🍱 음식 3칸</b>
           <div>{slots.map((key, i) => { const f = slotFood(key);
             return <label key={i} className={`raid-food-slot ${f ? "on" : ""}`}><span className="raid-food-key">{i + 1}</span><span className="raid-food-icon">{f ? f.icon : "＋"}</span>
               <select value={key ?? ""} onChange={event => pickSlot(i, event.target.value || null)} aria-label={`음식 ${i + 1}번 칸`}>
@@ -141,7 +141,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
               </select>
               <small>{f ? f.effect.text(f.effect.values[f.grade]) : "음식 고르기"}</small></label>; })}</div>
           <small className="raid-food-rule">같은 음식은 한 칸 · 회복 음식 최대 {MAX_HEAL_FOODS}칸 · 쓴 음식만 사라져요{foodOptions.length === 0 ? " · 🍳 주방에서 요리를 만들어 오세요" : ""}</small>
-        </div>
+        </div>}
 
         <button className="raid-start" onClick={start}><span>🗼 {floor.floor}층 도전하기</span><small>2분 웨이브 + 보스전 · 실패해도 장비와 해금 층은 그대로</small></button>
 

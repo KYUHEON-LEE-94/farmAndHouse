@@ -160,7 +160,7 @@
 
 ## 🍳 주방 — 사냥 준비물 요리
 
-> **2026-10-15 토벌탑 베타와 함께 공개**(`KITCHEN_ENABLED = KITCHEN_RELEASED || RAID_RELEASED || TEST_MODE`). 아래는 공개 전 기록. 주방은 토벌 기능이 나온 뒤 공개한다. `app/kitchen.ts`의 `KITCHEN_ENABLED = false`로 텃밭 패널의 🍳 주방 탭을 숨겨 두었다(코드·저장 형식은 그대로). 공개할 때 `true`로 바꾸면 된다.
+> **현재 비공개(2026-10-15)**: 토벌탑 베타는 공개했지만 요리는 따로 개발한 뒤 공개한다. `KITCHEN_ENABLED = KITCHEN_RELEASED || TEST_MODE`. 숨긴 동안 토벌탑의 🍱 음식 칸도 보이지 않는다. 아래는 이전 기록. 주방은 토벌 기능이 나온 뒤 공개한다. `app/kitchen.ts`의 `KITCHEN_ENABLED = false`로 텃밭 패널의 🍳 주방 탭을 숨겨 두었다(코드·저장 형식은 그대로). 공개할 때 `true`로 바꾸면 된다.
 
 **가공과 요리는 확실히 구분한다.**
 
