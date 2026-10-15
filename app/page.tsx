@@ -12,7 +12,7 @@ import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
-import RaidPanel, { RaidCraftView, RaidGearView } from "./raid/RaidPanel";
+import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
 import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
@@ -2443,7 +2443,17 @@ export default function Home() {
                 return <span key={item.id} className={got ? "owned" : ""} title={got ? item.name : "???"}><span className="furniture-thumb" style={{ "--c": item.color } as CSSProperties}>{got ? <FurnitureArt id={item.id} /> : <b className="unknown">?</b>}</span><small>{got ? item.name : "???"}</small></span>; })}</div>)}</div>
             </>; })()}
         </section>
+        {RAID_ENABLED && <section className="panel gacha battle-pet-gacha">
+          <div className="panel-heading"><div><span className="eyebrow">BATTLE PET GACHA</span><h3>⚔️ 전투펫 뽑기</h3></div><span className="plot-count">토벌탑 전용</span></div>
+          <BattlePetGacha raid={raid} forge={forge} />
+        </section>}
       </div>}
+
+      {tab === "pets" && RAID_ENABLED && <section className="panel battle-pet-panel">
+        <div className="panel-heading"><div><span className="eyebrow">BATTLE PETS</span><h3>⚔️ 전투펫</h3></div><span className="plot-count">{Object.keys(raid.battlePets ?? {}).length} / {BATTLE_PETS.length}</span></div>
+        <p className="hint">토벌탑에 한 마리 데려가요. 중복으로 모은 📜 계약 조각으로 레벨업하거나 희귀·전설 펫과 교환해요. <button className="ghost-button small" onClick={() => { setShopMain("gacha"); switchTab("gacha"); }}>🥚 전투펫 뽑으러 가기</button></p>
+        <BattlePetRoster raid={raid} forge={forge} />
+      </section>}
 
       {tab === "pets" && (() => { const ids = [...new Set([...placed, ...warehouse].filter(item => item.pet).map(item => item.id))];
         return <section className="panel pet-care-panel">

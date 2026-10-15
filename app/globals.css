@@ -1083,3 +1083,6 @@ button { color:inherit; }
 .equipment-panel .equipment-raid{margin-top:4px;padding-top:0;border-top:0}
 
 .raid-sfx{position:absolute;right:14px;top:130px;border:0;border-radius:999px;width:30px;height:30px;font-size:14px;background:rgba(24,28,20,.6);cursor:pointer}
+
+.battle-pet-gacha,.battle-pet-panel{margin-top:14px}
+.raid-pet-dex{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.raid-pet-dex span{display:grid;place-items:center;min-width:64px;padding:6px 4px;border-radius:10px;background:#f4efe4;border:1px solid var(--line);font-size:22px;opacity:.55}.raid-pet-dex span.owned{opacity:1;background:#fffaf0}.raid-pet-dex span small{font-size:10.5px;color:#6b5a3a}.raid-pet-dex .tier-희귀.owned{border-color:#7aa6d8}.raid-pet-dex .tier-전설.owned{border-color:#e0b040;background:#fff6dc}

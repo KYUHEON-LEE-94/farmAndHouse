@@ -187,7 +187,7 @@ export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActi
           {worn ? <button disabled>사용 중</button> : own ? <button onClick={() => forge.equipWeapon(def.id)}>들기</button> : <button className="make" disabled={!canCraft} onClick={() => forge.craftWeapon(def.id)}>{canCraft ? "만들기" : `🔒 ${WEAPON_CRAFT.needFloor}층 클리어 필요`}</button>}
         </div>; })}</div>
     </div>
-    <PetView raid={raid} forge={forge} />
+    <p className="hint">🐾 전투펫은 <b>펫</b> 탭에서 데려가기·레벨업하고, <b>상점 › 가챠</b>에서 뽑아요.</p>
     <div className="raid-armors">{ARMORS.map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, ok = canPay(a.need, forge.have) && forge.money >= a.gold;
       return <div key={a.id} className={`raid-armor ${worn ? "worn" : owned ? "owned" : ""}`}>
         <span className="raid-armor-icon">{a.icon}</span>
@@ -205,9 +205,10 @@ export function petFor(raid: RaidSave) {
   const lv = raid.battlePets?.[p.id]?.level ?? 1;
   return { id: p.id, mult: PET_LEVELS[lv - 1].mult, icon: p.icon };
 }
-function PetView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
+/** 전투펫 뽑기(상점 › 🎁 가챠). */
+export function BattlePetGacha({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
   const [last, setLast] = useState<string[]>([]);
-  const pets = raid.battlePets ?? {}, shards = raid.contractShards;
+  const shards = raid.contractShards;
   const draw = (count: number) => setLast(forge.drawPets(count));
   return <div className="raid-pets">
     <div className="raid-pet-gacha">
@@ -215,8 +216,15 @@ function PetView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
       <small>생활펫 뽑기와 같은 방식 · 보통 {(PET_TIER_RATE.보통 * 100).toFixed(1)}% · 희귀 {PET_TIER_RATE.희귀 * 100}% · 전설 {PET_TIER_RATE.전설 * 100}%</small>
       <div><button onClick={() => draw(1)} disabled={forge.money < PET_GACHA.gold}>💰 {PET_GACHA.gold.toLocaleString()}원 · 1회 뽑기</button></div>
       {last.length > 0 && <div className="raid-pet-last">{last.map((id, i) => { const p = BATTLE_PETS.find(x => x.id === id)!; return <span key={i} className={`tier-${p.tier}`} style={{ animationDelay: `${i * 0.05}s` }}>{p.icon}<small>{p.tier}</small></span>; })}</div>}
-      <small>📜 계약 조각 {shards} · 중복은 조각으로(보통 {DUPLICATE_SHARDS.보통} · 희귀 {DUPLICATE_SHARDS.희귀} · 전설 {DUPLICATE_SHARDS.전설}개) · 조각으로 레벨업·교환</small>
+      <small>📜 계약 조각 {shards} · 중복은 조각으로(보통 {DUPLICATE_SHARDS.보통} · 희귀 {DUPLICATE_SHARDS.희귀} · 전설 {DUPLICATE_SHARDS.전설}개) · 데려가기·레벨업·교환은 🐾 펫 탭에서</small>
     </div>
+    <div className="raid-pet-dex">{BATTLE_PETS.map(p => <span key={p.id} className={`tier-${p.tier} ${raid.battlePets?.[p.id] ? "owned" : ""}`} title={`${p.name} · ${p.tier} · ${p.text}`}>{raid.battlePets?.[p.id] ? p.icon : "❔"}<small>{p.name}</small></span>)}</div>
+  </div>;
+}
+/** 전투펫 보유 현황(🐾 펫 탭): 데려가기·레벨업·조각 교환. */
+export function BattlePetRoster({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
+  const pets = raid.battlePets ?? {}, shards = raid.contractShards;
+  return <div className="raid-pets">
     <div className="raid-pet-list">{BATTLE_PETS.map(p => { const own = pets[p.id], lv = own?.level ?? 0, next = PET_LEVELS[lv], worn = raid.equipped.battlePet === p.id, cost = p.tier === "보통" ? 0 : PET_EXCHANGE[p.tier];
       return <div key={p.id} className={`raid-pet ${own ? "owned" : ""} ${worn ? "worn" : ""} tier-${p.tier}`}>
         <span className="raid-armor-icon">{own ? p.icon : "❔"}</span>
