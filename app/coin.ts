@@ -17,7 +17,8 @@ export const COIN_MAX_TICKS = 12;
 export const COIN_DELIST_CHANCE = 0.8;
 export const COIN_MAX_UP = 2;
 export const COIN_DOWN_CHANCE = 0.65;
-export const COIN_MIN_BUY = 10;
+/** 한 번에 살 수 있는 최소 개수(주식처럼 정수 개수로 사고판다). */
+export const COIN_MIN_QTY = 1;
 
 const NAMES = [
   ["월루", "🪙"], ["너구리", "🦝"], ["당근", "🥕"], ["고등어", "🐟"], ["도토리", "🌰"], ["퇴근", "🏃"], ["야근", "🌙"], ["김치", "🥬"],
@@ -44,7 +45,9 @@ export type Coin = {
 
 function makeCoin(slot: number, gen: number, start: number): Coin {
   const seed = slot * 100_003 + gen;
-  const [name, icon] = NAMES[Math.floor(hash(seed, 1) * NAMES.length)];
+  // 같은 시세판에 같은 이름이 두 번 나오지 않게, 자리마다 겹치지 않는 이름 묶음(slot, slot+10, slot+20)에서 고른다.
+  const own = [slot, slot + 10, slot + 20].filter(i => i < NAMES.length);
+  const [name, icon] = NAMES[own[Math.floor(hash(seed, 1) * own.length)]];
   const delisted = hash(seed, 2) < COIN_DELIST_CHANCE;
   // 처음 상장되는 코인들은 수명을 섞어 한꺼번에 끝나지 않게 한다.
   const life = delisted ? 1 + Math.floor(hash(seed, 3) * COIN_MAX_TICKS) : COIN_MAX_TICKS;

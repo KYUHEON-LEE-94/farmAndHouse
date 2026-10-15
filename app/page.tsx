@@ -18,7 +18,7 @@ import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge"
 import type { ForgeActions } from "./raid/RaidPanel";
 import type { FoodSlot, RaidResult } from "./raid/engine";
 import CoinGame from "./CoinGame";
-import { COIN_ENABLED, COIN_MIN_BUY, coinBoard, settleCoin, type CoinHoldings } from "./coin";
+import { COIN_ENABLED, COIN_MIN_QTY, coinBoard, settleCoin, type CoinHoldings } from "./coin";
 import { ALL_LOOT, HUNT_ENABLED, HUNT_TEST_UNLOCK_ALL, HUNT_TICKET_MINUTES, HUNT_TICKET_PRICE, WEAPONS, type Weapon } from "./hunting";
 import { TEST_MODE, ownsItem } from "./testMode";
 import { KitchenPanel } from "./KitchenPanel";
@@ -1544,21 +1544,27 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [coinHoldings, nowMs]);
-  function buyCoin(key: string, amount: number) {
+  /** 코인 사기: 지금 시세로 정수 개수만 산다(주식처럼). */
+  function buyCoin(key: string, qty: number) {
     const quote = coinBoard(Date.now()).quotes.find(item => item.key === key);
     if (!quote) return setNotice("방금 시세가 바뀌었어요. 다시 골라 주세요.");
-    if (amount < COIN_MIN_BUY || money < amount || quote.price <= 0) return setNotice(`코인은 ${COIN_MIN_BUY}원부터 살 수 있어요.`);
-    setMoney(value => value - amount); playCoinSound([660, 880]);
-    setCoinHoldings(all => ({ ...all, [key]: { units: (all[key]?.units ?? 0) + amount / quote.price, spent: (all[key]?.spent ?? 0) + amount } }));
-    setNotice(`${quote.coin.icon} ${quote.coin.name}을(를) ${amount.toLocaleString()}원어치 샀어요. (개당 ${quote.price.toLocaleString()}원)`);
+    const count = Math.max(COIN_MIN_QTY, Math.floor(qty)), cost = count * quote.price;
+    if (quote.price <= 0) return;
+    if (money < cost) return setNotice(`돈이 모자라요. ${count.toLocaleString()}개는 ${cost.toLocaleString()}원이에요.`);
+    setMoney(value => value - cost); playCoinSound([660, 880]);
+    setCoinHoldings(all => ({ ...all, [key]: { units: (all[key]?.units ?? 0) + count, spent: (all[key]?.spent ?? 0) + cost } }));
+    setNotice(`${quote.coin.icon} ${quote.coin.name} ${count.toLocaleString()}개를 개당 ${quote.price.toLocaleString()}원, 총 ${cost.toLocaleString()}원에 샀어요.`);
   }
-  function sellCoin(key: string, fraction: number) {
+  /** 코인 팔기: 정수 개수만큼(Infinity면 전부) 지금 시세로 판다. */
+  function sellCoin(key: string, qty: number) {
     const quote = coinBoard(Date.now()).quotes.find(item => item.key === key), own = coinHoldings[key];
     if (!quote || !own) return;
-    const units = own.units * fraction, payout = Math.floor(units * quote.price), spent = Math.round(own.spent * fraction);
+    const all = !Number.isFinite(qty) || qty >= own.units - 1e-9;
+    const units = all ? own.units : Math.max(1, Math.floor(qty));
+    const payout = Math.floor(units * quote.price), spent = Math.round(own.spent * (units / own.units));
     setMoney(value => value + payout); playCoinSound(payout >= spent ? [880, 1100, 1320] : [440, 330]);
-    setCoinHoldings(all => { const next = { ...all }; if (fraction >= 1) delete next[key]; else next[key] = { units: own.units - units, spent: own.spent - spent }; return next; });
-    setNotice(`${quote.coin.icon} ${quote.coin.name} ${fraction >= 1 ? "전부" : `${fraction * 100}%`}를 ${payout.toLocaleString()}원에 팔았어요. (${payout >= spent ? "+" : ""}${(payout - spent).toLocaleString()}원)`);
+    setCoinHoldings(holdings => { const next = { ...holdings }; if (all) delete next[key]; else next[key] = { units: own.units - units, spent: own.spent - spent }; return next; });
+    setNotice(`${quote.coin.icon} ${quote.coin.name} ${all ? "전부" : `${units.toLocaleString()}개`}를 ${payout.toLocaleString()}원에 팔았어요. (${payout >= spent ? "+" : ""}${(payout - spent).toLocaleString()}원)`);
   }
 
   function recordCasino(amount: number, payout: number) {
@@ -2440,12 +2446,12 @@ export default function Home() {
           </div>
           </>}
           </div>
-          <div className="bet-row">
+          {casinoGame !== "coin" && <div className="bet-row">
             <span>판돈</span>
             {BET_PRESETS.map(amount => <button key={amount} className={bet === amount ? "on" : ""} onClick={() => setBet(amount)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>{amount.toLocaleString()}</button>)}
             <button className={bet === Math.max(MIN_BET, money) ? "on" : ""} onClick={() => setBet(Math.max(MIN_BET, money))} disabled={Boolean(rolling)} title="가진 돈 전부">올인</button>
             <input type="number" min={MIN_BET} step={10} value={bet} onChange={event => setBet(Math.max(MIN_BET, Math.floor(Number(event.target.value)) || MIN_BET))} aria-label="판돈(자유 입력)" disabled={Boolean(rolling)} />
-          </div>
+          </div>}
           {casinoGame === "parity" && lastRoll && !lastRoll.payout && !rolling && <div className="revenge-row">
             <button onClick={() => placeBet(lastRoll.pick)} disabled={money < bet}>🔥 복수전! 다시 {PARITY_NAME[lastRoll.pick]}에 {bet.toLocaleString()}원</button>
             <button className="double" onClick={() => { setBet(Math.min(money, bet * 2)); }} disabled={money < bet * 2}>💥 판돈 2배</button>
