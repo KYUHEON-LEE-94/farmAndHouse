@@ -29,11 +29,17 @@ export function EquipmentPanel({ owned, equipment, onEquip, onShop, raid }: { ow
   const [slot, setSlot] = useState<EffectSlot>('farm');
   const [preview, setPreview] = useState<string | null>(null);
   const [replay, setReplay] = useState(0);
+  // 장비창 구분: 토벌 장비(기본) | 이펙트. 토벌이 없으면 이펙트만.
+  const [view, setView] = useState<'raid' | 'effect'>(raid ? 'raid' : 'effect');
+  const shown = raid ? view : 'effect';
   const selected = EFFECTS.find(item => item.id === preview && item.slot === slot) ?? EFFECTS.find(item => item.id === equipment[slot]);
   const triggers = { farm: '작물을 수확할 때', fish: '물고기 포획에 성공할 때', hunt: '동물을 명중했을 때' };
   return <section className="panel equipment-panel">
-    <div className="panel-heading"><div><span className="eyebrow">MY EQUIPMENT</span><h3>🎒 장비창</h3></div><button className="ghost-button" onClick={onShop}>✨ 이펙트 뽑으러 가기</button></div>
-    <p className="hint">분야마다 하나씩 장착할 수 있어요. 이펙트는 소모되지 않으며 능력치는 바뀌지 않아요.</p>
+    <div className="panel-heading"><div><span className="eyebrow">MY EQUIPMENT</span><h3>🎒 장비창</h3></div>
+      {raid && <div className="shop-tabs equipment-views" role="tablist">{([['raid', '⚔️ 토벌 장비'], ['effect', '✨ 이펙트']] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={shown === id} className={shown === id ? 'active' : ''} onClick={() => setView(id)}>{label}</button>)}</div>}</div>
+    {shown === 'raid' && <div className="equipment-raid"><p className="hint">토벌탑에 들고 갈 무기·방어구·전투펫이에요. 강화와 진화는 토벌탑의 ⚒️ 대장간에서 해요.</p>{raid}</div>}
+    {shown === 'effect' && <>
+    <p className="hint">농사·낚시·사냥 분야마다 이펙트를 하나씩 장착해요. 소모되지 않고 능력치는 바뀌지 않아요. <button className="ghost-button small" onClick={onShop}>✨ 이펙트 뽑으러 가기</button></p>
     <div className="equipment-layout"><aside className="equipment-slots">
       {EFFECT_SLOTS.map(key => <button key={key} aria-pressed={slot === key} onClick={() => { setSlot(key); setPreview(null); }}><b>{SLOT_LABELS[key]} 이펙트</b><span>{EFFECTS.find(item => item.id === equipment[key])?.name ?? '기본 연출'}</span></button>)}
       {!raid && <><div className="equipment-reserved"><b>⚔️ 토벌 무기</b><span>토벌 업데이트에서 열려요</span></div><div className="equipment-reserved"><b>🛡️ 토벌 방어구</b><span>토벌 업데이트에서 열려요</span></div></>}
@@ -41,7 +47,6 @@ export function EquipmentPanel({ owned, equipment, onEquip, onShop, raid }: { ow
       <div className="effect-stage"><EffectBurst key={`${selected?.id}-${replay}`} id={selected?.id ?? null} /><b>{selected?.icon ?? '🌿'}</b><strong>{selected?.name ?? '기본 연출'}</strong><small>{triggers[slot]}</small></div>
       <div className="equipment-actions"><button className="ghost-button" onClick={() => setReplay(n => n + 1)} disabled={!selected}>↻ 미리보기</button><button className="ghost-button" disabled={!equipment[slot]} onClick={() => { onEquip(slot, null); setPreview(null); }}>장착 해제</button></div>
       <div className="effect-cards">{EFFECTS.filter(item => item.slot === slot).map(item => { const has = owned.includes(item.id), active = equipment[slot] === item.id; return <article key={item.id} className={active ? 'equipped' : ''}><span>{item.icon}</span><b>{item.name}</b><small>{active ? '✓ 장착 중' : has ? '보유' : '미보유'}</small><button className="ghost-button" onClick={() => { setPreview(item.id); setReplay(n => n + 1); }}>미리보기</button><button className="save-button" disabled={!has || active} onClick={() => { onEquip(slot, item.id); setPreview(item.id); }}>{active ? '장착 중' : has ? '장착' : '가챠로 획득'}</button></article>; })}</div>
-    </div></div>
-    {raid && <div className="equipment-raid"><div className="panel-heading"><div><span className="eyebrow">RAID GEAR</span><h3>⚔️ 토벌 장비</h3></div></div><p className="hint">토벌탑에 들고 갈 무기·방어구·전투펫이에요. 강화와 진화는 토벌탑의 ⚒️ 대장간에서 해요.</p>{raid}</div>}
+    </div></div></>}
   </section>;
 }

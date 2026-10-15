@@ -1078,3 +1078,6 @@ button { color:inherit; }
 
 .raid-pick-toggle{margin-top:4px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:#fff;font:700 11.5px "Gowun Dodum";cursor:pointer;color:#5a4a2a}
 .raid-pick{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.raid-pick button{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;font:600 11.5px "Gowun Dodum";cursor:pointer}.raid-pick button small{color:#8a7a5a;margin-left:2px}.raid-pick button.on{background:#2c2418;color:#ffe19a;border-color:#2c2418}.raid-pick button.on small{color:#e8d7a0}
+
+.equipment-views{grid-template-columns:repeat(2,minmax(110px,1fr))!important;margin:0!important;min-width:250px}
+.equipment-panel .equipment-raid{margin-top:4px;padding-top:0;border-top:0}
