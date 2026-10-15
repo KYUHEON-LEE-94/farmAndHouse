@@ -59,14 +59,15 @@ const END_FX_MS = 2400;
 
 // ---------- 타격 효과음(WebAudio로 짧게 합성, 파일 없음) ----------
 const SFX_KEY = "wolru-raid-sfx";
-let audio: AudioContext | null = null, lastHitSfx = 0;
+let audio: AudioContext | null = null, lastHitSfx = 0, lastXpSfx = 0;
 function readSfxOn() { try { return localStorage.getItem(SFX_KEY) !== "off"; } catch { return true; } }
-function sfx(kind: "hit" | "crit" | "kill" | "big") {
+function sfx(kind: "hit" | "crit" | "kill" | "big" | "xp") {
   const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioCtx) return;
   audio ??= new AudioCtx();
   const ctx = audio, now = ctx.currentTime;
   if (kind === "hit" || kind === "crit") { if (now - lastHitSfx < 0.045) return; lastHitSfx = now; }
+  if (kind === "xp") { if (now - lastXpSfx < 0.05) return; lastXpSfx = now; const o = ctx.createOscillator(), gn = ctx.createGain(); o.type = "sine"; o.frequency.setValueAtTime(1300 + Math.random() * 500, now); o.frequency.exponentialRampToValueAtTime(2100, now + 0.05); gn.gain.setValueAtTime(0.025, now); gn.gain.exponentialRampToValueAtTime(0.0001, now + 0.07); o.connect(gn); gn.connect(ctx.destination); o.start(now); o.stop(now + 0.08); return; }
   const out = ctx.createGain(); out.connect(ctx.destination);
   const vol = { hit: 0.05, crit: 0.08, kill: 0.06, big: 0.12 }[kind], len = { hit: 0.06, crit: 0.09, kill: 0.1, big: 0.28 }[kind];
   out.gain.setValueAtTime(vol, now); out.gain.exponentialRampToValueAtTime(0.0001, now + len);
@@ -139,7 +140,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
         while (acc >= STEP) { stepRaid(s, STEP, inputRef.current); acc -= STEP; if (touchRef.current.fire) { touchRef.current.fire = false; inputRef.current.special = false; } if (s.over || s.choices) { acc = 0; break; } }
       } else { acc = 0; stepRaid(s, 0, inputRef.current); }
       // 이번 프레임에 생긴 타격만큼 소리(가장 센 것 하나)
-      if (sfxOnRef.current && !holdRef.current) { const f = s.sfx; const kind = f.big > heard.big ? "big" : f.crit > heard.crit ? "crit" : f.kill > heard.kill ? "kill" : f.hit > heard.hit ? "hit" : null; if (kind) sfx(kind); }
+      if (sfxOnRef.current && !holdRef.current) { const f = s.sfx; const kind = f.big > heard.big ? "big" : f.crit > heard.crit ? "crit" : f.kill > heard.kill ? "kill" : f.hit > heard.hit ? "hit" : null; if (kind) sfx(kind); if (f.xp > heard.xp) sfx("xp"); }
       Object.assign(heard, s.sfx);
       draw(ctx, s, art, now / 1000, petIcon);
       if (s.over && overAtRef.current) drawEnd(ctx, s, art, Math.min(1, (now - overAtRef.current) / END_FX_MS), now / 1000);
@@ -397,7 +398,16 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   }
   // 경험치 구슬
   for (const o of s.orbs) if (o.heal) { ctx.fillStyle = "#000"; ctx.font = `18px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("🍖", o.x, o.y); ctx.textAlign = "left"; }
-  for (const o of s.orbs.filter(o => !o.heal)) { const r = 3.5 + Math.min(4, o.xp); const g = ctx.createRadialGradient(o.x - 1, o.y - 1, 0, o.x, o.y, r + 2); g.addColorStop(0, "#e9fff0"); g.addColorStop(1, "#38c46a"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, r, 0, Math.PI * 2); ctx.fill(); }
+  // 경험치 보석: 크기·색은 값에 따라(초록 → 파랑 → 보라), 빛나는 테두리 + 날아오는 흔적
+  for (const o of s.orbs) {
+    if (o.heal) continue;
+    const r = 4.5 + Math.min(4, o.xp * 0.9), col = o.xp >= 4 ? "#c38bff" : o.xp >= 2 ? "#58b8ff" : "#3fd47a";
+    if (o.px !== undefined && o.py !== undefined && (o.px !== o.x || o.py !== o.y)) { const tx = o.x + (o.px - o.x) * 3.5, ty = o.y + (o.py - o.y) * 3.5; const tg = ctx.createLinearGradient(o.x, o.y, tx, ty); tg.addColorStop(0, col); tg.addColorStop(1, "rgba(255,255,255,0)"); ctx.strokeStyle = tg; ctx.lineWidth = r * 1.3; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(tx, ty); ctx.stroke(); ctx.lineCap = "butt"; }
+    ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(clock * 3 + o.x * 0.01);
+    ctx.shadowColor = col; ctx.shadowBlur = 10; ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, -r * 1.25); ctx.lineTo(r, 0); ctx.lineTo(0, r * 1.25); ctx.lineTo(-r, 0); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.moveTo(0, -r * 0.7); ctx.lineTo(r * 0.4, -r * 0.1); ctx.lineTo(0, r * 0.2); ctx.lineTo(-r * 0.4, -r * 0.1); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
 
   // 돌진 예고
   for (const m of s.monsters) if (m.tele && m.tele.kind === "line") {
@@ -497,7 +507,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   if (p.shield > 0) bar(ctx, 84, 40, 186, 5, p.shield / p.maxHp, "rgba(140,210,255,.95)", "rgba(0,0,0,0)");
   ctx.font = "700 10px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`♥ ${Math.ceil(p.hp)} / ${p.maxHp}${p.shield > 0 ? `  🛡 ${Math.ceil(p.shield)}` : ""}`, 90, 47);
   const nextXp = xpForLevel(s.level + 1), prevXp = xpForLevel(s.level);
-  bar(ctx, 84, 60, 186, 8, (s.xp - prevXp) / Math.max(1, nextXp - prevXp), "#4fd27e");
+  bar(ctx, 84, 60, 186, 8, (s.xp - prevXp) / Math.max(1, nextXp - prevXp), s.xpFlash > 0 ? "#b8ffd0" : "#4fd27e");
+  if (s.xpFlash > 0) { ctx.save(); ctx.globalAlpha = s.xpFlash / 0.18; ctx.strokeStyle = "#b8ffd0"; ctx.lineWidth = 2; ctx.shadowColor = "#7dffa8"; ctx.shadowBlur = 10; ctx.strokeRect(83, 59, 188, 10); ctx.restore(); }
   ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}`, 84, 75);
   s.auxes.forEach((aux, i) => {
     const def = AUX_WEAPONS[aux.id], cx = 258 - i * 24, cy = 72, left = Math.max(0, aux.readyAt - s.t), ratio = 1 - Math.min(1, left / def.cd);

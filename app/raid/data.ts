@@ -13,12 +13,12 @@ export const ARENA_W = 960, ARENA_H = 540;
 /** 2분 고밀도 웨이브 + 제한 없는 보스전(59절). FLOOR_SECONDS는 훈련장 외에는 쓰지 않는다(보스전 시간 초과 없음). */
 export const FLOOR_SECONDS = 0, BOSS_AT = 120;
 /** 쾌속(2026-10-15): 일반 몹 체력 배율, 일반 몹 투사체 피해 배율·발사 간격 배율, 보조무기 칸·피해 배율 */
-export const FODDER_HP = 0.6, MOB_SHOT_DAMAGE = 0.6, MOB_SHOT_INTERVAL = 1.5, AUX_SLOTS = 3, AUX_POWER = 5;
+export const FODDER_HP = 0.5, MOB_SHOT_DAMAGE = 0.6, MOB_SHOT_INTERVAL = 1.5, AUX_SLOTS = 3, AUX_POWER = 5;
 /** 생성량 ×1.6, 최대 동시 수 ×1.25(올림), 일반 몬스터 이동속도 +15%(빠른 적 제외), 간접 개입 0:30·1:00·1:30, 정예 40초·80초, 보스전 20초마다 소환. */
-export const SPAWN_MUL = 2.08, MAX_ALIVE_MUL = 1.6, NORMAL_SPEED_MUL = 1.15, INTERVENTION_AT = [30, 60, 90], ELITE_AT = [40, 80], BOSS_SUMMON_EVERY = 20;
+export const SPAWN_MUL = 2.5, MAX_ALIVE_MUL = 1.9, NORMAL_SPEED_MUL = 1.15, INTERVENTION_AT = [30, 60, 90], ELITE_AT = [40, 80], BOSS_SUMMON_EVERY = 20;
 
 // ---------- 플레이어 ----------
-export const PLAYER = { radius: 14, hp: 100, speed: 220, iframes: 0.6, dashCooldown: 2.4, dashTime: 0.16, dashSpeed: 720, critChance: 0.05, critMul: 1.5, absorb: 520, attackSlow: 0 };
+export const PLAYER = { radius: 14, hp: 100, speed: 250, iframes: 0.6, dashCooldown: 2.4, dashTime: 0.16, dashSpeed: 720, critChance: 0.05, critMul: 1.5, absorb: 520, attackSlow: 0 };
 
 // ---------- 무기: 토벌 낫(23절) ----------
 import { RAID_WEAPONS, raidWeaponStats, type WeaponStats } from "./weapons";

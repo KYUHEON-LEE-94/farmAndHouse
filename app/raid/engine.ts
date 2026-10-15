@@ -48,7 +48,8 @@ export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "ts
   src?: HitSource;
   /** 내 공격 장판: 폭발 배율·독·그물 반지름 등 */
   mine?: { mul: number; poison?: boolean; seedChain?: boolean; big?: boolean }; x: number; y: number; r: number; t: number; tele: number; damage: number; every: number; tick: number; slow: number; dx?: number; dy?: number; len?: number };
-export type Orb = { x: number; y: number; xp: number; age: number; /** 회복 고기(먹으면 체력) */ heal?: number };
+export type Orb = { x: number; y: number; xp: number; age: number; /** 회복 고기(먹으면 체력) */ heal?: number;
+  /** 처치 때 사방으로 튀는 속도, 직전 위치(흔적 그리기) */ vx?: number; vy?: number; px?: number; py?: number };
 export type Spark = { x: number; y: number; vx: number; vy: number; t: number; life: number; color: string; size: number };
 export type Pop = { x: number; y: number; text: string; t: number; kind: "hit" | "crit" | "hurt" | "heal" | "info" | "aux" };
 /** 피해 원천(62절: 보조무기 피해는 따로 집계·주무기 강화 미적용) */
@@ -78,7 +79,9 @@ export type RaidState = {
   /** 처치 연출: 최근 처치 시각들(1초 안 5마리 이상이면 연쇄 처치), 화면 흔들림 */
   killTimes: number[]; shake: number; chainShown: number;
   /** 타격감: 잠깐 느려지기(초), 마지막 히트스톱 시각, 맞은 자리 불꽃, 효과음 카운터(화면이 보고 소리를 낸다) */
-  hitstop: number; lastStop: number; sparks: Spark[]; sfx: { hit: number; crit: number; kill: number; big: number };
+  hitstop: number; lastStop: number; sparks: Spark[]; sfx: { hit: number; crit: number; kill: number; big: number; xp: number };
+  /** 경험치 바 반짝임(초) */
+  xpFlash: number;
   /** 몬스터 길찾기 흐름장(플레이어 칸 기준, 0.25초마다 갱신) */
   flow: Flow | null; flowAt: number; flowCell: number; bossSpawned: boolean; interventions: number; boss: Monster | null;
   /** 스크롤 전장(50절): 카메라 왼쪽 위(월드 좌표), 지형, 탑의 압박, 정예 예고. */
@@ -113,7 +116,7 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
     buffs: [], foods, foodUsed: foods.map(() => false),
     level: 1, xp: 0, picks: {}, choices: null,
     monsters: [], projectiles: [], zones: [], orbs: [], pops: [], swings: [],
-    spawnAcc: 0.97, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSummons: 0, killTimes: [], shake: 0, chainShown: 0, auxes: [], auxLevel: 0, dmgBy: { basic: 0, special: 0, aux: 0, pet: 0 }, ext: { tempo: 0, tempoUntil: 0, focusUid: -1, focusN: 0, regenAt: 20, secondWind: false, thornAt: -9, petBondAt: -9, petGuard: false, specialHitAt: -9, castId: 0, firstHitCast: -1, perfectUntil: 0, dashBoostUntil: 0, cut: [], wasDashing: false }, hitstop: 0, lastStop: -1, sparks: [], sfx: { hit: 0, crit: 0, kill: 0, big: 0 }, flow: null, flowAt: 0, flowCell: -1, bossSpawned: false, interventions: 0, boss: null,
+    spawnAcc: 0.97, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSummons: 0, killTimes: [], shake: 0, chainShown: 0, auxes: [], auxLevel: 0, dmgBy: { basic: 0, special: 0, aux: 0, pet: 0 }, ext: { tempo: 0, tempoUntil: 0, focusUid: -1, focusN: 0, regenAt: 20, secondWind: false, thornAt: -9, petBondAt: -9, petGuard: false, specialHitAt: -9, castId: 0, firstHitCast: -1, perfectUntil: 0, dashBoostUntil: 0, cut: [], wasDashing: false }, hitstop: 0, lastStop: -1, sparks: [], sfx: { hit: 0, crit: 0, kill: 0, big: 0, xp: 0 }, xpFlash: 0, flow: null, flowAt: 0, flowCell: -1, bossSpawned: false, interventions: 0, boss: null,
     special: { readyAt: 0, prev: false, moveUntil: 0, moveMul: 1, lockAim: null, stanceUntil: 0, stanceHit: false, cancelable: false, hits: {}, bump: 0, castAt: -99, castX: 0, castY: 0, castAim: 0 }, actions: [],
     kills: 0, damageTaken: {}, uid: 1, prevDash: false, prevFood: [false, false, false], bossHpAtEnd: 1,
   };
@@ -129,7 +132,7 @@ const pick = (s: RaidState, id: AwakenId) => s.picks[id] ?? 0;
 const buffSum = (s: RaidState, kinds: FoodEffect["kind"][]) => s.buffs.filter(b => b.until > s.t && kinds.includes(b.kind)).reduce((sum, b) => sum + b.value / 100, 0);
 export const derived = (s: RaidState) => ({
   damageMul: 1 + 0.22 * pick(s, "keen-edge") + 0.06 * pick(s, "endless-edge") + buffSum(s, ["attack", "all"]),
-  interval: Math.max(0.25, s.weapon.interval * Math.max(0.65, 1 - 0.14 * pick(s, "quick-grip") - 0.03 * pick(s, "endless-haste") - buffSum(s, ["haste", "all"]) - (pick(s, "battle-tempo") && s.t < s.ext.tempoUntil ? 0.03 * s.ext.tempo : 0))),
+  interval: Math.max(0.2, s.weapon.interval * ATTACK_SPEED_MUL * Math.max(0.65, 1 - 0.14 * pick(s, "quick-grip") - 0.03 * pick(s, "endless-haste") - buffSum(s, ["haste", "all"]) - (pick(s, "battle-tempo") && s.t < s.ext.tempoUntil ? 0.03 * s.ext.tempo : 0))),
   range: s.weapon.range * (1 + 0.22 * pick(s, "long-handle") + 0.18 * pick(s, "sweeping-edge")),
   arc: Math.min(360, s.weapon.angle + 10 * pick(s, "long-handle")),
   knockback: s.weapon.knockback * (1 + 0.5 * pick(s, "heavy-swing")),
@@ -200,6 +203,8 @@ function pickSpawn(s: RaidState) {
 const DODGE_GRACE = 0.2;
 /** 쾌속: 공격은 항상 자동(마우스 방향으로 계속). */
 const AUTO_ATTACK = true;
+/** 쾌속: 기본 공격 간격 배율(−15%) */
+const ATTACK_SPEED_MUL = 0.85;
 /** 플레이어 피해 배율 상한(각성·음식·조건부 합산, 치명타·경직 배율은 따로). 카드 확장 뒤 최대치가 무한히 커지지 않게. */
 const DAMAGE_MUL_CAP = 3;
 /** 방어 1당 계수(방어 4 ≈ 24%, 8 ≈ 39%, 15 ≈ 55% 감소) */
@@ -312,7 +317,8 @@ function killMonster(s: RaidState, m: Monster) {
   if (s.killTimes.length >= 5 && s.t - s.chainShown > 1) { s.chainShown = s.t; s.pops.push({ x: s.player.x, y: s.player.y - 60, text: `⚡ 연쇄 처치 ×${s.killTimes.length}`, t: 0.9, kind: "info" }); }
   burst(s, m.x, m.y, m.boss ? 30 : m.elite ? 18 : 8, m.boss || m.elite ? "#ffcf6a" : "#f4ead2", m.boss ? 320 : 220);
   if (m.boss || m.elite) { hitStop(s, m.boss ? 0.18 : 0.1); s.sfx.big++; } else s.sfx.kill++;
-  if (m.xp > 0) s.orbs.push({ x: m.x, y: m.y, xp: m.xp, age: 0 });
+  // 경험치 보석: 사방으로 톡 튀었다가 빨려 들어온다(큰 몹은 여러 개로 쪼개서)
+  if (m.xp > 0) { const n = Math.min(6, Math.max(1, Math.ceil(m.xp / 3))), each = m.xp / n; for (let i = 0; i < n; i++) { const a = rnd() * Math.PI * 2, v = 90 + rnd() * 120; s.orbs.push({ x: m.x, y: m.y, xp: each, age: 0, vx: Math.cos(a) * v, vy: Math.sin(a) * v }); } }
   // 쾌속: 일반 몹 1%로 회복 고기(체력 12)
   if (!m.boss && !m.elite && rnd() < 0.01) s.orbs.push({ x: m.x + 8, y: m.y, xp: 1, age: 0, heal: 12 });
   if (s.weapon.fx?.spinKill && !m.elite && !m.boss) s.player.swingCd = Math.max(0, s.player.swingCd - s.weapon.interval * 0.1);
@@ -874,7 +880,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   updateWorld(s, dt);
   // 꾸준한 회복: 20초마다 체력 5(중첩마다)
   if (pick(s, "steady-recovery") && s.t >= s.ext.regenAt) { s.ext.regenAt = s.t + 20; const v = 5 * pick(s, "steady-recovery"); p.hp = Math.min(p.maxHp, p.hp + v); s.pops.push({ x: p.x, y: p.y - 30, text: `+${v}`, t: 0.8, kind: "heal" }); }
-  s.shake = Math.max(0, s.shake - dt * 30);
+  s.shake = Math.max(0, s.shake - dt * 30); s.xpFlash = Math.max(0, s.xpFlash - dt);
   // 지속 회복 음식(약초 고기찜): 초당 체력 회복
   for (const b of s.buffs) if (b.kind === "regen" && b.until > s.t && s.player.hp > 0) s.player.hp = Math.min(s.player.maxHp, s.player.hp + b.value * dt);
   // 예약된 특수 공격 타격
@@ -1007,10 +1013,16 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
 
   // 경험치 구슬
   for (const o of s.orbs) {
-    o.age += dt;
+    o.age += dt; o.px = o.x; o.py = o.y;
+    // 0.22초 동안 튀어나가며 감속, 그 뒤 점점 빨라지며 빨려 든다(보이는 속도 300 → 1,600px/s)
+    if (o.vx !== undefined && o.age < 0.22) { o.x += o.vx * dt; o.y += (o.vy ?? 0) * dt; o.vx *= 0.9; o.vy = (o.vy ?? 0) * 0.9; }
     const r = dist(o.x, o.y, p.x, p.y);
-    if (r < d.absorb || o.age > ORB_AUTO) { const k = Math.min(1, (ORB_PULL * dt) / Math.max(1, r)); o.x += (p.x - o.x) * k; o.y += (p.y - o.y) * k; }
-    if (r < PLAYER.radius + 6) { if (o.heal) { p.hp = Math.min(p.maxHp, p.hp + o.heal); s.pops.push({ x: p.x, y: p.y - 30, text: `🍖 +${o.heal}`, t: 0.8, kind: "heal" }); } else s.xp += o.xp * (1 + (s.gear.xpGain ?? 0)); o.xp = 0; }
+    if ((r < d.absorb || o.age > ORB_AUTO) && o.age >= 0.22) { const v = Math.min(ORB_PULL * 1.35, 300 + (o.age - 0.22) * 2600), k = Math.min(1, (v * dt) / Math.max(1, r)); o.x += (p.x - o.x) * k; o.y += (p.y - o.y) * k; }
+    if (dist(o.x, o.y, p.x, p.y) < PLAYER.radius + 8) {
+      if (o.heal) { p.hp = Math.min(p.maxHp, p.hp + o.heal); s.pops.push({ x: p.x, y: p.y - 30, text: `🍖 +${o.heal}`, t: 0.8, kind: "heal" }); }
+      else { s.xp += o.xp * (1 + (s.gear.xpGain ?? 0)); s.xpFlash = 0.18; s.sfx.xp++; burst(s, p.x + (rnd() - 0.5) * 10, p.y + (rnd() - 0.5) * 10, 2, "#9dffc0", 120); }
+      o.xp = 0;
+    }
   }
   s.orbs = s.orbs.filter(o => o.xp > 0);
   checkLevel(s);
