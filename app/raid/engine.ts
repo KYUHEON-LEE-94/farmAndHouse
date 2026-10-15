@@ -51,7 +51,9 @@ export type RaidState = {
   floor: FloorDef; t: number; over: null | "clear" | "dead" | "timeout"; paused: boolean;
   weapon: WeaponStats; evolution: Evolution | null; gear: Gear;
   pet: { id: string; mult: number; x: number; y: number; timer: number; shieldUsed: boolean; flash: number } | null;
-  player: { x: number; y: number; hp: number; maxHp: number; shield: number; shieldUntil: number; iframes: number; dashCd: number; dashT: number; dashDir: { x: number; y: number }; swingCd: number; windup: number; aim: number; attacks: number; slowUntil: number; emergencyUsed: boolean; stormUntil: number; stormTick: number; chainAt: number[];
+  player: { x: number; y: number; hp: number; maxHp: number; shield: number; shieldUntil: number; iframes: number; dashCd: number; dashT: number;
+    /** 회피 무적이 끝나는 시각(대시 + 여유 0.2초), 마지막 "회피!" 표시 시각 */
+    dodgeUntil: number; dodgePop: number; dashDir: { x: number; y: number }; swingCd: number; windup: number; aim: number; attacks: number; slowUntil: number; emergencyUsed: boolean; stormUntil: number; stormTick: number; chainAt: number[];
     /** 채널형(물뿌리개) 틱, 계속 쏜 시간, 대시 보너스, 마지막 타격 대상, 주기 효과 타이머, 보스 피격 감소 쿨 */
     tick: number; holdT: number; dashBonusUntil: number; lastTarget: number; bigCatch: number; periodic: number; ironAt: number; still: number; gale: number[];
     /** 조준 지점(월드 좌표, 비료 투척 목표) */
@@ -90,7 +92,7 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
     cam: { x: START.x - ARENA_W / 2, y: START.y - ARENA_H / 2, lx: 0, ly: 0 }, terrain, pressure: { x: START.x, y: START.y, since: 0, stage: 0, leftAt: -1 }, warns: [],
     floor, t: 0, over: null, paused: false, weapon, evolution, gear,
     pet: pet ? { ...pet, x: START.x - 30, y: START.y, timer: 2, shieldUsed: false, flash: 0 } : null,
-    player: { x: START.x, y: START.y, hp: PLAYER.hp + gear.hp, maxHp: PLAYER.hp + gear.hp, shield: gear.startShield, shieldUntil: 0, iframes: 1, dashCd: 0, dashT: 0, dashDir: { x: 1, y: 0 }, swingCd: 0, windup: -1, aim: 0, attacks: 0, slowUntil: 0, emergencyUsed: false, stormUntil: 0, stormTick: 0, chainAt: [], tick: 0, holdT: 0, dashBonusUntil: 0, lastTarget: -1, bigCatch: 0, periodic: 6, ironAt: 0, still: 0, gale: [], tx: START.x + 100, ty: START.y },
+    player: { x: START.x, y: START.y, hp: PLAYER.hp + gear.hp, maxHp: PLAYER.hp + gear.hp, shield: gear.startShield, shieldUntil: 0, iframes: 1, dashCd: 0, dashT: 0, dodgeUntil: 0, dodgePop: -1, dashDir: { x: 1, y: 0 }, swingCd: 0, windup: -1, aim: 0, attacks: 0, slowUntil: 0, emergencyUsed: false, stormUntil: 0, stormTick: 0, chainAt: [], tick: 0, holdT: 0, dashBonusUntil: 0, lastTarget: -1, bigCatch: 0, periodic: 6, ironAt: 0, still: 0, gale: [], tx: START.x + 100, ty: START.y },
     buffs: [], foods, foodUsed: foods.map(() => false),
     level: 1, xp: 0, picks: {}, choices: null,
     monsters: [], projectiles: [], zones: [], orbs: [], pops: [], swings: [],
@@ -169,9 +171,14 @@ function pickSpawn(s: RaidState) {
 }
 
 // ---------- 피해 ----------
+/** 회피가 끝난 뒤에도 무적이 이어지는 여유 시간(초). */
+const DODGE_GRACE = 0.2;
 function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = false) {
   const p = s.player;
-  if (p.iframes > 0 || p.dashT > 0 || s.over) return;
+  if (s.over) return;
+  // 회피(대시) 중과 직후 0.2초는 무적: 맞을 뻔하면 "회피!"
+  if (p.dashT > 0 || s.t < p.dodgeUntil) { if (s.t - p.dodgePop > 0.5) { p.dodgePop = s.t; s.pops.push({ x: p.x, y: p.y - 34, text: "회피!", t: 0.6, kind: "info" }); } return; }
+  if (p.iframes > 0) return;
   raw *= 1 - (s.weapon.fx?.guard ?? 0) - (s.picks["frost-veil"] && p.holdT > 0 ? 0.25 : 0) - buffSum(s, ["armor"]);
   if (s.special.stanceUntil > s.t) { raw *= 0.2; if (!s.special.stanceHit) { s.special.stanceHit = true; s.special.stanceUntil = 0; counterBlast(s, true); } }
   if (fromBoss && s.picks["iron-wall"] && s.t - p.ironAt >= 1) { p.ironAt = s.t; raw *= 0.5; }
@@ -684,7 +691,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   if (input.special && !s.special.prev) castSpecial(s);
   s.special.prev = Boolean(input.special);
   if (input.dash && !s.prevDash && p.dashCd <= 0 && s.special.cancelable) { s.actions = s.actions.filter(x => x.tag !== "cancel"); if (s.evolution === "longbow") s.special.readyAt = s.t + 3; s.special.cancelable = false; s.special.lockAim = null; s.special.moveUntil = 0; }
-  if (input.dash && !s.prevDash && p.dashCd <= 0) { p.gale = []; p.dashT = PLAYER.dashTime * (inMud(s.terrain, p.x, p.y) ? 0.8 : 1); p.dashDir = ml ? { x: mx, y: my } : { x: Math.cos(p.aim), y: Math.sin(p.aim) }; p.dashCd = d.dashCd; }
+  if (input.dash && !s.prevDash && p.dashCd <= 0) { p.gale = []; p.dodgeUntil = s.t + PLAYER.dashTime + DODGE_GRACE; p.dashT = PLAYER.dashTime * (inMud(s.terrain, p.x, p.y) ? 0.8 : 1); p.dashDir = ml ? { x: mx, y: my } : { x: Math.cos(p.aim), y: Math.sin(p.aim) }; p.dashCd = d.dashCd; }
   s.prevDash = input.dash;
 
   // 이동(장판 둔화, 공격 중 둔화)
@@ -777,7 +784,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
         if (!pr.wave) { if ((pr.left ?? 0) > 0) pr.left = (pr.left ?? 0) - 1; else pr.life = 0; }
       }
     }
-    else if (dist(pr.x, pr.y, p.x, p.y) < pr.r + PLAYER.radius) { hurtPlayer(s, pr.damage, "투사체"); pr.life = 0; }
+    else if (dist(pr.x, pr.y, p.x, p.y) < pr.r + PLAYER.radius) { const dodging = p.dashT > 0 || s.t < p.dodgeUntil; hurtPlayer(s, pr.damage, "투사체"); if (!dodging) pr.life = 0; } // 회피 중에는 탄이 몸을 통과한다
     if (pr.x < -50 || pr.x > WORLD_W + 50 || pr.y < -50 || pr.y > WORLD_H + 50) pr.life = 0;
   }
   s.projectiles = s.projectiles.filter(pr => pr.life > 0);

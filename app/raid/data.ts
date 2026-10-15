@@ -186,7 +186,7 @@ export const LIFE_MATS: Record<string, { name: string; icon: string; recipe: str
   "farm-fiber": { name: "튼튼한 농업 섬유", icon: "🧵", recipe: "농산물 5개(황금 제외)" },
   "fish-oil": { name: "정제 물고기 기름", icon: "🫗", recipe: "물고기 3마리(전설·신화 제외)" },
   "tanned-leather": { name: "무두질 가죽", icon: "🟫", recipe: "일반 사냥 소재 3개(희귀 소재 제외)" },
-  "artisan-core": { name: "생활 장인의 핵", icon: "💠", recipe: "농업 섬유 1 · 물고기 기름 1 · 무두질 가죽 1 · 가공품 아무 종류 1" },
+  "artisan-core": { name: "생활 장인의 핵", icon: "💠", recipe: "농업 섬유 1 · 물고기 기름 1 · 무두질 가죽 1" },
 };
 export const HUNT_COMMON_LOOT = ["rabbitfur", "foxfur", "antler", "boarhair", "bearfur", "tigerpelt"];
 export const HUNT_RARE_LOOT = ["luckyfoot", "foxbead", "goldantler", "tusk", "honey", "tigerfang"];

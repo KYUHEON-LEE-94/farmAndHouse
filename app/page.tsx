@@ -2071,7 +2071,7 @@ export default function Home() {
     "farm-fiber": (n, pick) => takeTag(LIFE_TAGS["farm-fiber"], 5 * n, pick),
     "fish-oil": (n, pick) => takeTag(LIFE_TAGS["fish-oil"], 3 * n, pick),
     "tanned-leather": (n, pick) => takeTag(LIFE_TAGS["tanned-leather"], 3 * n, pick),
-    "artisan-core": n => planFor({ "farm-fiber": n, "fish-oil": n, "tanned-leather": n, goods: n }),
+    "artisan-core": n => planFor({ "farm-fiber": n, "fish-oil": n, "tanned-leather": n }),
   };
   const lifeMax = (id: string, pick?: string[]) => { let n = 0; while (n < 999 && LIFE_NEED[id]?.(n + 1, pick)) n++; return n; };
   const describePlan = (plan: Plan) => [...plan.take.map(t => `${t.src.name} ${t.n}`), ...Object.entries(plan.mats).map(([id, n]) => `${ALL_RAID_ITEMS[id]?.icon ?? ""} ${ALL_RAID_ITEMS[id]?.name ?? id} ${n}`)];
