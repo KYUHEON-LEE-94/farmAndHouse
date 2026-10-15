@@ -2053,14 +2053,16 @@ export default function Home() {
     return { take, mats, gold };
   };
   /** 강화 가공(51.4): n개를 만들 때 실제로 쓸 재료. 모자라면 null. */
-  const takeTag = (tag: string, count: number): Plan | null => { const tags = tag.split("|"), sources = forgeSources().filter(x => tags.includes(x.tag)).sort((a, b) => a.value - b.value); let left = count; const take: Plan["take"] = []; for (const src of sources) { const k = Math.min(left, src.n); if (k) { take.push({ src, n: k }); left -= k; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; };
-  const LIFE_NEED: Record<string, (n: number) => Plan | null> = {
-    "farm-fiber": n => takeTag("crop0|goodcrop", 5 * n),
-    "fish-oil": n => takeTag("fish", 3 * n),
-    "tanned-leather": n => takeTag("hunt", 3 * n),
+  const takeTag = (tag: string, count: number, pick?: string[]): Plan | null => { const tags = tag.split("|"), sources = forgeSources().filter(x => tags.includes(x.tag) && (!pick?.length || pick.includes(x.id))).sort((a, b) => a.value - b.value); let left = count; const take: Plan["take"] = []; for (const src of sources) { const k = Math.min(left, src.n); if (k) { take.push({ src, n: k }); left -= k; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; };
+  /** 강화 가공 재료 분류(51.5 재료 직접 고르기에서도 씀). */
+  const LIFE_TAGS: Record<string, string> = { "farm-fiber": "crop0|goodcrop", "fish-oil": "fish", "tanned-leather": "hunt" };
+  const LIFE_NEED: Record<string, (n: number, pick?: string[]) => Plan | null> = {
+    "farm-fiber": (n, pick) => takeTag(LIFE_TAGS["farm-fiber"], 5 * n, pick),
+    "fish-oil": (n, pick) => takeTag(LIFE_TAGS["fish-oil"], 3 * n, pick),
+    "tanned-leather": (n, pick) => takeTag(LIFE_TAGS["tanned-leather"], 3 * n, pick),
     "artisan-core": n => planFor({ "farm-fiber": n, "fish-oil": n, "tanned-leather": n, goods: n }),
   };
-  const lifeMax = (id: string) => { let n = 0; while (n < 999 && LIFE_NEED[id]?.(n + 1)) n++; return n; };
+  const lifeMax = (id: string, pick?: string[]) => { let n = 0; while (n < 999 && LIFE_NEED[id]?.(n + 1, pick)) n++; return n; };
   const describePlan = (plan: Plan) => [...plan.take.map(t => `${t.src.name} ${t.n}`), ...Object.entries(plan.mats).map(([id, n]) => `${ALL_RAID_ITEMS[id]?.icon ?? ""} ${ALL_RAID_ITEMS[id]?.name ?? id} ${n}`)];
   /** 계획대로 재료·돈을 쓴다. */
   function spendPlan(plan: Plan) {
@@ -2086,10 +2088,11 @@ export default function Home() {
   { const src = forgeSources(); forgeHave["rare-hunt"] = src.filter(x => x.tag === "rarehunt").reduce((sum, x) => sum + x.n, 0); forgeHave.goods = src.filter(x => x.tag === "goods").reduce((sum, x) => sum + x.n, 0); forgeHave["good-crop"] = src.filter(x => x.tag === "goodcrop").reduce((sum, x) => sum + x.n, 0); }
   const forge: ForgeActions = {
     have: forgeHave, money,
-    lifePlan: (id, n = 1) => { const plan = LIFE_NEED[id]?.(n); return plan ? describePlan(plan) : null; },
+    lifePlan: (id, n = 1, pick) => { const plan = LIFE_NEED[id]?.(n, pick); return plan ? describePlan(plan) : null; },
     lifeMax, craftStock,
-    craftLife: (id, n = 1) => {
-      const plan = LIFE_NEED[id]?.(n); if (!plan) return setNotice("재료가 부족해요.");
+    craftSources: id => { const tags = LIFE_TAGS[id]?.split("|") ?? []; return forgeSources().filter(x => tags.includes(x.tag)).sort((a, b) => a.value - b.value).map(x => ({ id: x.id, name: x.name, n: x.n })); },
+    craftLife: (id, n = 1, pick) => {
+      const plan = LIFE_NEED[id]?.(n, pick); if (!plan) return setNotice("재료가 부족해요.");
       spendPlan(plan); setRaidItems(view => ({ ...view, [id]: (view[id] ?? 0) + n }));
       playCoinSound([660, 880]); setNotice(`⚒️ ${LIFE_MATS[id].icon} ${LIFE_MATS[id].name} ${n}개 즉시 완성! (사용: ${describePlan(plan).join(", ")})`);
     },
@@ -2267,7 +2270,7 @@ export default function Home() {
         <button className={tab === "workshop" ? "active" : ""} onClick={() => switchTab("workshop")}>🏭 공방{doneJobs > 0 ? ` ✨${doneJobs}` : ""}</button>
         <button className={tab === "fish" ? "active" : ""} onClick={() => switchTab("fish")}>🎣 낚시터</button>
         {HUNT_ENABLED && <button className={tab === "hunt" ? "active" : ""} onClick={() => switchTab("hunt")}>🏹 사냥터</button>}
-        {RAID_ENABLED && <button className={tab === "raid" ? "active" : ""} onClick={() => switchTab("raid")}>🗼 토벌탑</button>}
+        {RAID_ENABLED && <button className={tab === "raid" ? "active" : ""} onClick={() => switchTab("raid")}>🗼 토벌탑 (베타)</button>}
         <button className={tab === "book" ? "active" : ""} onClick={() => switchTab("book")}>📖 도감</button>
         <button className={tab === "home" ? "active" : ""} onClick={() => switchTab("home")}>🏡 나의 집</button>
         <button className={tab === "pets" ? "active" : ""} onClick={() => switchTab("pets")}>🐾 펫</button>
@@ -2490,7 +2493,7 @@ export default function Home() {
       </section>}
 
       {RAID_ENABLED && tab === "raid" && <section className="panel raid-panel">
-        <div className="panel-heading"><div><span className="eyebrow">TOWER RAID · 로컬 테스트</span><h3>월루탑 토벌</h3></div><span className="plot-count">최고 {raid.highestFloor}층 · 1~{RAID_MAX_FLOOR}층 개방</span></div>
+        <div className="panel-heading"><div><span className="eyebrow">TOWER RAID · BETA</span><h3>월루탑 토벌 (베타)</h3></div><span className="plot-count">최고 {raid.highestFloor}층 · 1~{RAID_MAX_FLOOR}층 개방</span></div>
         <RaidPanel raid={raid} dishStock={dishStock} raidItems={raidItems} hold={bossMode || tab !== "raid"} avatar={avatar} forge={forge} onResult={applyRaidResult} onOpenGear={() => switchTab("equipment")} onOpenWorkshop={() => { setWorkshopView("raid"); switchTab("workshop"); }} />
       </section>}
 

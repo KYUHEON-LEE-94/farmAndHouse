@@ -4,7 +4,7 @@ import { GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE } from "../house";
  * 탑 토벌 데이터(HUNTING_RAID.md 23~31절, raidBalanceVersion 1). 첫 구현은 1~10층.
  * 모든 거리는 논리 해상도 960×540 기준 px, 시간은 초.
  */
-export const RAID_RELEASED = false;
+export const RAID_RELEASED = true;
 export const RAID_ENABLED = RAID_RELEASED || TEST_MODE;
 export const RAID_BALANCE_VERSION = 1;
 export const RAID_MAX_FLOOR = 10;

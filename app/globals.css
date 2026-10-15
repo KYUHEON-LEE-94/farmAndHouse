@@ -1075,3 +1075,6 @@ button { color:inherit; }
 
 .gacha-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .pet-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}.pet-bulk small{color:#7a7060;font-size:11px}
+
+.raid-pick-toggle{margin-top:4px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:#fff;font:700 11.5px "Gowun Dodum";cursor:pointer;color:#5a4a2a}
+.raid-pick{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.raid-pick button{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;font:600 11.5px "Gowun Dodum";cursor:pointer}.raid-pick button small{color:#8a7a5a;margin-left:2px}.raid-pick button.on{background:#2c2418;color:#ffe19a;border-color:#2c2418}.raid-pick button.on small{color:#e8d7a0}

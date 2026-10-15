@@ -18,10 +18,13 @@ export type ForgeActions = {
   /** 재료 보유량(탑 재료 · 생활 재료 · 사냥 소재 · 특수 키 rare-hunt/goods/good-crop). */
   have: Record<string, number>; money: number;
   /** 생활 재료 만들 때 실제로 쓰일 재료 목록(모자라면 null). */
-  lifePlan: (id: string, n?: number) => string[] | null;
-  craftLife: (id: string, n?: number) => void;
+  /** pick: 직접 고른 재료 id(비어 있으면 싼 것부터 자동) */
+  lifePlan: (id: string, n?: number, pick?: string[]) => string[] | null;
+  craftLife: (id: string, n?: number, pick?: string[]) => void;
+  /** 강화 가공에 쓸 수 있는 재료 목록(싼 순) */
+  craftSources: (id: string) => { id: string; name: string; n: number }[];
   /** 지금 재료로 만들 수 있는 최대 개수 */
-  lifeMax: (id: string) => number;
+  lifeMax: (id: string, pick?: string[]) => number;
   /** 강화 가공 재료 현황: [쓸 수 있는 수, 가진 수(잠금·주문 예약 포함)] */
   craftStock: Record<string, [number, number]>;
   enhance: (useStabilizer: boolean) => void;
@@ -293,16 +296,24 @@ function nameOf(id: string) {
 /** 강화 소재 즉시 제작: 1·5·10·최대, 실제로 쓰일 재료를 보여 주고 누르는 즉시 완성. */
 export function RaidCraftView({ forge, onForge }: { forge: ForgeActions; onForge: () => void }) {
   const [qty, setQty] = useState<Record<string, number>>({});
+  // 재료 직접 고르기(51.5): 고른 재료만 쓴다. 아무것도 안 고르면 싼 것부터 자동.
+  const [picks, setPicks] = useState<Record<string, string[]>>({}), [open, setOpen] = useState<string | null>(null);
   return <div className="raid-craft">
-    <p className="hint">싼 재료부터 써서 바로 만들어요. 잠금·주문 예약분은 쓰지 않아요. <button className="raid-gear-link" onClick={onForge}>⚒️ 대장간으로</button></p>
-    {Object.entries(LIFE_MATS).map(([id, m]) => { const max = forge.lifeMax(id), want = Math.max(1, Math.min(qty[id] ?? 1, Math.max(1, max))), plan = forge.lifePlan(id, want);
+    <p className="hint">기본은 싼 재료부터 자동으로 써요. 🎯 재료 고르기로 쓸 재료를 직접 정할 수 있어요. 잠금·주문 예약분은 쓰지 않아요. <button className="raid-gear-link" onClick={onForge}>⚒️ 대장간으로</button></p>
+    {Object.entries(LIFE_MATS).map(([id, m]) => { const sources = id === "artisan-core" ? [] : forge.craftSources(id), pick = (picks[id] ?? []).filter(key => sources.some(src => src.id === key)),
+      max = forge.lifeMax(id, pick), want = Math.max(1, Math.min(qty[id] ?? 1, Math.max(1, max))), plan = forge.lifePlan(id, want, pick);
       return <div key={id} className="raid-craft-row">
         <span className="raid-armor-icon">{m.icon}</span>
         <div><b>{m.name} <small>보유 {forge.have[id] ?? 0}</small></b>
           <span>{m.recipe}{id !== "artisan-core" && <> · 쓸 수 있는 재료 <em className="raid-stock">{forge.craftStock[id]?.[0] ?? 0}</em>개</>}</span>
-          {plan ? <span className="raid-plan">사용: {plan.join(", ")}</span> : <span className="raid-plan lack">재료 부족</span>}</div>
+          {plan ? <span className="raid-plan">사용: {plan.join(", ")}</span> : <span className="raid-plan lack">재료 부족</span>}
+          {sources.length > 0 && <button className="raid-pick-toggle" onClick={() => setOpen(open === id ? null : id)}>🎯 재료 고르기{pick.length ? ` (${pick.length}종 선택)` : " (자동)"} {open === id ? "▴" : "▾"}</button>}
+          {open === id && <div className="raid-pick">
+            <button className={!pick.length ? "on" : ""} onClick={() => setPicks(all => ({ ...all, [id]: [] }))}>자동(싼 것부터)</button>
+            {sources.map(src => <button key={src.id} className={pick.includes(src.id) ? "on" : ""} onClick={() => setPicks(all => ({ ...all, [id]: pick.includes(src.id) ? pick.filter(key => key !== src.id) : [...pick, src.id] }))}>{src.name} <small>{src.n}</small></button>)}
+          </div>}</div>
         <div className="raid-craft-qty">{[1, 5, 10].map(n => <button key={n} className={want === n ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: n }))} disabled={max < n}>{n}개</button>)}<button className={want === max && max > 10 ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: max }))} disabled={max < 1}>최대</button>
-          <button className="make" disabled={!plan} onClick={() => forge.craftLife(id, want)}>즉시 완성 ×{want}</button></div>
+          <button className="make" disabled={!plan} onClick={() => forge.craftLife(id, want, pick)}>즉시 완성 ×{want}</button></div>
       </div>; })}
   </div>;
 }
