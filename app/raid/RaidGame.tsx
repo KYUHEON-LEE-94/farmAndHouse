@@ -254,7 +254,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   // 왼쪽 위: 내 카드(아바타 · 체력 · 각성)
   panel(ctx, 12, 12, 270, 70);
   ctx.save(); roundRect(ctx, 20, 20, 54, 54, 10); ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fill(); ctx.clip(); drawAvatar(ctx, art, 47, 47, 50, false); ctx.restore();
-  ctx.font = `700 13px ${UI_FONT}`; ctx.fillStyle = "#fff6d0"; ctx.fillText(`${s.floor.floor}층 · ${s.floor.zone}`, 84, 28);
+  ctx.font = `700 13px ${UI_FONT}`; ctx.fillStyle = "#fff6d0"; ctx.fillText(s.floor.training ? `🎯 ${s.floor.zone}` : `${s.floor.floor}층 · ${s.floor.zone}`, 84, 28);
   bar(ctx, 84, 40, 186, 13, p.hp / p.maxHp, p.hp / p.maxHp < 0.3 ? "#ff5040" : "#ef5a43");
   if (p.shield > 0) bar(ctx, 84, 40, 186, 5, p.shield / p.maxHp, "rgba(140,210,255,.95)", "rgba(0,0,0,0)");
   ctx.font = "700 10px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`♥ ${Math.ceil(p.hp)} / ${p.maxHp}${p.shield > 0 ? `  🛡 ${Math.ceil(p.shield)}` : ""}`, 90, 47);
@@ -263,7 +263,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}${s.level >= 5 ? " MAX" : ""}`, 84, 75);
 
   // 가운데 위: 남은 시간 / 보스 체력
-  const left = FLOOR_SECONDS - s.t, bossTime = s.t >= 240;
+  const left = (s.floor.duration ?? FLOOR_SECONDS) - s.t, bossTime = !s.floor.training && s.t >= 240;
   if (s.boss && s.boss.hp > 0) {
     const bw = 400, bx = (W - bw) / 2;
     panel(ctx, bx - 10, 12, bw + 20, 46);
@@ -274,7 +274,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   } else {
     panel(ctx, W / 2 - 70, 12, 140, 40);
     ctx.textAlign = "center"; ctx.font = "800 20px sans-serif"; ctx.fillStyle = bossTime ? "#ff7a6a" : "#fff"; ctx.fillText(fmt(left), W / 2, 30);
-    ctx.font = `700 9px ${UI_FONT}`; ctx.fillStyle = "#d9cfae"; ctx.fillText(s.t < 240 ? `보스까지 ${fmt(240 - s.t)}` : "보스 등장!", W / 2, 45);
+    ctx.font = `700 9px ${UI_FONT}`; ctx.fillStyle = "#d9cfae"; ctx.fillText(s.floor.training ? "진화 체험 중" : s.t < 240 ? `보스까지 ${fmt(240 - s.t)}` : "보스 등장!", W / 2, 45);
     ctx.textAlign = "left";
   }
   // 오른쪽 위: 처치 수

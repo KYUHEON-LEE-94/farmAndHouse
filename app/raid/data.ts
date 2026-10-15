@@ -1,4 +1,5 @@
 import { TEST_MODE } from "../testMode";
+import { GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE } from "../house";
 /**
  * 탑 토벌 데이터(HUNTING_RAID.md 23~31절, raidBalanceVersion 1). 첫 구현은 1~10층.
  * 모든 거리는 논리 해상도 960×540 기준 px, 시간은 초.
@@ -69,6 +70,10 @@ export type FloorDef = {
   /** 정예: 시작 시 고정 수(엘리트 버전 몬스터) 또는 주기(초)마다 1마리. */
   elite: { id: string; hp: number; count?: number; every?: number } | null;
   boss: BossDef;
+  /** 판 길이(초, 기본 300). 훈련장은 60. */
+  duration?: number;
+  /** 진화 훈련장: 보스·간접 개입 없음, 체력이 1 아래로 내려가지 않는다. */
+  training?: boolean;
 };
 const z1 = "꽃가루 들판", z2 = "침수된 수로";
 export const FLOORS: FloorDef[] = [
@@ -244,30 +249,33 @@ export function masteryLines(cropLog: Record<string, { n: number }>, fishLog: Re
 }
 export const masteryDone = (lines: MasteryLine[]) => lines.every(l => l.cur >= l.need);
 
-// ---------- 전투펫(31·40절) ----------
-export type BattlePetDef = { id: string; name: string; icon: string; tier: "일반" | "희귀" | "전설"; role: string; text: string };
+// ---------- 전투펫(31·40절, 2026-10-15 사용자 결정으로 뽑기 방식 변경) ----------
+/** 등급: 보통 · 희귀 · 전설. 뽑기는 생활펫 뽑기와 같은 확률·방식(1회 GACHA_PRICE원, 전설 0.1% · 희귀 10% · 보통 나머지). */
+export type PetTier = "보통" | "희귀" | "전설";
+export type BattlePetDef = { id: string; name: string; icon: string; tier: PetTier; role: string; text: string };
 export const BATTLE_PETS: BattlePetDef[] = [
-  { id: "battle-hedgehog", name: "가시 고슴도치", icon: "🦔", tier: "일반", role: "공격", text: "1.4초마다 가까운 적에게 피해 7" },
-  { id: "battle-turtle", name: "방패 거북", icon: "🐢", tier: "일반", role: "방어", text: "22초마다 보호막 10(최대 1중첩)" },
+  { id: "battle-hedgehog", name: "가시 고슴도치", icon: "🦔", tier: "보통", role: "공격", text: "1.4초마다 가까운 적에게 피해 7" },
+  { id: "battle-turtle", name: "방패 거북", icon: "🐢", tier: "보통", role: "방어", text: "22초마다 보호막 10(최대 1중첩)" },
   { id: "battle-sprite", name: "치유 요정", icon: "🧚", tier: "희귀", role: "회복", text: "16초마다 체력 4 회복" },
   { id: "battle-foxfire", name: "여우불", icon: "🦊", tier: "희귀", role: "지원", text: "8초마다 적 하나에 5초 표식(받는 피해 +10%)" },
   { id: "battle-hawk", name: "사냥매", icon: "🦅", tier: "희귀", role: "공격", text: "2.2초마다 가장 강한 적에게 피해 16" },
   { id: "battle-tiger", name: "백호의 혼", icon: "🐯", tier: "전설", role: "공격·방어", text: "5초마다 앞쪽 범위 피해 28, 체력 30% 이하에서 판당 1회 보호막 30" },
 ];
-export const PET_TIER_RATE = { 일반: 0.7, 희귀: 0.25, 전설: 0.05 } as const;
-/** 뽑기 1회: 탑의 인장 10개 또는 8,000골드. 10회 뽑기는 희귀 이상 1마리 보장, 40회째 전설 보장(천장, 골드·인장 공유). */
-export const PET_GACHA = { seals: 10, gold: 8000, pity: 40 };
+export const PET_TIER_RATE: Record<PetTier, number> = { 보통: 1 - GACHA_RARE_CHANCE - GACHA_LEGEND_CHANCE, 희귀: GACHA_RARE_CHANCE, 전설: GACHA_LEGEND_CHANCE };
+export const PET_GACHA = { gold: GACHA_PRICE };
 /** 중복 → 계약 조각, 조각으로 원하는 펫 교환·레벨업. */
-export const DUPLICATE_SHARDS = { 일반: 1, 희귀: 4, 전설: 15 } as const;
+export const DUPLICATE_SHARDS: Record<PetTier, number> = { 보통: 1, 희귀: 4, 전설: 15 };
 export const PET_EXCHANGE = { 희귀: 30, 전설: 100 } as const;
 export const PET_LEVELS = [{ level: 1, shards: 0, mult: 1 }, { level: 2, shards: 5, mult: 1.15 }, { level: 3, shards: 10, mult: 1.3 }, { level: 4, shards: 20, mult: 1.5 }, { level: 5, shards: 35, mult: 1.75 }];
 
-/** 뽑기 한 번(천장 반영). guaranteeRare면 일반이 나와도 희귀로 올린다. */
-export function rollBattlePet(pity: number, guaranteeRare: boolean, random = Math.random) {
-  let tier: BattlePetDef["tier"];
-  if (pity + 1 >= PET_GACHA.pity) tier = "전설";
-  else { const r = random(); tier = r < PET_TIER_RATE.전설 ? "전설" : r < PET_TIER_RATE.전설 + PET_TIER_RATE.희귀 ? "희귀" : "일반"; }
-  if (guaranteeRare && tier === "일반") tier = "희귀";
+/** 전투펫 뽑기 한 번(생활펫 뽑기와 같은 확률). */
+export function rollBattlePet(random = Math.random) {
+  const r = random(), tier: PetTier = r < PET_TIER_RATE.전설 ? "전설" : r < PET_TIER_RATE.전설 + PET_TIER_RATE.희귀 ? "희귀" : "보통";
   const pool = BATTLE_PETS.filter(p => p.tier === tier);
-  return { pet: pool[Math.floor(random() * pool.length)], pity: tier === "전설" ? 0 : pity + 1 };
+  return pool[Math.floor(random() * pool.length)];
 }
+
+// ---------- 진화 체험 훈련장(39절) ----------
+/** 60초 동안 두 진화를 체험한다. 보스·보상 없음, 쓰러지지 않음. */
+export const TRAINING_SECONDS = 60;
+export const TRAINING_FLOOR: FloorDef = { floor: 0, zone: "진화 훈련장", monsters: ["pollen-mite", "thorn-rabbit", "boarling"], spawnRate: 1.6, maxAlive: 26, elite: { id: "field-brute", hp: 180, every: 20 }, boss: { id: "mini", name: "훈련용 허수아비", icon: "🎯", hp: 1, damage: 0, defense: 0 }, duration: TRAINING_SECONDS, training: true };

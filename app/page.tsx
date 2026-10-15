@@ -13,7 +13,7 @@ import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel from "./raid/RaidPanel";
-import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_MASTERY, EMPTY_RAID, masteryLines, type LifeMastery, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
+import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_MASTERY, EMPTY_RAID, masteryLines, type LifeMastery, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
 import type { ForgeActions } from "./raid/RaidPanel";
 import type { FoodSlot, RaidResult } from "./raid/engine";
@@ -316,6 +316,12 @@ export default function Home() {
   const huntStock = useMemo(() => pickCategory(inventory, "hunt"), [inventory]), setHuntStock = categorySetter("hunt");
   // 탑 토벌: 진행 저장과 탑 재료(통합 인벤토리 raid 분류)
   const [raid, setRaid] = useState<RaidSave>(EMPTY_RAID);
+  // 로컬 테스트 모드: 돈을 무제한으로(1억 원 아래로 내려가면 다시 채운다). 배포 빌드에서는 TEST_MODE가 false라 동작하지 않는다.
+  useEffect(() => {
+    if (!TEST_MODE) return;
+    const timer = window.setInterval(() => setMoney(value => (value < 50_000_000 ? 99_999_999 : value)), 400);
+    return () => window.clearInterval(timer);
+  }, []);
   // 생활 숙련 기록(+10 진화 조건): 좋은 품질 수확·미끼 낚시·동물별 사냥·요리별 완성
   const [lifeMastery, setLifeMastery] = useState<LifeMastery>(EMPTY_MASTERY);
   const raidItems = useMemo(() => pickCategory(inventory, "raid"), [inventory]), setRaidItems = categorySetter("raid");
@@ -2071,21 +2077,25 @@ export default function Home() {
       playCoinSound([660, 880, 1100]); setNotice(`${armor.icon} ${armor.name}을(를) 만들었어요!`);
     },
     equip: (slot: ArmorSlot, id: string | null) => setRaid(r => ({ ...r, equipped: { ...r.equipped, [slot]: id } })),
-    drawPets: (count, pay) => {
-      const cost = pay === "seal" ? PET_GACHA.seals * count : PET_GACHA.gold * count;
-      if (pay === "seal" ? raid.towerSeals < cost : money < cost) { setNotice("뽑기 재화가 모자라요."); return []; }
-      let pity = raid.petPity ?? 0, shards = 0; const got: string[] = [], pets = { ...(raid.battlePets ?? {}) };
-      for (let i = 0; i < count; i++) {
-        const guarantee = count === 10 && i === count - 1 && !got.some(id => BATTLE_PETS.find(p => p.id === id)!.tier !== "일반");
-        const r = rollBattlePet(pity, guarantee); pity = r.pity; got.push(r.pet.id);
-        if (pets[r.pet.id]) shards += DUPLICATE_SHARDS[r.pet.tier]; else pets[r.pet.id] = { level: 1 };
-      }
-      if (pay === "gold") setMoney(value => value - cost);
-      setRaid(r => ({ ...r, towerSeals: r.towerSeals - (pay === "seal" ? cost : 0), petPity: pity, contractShards: r.contractShards + shards, battlePets: pets, equipped: { ...r.equipped, battlePet: r.equipped.battlePet ?? got[0] } }));
-      const best = got.map(id => BATTLE_PETS.find(p => p.id === id)!).sort((a, b) => ["일반", "희귀", "전설"].indexOf(b.tier) - ["일반", "희귀", "전설"].indexOf(a.tier))[0];
+    drawPets: count => {
+      const cost = PET_GACHA.gold * count;
+      if (money < cost) { setNotice(`전투펫 뽑기는 ${PET_GACHA.gold.toLocaleString()}원이에요.`); return []; }
+      let shards = 0; const got: string[] = [], pets = { ...(raid.battlePets ?? {}) };
+      for (let i = 0; i < count; i++) { const pet = rollBattlePet(); got.push(pet.id); if (pets[pet.id]) shards += DUPLICATE_SHARDS[pet.tier]; else pets[pet.id] = { level: 1 }; }
+      setMoney(value => value - cost);
+      setRaid(r => ({ ...r, contractShards: r.contractShards + shards, battlePets: pets, equipped: { ...r.equipped, battlePet: r.equipped.battlePet ?? got[0] } }));
+      const best = got.map(id => BATTLE_PETS.find(p => p.id === id)!).sort((x, y) => ["보통", "희귀", "전설"].indexOf(y.tier) - ["보통", "희귀", "전설"].indexOf(x.tier))[0];
       playCoinSound(best.tier === "전설" ? [523, 659, 784, 1047, 1319] : best.tier === "희귀" ? [660, 880, 1100] : [660, 880]);
-      setNotice(`🥚 전투펫 뽑기 ${count}회: ${got.map(id => BATTLE_PETS.find(p => p.id === id)!.icon).join(" ")}${shards ? ` · 중복은 계약 조각 ${shards}개로` : ""}`);
+      setNotice(`🥚 전투펫 뽑기: ${got.map(id => { const p = BATTLE_PETS.find(x => x.id === id)!; return `${p.icon} ${p.name}(${p.tier})`; }).join(", ")}${shards ? ` · 이미 있어서 계약 조각 ${shards}개로 바꿨어요` : ""}`);
       return got;
+    },
+    changeEvolution: (evolution: Evolution) => {
+      const w = raid.weapons["raid-scythe"];
+      if (!w.evolution || w.evolution === evolution) return;
+      const plan = planFor({ ...EVOLUTION_CHANGE.need, ...(w.enhancement >= 13 ? EVOLUTION_CHANGE.upper : {}) }, EVOLUTION_CHANGE.gold);
+      if (!plan) return setNotice("진화를 바꿀 재료나 돈이 모자라요.");
+      spendPlan(plan); setRaid(r => setEvolution(r, "raid-scythe", evolution)); playCoinSound([660, 880, 1100, 1320]);
+      setNotice("🔁 토벌 낫의 진화를 바꿨어요! 강화 단계는 그대로예요.");
     },
     equipPet: id => setRaid(r => ({ ...r, equipped: { ...r.equipped, battlePet: id } })),
     levelPet: id => {
@@ -2095,7 +2105,7 @@ export default function Home() {
       playCoinSound([660, 880, 1100]); setNotice(`${BATTLE_PETS.find(p => p.id === id)?.icon} 전투펫이 Lv.${next.level}이 됐어요!`);
     },
     exchangePet: id => {
-      const pet = BATTLE_PETS.find(p => p.id === id); if (!pet || pet.tier === "일반" || raid.battlePets?.[id]) return;
+      const pet = BATTLE_PETS.find(p => p.id === id); if (!pet || pet.tier === "보통" || raid.battlePets?.[id]) return;
       const cost = PET_EXCHANGE[pet.tier]; if (raid.contractShards < cost) return;
       setRaid(r => ({ ...r, contractShards: r.contractShards - cost, battlePets: { ...(r.battlePets ?? {}), [id]: { level: 1 } } }));
       playCoinSound([660, 880, 1100, 1320]); setNotice(`${pet.icon} ${pet.name}을(를) 계약 조각으로 데려왔어요!`);

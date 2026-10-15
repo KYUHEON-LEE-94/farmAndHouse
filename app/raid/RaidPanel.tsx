@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DISHES, DISH_GRADES } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, FLOORS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, masteryDone, weaponStats, type ArmorSlot, type Evolution, type MasteryLine, type RaidSave } from "./data";
+import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, masteryDone, weaponStats, type ArmorSlot, type Evolution, type MasteryLine, type RaidSave } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -26,8 +26,10 @@ export type ForgeActions = {
   equip: (slot: ArmorSlot, id: string | null) => void;
   /** 생활 숙련(+10 진화 조건) 진행. */
   mastery: MasteryLine[];
-  /** 전투펫 뽑기(count 1 또는 10, pay "seal"|"gold") — 결과 펫 id 목록. */
-  drawPets: (count: number, pay: "seal" | "gold") => string[];
+  /** 전투펫 뽑기(생활펫 뽑기와 같은 방식, 1회) — 결과 펫 id 목록. */
+  drawPets: (count: number) => string[];
+  /** 진화 변경(30,000골드 + 생활 장인의 핵 3, +13 이상은 미궁 호박 2 추가). */
+  changeEvolution: (evolution: Evolution) => void;
   equipPet: (id: string | null) => void;
   levelPet: (id: string) => void;
   exchangePet: (id: string) => void;
@@ -41,7 +43,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   const [view, setView] = useState<"tower" | "gear" | "forge">("tower");
   const [floorNo, setFloorNo] = useState(Math.min(raid.unlockedFloor, RAID_MAX_FLOOR));
   const [slots, setSlots] = useState<(string | null)[]>([null, null, null]);
-  const [running, setRunning] = useState<{ foods: FoodSlot[]; id: number } | null>(null);
+  const [running, setRunning] = useState<{ foods: FoodSlot[]; id: number; training?: Evolution } | null>(null);
   const [outcome, setOutcome] = useState<RaidOutcome | null>(null);
   const [testSpeed, setTestSpeed] = useState(1);
   const [testEnh, setTestEnh] = useState<number | null>(null);
@@ -64,12 +66,18 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   const healCount = (i: number) => slots.filter((k, j) => j !== i && k && FOOD_EFFECTS[k.split("|")[0]].heal).length;
 
   const start = () => { setOutcome(null); setRunning({ foods: slots.map(slotFood), id: ++runSeq }); };
+  const train = (evolution: Evolution) => { setOutcome(null); setRunning({ foods: [], id: ++runSeq, training: evolution }); };
   const finish = (result: RaidResult) => {
+    if (running?.training) { const name = EVOLUTIONS[running.training].name; setRunning(null); setView("forge"); setOutcome({ result: { ...result, floor: 0 }, lines: [`🎯 ${name} 체험 끝 · 처치 ${result.kills}`] }); return; }
     const lines = onResult(result, running?.foods ?? []);
     setOutcome({ result, lines }); setRunning(null); setSlots([null, null, null]);
     if (result.cleared) setFloorNo(n => Math.min(RAID_MAX_FLOOR, n + 1));
   };
 
+  if (running?.training) return <div className="raid-run">
+    <RaidGame key={running.id} floor={TRAINING_FLOOR} weapon={weaponStats(Math.max(10, scythe.enhancement), running.training)} evolution={running.training} foods={[]} gear={gear} pet={petFor(raid)} avatar={avatar} hold={hold} onFinish={finish} onQuit={finish} />
+    <p className="raid-keys">🎯 <b>{EVOLUTIONS[running.training].name}</b> {TRAINING_SECONDS}초 체험 · 쓰러지지 않고 보상도 없어요 · <kbd>P</kbd> 일시정지에서 그만둘 수 있어요</p>
+  </div>;
   if (running) return <div className="raid-run">
     <RaidGame key={running.id} floor={floor} weapon={stats} evolution={evo} foods={running.foods} gear={gear} pet={petFor(raid)} avatar={avatar} hold={hold} speed={TEST_MODE ? testSpeed : 1} onFinish={finish} onQuit={finish} />
     <p className="raid-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 🖱 조준 · 클릭(누르고 있기) 공격 · <kbd>Space</kbd> 회피 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 음식 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 보스키</p>
@@ -139,7 +147,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
     </div>}
 
     {view === "gear" && <GearView raid={raid} forge={forge} />}
-    {view === "forge" && <ForgeView raid={raid} forge={forge} />}
+    {view === "forge" && <>{outcome && outcome.result.floor === 0 && <div className="raid-result clear"><b>{outcome.lines[0]}</b><span>두 진화를 모두 체험해 보고 골라 보세요.</span></div>}<ForgeView raid={raid} forge={forge} onTrain={train} /></>}
   </div>;
 }
 
@@ -175,21 +183,17 @@ export function petFor(raid: RaidSave) {
 }
 function PetView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
   const [last, setLast] = useState<string[]>([]);
-  const pets = raid.battlePets ?? {}, pity = raid.petPity ?? 0, shards = raid.contractShards;
-  const draw = (count: number, pay: "seal" | "gold") => setLast(forge.drawPets(count, pay));
+  const pets = raid.battlePets ?? {}, shards = raid.contractShards;
+  const draw = (count: number) => setLast(forge.drawPets(count));
   return <div className="raid-pets">
     <div className="raid-pet-gacha">
       <b>🥚 전투펫 뽑기</b>
-      <small>일반 {PET_TIER_RATE.일반 * 100}% · 희귀 {PET_TIER_RATE.희귀 * 100}% · 전설 {PET_TIER_RATE.전설 * 100}% · 10회 뽑기는 희귀 이상 1마리 보장 · 전설 천장 {pity}/{PET_GACHA.pity}</small>
-      <div>
-        <button onClick={() => draw(1, "seal")} disabled={raid.towerSeals < PET_GACHA.seals}>🔖 인장 {PET_GACHA.seals}개 · 1회</button>
-        <button onClick={() => draw(10, "seal")} disabled={raid.towerSeals < PET_GACHA.seals * 10}>🔖 인장 {PET_GACHA.seals * 10}개 · 10회</button>
-        <button onClick={() => draw(1, "gold")} disabled={forge.money < PET_GACHA.gold}>💰 {PET_GACHA.gold.toLocaleString()}원 · 1회</button>
-      </div>
+      <small>생활펫 뽑기와 같은 방식 · 보통 {(PET_TIER_RATE.보통 * 100).toFixed(1)}% · 희귀 {PET_TIER_RATE.희귀 * 100}% · 전설 {PET_TIER_RATE.전설 * 100}%</small>
+      <div><button onClick={() => draw(1)} disabled={forge.money < PET_GACHA.gold}>💰 {PET_GACHA.gold.toLocaleString()}원 · 1회 뽑기</button></div>
       {last.length > 0 && <div className="raid-pet-last">{last.map((id, i) => { const p = BATTLE_PETS.find(x => x.id === id)!; return <span key={i} className={`tier-${p.tier}`} style={{ animationDelay: `${i * 0.05}s` }}>{p.icon}<small>{p.tier}</small></span>; })}</div>}
-      <small>보유: 🔖 탑의 인장 {raid.towerSeals} · 📜 계약 조각 {shards} (중복 일반 {DUPLICATE_SHARDS.일반} · 희귀 {DUPLICATE_SHARDS.희귀} · 전설 {DUPLICATE_SHARDS.전설}개)</small>
+      <small>📜 계약 조각 {shards} · 중복은 조각으로(보통 {DUPLICATE_SHARDS.보통} · 희귀 {DUPLICATE_SHARDS.희귀} · 전설 {DUPLICATE_SHARDS.전설}개) · 조각으로 레벨업·교환</small>
     </div>
-    <div className="raid-pet-list">{BATTLE_PETS.map(p => { const own = pets[p.id], lv = own?.level ?? 0, next = PET_LEVELS[lv], worn = raid.equipped.battlePet === p.id, cost = p.tier === "일반" ? 0 : PET_EXCHANGE[p.tier];
+    <div className="raid-pet-list">{BATTLE_PETS.map(p => { const own = pets[p.id], lv = own?.level ?? 0, next = PET_LEVELS[lv], worn = raid.equipped.battlePet === p.id, cost = p.tier === "보통" ? 0 : PET_EXCHANGE[p.tier];
       return <div key={p.id} className={`raid-pet ${own ? "owned" : ""} ${worn ? "worn" : ""} tier-${p.tier}`}>
         <span className="raid-armor-icon">{own ? p.icon : "❔"}</span>
         <div><b>{p.name} <small>{p.tier} · {p.role}{own ? ` · Lv.${lv}` : ""}</small></b><span>{p.text}</span></div>
@@ -203,7 +207,7 @@ function PetView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
 }
 
 // ---------- 대장간 ----------
-function ForgeView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
+function ForgeView({ raid, forge, onTrain }: { raid: RaidSave; forge: ForgeActions; onTrain: (evolution: Evolution) => void }) {
   const [useStab, setUseStab] = useState(false);
   const w = raid.weapons["raid-scythe"], step = nextStep(w.enhancement);
   const needsOpen = !!step?.open && !w.unlockedEnhancements.includes(step.to);
@@ -223,7 +227,7 @@ function ForgeView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
       </div>
       {needEvolution ? <div className="raid-evolve"><b>⚡ +10 진화 방향을 고르세요 (첫 선택 무료)</b>
         {!masteryDone(forge.mastery) && <small className="raid-evolve-lock">{TEST_MODE ? "🧪 테스트 모드라 생활 숙련 조건 없이 고를 수 있어요." : "🔒 아래 생활 숙련 조건을 모두 채우면 진화할 수 있어요."}</small>}
-        <div>{(Object.keys(EVOLUTIONS) as Evolution[]).map(id => <button key={id} disabled={!TEST_MODE && !masteryDone(forge.mastery)} onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small></button>)}</div></div>
+        <div>{(Object.keys(EVOLUTIONS) as Evolution[]).map(id => <div key={id} className="raid-evo-card"><button disabled={!TEST_MODE && !masteryDone(forge.mastery)} onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small></button><button className="raid-try" onClick={() => onTrain(id)}>🎯 {TRAINING_SECONDS}초 체험</button></div>)}</div></div>
         : !step ? <p className="raid-max">최대 강화(+15)에 도달했어요!</p>
         : <>
           <div className="raid-odds">
@@ -236,6 +240,11 @@ function ForgeView({ raid, forge }: { raid: RaidSave; forge: ForgeActions }) {
           <button className="raid-hammer" disabled={!affordable} onClick={() => (needsOpen ? forge.openStep() : forge.enhance(useStab))}>{needsOpen ? `🔓 +${step.to} 단계 개방` : `🔨 +${step.to} 강화하기`}</button>
           {w.enhancement >= 10 && <small className="raid-floor-note">+10에 한 번 도달하면 +9 아래로는 내려가지 않아요.</small>}
         </>}
+      {w.evolution && <div className="raid-evo-change"><b>🔁 진화 바꾸기</b><small>강화 단계와 개방한 단계는 그대로예요 · 횟수 제한 없음</small>
+        {(() => { const other = (Object.keys(EVOLUTIONS) as Evolution[]).find(id => id !== w.evolution)!, need: Record<string, number> = { ...EVOLUTION_CHANGE.need, ...(w.enhancement >= 13 ? EVOLUTION_CHANGE.upper : {}) }, ok = forge.money >= EVOLUTION_CHANGE.gold && canPay(need, forge.have);
+          return <><div className="raid-cost big"><em className={forge.money >= EVOLUTION_CHANGE.gold ? "ok" : "lack"}>💰 {EVOLUTION_CHANGE.gold.toLocaleString()}원</em>{Object.entries(need).map(([id, n]) => <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</div>
+            <div className="raid-evo-change-row"><button className="raid-try" onClick={() => onTrain(other)}>🎯 {EVOLUTIONS[other].name} {TRAINING_SECONDS}초 체험</button><button className="raid-hammer small" disabled={!ok} onClick={() => forge.changeEvolution(other)}>🔁 {EVOLUTIONS[other].name}(으)로 바꾸기</button></div></>; })()}
+      </div>}
     </div>
 
     <div className="raid-mastery"><b>📜 생활 숙련 <small>+10 진화 조건 · {forge.mastery.filter(l => l.cur >= l.need).length}/{forge.mastery.length}</small></b>

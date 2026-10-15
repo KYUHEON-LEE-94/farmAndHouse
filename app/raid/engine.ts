@@ -131,7 +131,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타") {
   p.hp -= dmg; p.iframes = PLAYER.iframes; s.damageTaken[source] = (s.damageTaken[source] ?? 0) + dmg;
   if (dmg > 0) s.pops.push({ x: p.x, y: p.y - 24, text: `-${dmg}`, t: 0.8, kind: "hurt" });
   if (!p.emergencyUsed && pick(s, "emergency-shield") && p.hp > 0 && p.hp <= p.maxHp * 0.3) { p.emergencyUsed = true; p.shield += 25; p.shieldUntil = s.t + 60; s.pops.push({ x: p.x, y: p.y - 40, text: "비상 보호막!", t: 1.2, kind: "info" }); }
-  if (p.hp <= 0) { p.hp = 0; s.over = "dead"; }
+  if (p.hp <= 0) { if (s.floor.training) p.hp = 1; else { p.hp = 0; s.over = "dead"; } }
 }
 function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: number) {
   if (m.hp <= 0) return;
@@ -382,8 +382,8 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
       if (e.every) { spawnElite(s); s.nextElite += e.every; }
       else if (s.elitesPlaced < (e.count ?? 0)) { spawnElite(s); s.elitesPlaced++; s.nextElite += 90; }
     }
-    if (s.t >= 60 * (s.interventions + 1) && s.interventions < 3) { s.interventions++; intervention(s, s.interventions); }
-  } else if (!s.bossSpawned) spawnBoss(s);
+    if (!s.floor.training && s.t >= 60 * (s.interventions + 1) && s.interventions < 3) { s.interventions++; intervention(s, s.interventions); }
+  } else if (!s.bossSpawned && !s.floor.training) spawnBoss(s);
 
   // 몬스터
   for (const m of s.monsters) if (m.hp > 0) updateMonster(s, m, dt);
@@ -439,7 +439,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   s.swings = s.swings.filter(sw => sw.t > 0);
 
   if (s.boss) s.bossHpAtEnd = Math.max(0, s.boss.hp / s.boss.maxHp);
-  if (!s.over && s.t >= FLOOR_SECONDS) s.over = "timeout";
+  if (!s.over && s.t >= (s.floor.duration ?? FLOOR_SECONDS)) s.over = "timeout";
 }
 
 export type RaidResult = { floor: number; cleared: boolean; kills: number; usedFoods: number[]; bossHpLeft: number; hpLeft: number; level: number; reason: string[]; abandoned?: boolean };
