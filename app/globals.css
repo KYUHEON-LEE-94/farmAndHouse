@@ -1126,3 +1126,29 @@ button { color:inherit; }
 .evo-confirm{position:sticky;bottom:0;display:block;margin:0 auto;min-width:240px;border:0;border-radius:14px;padding:12px 22px;font:800 15px "Gowun Dodum";background:#3f7a3a;color:#fff;cursor:pointer;box-shadow:0 4px 0 #24481f}
 .evo-confirm:disabled{background:#b8ad94;box-shadow:none;cursor:default}
 @media (max-width:720px){.evo-pick-cards{grid-template-columns:1fr}.evo-pick{padding:16px 12px}.evo-art{flex-basis:72px;height:72px}.evo-art b{font-size:42px}}
+
+.weapon-icon{display:inline-grid;place-items:center;vertical-align:middle;flex:0 0 auto}.weapon-icon svg{width:100%;height:100%;display:block}
+.evo-art .weapon-icon{filter:drop-shadow(0 3px 4px rgba(0,0,0,.2))}
+
+/* ---------- 모바일 토벌(65절): 가로 전체 화면·가상 스틱·버튼 ---------- */
+.raid-game.touch{position:fixed;inset:0;z-index:90;max-width:none;display:grid;place-items:center;background:#15120c;height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);touch-action:none;overscroll-behavior:none}
+.raid-game.touch .raid-canvas{width:min(100%,calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));border-radius:0;box-shadow:none;border:0}
+.raid-touch{position:absolute;inset:0;z-index:4;touch-action:none;user-select:none;-webkit-user-select:none}
+.raid-stick{position:absolute;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;background:rgba(255,250,235,.16);border:2px solid rgba(255,250,235,.45);pointer-events:none}
+.raid-stick.idle{left:calc(env(safe-area-inset-left) + 92px);top:auto;bottom:calc(env(safe-area-inset-bottom) + 38px);margin:0 0 0 -54px;opacity:.55}
+.raid-stick i{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(255,240,200,.85);box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.raid-touch button{touch-action:none;-webkit-tap-highlight-color:transparent;border:0;cursor:pointer;font-family:inherit}
+.raid-touch-special,.raid-touch-dash{position:absolute;border-radius:50%;display:grid;place-items:center;color:#fff;background:conic-gradient(rgba(20,16,10,.75) calc(var(--cd,0) * 360deg),rgba(232,165,48,.92) 0);box-shadow:0 0 0 3px rgba(255,240,200,.7),0 4px 12px rgba(0,0,0,.4)}
+.raid-touch-special{right:calc(env(safe-area-inset-right) + 24px);bottom:calc(env(safe-area-inset-bottom) + 24px);width:76px;height:76px;font-size:32px}
+.raid-touch-special::after{content:attr(data-left);position:absolute;inset:0;display:grid;place-items:center;font:900 22px sans-serif;color:#fff;text-shadow:0 1px 3px #000}
+.raid-touch-special:disabled{opacity:.45}
+.raid-touch-dash{right:calc(env(safe-area-inset-right) + 112px);bottom:calc(env(safe-area-inset-bottom) + 34px);width:60px;height:60px;font-size:24px;background:conic-gradient(rgba(20,16,10,.75) calc(var(--cd,0) * 360deg),rgba(90,170,230,.9) 0)}
+.raid-touch-foods{position:absolute;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 56px);display:flex;gap:8px}
+.raid-touch-foods button{width:48px;height:48px;border-radius:12px;font-size:24px;background:rgba(255,250,235,.85);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.raid-touch-foods .raid-touch-pause{background:rgba(24,28,20,.7);color:#fff;font-size:20px}
+.raid-rotate{display:none}
+@media (orientation:portrait){.raid-game.touch .raid-rotate{position:absolute;inset:0;z-index:6;display:grid;place-content:center;justify-items:center;gap:10px;padding:24px;text-align:center;background:rgba(20,16,10,.92);color:#fff6dc}.raid-rotate b{font-size:22px}.raid-rotate small{opacity:.8}.raid-rotate button{border:0;border-radius:12px;padding:10px 16px;background:#e8a530;color:#2c1a08;font-weight:800}}
+.raid-game.touch .raid-giveup{top:calc(env(safe-area-inset-top) + 10px);right:calc(env(safe-area-inset-right) + 64px);z-index:5}
+.raid-game.touch .raid-sfx{top:calc(env(safe-area-inset-top) + 10px);right:calc(env(safe-area-inset-right) + 22px);z-index:5}
+.raid-game.touch .raid-overlay{z-index:7}
+@media (pointer:coarse) and (orientation:landscape){.raid-game.touch .raid-choices>div{grid-template-columns:repeat(3,minmax(0,1fr));width:88vw;max-width:none}.raid-game.touch .raid-choices{max-width:94vw;padding:12px}}

@@ -2,12 +2,58 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
-import { WORLD_H, WORLD_W, type Terrain } from "./terrain";
+import { WORLD_H, WORLD_W, segmentHits, type Terrain } from "./terrain";
 import { SPECIALS } from "./weapons";
 import { weaponArtUrl } from "./weaponArt";
 import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
 const STEP = 1 / 60;
+/** 터치 기기(손가락이 주 입력)면 모바일 조작(가상 스틱·자동 공격·버튼)을 쓴다(HUNTING_RAID.md 65절). */
+const isTouchDevice = () => {
+  if (typeof window === "undefined") return false;
+  // 강제 설정(터치 노트북·테스트용): localStorage "wolru-raid-touch" = "on" | "off"
+  try { const force = localStorage.getItem("wolru-raid-touch"); if (force === "on") return true; if (force === "off") return false; } catch { /* 저장소 없음 */ }
+  return Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+};
+/** 모바일 조작 중이면 캔버스 아래 HUD(회피·특수·음식 칸)를 생략한다. */
+let compactHud = false;
+const STICK_R = 54, STICK_DEAD = 10, AIM_TURN = (12 * Math.PI) / 180, MANUAL_AIM_HOLD = 1.2, SPECIAL_SLOW = 0.35, SPECIAL_SLOW_MAX = 1.2;
+type Touchy = {
+  stick: { id: number; x0: number; y0: number; x: number; y: number } | null;
+  aim: { id: number } | null; manualUntil: number; aimAngle: number;
+  special: { id: number; x0: number; y0: number; x: number; y: number; at: number } | null; fire: boolean;
+};
+/** 매 프레임: 자동 공격 조준(한 프레임 최대 12°씩 돌기), 수동 조준 우선 1.2초, 특수 공격 조준 중 감속. 반환값은 시간 배율. */
+function mobileFrame(s: RaidState, nowSec: number, t: Touchy, input: Input, btn: HTMLButtonElement | null, dashBtn: HTMLButtonElement | null) {
+  const p = s.player, px = p.x - s.cam.x, py = p.y - s.cam.y;
+  let want: number | null = null;
+  if (t.special && Math.hypot(t.special.x - t.special.x0, t.special.y - t.special.y0) > 20) want = Math.atan2(t.special.y - t.special.y0, t.special.x - t.special.x0);
+  else if (t.aim || nowSec < t.manualUntil) want = Math.atan2(input.aimY - py, input.aimX - px);
+  const target = autoTarget(s);
+  if (want === null && target) want = Math.atan2(target.y - p.y, target.x - p.x);
+  if (want !== null) { let d = want - t.aimAngle; d = Math.atan2(Math.sin(d), Math.cos(d)); t.aimAngle += Math.max(-AIM_TURN, Math.min(AIM_TURN, d)); }
+  const far = target && !t.aim && !t.special ? Math.hypot(target.x - p.x, target.y - p.y) : 200;
+  if (!t.aim || t.special) { input.aimX = px + Math.cos(t.aimAngle) * far; input.aimY = py + Math.sin(t.aimAngle) * far; }
+  input.attack = Boolean(t.aim) || nowSec < t.manualUntil || Boolean(target);
+  // 특수 공격 버튼 재사용 표시(리렌더 없이)
+  if (btn) { const left = Math.max(0, s.special.readyAt - s.t), cd = s.evolution ? SPECIALS[s.evolution]?.cooldown ?? 1 : 1; btn.style.setProperty("--cd", String(s.evolution ? left / cd : 1)); btn.dataset.left = left > 0 ? String(Math.ceil(left)) : ""; btn.disabled = !s.evolution; }
+  if (dashBtn) dashBtn.style.setProperty("--cd", String(p.dashCd / Math.max(0.1, PLAYER.dashCooldown)));
+  return t.special && nowSec - t.special.at < SPECIAL_SLOW_MAX ? SPECIAL_SLOW : 1;
+}
+/** 자동 조준: 사거리 안·화면 안·벽에 안 막힌 적 중 가까운 적 우선(정예·보스·막타 가능은 조금 더 우선). */
+function autoTarget(s: RaidState) {
+  const p = s.player, reach = s.weapon.range + 30;
+  let best: RaidState["monsters"][number] | null = null, score = Infinity;
+  for (const m of s.monsters) {
+    if (m.hp <= 0) continue;
+    const sx = m.x - s.cam.x, sy = m.y - s.cam.y; if (sx < -20 || sy < -20 || sx > ARENA_W + 20 || sy > ARENA_H + 20) continue;
+    const d = Math.hypot(m.x - p.x, m.y - p.y); if (d > reach + m.r) continue;
+    if (segmentHits(s.terrain.walls, p.x, p.y, m.x, m.y)) continue;
+    const sc = d - (m.boss || m.elite ? 40 : 0) - (m.hp <= s.weapon.damage ? 30 : 0);
+    if (sc < score) { score = sc; best = m; }
+  }
+  return best;
+}
 const END_FX_MS = 2400;
 
 // ---------- 타격 효과음(WebAudio로 짧게 합성, 파일 없음) ----------
@@ -59,6 +105,11 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   const [sfxOn, setSfxOn] = useState(readSfxOn), sfxOnRef = useRef(sfxOn);
   useEffect(() => { sfxOnRef.current = sfxOn; try { localStorage.setItem(SFX_KEY, sfxOn ? "on" : "off"); } catch { /* 저장 불가 */ } }, [sfxOn]);
   const [ui, setUi] = useState<Ui>({ choices: null, paused: false, over: null, level: 1, picks: {} });
+  // 모바일 조작 상태(렌더와 상관없는 값은 ref로)
+  const [touchMode] = useState(isTouchDevice), [portraitOk, setPortraitOk] = useState(false);
+  const touchRef = useRef<Touchy>({ stick: null, aim: null, manualUntil: 0, aimAngle: 0, special: null, fire: false });
+  const [stickView, setStickView] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
+  const specialBtnRef = useRef<HTMLButtonElement>(null), dashBtnRef = useRef<HTMLButtonElement>(null), overlayRef = useRef<HTMLDivElement>(null);
   useEffect(() => { holdRef.current = hold; speedRef.current = speed; finishRef.current = onFinish; });
 
   // 전투 시작(한 번)
@@ -80,9 +131,11 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
       const s = stateRef.current!;
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       s.paused = s.paused || holdRef.current;
+      let slow = 1;
+      if (touchMode) slow = mobileFrame(s, now / 1000, touchRef.current, inputRef.current, specialBtnRef.current, dashBtnRef.current);
       if (!s.over && !s.paused && !s.choices) {
-        acc += dt * speedRef.current;
-        while (acc >= STEP) { stepRaid(s, STEP, inputRef.current); acc -= STEP; if (s.over || s.choices) { acc = 0; break; } }
+        acc += dt * speedRef.current * slow;
+        while (acc >= STEP) { stepRaid(s, STEP, inputRef.current); acc -= STEP; if (touchRef.current.fire) { touchRef.current.fire = false; inputRef.current.special = false; } if (s.over || s.choices) { acc = 0; break; } }
       } else { acc = 0; stepRaid(s, 0, inputRef.current); }
       // 이번 프레임에 생긴 타격만큼 소리(가장 센 것 하나)
       if (sfxOnRef.current && !holdRef.current) { const f = s.sfx; const kind = f.big > heard.big ? "big" : f.crit > heard.crit ? "crit" : f.kill > heard.kill ? "kill" : f.hit > heard.hit ? "hit" : null; if (kind) sfx(kind); }
@@ -125,6 +178,56 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     return () => { window.removeEventListener("keydown", down, true); window.removeEventListener("keyup", up, true); window.removeEventListener("blur", blur); document.removeEventListener("visibilitychange", vis); };
   }, [autoPause]);
 
+  // ---------- 모바일 조작 ----------
+  const capture = (event: React.PointerEvent) => { try { (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); } catch { /* 이미 끝난 포인터 */ } };
+  const overlayPoint = (event: React.PointerEvent) => { const r = overlayRef.current!.getBoundingClientRect(); return { x: event.clientX - r.left, y: event.clientY - r.top, w: r.width, h: r.height }; };
+  const canvasLogical = (clientX: number, clientY: number) => { const r = canvasRef.current!.getBoundingClientRect(); return { x: ((clientX - r.left) / r.width) * ARENA_W, y: ((clientY - r.top) / r.height) * ARENA_H }; };
+  const releaseAll = () => { const t = touchRef.current; t.stick = null; t.aim = null; t.special = null; setStickView(null); const input = inputRef.current; input.moveX = 0; input.moveY = 0; input.attack = false; input.dash = false; };
+  const onTouchDown = (event: React.PointerEvent) => {
+    const t = touchRef.current, pt = overlayPoint(event); capture(event);
+    if (pt.x < pt.w * 0.45 && !t.stick) { t.stick = { id: event.pointerId, x0: pt.x, y0: pt.y, x: pt.x, y: pt.y }; setStickView({ ...t.stick }); return; }
+    if (!t.aim) { t.aim = { id: event.pointerId }; const l = canvasLogical(event.clientX, event.clientY); inputRef.current.aimX = l.x; inputRef.current.aimY = l.y; }
+  };
+  const onTouchMove = (event: React.PointerEvent) => {
+    const t = touchRef.current, pt = overlayPoint(event), input = inputRef.current;
+    if (t.stick?.id === event.pointerId) {
+      let dx = pt.x - t.stick.x0, dy = pt.y - t.stick.y0; const d = Math.hypot(dx, dy);
+      if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+      t.stick.x = t.stick.x0 + dx; t.stick.y = t.stick.y0 + dy; setStickView({ ...t.stick });
+      const mag = d < STICK_DEAD ? 0 : Math.min(1, (Math.min(d, STICK_R) - STICK_DEAD) / (STICK_R - STICK_DEAD));
+      input.moveX = d ? (dx / Math.min(d, STICK_R)) * mag : 0; input.moveY = d ? (dy / Math.min(d, STICK_R)) * mag : 0;
+    } else if (t.aim?.id === event.pointerId) { const l = canvasLogical(event.clientX, event.clientY); input.aimX = l.x; input.aimY = l.y; }
+  };
+  const onTouchUp = (event: React.PointerEvent) => {
+    const t = touchRef.current;
+    if (t.stick?.id === event.pointerId) { t.stick = null; setStickView(null); inputRef.current.moveX = 0; inputRef.current.moveY = 0; }
+    if (t.aim?.id === event.pointerId) { t.aim = null; t.manualUntil = performance.now() / 1000 + MANUAL_AIM_HOLD; }
+  };
+  const onSpecialDown = (event: React.PointerEvent) => { event.stopPropagation(); capture(event); touchRef.current.special = { id: event.pointerId, x0: event.clientX, y0: event.clientY, x: event.clientX, y: event.clientY, at: performance.now() / 1000 }; };
+  const onSpecialMove = (event: React.PointerEvent) => { const sp = touchRef.current.special; if (sp?.id === event.pointerId) { sp.x = event.clientX; sp.y = event.clientY; } };
+  const onSpecialUp = (event: React.PointerEvent) => {
+    const t = touchRef.current, sp = t.special; if (!sp || sp.id !== event.pointerId) return;
+    t.special = null;
+    if (sp.y - sp.y0 > 100) return; // 아래로 100px 이상 끌고 놓으면 취소
+    const s = stateRef.current; if (!s) return;
+    // 끌었으면 그 방향, 아니면 자동 조준 대상 쪽으로
+    const p = s.player, px = p.x - s.cam.x, py = p.y - s.cam.y, dragged = Math.hypot(sp.x - sp.x0, sp.y - sp.y0) > 20;
+    const tg = dragged ? null : autoTarget(s), ang = dragged ? Math.atan2(sp.y - sp.y0, sp.x - sp.x0) : tg ? Math.atan2(tg.y - p.y, tg.x - p.x) : t.aimAngle;
+    const reach = tg ? Math.hypot(tg.x - p.x, tg.y - p.y) : 220;
+    t.aimAngle = ang; inputRef.current.aimX = px + Math.cos(ang) * reach; inputRef.current.aimY = py + Math.sin(ang) * reach;
+    inputRef.current.special = true; t.fire = true; t.manualUntil = performance.now() / 1000 + 0.3;
+  };
+  const tapFood = (i: number) => { const input = inputRef.current, next = [...input.food] as Input["food"]; next[i] = true; input.food = next; window.setTimeout(() => { const off = [...inputRef.current.food] as Input["food"]; off[i] = false; inputRef.current.food = off; }, 120); };
+  useEffect(() => {
+    compactHud = touchMode;
+    if (!touchMode) return;
+    // 전투 중에는 뒤 페이지가 스크롤·확대되지 않게
+    const prevOverflow = document.body.style.overflow; document.body.style.overflow = "hidden";
+    const off = () => releaseAll();
+    window.addEventListener("blur", off); window.addEventListener("orientationchange", off); document.addEventListener("visibilitychange", off);
+    return () => { document.body.style.overflow = prevOverflow; window.removeEventListener("blur", off); window.removeEventListener("orientationchange", off); document.removeEventListener("visibilitychange", off); };
+  }, [touchMode]);
+
   const toLogical = (event: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
     inputRef.current.aimX = ((event.clientX - r.left) / r.width) * ARENA_W;
@@ -134,13 +237,21 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   const choose = (id: AwakenId) => { const s = stateRef.current; if (s) chooseAwakening(s, id); };
   const quit = () => { const s = stateRef.current; if (!s || doneRef.current) return; doneRef.current = true; onQuit({ ...raidResult(s), abandoned: true }); };
 
-  return <div className="raid-game">
+  return <div className={`raid-game ${touchMode ? "touch" : ""}`}>
     <canvas ref={canvasRef} className="raid-canvas" style={{ aspectRatio: `${ARENA_W} / ${ARENA_H}` }}
       onPointerMove={toLogical}
-      onPointerDown={event => { toLogical(event); if (event.button === 0) { inputRef.current.attack = true; (event.target as HTMLElement).setPointerCapture(event.pointerId); } else if (event.button === 2) inputRef.current.special = true; }}
+      onPointerDown={event => { if (touchMode) return; toLogical(event); if (event.button === 0) { inputRef.current.attack = true; (event.target as HTMLElement).setPointerCapture(event.pointerId); } else if (event.button === 2) inputRef.current.special = true; }}
       onPointerUp={event => { if (event.button === 2) inputRef.current.special = false; else inputRef.current.attack = false; }}
       onPointerLeave={() => { inputRef.current.attack = false; }}
       onContextMenu={event => event.preventDefault()} />
+    {touchMode && !ui.over && <div className="raid-touch" ref={overlayRef} onPointerDown={onTouchDown} onPointerMove={onTouchMove} onPointerUp={onTouchUp} onPointerCancel={releaseAll}>
+      {stickView ? <span className="raid-stick" style={{ left: stickView.x0, top: stickView.y0 }}><i style={{ transform: `translate(${stickView.x - stickView.x0}px, ${stickView.y - stickView.y0}px)` }} /></span> : <span className="raid-stick idle"><i /></span>}
+      <div className="raid-touch-foods">{foods.map((f, i) => f && <button key={i} onPointerDown={event => { event.stopPropagation(); tapFood(i); }} aria-label={`${f.name} 먹기`}>{f.icon}</button>)}
+        <button className="raid-touch-pause" onPointerDown={event => { event.stopPropagation(); const s = stateRef.current; if (s && !s.over) s.paused = true; }} aria-label="일시정지">⏸</button></div>
+      <button ref={dashBtnRef} className="raid-touch-dash" onPointerDown={event => { event.stopPropagation(); inputRef.current.dash = true; }} onPointerUp={() => { inputRef.current.dash = false; }} onPointerCancel={() => { inputRef.current.dash = false; }} aria-label="회피">💨</button>
+      <button ref={specialBtnRef} className="raid-touch-special" onPointerDown={onSpecialDown} onPointerMove={onSpecialMove} onPointerUp={onSpecialUp} onPointerCancel={() => { touchRef.current.special = null; }} aria-label="특수 공격">{evolution ? SPECIALS[evolution]?.icon ?? "✨" : "🔒"}</button>
+    </div>}
+    {touchMode && !portraitOk && !ui.over && <div className="raid-rotate"><b>📱↻ 가로로 돌려 주세요</b><small>토벌탑은 가로 화면에서 가장 잘 보여요. 돌리는 동안 전투가 멈춰요.</small><button onClick={() => setPortraitOk(true)}>세로로 그냥 할게요</button></div>}
     {ui.choices && <div className="raid-overlay"><div className="raid-choices">
       <span className="raid-ov-eyebrow">AWAKENING</span><b>⚔️ 전투 각성 Lv.{ui.level}</b><small>하나를 고르세요 · 고르는 동안 전투가 멈춰요</small>
       <div>{ui.choices.map((id, i) => <button key={id} onClick={() => choose(id)} className={AWAKENINGS[id].final ? "final" : ""} style={{ animationDelay: `${i * 0.06}s` }}>
@@ -148,7 +259,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
       </button>)}</div>
     </div></div>}
     {!ui.over && <button className="raid-sfx" onClick={() => setSfxOn(on => !on)} title="타격 효과음">{sfxOn ? "🔊" : "🔇"}</button>}
-    {!ui.over && !ui.choices && !ui.paused && <button className="raid-giveup" onClick={() => { if (window.confirm("도전을 포기할까요? 사용한 음식만 사라져요.")) quit(); }}>🏳 포기</button>}
+    {!touchMode && !ui.over && !ui.choices && !ui.paused && <button className="raid-giveup" onClick={() => { if (window.confirm("도전을 포기할까요? 사용한 음식만 사라져요.")) quit(); }}>🏳 포기</button>}
     {ui.over && <div className="raid-end-skip"><button onClick={() => { const s = stateRef.current; if (s && !doneRef.current) { doneRef.current = true; finishRef.current(raidResult(s)); } }}>결과 보기 ▶</button></div>}
     {ui.paused && !ui.over && !ui.choices && <div className="raid-overlay"><div className="raid-pause"><span className="raid-ov-eyebrow">PAUSED</span><b>⏸ 일시정지</b><small>P 또는 계속하기를 누르면 이어서 싸워요</small><button className="save-button" onClick={resume}>▶ 계속하기</button><button className="ghost-button" onClick={quit}>🏳 도전 포기 (사용한 음식만 소모)</button></div></div>}
   </div>;
@@ -395,6 +506,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
 
   // 아래: 회피 · 음식 칸 · 버프
   const by = H - 62;
+  // 모바일은 회피·특수·음식이 화면 버튼으로 있으니 캔버스 아래 칸은 그리지 않는다.
+  if (!compactHud) {
   panel(ctx, 12, by, 64, 50);
   const ready = p.dashCd <= 0, cdRatio = ready ? 1 : 1 - p.dashCd / d.dashCd;
   ctx.beginPath(); ctx.arc(44, by + 21, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cdRatio); ctx.strokeStyle = ready ? "#9fe8ff" : "rgba(160,200,220,.6)"; ctx.lineWidth = 3; ctx.stroke();
@@ -420,6 +533,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.font = "800 10px sans-serif"; ctx.fillStyle = "#2a2010"; ctx.fillText(String(i + 1), x + 41, by + 42);
     if (f && s.foodUsed[i]) { ctx.font = "700 9px sans-serif"; ctx.fillStyle = "#ddd"; ctx.fillText("사용", x + 25, by + 43); }
   });
+  }
   ctx.textAlign = "left";
   const buffs = s.buffs.filter(b => b.until > s.t);
   if (buffs.length) {

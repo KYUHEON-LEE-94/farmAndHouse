@@ -11,7 +11,9 @@ import { FLOW_CELL, START, WORLD_H, WORLD_W, blockedAt, blockers, buildFlow, cle
 
 export type Input = { up: boolean; down: boolean; left: boolean; right: boolean; aimX: number; aimY: number; attack: boolean; dash: boolean; food: [boolean, boolean, boolean];
   /** 우클릭 특수 공격(누른 순간 한 번) */
-  special?: boolean };
+  special?: boolean;
+  /** 모바일 가상 스틱(−1~1, 길이 1 이하). 있으면 방향키 대신 쓴다. */
+  moveX?: number; moveY?: number };
 /** 방어구 합계 능력(26절). */
 export type Gear = { hp: number; defense: number; crit: number; absorb: number; speed: number; dashCd: number; startShield: number };
 export const NO_GEAR: Gear = { hp: 0, defense: 0, crit: 0, absorb: 0, speed: 0, dashCd: 0, startShield: 0 };
@@ -669,7 +671,8 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   p.iframes = Math.max(0, p.iframes - dt); p.dashCd = Math.max(0, p.dashCd - dt);
   if (p.shield > 0 && p.shieldUntil && s.t > p.shieldUntil) p.shield = 0;
   let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0), my = (input.down ? 1 : 0) - (input.up ? 1 : 0);
-  const ml = Math.hypot(mx, my); if (ml) { mx /= ml; my /= ml; }
+  if (input.moveX || input.moveY) { mx = input.moveX ?? 0; my = input.moveY ?? 0; }
+  const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
   // 입력 조준은 화면 좌표 → 월드 좌표
   p.aim = Math.atan2(input.aimY + s.cam.y - p.y, input.aimX + s.cam.x - p.x);
   p.tx = input.aimX + s.cam.x; p.ty = input.aimY + s.cam.y;
