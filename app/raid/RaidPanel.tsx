@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
 import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance } from "./forge";
 import RaidGame from "./RaidGame";
-import { RAID_WEAPONS, SPECIALS, WEAPON_CRAFT, dps, weaponDef } from "./weapons";
+import { RAID_WEAPONS, SPECIALS, WEAPON_CRAFT, dps, weaponDef, type WeaponStats } from "./weapons";
 
 let runSeq = 0;
 export type RaidOutcome = { result: RaidResult; lines: string[] };
@@ -240,7 +240,7 @@ export function BattlePetRoster({ raid, forge }: { raid: RaidSave; forge: ForgeA
 
 // ---------- 대장간 ----------
 function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; forge: ForgeActions; onTrain: (evolution: Evolution) => void; onOpenWorkshop: () => void }) {
-  const [useStab, setUseStab] = useState(false);
+  const [useStab, setUseStab] = useState(false), [picking, setPicking] = useState(false);
   const weaponId = raid.equipped.weapon, wDef = weaponDef(weaponId), w = raid.weapons[weaponId] ?? { enhancement: 0, evolution: null, unlockedEnhancements: [] }, step = nextStep(w.enhancement);
   const needsOpen = !!step?.open && !w.unlockedEnhancements.includes(step.to);
   const needEvolution = w.enhancement >= 10 && !w.evolution;
@@ -249,6 +249,7 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
   const stats = weaponStats(w.enhancement, w.evolution, weaponId), next = step ? weaponStats(step.to, w.evolution, weaponId) : null;
 
   return <div className="raid-forge">
+    {picking && needEvolution && <EvolutionPicker weaponId={weaponId} onTrain={id => { setPicking(false); onTrain(id); }} onPick={id => { setPicking(false); forge.evolve(id); }} onClose={() => setPicking(false)} />}
     <div className="raid-anvil">
       <div className="raid-anvil-weapon"><span>{wDef.icon}</span><b>{wDef.name} <em>+{w.enhancement}</em></b><small>{w.evolution ? EVOLUTIONS[w.evolution].name : "기본"}</small></div>
       <div className="raid-anvil-stats">
@@ -257,8 +258,7 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
         <span>공격각<b>{stats.angle}°</b>{next && !needEvolution && step!.to <= 10 && <i>→ {next.angle}°</i>}</span>
         <span>간격<b>{stats.interval}초</b>{next && !needEvolution && step!.to <= 10 && <i>→ {next.interval}초</i>}</span>
       </div>
-      {needEvolution ? <div className="raid-evolve"><b>⚡ +10 진화 방향을 고르세요 (첫 선택 무료)</b>
-        <div>{wDef.evos.map(e => e.id).map(id => <div key={id} className="raid-evo-card"><button onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small>{SPECIALS[id] && <small className="raid-special">🖱 우클릭 {SPECIALS[id].icon} {SPECIALS[id].name}: {SPECIALS[id].text} · {SPECIALS[id].cooldown}초</small>}</button><button className="raid-try" onClick={() => onTrain(id)}>🎯 {TRAINING_SECONDS}초 체험</button></div>)}</div></div>
+      {needEvolution ? <div className="raid-evolve-banner"><span className="raid-evolve-burst">✨</span><div><b>+10 강화 달성!</b><small>{wDef.icon} {wDef.name}을(를) 전투 무기로 진화시킬 수 있어요 (첫 선택 무료)</small></div><button onClick={() => setPicking(true)}>⚔️ 전투 무기로 진화</button></div>
         : !step ? <p className="raid-max">최대 강화(+15)에 도달했어요!</p>
         : <>
           <div className="raid-odds">
@@ -323,6 +323,42 @@ export function RaidCraftView({ forge, onForge }: { forge: ForgeActions; onForge
         <div className="raid-craft-qty">{[1, 5, 10].map(n => <button key={n} className={want === n ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: n }))} disabled={max < n}>{n}개</button>)}<button className={want === max && max > 10 ? "on" : ""} onClick={() => setQty(all => ({ ...all, [id]: max }))} disabled={max < 1}>최대</button>
           <button className="make" disabled={!plan} onClick={() => forge.craftLife(id, want, pick)}>즉시 완성 ×{want}</button></div>
       </div>; })}
+  </div>;
+}
+
+// ---------- +10 전투 무기 진화 화면 ----------
+/** 진화 하나의 특징 3줄: 피해·범위·템포(다른 진화와 비교해 말로). */
+function evoTraits(st: WeaponStats, other: WeaponStats) {
+  const area = st.mode === "arc" ? (st.angle >= 360 ? "주변 전체 공격(360°)" : `${st.angle}° 범위 베기`)
+    : st.mode === "slam" || st.mode === "lob" ? `반경 ${st.radius ?? 0} 범위 타격` : st.mode === "spread" ? `산탄 ${st.pellets ?? 1}발` : st.mode === "beam" || st.mode === "channel" ? `사거리 ${st.range} 지속 공격` : `사거리 ${st.range}`;
+  const hit = dps(st) >= dps(other) ? "더 높은 초당 피해" : st.damage > other.damage ? "강한 한 방 피해" : "가벼운 연속 피해";
+  const tempo = st.interval < other.interval ? "빠른 공격 템포" : st.interval > other.interval ? "묵직한 공격 템포" : "같은 공격 템포";
+  return [
+    { icon: "⚔️", text: `${hit} · 피해 ${st.damage}${st.pellets ? `×${st.pellets}` : ""}` },
+    { icon: st.mode === "arc" && st.angle >= 360 ? "🌀" : "🎯", text: area },
+    { icon: "⏱", text: `${tempo} · ${st.interval}초` },
+  ];
+}
+function EvolutionPicker({ weaponId, onTrain, onPick, onClose }: { weaponId: string; onTrain: (id: Evolution) => void; onPick: (id: Evolution) => void; onClose: () => void }) {
+  const wDef = weaponDef(weaponId), [sel, setSel] = useState<Evolution | null>(null);
+  const evos = wDef.evos.map(e => e.id as Evolution);
+  useEffect(() => { const key = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); }; window.addEventListener("keydown", key); return () => window.removeEventListener("keydown", key); }, [onClose]);
+  return <div className="evo-pick-backdrop">
+    <section className="evo-pick" role="dialog" aria-label="전투 무기로 진화">
+      <button className="evo-pick-close" onClick={onClose} aria-label="닫기">✕</button>
+      <header className="evo-pick-head"><span className="evo-pick-old">{wDef.icon}</span><div><em>+10 강화 달성</em><h3>전투 무기로 진화</h3></div></header>
+      <div className="evo-pick-cards">{evos.map((id, i) => { const ev = EVOLUTIONS[id], st = ev.stats[0], other = EVOLUTIONS[evos[1 - i]].stats[0], sp = SPECIALS[id];
+        return <div key={id} className={`evo-card ${i ? "b" : "a"} ${sel === id ? "on" : ""}`} role="button" tabIndex={0} aria-pressed={sel === id} onClick={() => setSel(id)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSel(id); } }}>
+          {sel === id && <span className="evo-check">✓</span>}
+          <div className="evo-card-top"><span className="evo-art"><b>{wDef.icon}</b>{sp && <i>{sp.icon}</i>}</span>
+            <div><h4>{ev.name}</h4><p>{ev.note}</p></div></div>
+          <ul className="evo-traits">{evoTraits(st, other).map(t => <li key={t.text}><span>{t.icon}</span>{t.text}</li>)}</ul>
+          {sp && <div className="evo-special"><small>특수 공격 미리보기 · 🖱 우클릭</small><div><span className="evo-special-icon">{sp.icon}</span><div><b>{sp.name}</b><span>{sp.text}</span><em>재사용 {sp.cooldown}초</em></div></div></div>}
+          <button className="evo-try" onClick={event => { event.stopPropagation(); onTrain(id); }}>🎯 훈련장에서 체험 ({TRAINING_SECONDS}초)</button>
+        </div>; })}</div>
+      <p className="evo-warn">⚠️ 선택한 진화에 따라 이후 전투 스타일이 정해져요. (나중에 대장간에서 재료를 내고 바꿀 수 있어요)</p>
+      <button className="evo-confirm" disabled={!sel} onClick={() => sel && onPick(sel)}>{sel ? `${EVOLUTIONS[sel].name}(으)로 진화 확정` : "진화를 골라 주세요"}</button>
+    </section>
   </div>;
 }
 
