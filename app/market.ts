@@ -17,7 +17,7 @@ export const SAT_SLOTS = 3;
 /** 농협 일괄 출하: 지금 시세(버프 없음)의 70%, 포화·수요 한도 없음. */
 export const COOP_RATE = 0.7;
 /** 5분 주기당 시장 전체가 시장가로 사 가는 작물 수(모든 작물 합계). */
-export const MARKET_DEMAND = 100;
+export const MARKET_DEMAND = 200;
 /** 수요를 넘긴 물량의 가격 배수(농협 매입가와 같다). */
 export const OVERFLOW_RATE = COOP_RATE;
 

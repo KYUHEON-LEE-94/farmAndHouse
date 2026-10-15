@@ -19,7 +19,7 @@ import { DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rollGrade, 
 import { migrateInventory, pickCategory, replaceCategory, type Inventory, type ItemCategory } from "./items";
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
-import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
+import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, OVERFLOW_RATE, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_BASE, petBugPenalty, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session, readCloudBase, writeCloudBase } from "./account";
 import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
@@ -2041,6 +2041,7 @@ export default function Home() {
           </div>
           {sidePanel === "seed" ? <>
           <div className="panel-heading"><div><span className="eyebrow">SEED BOX · 5분 시세</span><h3>{season} 씨앗 상자</h3></div><span className="market-timer">{formatClock(marketSecondsLeft)}</span></div>
+          {demandLeft(market) <= 0 && <p className="demand-out">🛒 이번 5분 시장 수요를 다 채웠어요 · 모든 작물 시세 −{Math.round((1 - OVERFLOW_RATE) * 100)}% <small>({formatClock(marketSecondsLeft)} 뒤 새 시세에서 회복)</small></p>}
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
           </> : KITCHEN_ENABLED && sidePanel === "kitchen" ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} dishStock={dishStock} onCook={startCooking} />
