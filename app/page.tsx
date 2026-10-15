@@ -354,7 +354,7 @@ export default function Home() {
   const [harvestMode, setHarvestMode] = useState<"sell" | "store">("store");
   const [sidePanel, setSidePanel] = useState<"seed" | "storage" | "orders" | "workshop" | "kitchen">("seed");
   // 공방 하위 탭: 생활 가공(시간형·판매) / 강화 가공(즉시·강화 소재)
-  const [workshopView, setWorkshopView] = useState<"life" | "raid">("life");
+  const [workshopView, setWorkshopView] = useState<"life" | "raid" | "cook">("life");
   // 시장 포화: 작물별로 최근에 판 양(시간이 지나면 회복)
   const [marketState, setMarketState] = useState<MarketState>(EMPTY_MARKET);
   // 오늘의 주문서: 날짜별로 납품한 주문 id
@@ -1326,18 +1326,19 @@ export default function Home() {
     .filter(entry => entry.fish && entry.fish.rarity !== "전설" && entry.fish.rarity !== "신화" && entry.free > 0).sort((a, b) => a.fish!.price - b.fish!.price);
   const cookFishCount = () => cookFishList().reduce((sum, entry) => sum + entry.free, 0);
   function startCooking(dish: Dish) {
-    const missing = dish.ingredients.find(ing => (ing.kind === "crop" ? usableOf(ing.id) : cookFishCount()) < ing.count);
+    const missing = dish.ingredients.find(ing => (ing.kind === "crop" ? usableOf(ing.id) : ing.kind === "hunt" ? huntStock[ing.id] ?? 0 : cookFishCount()) < ing.count);
     if (missing) return setNotice("🍳 재료가 모자라요. 창고 보관으로 모아 주세요(잠금·미션 예약분은 쓰지 않아요).");
     // 재료는 요리를 시작할 때 꺼낸다: 작물은 낮은 품질·황금 아닌 것부터, 물고기는 싼 것부터.
-    const nextCrops = { ...produce }, nextFish = { ...fishStock };
+    const nextCrops = { ...produce }, nextFish = { ...fishStock }, nextHunt = { ...huntStock };
     dish.ingredients.forEach(ing => {
       let need = ing.count;
+      if (ing.kind === "hunt") { nextHunt[ing.id] = (nextHunt[ing.id] ?? 0) - need; if (nextHunt[ing.id] <= 0) delete nextHunt[ing.id]; return; }
       if (ing.kind === "crop") Object.keys(nextCrops).filter(key => parseProduceKey(key).cropId === ing.id)
         .sort((a, b) => { const x = parseProduceKey(a), y = parseProduceKey(b); return Number(x.golden) - Number(y.golden) || x.quality - y.quality; })
         .forEach(key => { const take = Math.min(need, sellableOf(key)); if (take <= 0) return; nextCrops[key] -= take; need -= take; if (nextCrops[key] <= 0) delete nextCrops[key]; });
       else cookFishList().forEach(entry => { const take = Math.min(need, entry.free, nextFish[entry.id] ?? 0); if (take <= 0) return; nextFish[entry.id] -= take; need -= take; if (nextFish[entry.id] <= 0) delete nextFish[entry.id]; });
     });
-    setProduce(nextCrops); setFishStock(nextFish); setCookResult(null); setCooking({ dish, at: Date.now() }); playPlop();
+    setProduce(nextCrops); setFishStock(nextFish); if (dish.ingredients.some(ing => ing.kind === "hunt")) setHuntStock(nextHunt); setCookResult(null); setCooking({ dish, at: Date.now() }); playPlop();
   }
   function finishCooking(score: number) {
     const dish = cooking?.dish; if (!dish) return;
@@ -2333,7 +2334,6 @@ export default function Home() {
         <aside className="seed-panel panel">
           <div className="side-tabs" role="tablist" aria-label="씨앗과 가공">
             <button role="tab" aria-selected={sidePanel === "seed"} className={sidePanel === "seed" ? "on" : ""} onClick={() => setSidePanel("seed")}>🌱 씨앗</button>
-            {KITCHEN_ENABLED && <button role="tab" aria-selected={sidePanel === "kitchen"} className={sidePanel === "kitchen" ? "on" : ""} onClick={() => setSidePanel("kitchen")}>🍳 주방</button>}
             <button className="side-workshop-link" onClick={() => switchTab("workshop")}>🏭 공방 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot">{doneJobs}</i>}</button>
           </div>
           {sidePanel === "seed" ? <>
@@ -2341,8 +2341,7 @@ export default function Home() {
           {demandLeft(market) <= 0 && <p className="demand-out">🛒 이번 5분 시장 수요를 다 채웠어요 · 모든 작물 시세 −{Math.round((1 - OVERFLOW_RATE) * 100)}% <small>({formatClock(marketSecondsLeft)} 뒤 새 시세에서 회복)</small></p>}
           <p className="hint">한국의 노지 재배 시기를 바탕으로 고른 작물이에요.</p>
           <div className="crop-list">{cropCards}</div>
-          </> : KITCHEN_ENABLED && sidePanel === "kitchen" ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} dishStock={dishStock} onCook={startCooking} />
-          : null}
+          </> : null}
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `${fieldPrice(ownedPlots).toLocaleString()}원 · ${ownedPlots}/${MAX_PLOTS}칸`}</small><span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span></div><button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>구매</button></div>
           <div className="tool-shop">
             <div className="tool-shop-tabs" role="tablist" aria-label="도구 상점">{([["seed", "🌱 심기"], ["hand", "🧺 수확"], ["water", "🚿 물"], ["fert", "🌿 거름"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={toolShop === id} className={toolShop === id ? "on" : ""} onClick={() => setToolShop(id)}>{label}</button>)}</div>
@@ -2472,8 +2471,8 @@ export default function Home() {
 
       {tab === "workshop" && <section className="panel workshop-panel">
         <div className="panel-heading"><div><span className="eyebrow">WORKSHOP</span><h3>🏭 공방</h3></div>
-          <div className="shop-tabs" role="tablist">{([["life", "🏺 생활 가공"], ...(RAID_ENABLED ? [["raid", "⚒️ 강화 가공"]] as const : [])] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={workshopView === id} className={workshopView === id ? "active" : ""} onClick={() => setWorkshopView(id)}>{label}</button>)}</div></div>
-        {workshopView === "raid" && RAID_ENABLED ? <RaidCraftView forge={forge} onForge={() => switchTab("raid")} /> : <div className="workshop-view">
+          <div className="shop-tabs" role="tablist">{([["life", "🏺 생활 가공"], ...(RAID_ENABLED ? [["raid", "⚒️ 강화 가공"]] as const : []), ...(KITCHEN_ENABLED ? [["cook", "🍳 요리"]] as const : [])] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={workshopView === id} className={workshopView === id ? "active" : ""} onClick={() => setWorkshopView(id)}>{label}</button>)}</div></div>
+        {workshopView === "raid" && RAID_ENABLED ? <RaidCraftView forge={forge} onForge={() => switchTab("raid")} /> : workshopView === "cook" && KITCHEN_ENABLED ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} huntHave={id => huntStock[id] ?? 0} huntName={id => { const loot = ALL_LOOT.find(l => l.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }} dishStock={dishStock} onCook={startCooking} /> : <div className="workshop-view">
             <div className="panel-heading"><div><span className="eyebrow">WORKSHOP · 절임 항아리</span><h3>가공 공방</h3></div><span className="plot-count">항아리 {workshop.slots}개</span></div>
             <p className="hint">창고 작물을 담가 비싼 가공품으로 만들어요. <b>여러 작물을 섞을수록 배율이 높아요</b>(단일 ×1.25 → 4종 ×1.9). 가공품은 시세·포화와 상관없는 고정가예요. 잠금·주문 예약분은 쓰지 않아요.</p>
             <div className="jar-row">{Array.from({ length: workshop.slots }).map((_, i) => { const job = workshop.jobs[i], recipe = job && RECIPES.find(r => r.id === job.recipeId);
@@ -2734,7 +2733,7 @@ export default function Home() {
           return <div className={`cook-result grade-${cookResult.grade}`}>
             <span className="cook-result-icon">{cookResult.dish.icon}</span>
             <h3>{cookResult.grade === 2 ? "✨ 일품 요리 완성!" : cookResult.grade === 1 ? "맛있게 됐어요! ★" : "요리 완성"}</h3>
-            <p><b>{cookResult.dish.name} {DISH_GRADES[cookResult.grade].stars} {DISH_GRADES[cookResult.grade].name}</b><br />사냥에서 먹으면 {dishEffectText(cookResult.dish, cookResult.grade)}</p>
+            <p><b>{cookResult.dish.name} {DISH_GRADES[cookResult.grade].stars} {DISH_GRADES[cookResult.grade].name}</b><br />토벌탑에서 먹으면 {dishEffectText(cookResult.dish, cookResult.grade)}</p>
             <small>타이밍 점수 {cookResult.score}/6 → 이번 확률: 일품 {Math.round(best * 100)}% · 맛있음 {Math.round(good * 100)}% · 보통 {Math.round(normal * 100)}%<br />🎒 사냥 가방에 넣었어요.</small>
             <button className="save-button" onClick={() => setCookResult(null)}>주방으로</button>
           </div>; })()}

@@ -151,6 +151,8 @@ export const FOOD_EFFECTS: Record<string, FoodEffect> = {
   bibimbap: { kind: "speed", heal: false, seconds: 60, values: [12, 18, 25], text: v => `60초 이동속도 +${v}%` },
   gui: { kind: "shield", heal: true, seconds: 60, values: [20, 30, 45], text: v => `60초 보호막 ${v}` },
   dosirak: { kind: "all", heal: false, seconds: 45, values: [6, 9, 13], text: v => `45초 공격력·공격속도·이동속도 +${v}%` },
+  "herb-stew": { kind: "regen", heal: true, seconds: 20, values: [2, 3, 4], text: v => `20초간 초당 체력 ${v} 회복` },
+  skewer: { kind: "haste", heal: false, seconds: 60, values: [12, 18, 25], text: v => `60초 공격속도 +${v}%` },
 };
 export const MAX_HEAL_FOODS = 2;
 

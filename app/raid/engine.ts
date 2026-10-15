@@ -691,6 +691,8 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   { const o = pushOut(p.x, p.y, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; }
   updateWorld(s, dt);
   s.shake = Math.max(0, s.shake - dt * 30);
+  // 지속 회복 음식(약초 고기찜): 초당 체력 회복
+  for (const b of s.buffs) if (b.kind === "regen" && b.until > s.t && s.player.hp > 0) s.player.hp = Math.min(s.player.maxHp, s.player.hp + b.value * dt);
   // 예약된 특수 공격 타격
   if (s.actions.length) { const due = s.actions.filter(x => x.at <= s.t); s.actions = s.actions.filter(x => x.at > s.t); for (const x of due) x.run(); }
 

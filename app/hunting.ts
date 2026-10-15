@@ -1,4 +1,5 @@
 import { TEST_MODE } from "./testMode";
+import { KITCHEN_ENABLED } from "./kitchen";
 /**
  * 사냥: 초단기 사냥.
  * 동물 등장(예고 없이 바로)(움직임 시작) → 클릭할 때마다 즉시 판정(즉발형) → 체력 0이면 포획.
@@ -9,7 +10,7 @@ export type MoveKind = "hop" | "zip" | "dash" | "charge" | "wander" | "stalk";
 /** price: 상점에 팔 때 받는 값(원). */
 export type Loot = { id: string; name: string; icon: string; price: number };
 /** speed: 토끼 기준 배수, hp: 체력, defense: 방어력(무기 데미지에서 빼고 들어간다, 0이면 튕김), window: 제한 시간(초), size: 판정 반지름(사냥터 가로 % 기준). */
-export type Animal = { id: string; name: string; icon: string; weight: number; speed: number; hp: number; defense: number; move: MoveKind; moveName: string; window: number; size: number; loot: Loot; rare: Loot };
+export type Animal = { id: string; name: string; icon: string; weight: number; speed: number; hp: number; defense: number; move: MoveKind; moveName: string; window: number; size: number; loot: Loot; rare: Loot; /** 요리 재료(요리 공개 후에만 떨어진다) */ meat?: Loot };
 
 /** 토끼 속도(사냥터 가로 %/초). 다른 동물은 이 배수. */
 export const BASE_SPEED = 48;
@@ -18,11 +19,11 @@ export const ANIMALS: Animal[] = [
   { id: "rabbit", name: "토끼", icon: "🐇", weight: 30, speed: 1, hp: 2, defense: 0, move: "hop", moveName: "지그재그로 깡충", window: 3.5, size: 4.2, loot: { id: "rabbitfur", name: "토끼 털뭉치", icon: "🤍", price: 60 }, rare: { id: "luckyfoot", name: "행운의 털", icon: "🍀", price: 300 } },
   { id: "fox", name: "여우", icon: "🦊", weight: 15, speed: 1.6, hp: 2, defense: 1, move: "zip", moveName: "번개처럼 튀었다 멈칫", window: 3, size: 4, loot: { id: "foxfur", name: "여우 꼬리털", icon: "🧡", price: 100 }, rare: { id: "foxbead", name: "여우 구슬", icon: "🔮", price: 500 } },
   { id: "deer", name: "사슴", icon: "🦌", weight: 22, speed: 1.2, hp: 3, defense: 1, move: "dash", moveName: "곧게 내달림", window: 3.5, size: 4.8, loot: { id: "antler", name: "떨어진 사슴뿔", icon: "🦌", price: 100 }, rare: { id: "goldantler", name: "황금 뿔 조각", icon: "✨", price: 600 } },
-  { id: "boar", name: "멧돼지", icon: "🐗", weight: 20, speed: 1.15, hp: 5, defense: 2, move: "charge", moveName: "돌진 후 급선회", window: 4, size: 5.2, loot: { id: "boarhair", name: "멧돼지 털", icon: "🧶", price: 140 }, rare: { id: "tusk", name: "엄니 조각", icon: "🦷", price: 700 } },
+  { id: "boar", name: "멧돼지", icon: "🐗", weight: 20, speed: 1.15, hp: 5, defense: 2, move: "charge", moveName: "돌진 후 급선회", window: 4, size: 5.2, loot: { id: "boarhair", name: "멧돼지 털", icon: "🧶", price: 140 }, meat: { id: "boarmeat", name: "멧돼지고기", icon: "🥩", price: 70 }, rare: { id: "tusk", name: "엄니 조각", icon: "🦷", price: 700 } },
   { id: "bear", name: "곰", icon: "🐻", weight: 10, speed: 0.6, hp: 6, defense: 3, move: "wander", moveName: "느릿느릿 어슬렁", window: 5, size: 6, loot: { id: "bearfur", name: "곰 털뭉치", icon: "🟫", price: 240 }, rare: { id: "honey", name: "야생 꿀", icon: "🍯", price: 1000 } },
   { id: "tiger", name: "호랑이", icon: "🐅", weight: 3, speed: 0.9, hp: 10, defense: 4, move: "stalk", moveName: "웅크렸다 덮침", window: 6, size: 6.4, loot: { id: "tigerpelt", name: "호랑이 가죽", icon: "🐯", price: 800 }, rare: { id: "tigerfang", name: "호랑이 송곳니", icon: "🦷", price: 3000 } },
 ];
-export const ALL_LOOT: Loot[] = ANIMALS.flatMap(animal => [animal.loot, animal.rare]);
+export const ALL_LOOT: Loot[] = ANIMALS.flatMap(animal => [animal.loot, animal.rare, ...(animal.meat ? [animal.meat] : [])]);
 
 /** 무기: 상점에서 산다. damage: 한 발 데미지, cooldown: 다음 발까지(초). 모두 즉발형(클릭한 순간 판정). */
 export type Weapon = { id: string; name: string; icon: string; price: number; damage: number; cooldown: number; note: string };
@@ -51,6 +52,7 @@ export function rollLoot(animal: Animal, outcome: HuntOutcome, random = Math.ran
   if (outcome === "escape") return {};
   const out: Record<string, number> = { [animal.loot.id]: outcome === "great" ? 2 : 1 };
   if (random() < (outcome === "great" ? 0.4 : 0.05)) out[animal.rare.id] = 1;
+  if (animal.meat && KITCHEN_ENABLED) out[animal.meat.id] = 1; // 요리 재료: 잡으면 고기 1개
   return out;
 }
 
