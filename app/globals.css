@@ -836,3 +836,7 @@ button { color:inherit; }
 .settings-save{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px;margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fffdf7}
 .settings-save b{grid-column:1/-1;font-size:13px}.settings-save small{color:#6b6450;font-size:11.5px}
 .settings-save button{width:auto;padding:7px 14px;margin:0}
+
+/* 성능: 밭 칸마다 매 프레임 다시 그리던 효과 줄이기 */
+.plot-label{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(40,28,16,.62)}
+.plant{will-change:transform}

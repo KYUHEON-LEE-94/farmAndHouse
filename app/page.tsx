@@ -54,6 +54,7 @@ const PALETTES = [
 const initialPlots: Plot[] = Array(8).fill(null);
 /** 파산했을 때 하루 한 번 받는 월루 지원금. */
 const BAILOUT_AMOUNT = 300;
+const NO_IDS: string[] = [];
 /** 희귀 어획 버프(이벤트·날씨·고양이) 합산 상한. */
 const FISH_BOOST_MAX = 1.5;
 /** 이 금액 미만이면 파산으로 본다. */
@@ -407,6 +408,14 @@ export default function Home() {
   const [pendingLoad, setPendingLoad] = useState<{ save: string; updatedAt: number; session: Session; conflict?: boolean } | null>(null);
   const suspendSave = useRef(false);
   const lastSynced = useRef("");
+  const saveJob = useRef<(() => void) | null>(null);
+  /** 미뤄 둔 저장을 지금 쓴다(계정 데이터로 바꾸는 중이면 쓰지 않는다). */
+  const flushSave = () => { const job = saveJob.current; saveJob.current = null; if (job && !suspendSave.current) job(); };
+  useEffect(() => {
+    const flush = () => flushSave();
+    window.addEventListener("pagehide", flush); document.addEventListener("visibilitychange", flush);
+    return () => { window.removeEventListener("pagehide", flush); document.removeEventListener("visibilitychange", flush); };
+  }, []);
   // 계정 충돌 방지: cloudChecked = 시작할 때 계정 저장과 비교를 마쳤는지, cloudConflict = 다른 기기의 더 새 저장이 있어 자동 저장을 멈췄는지.
   const cloudChecked = useRef(false), cloudConflict = useRef(false);
   const offGate = useRef({ isWorkTime: false, secondsLeft: -1, money: 0, notify: false, dayStart: null as { date: string; money: number } | null, endHour: 18, seasonIndex: -1, seasonLeft: 0 });
@@ -452,9 +461,12 @@ export default function Home() {
     return () => { clearInterval(timer); window.clearTimeout(fishTimer.current); };
   }, []);
 
+  // 저장은 0.4초 모아서 한 번 쓴다(드래그로 여러 칸을 심을 때 매번 전체 저장을 직렬화하지 않게). 숨김·종료·계정 저장 직전에는 바로 쓴다.
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId }));
+    const timer = window.setTimeout(flushSave, 400);
+    return () => window.clearTimeout(timer);
   }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, loaded]);
 
   const nowMs = now.getTime();
@@ -692,6 +704,7 @@ export default function Home() {
     if (!session || suspendSave.current || TEST_MODE) return; // 로컬 테스트 상태가 실제 계정에 올라가지 않게
     // 시작 비교 전이거나 다른 기기 저장과 충돌 중이면 자동 저장하지 않는다(수동 저장은 서버가 다시 비교해 충돌 창을 띄운다).
     if (!force && (!cloudChecked.current || cloudConflict.current)) return;
+    flushSave();
     const save = packSave();
     if (!force && save === lastSynced.current) return;
     try {
@@ -1844,7 +1857,7 @@ export default function Home() {
   // 황금 여부와 관계없이 잠금은 오직 사용자가 직접 선택한 경우에만 적용한다.
   const isLocked = (key: string) => produceLocks[key] === true;
   const orderDate = now.toDateString(), orders = useMemo(() => dailyOrders(orderDate), [orderDate]);
-  const doneToday = ordersDone.date === orderDate ? ordersDone.ids : [];
+  const doneToday = ordersDone.date === orderDate ? ordersDone.ids : NO_IDS;
   // 오늘 못 끝낸 주문에 필요한 수량을 창고에서 예약해 둔다(낮은 품질·황금 아닌 것부터, 납품 규칙과 같게).
   const reserved = useMemo(() => {
     const left = { ...produce }, out: Record<string, number> = {};
@@ -1867,7 +1880,7 @@ export default function Home() {
   const sellableOf = (key: string) => (isLocked(key) ? 0 : Math.max(0, (produce[key] ?? 0) - (reserved[key] ?? 0)));
   const readyOrders = orders.filter(order => !doneToday.includes(order.id) && order.items.every(item => depositedFor(order, item) + orderHave(item) >= item.count)).length;
   // 창고: 작물별 상자 하나에 품질 묶음을 모은다. 최근 6번(30분) 시세 흐름도 함께.
-  const storageBoxes = Object.values(Object.entries(produce).filter(([, count]) => count > 0).reduce<Record<string, { cropId: string; keys: string[] }>>((acc, [key]) => { const { cropId } = parseProduceKey(key); (acc[cropId] ??= { cropId, keys: [] }).keys.push(key); return acc; }, {})).map(({ cropId, keys }) => {
+  const storageBoxes = !showStorage ? [] : Object.values(Object.entries(produce).filter(([, count]) => count > 0).reduce<Record<string, { cropId: string; keys: string[] }>>((acc, [key]) => { const { cropId } = parseProduceKey(key); (acc[cropId] ??= { cropId, keys: [] }).keys.push(key); return acc; }, {})).map(({ cropId, keys }) => {
     const crop = CROPS.find(c => c.id === cropId);
     if (!crop) return null;
     const history = Array.from({ length: 6 }, (_, i) => marketPrice(crop, marketBucket - 5 + i)), now = history[5], prev = history[4];
@@ -2003,7 +2016,7 @@ export default function Home() {
                 onClick={event => { if (tool === "water" && event.detail > 0) return; clickPlot(index); }}
                 onPointerDown={event => { if (tool !== "water" && tool !== "hand" && tool !== "seed" && !activeFert) return; event.currentTarget.releasePointerCapture?.(event.pointerId); if (tool === "water") { if (plot?.bug) catchBug(index); else waterPlot(index); } }}
                 onPointerEnter={event => { const reach = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : activeFert ? currentSpreader : null;
-                  if (reach && (tool === "water" || reach.w * reach.h > 1)) setHoverArea(canArea(index, plotColumns(), plotCount, reach));
+                  if (reach && (tool === "water" || reach.w * reach.h > 1)) { const area = canArea(index, plotColumns(), plotCount, reach); setHoverArea(prev => prev.length === area.length && prev.every((v, i) => v === area[i]) ? prev : area); }
                   if (!(event.buttons & 1)) return;
                   if (plot?.bug) return catchBug(index);
                   if (tool === "water") waterPlot(index); else if (tool === "hand") harvest(index, true); else if (tool === "seed") plant(index, true); else if (activeFert) fertilize(index, activeFert, true); }}>
