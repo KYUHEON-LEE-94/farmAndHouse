@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, type Terrain } from "./terrain";
 import { SPECIALS } from "./weapons";
+import { weaponArtUrl } from "./weaponArt";
 import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
 const STEP = 1 / 60;
@@ -39,7 +40,7 @@ const UI_FONT = '"Gowun Dodum", "Pretendard", sans-serif';
 
 type Ui = { choices: AwakenId[] | null; paused: boolean; over: RaidState["over"]; level: number; picks: Partial<Record<AwakenId, number>> };
 type Avatar = { src: string; pixelated: boolean };
-type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; pixelated: boolean };
+type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; pixelated: boolean; weapon?: HTMLImageElement };
 
 /**
  * 탑 토벌 전투 화면. canvas + requestAnimationFrame 고정 스텝 루프로 그리고,
@@ -71,6 +72,8 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     ctx.scale(dpr, dpr);
     const art: Art = { bg: paintWorld(stateRef.current.terrain), avatar: null, pixelated: avatar.pixelated };
     const img = new Image(); img.onload = () => { art.avatar = img; }; img.src = avatar.src;
+    // 들고 있는 무기 그림(진화했으면 진화 그림)
+    const wimg = new Image(); wimg.onload = () => { art.weapon = wimg; }; wimg.src = weaponArtUrl(stateRef.current.weapon.art ?? "raid-scythe");
     let raf = 0, last = performance.now(), acc = 0, uiKey = "";
     const heard = { ...stateRef.current.sfx };
     const frame = (now: number) => {
@@ -308,7 +311,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   if (p.shield > 0) { ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 6, 0, Math.PI * 2); ctx.strokeStyle = `rgba(120,200,255,${0.6 + pulse * 0.3})`; ctx.lineWidth = 3; ctx.stroke(); }
   // 들고 있는 무기(조준 방향)
   ctx.translate(p.x, p.y); ctx.rotate(p.aim);
-  ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.fillText(s.weapon.icon ?? "🌙", size / 2 + 6, 0);
+  if (art.weapon) { ctx.rotate(Math.PI / 4); ctx.drawImage(art.weapon, size / 2 - 6, -size / 2 - 10, 30, 30); } else { ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.fillText(s.weapon.icon ?? "🌙", size / 2 + 6, 0); }
   ctx.restore();
   // 조준 범위(아주 옅게)
   ctx.save(); ctx.globalAlpha = 0.16; ctx.strokeStyle = "#fffbe8"; ctx.lineWidth = 2; ctx.setLineDash([4, 6]);

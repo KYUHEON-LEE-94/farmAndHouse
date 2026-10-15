@@ -15,8 +15,8 @@ export type WeaponStats = {
   /** slam·lob·폭발 반지름, thrust·beam·hook 폭, 투사체 속도, 산탄 수 */
   radius?: number; width?: number; speed?: number; pellets?: number;
   fx?: WeaponFx;
-  /** 화면에 그릴 무기 아이콘(raidWeaponStats가 채운다) */
-  icon?: string;
+  /** 화면에 그릴 무기 아이콘(raidWeaponStats가 채운다), art: 그림 id(진화했으면 진화 id) */
+  icon?: string; art?: string;
 };
 export type EvoDef = { id: string; name: string; note: string; s10: WeaponStats; s15: WeaponStats };
 export type RaidWeaponDef = { id: string; name: string; icon: string; difficulty: "쉬움" | "보통" | "어려움"; style: string; s0: WeaponStats; s5: WeaponStats; s10: WeaponStats; table?: WeaponStats[]; evos: [EvoDef, EvoDef]; craft?: { lifeMat: string } };
@@ -94,7 +94,7 @@ const lerp = (a: WeaponStats, b: WeaponStats, t: number): WeaponStats => ({
 export function raidWeaponStats(weaponId: string, enhancement: number, evolution: string | null): WeaponStats {
   const w = weaponDef(weaponId), evo = w.evos.find(e => e.id === evolution), e = Math.max(0, Math.min(10, enhancement));
   const st = evo && enhancement >= 10 ? lerp(evo.s10, evo.s15, Math.min(5, enhancement - 10) / 5) : w.table ? w.table[e] : e <= 5 ? lerp(w.s0, w.s5, e / 5) : lerp(w.s5, w.s10, (e - 5) / 5);
-  return { ...st, icon: w.icon };
+  return { ...st, icon: w.icon, art: evo && enhancement >= 10 ? evo.id : w.id };
 }
 /** 단일 대상 초당 피해(표시용). */
 export function dps(st: WeaponStats) { return Math.round((st.damage * (st.pellets ?? 1) * (st.fx?.double ? 2 : 1)) / st.interval); }

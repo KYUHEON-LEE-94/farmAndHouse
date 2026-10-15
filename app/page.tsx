@@ -49,7 +49,16 @@ type ActiveEvent = { event: StoryEvent; result?: Effect };
 
 const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
 const SEASON_ICON: Record<Season, string> = { 봄: "🌸", 여름: "☀️", 가을: "🍂", 겨울: "❄️" };
-const LEGEND_ART: Record<string, string> = { "legend-spring": "spring", "legend-summer": "summer", "legend-autumn": "autumn", "legend-winter": "winter" };
+const LEGEND_ART: Record<string, string> = {
+  "legend-spring": "spring",
+  "legend-spring-2": "spring-2",
+  "legend-summer": "summer",
+  "legend-summer-2": "summer-2",
+  "legend-autumn": "autumn",
+  "legend-autumn-2": "autumn-2",
+  "legend-winter": "winter",
+  "legend-winter-2": "winter-2",
+};
 // 3D 집 바깥 풍경 색. 마지막은 운영 시간 밖(밤).
 const PALETTES = [
   { sky: "#cfe7f2", grass: "#9cc57a", leaf: "#f4b8c8" },
