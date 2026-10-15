@@ -451,9 +451,17 @@ export function chooseAwakening(s: RaidState, id: AwakenId) {
   s.choices = null;
   checkLevel(s);
 }
+/** 각성 레벨이 오를 때마다 회복하는 체력 */
+const LEVEL_UP_HEAL = 5;
 function checkLevel(s: RaidState) {
   if (s.choices) return;
-  if (s.xp >= xpForLevel(s.level + 1)) { s.level++; offerChoices(s); }
+  if (s.xp >= xpForLevel(s.level + 1)) {
+    // 각성 레벨업: 체력 5 회복
+    const heal = Math.min(LEVEL_UP_HEAL, s.player.maxHp - s.player.hp);
+    s.level++; s.player.hp += heal;
+    if (heal > 0) s.pops.push({ x: s.player.x, y: s.player.y - 34, text: `+${Math.round(heal)} HP`, t: 0.9, kind: "info" });
+    offerChoices(s);
+  }
 }
 
 // ---------- 몬스터 행동 ----------
