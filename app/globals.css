@@ -1064,3 +1064,5 @@ button { color:inherit; }
 .raid-craft-qty button.on{background:#2c2418;color:#ffe19a;border-color:#2c2418}.raid-craft-qty button:disabled{opacity:.4;cursor:default}
 .raid-craft-qty button.make{background:#e8a530;border-color:#e8a530;color:#2c1a08;width:100%}
 .raid-cost-link{border:0;border-radius:999px;padding:4px 10px;font-size:12.5px;background:#fbe3dc;color:#a0402a;cursor:pointer;font-family:inherit;text-decoration:underline}
+
+.raid-evolve small.raid-special{color:#ffd84a;display:block;margin-top:2px}

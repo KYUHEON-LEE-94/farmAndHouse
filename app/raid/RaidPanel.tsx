@@ -7,7 +7,7 @@ import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTI
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance } from "./forge";
 import RaidGame from "./RaidGame";
-import { RAID_WEAPONS, WEAPON_CRAFT, dps, weaponDef } from "./weapons";
+import { RAID_WEAPONS, SPECIALS, WEAPON_CRAFT, dps, weaponDef } from "./weapons";
 
 let runSeq = 0;
 export type RaidOutcome = { result: RaidResult; lines: string[] };
@@ -88,7 +88,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   </div>;
   if (running) return <div className="raid-run">
     <RaidGame key={running.id} floor={floor} weapon={stats} evolution={evo} foods={running.foods} gear={gear} pet={petFor(raid)} avatar={avatar} hold={hold} speed={TEST_MODE ? testSpeed : 1} onFinish={finish} onQuit={finish} />
-    <p className="raid-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 🖱 조준 · 클릭(누르고 있기) 공격 · <kbd>Space</kbd> 회피 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 음식 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 보스키</p>
+    <p className="raid-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 🖱 조준 · 클릭(누르고 있기) 공격 · <kbd>Space</kbd> 회피 · 🖱 우클릭 특수 공격(진화 무기) · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 음식 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 보스키</p>
   </div>;
 
   return <div className="raid-wrap">
@@ -245,7 +245,7 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
         <span>간격<b>{stats.interval}초</b>{next && !needEvolution && step!.to <= 10 && <i>→ {next.interval}초</i>}</span>
       </div>
       {needEvolution ? <div className="raid-evolve"><b>⚡ +10 진화 방향을 고르세요 (첫 선택 무료)</b>
-        <div>{wDef.evos.map(e => e.id).map(id => <div key={id} className="raid-evo-card"><button onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small></button><button className="raid-try" onClick={() => onTrain(id)}>🎯 {TRAINING_SECONDS}초 체험</button></div>)}</div></div>
+        <div>{wDef.evos.map(e => e.id).map(id => <div key={id} className="raid-evo-card"><button onClick={() => forge.evolve(id)}><strong>{EVOLUTIONS[id].name}</strong><span>{EVOLUTIONS[id].note}</span><small>피해 {EVOLUTIONS[id].stats[0].damage} · 사거리 {EVOLUTIONS[id].stats[0].range} · {EVOLUTIONS[id].stats[0].angle}° · {EVOLUTIONS[id].stats[0].interval}초</small>{SPECIALS[id] && <small className="raid-special">🖱 우클릭 {SPECIALS[id].icon} {SPECIALS[id].name}: {SPECIALS[id].text} · {SPECIALS[id].cooldown}초</small>}</button><button className="raid-try" onClick={() => onTrain(id)}>🎯 {TRAINING_SECONDS}초 체험</button></div>)}</div></div>
         : !step ? <p className="raid-max">최대 강화(+15)에 도달했어요!</p>
         : <>
           <div className="raid-odds">

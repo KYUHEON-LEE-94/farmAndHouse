@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_XP, BOSS_AT, FLOOR_SECONDS, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, type Terrain } from "./terrain";
+import { SPECIALS } from "./weapons";
 import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
 const STEP = 1 / 60;
@@ -102,8 +103,8 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   return <div className="raid-game">
     <canvas ref={canvasRef} className="raid-canvas" style={{ aspectRatio: `${ARENA_W} / ${ARENA_H}` }}
       onPointerMove={toLogical}
-      onPointerDown={event => { toLogical(event); if (event.button === 0) { inputRef.current.attack = true; (event.target as HTMLElement).setPointerCapture(event.pointerId); } }}
-      onPointerUp={() => { inputRef.current.attack = false; }}
+      onPointerDown={event => { toLogical(event); if (event.button === 0) { inputRef.current.attack = true; (event.target as HTMLElement).setPointerCapture(event.pointerId); } else if (event.button === 2) inputRef.current.special = true; }}
+      onPointerUp={event => { if (event.button === 2) inputRef.current.special = false; else inputRef.current.attack = false; }}
       onPointerLeave={() => { inputRef.current.attack = false; }}
       onContextMenu={event => event.preventDefault()} />
     {ui.choices && <div className="raid-overlay"><div className="raid-choices">
@@ -201,6 +202,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
       else if (z.kind === "pollen") { const g = ctx.createRadialGradient(z.x, z.y, 4, z.x, z.y, z.r); g.addColorStop(0, "rgba(255,230,90,.55)"); g.addColorStop(1, "rgba(240,200,60,.2)"); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(200,160,30,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "puddle") { const g = ctx.createRadialGradient(z.x, z.y, 4, z.x, z.y, z.r); g.addColorStop(0, "rgba(90,160,220,.45)"); g.addColorStop(1, "rgba(60,120,190,.22)"); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = "rgba(200,235,255,.5)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "pbomb") { ctx.strokeStyle = "#e0a030"; ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🧴", z.x, z.y); }
+      else if (z.kind === "frost") { ctx.fillStyle = `rgba(190,235,255,${0.25 + pulse * 0.1})`; ctx.fill(); ctx.strokeStyle = "rgba(230,250,255,.9)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "poison") { ctx.fillStyle = `rgba(120,200,60,${0.25 + pulse * 0.1})`; ctx.fill(); ctx.strokeStyle = "rgba(80,160,40,.8)"; ctx.lineWidth = 2; ctx.stroke(); }
       else if (z.kind === "net") { ctx.strokeStyle = "rgba(240,230,200,.8)"; ctx.lineWidth = 1.5; ctx.stroke(); ctx.save(); ctx.clip(); for (let k = -z.r; k <= z.r; k += 14) { ctx.beginPath(); ctx.moveTo(z.x + k, z.y - z.r); ctx.lineTo(z.x + k, z.y + z.r); ctx.moveTo(z.x - z.r, z.y + k); ctx.lineTo(z.x + z.r, z.y + k); ctx.stroke(); } ctx.restore(); }
       else if (z.kind === "rain" || z.kind === "blast") { ctx.fillStyle = "rgba(255,230,150,.45)"; ctx.fill(); }
@@ -354,6 +356,16 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.beginPath(); ctx.arc(44, by + 21, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cdRatio); ctx.strokeStyle = ready ? "#9fe8ff" : "rgba(160,200,220,.6)"; ctx.lineWidth = 3; ctx.stroke();
   ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("💨", 44, by + 21);
   ctx.font = "700 9px sans-serif"; ctx.fillStyle = ready ? "#fff" : "#aaa"; ctx.fillText(ready ? "SPACE" : p.dashCd.toFixed(1), 44, by + 43);
+  // 우클릭 특수 공격(진화 무기만)
+  const spec = s.evolution ? SPECIALS[s.evolution] : null;
+  if (spec) {
+    const sx0 = 266, left = Math.max(0, s.special.readyAt - s.t), ready = left <= 0, shake = s.t - s.special.bump < 0.2 ? Math.sin(clock * 80) * 2 : 0;
+    panel(ctx, sx0 + shake, by, 58, 50);
+    ctx.beginPath(); ctx.arc(sx0 + 29 + shake, by + 21, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (ready ? 1 : 1 - left / spec.cooldown)); ctx.strokeStyle = ready ? "#ffd84a" : "rgba(255,216,74,.45)"; ctx.lineWidth = 3; ctx.stroke();
+    if (ready) { ctx.beginPath(); ctx.arc(sx0 + 29, by + 21, 19 + Math.sin(clock * 6) * 1.5, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,216,74,.35)"; ctx.lineWidth = 2; ctx.stroke(); }
+    ctx.fillStyle = "#000"; ctx.font = `17px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.globalAlpha = ready ? 1 : 0.5; ctx.fillText(spec.icon, sx0 + 29 + shake, by + 21); ctx.globalAlpha = 1;
+    ctx.font = "700 9px sans-serif"; ctx.fillStyle = ready ? "#ffe19a" : "#aaa"; ctx.fillText(ready ? "우클릭" : left.toFixed(1), sx0 + 29 + shake, by + 43); ctx.textAlign = "left";
+  }
   s.foods.forEach((f, i) => {
     const x = 84 + i * 58, used = !f || s.foodUsed[i];
     panel(ctx, x, by, 50, 50);
@@ -369,7 +381,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   if (buffs.length) {
     const text = buffs.map(b => `${{ attack: "⚔ 공격", speed: "👟 이속", haste: "⚡ 공속", all: "🌟 전체", heal: "", shield: "", regen: "" }[b.kind]} +${b.value}% · ${Math.ceil(b.until - s.t)}s`).join("   ");
     ctx.font = `700 12px ${UI_FONT}`; const w = ctx.measureText(text).width + 24;
-    panel(ctx, 262, by + 10, w, 30); ctx.fillStyle = "#ffe19a"; ctx.fillText(text, 274, by + 26);
+    panel(ctx, 332, by + 10, w, 30); ctx.fillStyle = "#ffe19a"; ctx.fillText(text, 344, by + 26);
   }
 }
 

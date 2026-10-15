@@ -6,9 +6,12 @@ import {
   ARENA_H, ARENA_W, AWAKENINGS, AWAKEN_GUARANTEE, AWAKEN_XP, BOSS_AT, COMMON_AWAKENINGS, ELITE_AT, FLOOR_SECONDS, INTERVENTION_AT, NORMAL_SPEED_MUL, ORB_AUTO, SPAWN_MUL, MONSTERS, PLAYER,
   type AwakenId, type BossDef, type Evolution, type FloorDef, type FoodEffect, type MonsterDef, type WeaponStats,
 } from "./data";
+import { SPECIALS } from "./weapons";
 import { START, WORLD_H, WORLD_W, blockedAt, blockers, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, type Terrain } from "./terrain";
 
-export type Input = { up: boolean; down: boolean; left: boolean; right: boolean; aimX: number; aimY: number; attack: boolean; dash: boolean; food: [boolean, boolean, boolean] };
+export type Input = { up: boolean; down: boolean; left: boolean; right: boolean; aimX: number; aimY: number; attack: boolean; dash: boolean; food: [boolean, boolean, boolean];
+  /** 우클릭 특수 공격(누른 순간 한 번) */
+  special?: boolean };
 /** 방어구 합계 능력(26절). */
 export type Gear = { hp: number; defense: number; crit: number; absorb: number; speed: number; dashCd: number; startShield: number };
 export const NO_GEAR: Gear = { hp: 0, defense: 0, crit: 0, absorb: 0, speed: 0, dashCd: 0, startShield: 0 };
@@ -29,8 +32,8 @@ export type Monster = {
 };
 export type Projectile = { x: number; y: number; vx: number; vy: number; r: number; damage: number; life: number; mine: boolean; pierce: Set<number> | null;
   /** 내 투사체: 남은 관통 수, 폭발, 쏜 자리(먼 거리 보너스), 보스 방어 무시 */
-  left?: number; explode?: number; ox?: number; oy?: number; ignoreDef?: boolean; wave?: boolean };
-export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "tshock" | "blast" | "pbomb" | "poison" | "net" | "rain";
+  left?: number; explode?: number; ox?: number; oy?: number; ignoreDef?: boolean; wave?: boolean; defIgnore?: number; siege?: boolean };
+export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "tshock" | "blast" | "pbomb" | "poison" | "net" | "rain" | "frost";
   /** 내 공격 장판: 폭발 배율·독·그물 반지름 등 */
   mine?: { mul: number; poison?: boolean; seedChain?: boolean; big?: boolean }; x: number; y: number; r: number; t: number; tele: number; damage: number; every: number; tick: number; slow: number; dx?: number; dy?: number; len?: number };
 export type Orb = { x: number; y: number; xp: number; age: number };
@@ -57,6 +60,9 @@ export type RaidState = {
   cam: { x: number; y: number; lx: number; ly: number }; terrain: Terrain;
   pressure: { x: number; y: number; since: number; stage: number; leftAt: number };
   warns: { x: number; y: number; at: number; id: string }[];
+  /** 특수 공격(52절): 준비 시각, 진행 중 효과, 예약된 타격 */
+  special: { readyAt: number; prev: boolean; moveUntil: number; moveMul: number; lockAim: number | null; stanceUntil: number; stanceHit: boolean; cancelable: boolean; hits: Record<number, number>; bump: number };
+  actions: { at: number; run: () => void; tag?: string }[];
   kills: number; damageTaken: Record<string, number>; uid: number; prevDash: boolean; prevFood: [boolean, boolean, boolean]; bossHpAtEnd: number;
 };
 
@@ -76,6 +82,7 @@ export function createRaid(floor: FloorDef, weapon: WeaponStats, evolution: Evol
     level: 1, xp: 0, picks: {}, choices: null,
     monsters: [], projectiles: [], zones: [], orbs: [], pops: [], swings: [],
     spawnAcc: 0.9, nextElite: ELITE_AT[0], elitesPlaced: 0, packAt: 0, bossSpawned: false, interventions: 0, boss: null,
+    special: { readyAt: 0, prev: false, moveUntil: 0, moveMul: 1, lockAim: null, stanceUntil: 0, stanceHit: false, cancelable: false, hits: {}, bump: 0 }, actions: [],
     kills: 0, damageTaken: {}, uid: 1, prevDash: false, prevFood: [false, false, false], bossHpAtEnd: 1,
   };
 }
@@ -153,6 +160,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   const p = s.player;
   if (p.iframes > 0 || p.dashT > 0 || s.over) return;
   raw *= 1 - (s.weapon.fx?.guard ?? 0) - (s.picks["frost-veil"] && p.holdT > 0 ? 0.25 : 0);
+  if (s.special.stanceUntil > s.t) { raw *= 0.2; if (!s.special.stanceHit) { s.special.stanceHit = true; s.special.stanceUntil = 0; counterBlast(s, true); } }
   if (fromBoss && s.picks["iron-wall"] && s.t - p.ironAt >= 1) { p.ironAt = s.t; raw *= 0.5; }
   let dmg = Math.max(1, Math.round(raw - derived(s).armor));
   if (p.shield > 0) { const used = Math.min(p.shield, dmg); p.shield -= used; dmg -= used; }
@@ -161,7 +169,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   if (!p.emergencyUsed && pick(s, "emergency-shield") && p.hp > 0 && p.hp <= p.maxHp * 0.3) { p.emergencyUsed = true; p.shield += 25; p.shieldUntil = s.t + 60; s.pops.push({ x: p.x, y: p.y - 40, text: "비상 보호막!", t: 1.2, kind: "info" }); }
   if (p.hp <= 0) { if (s.floor.training) p.hp = 1; else { p.hp = 0; s.over = "dead"; } }
 }
-type HitOpts = { critAdd?: number; ignoreDef?: boolean; noCombo?: boolean };
+type HitOpts = { critAdd?: number; ignoreDef?: boolean; noCombo?: boolean; noCrit?: boolean; forceCrit?: boolean; defIgnore?: number; extra?: number };
 function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: number, o: HitOpts = {}) {
   if (m.hp <= 0) return;
   const d = derived(s), fx = s.weapon.fx ?? {}, p = s.player;
@@ -178,10 +186,11 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   if (s.picks["crush-combo"] && !o.noCombo) { m.combo = p.lastTarget === m.uid ? Math.min(5, m.combo + 1) : 0; p.lastTarget = m.uid; mul += 0.08 * m.combo; }
   if (m.boss && s.picks["big-catch"]) p.bigCatch = Math.min(0.3, p.bigCatch + 0.03);
   const critChance = d.crit + (fx.crit ?? 0) + (o.critAdd ?? 0) + ((m.elite || m.boss) ? (fx.eliteCrit ?? 0) + (s.picks["weak-aim"] ? 0.2 : 0) : 0);
-  const crit = rnd() < critChance;
+  const crit = o.forceCrit || (!o.noCrit && rnd() < critChance);
+  mul += o.extra ?? 0;
   let dmg = base * mul * (crit ? (s.picks["vital-stab"] ? 2 : PLAYER.critMul) : 1) * (m.state === "stun" ? 1.3 : 1);
   const ignore = m.boss && (o.ignoreDef || (crit && s.picks["vital-pierce"]));
-  dmg = Math.max(1, Math.round(dmg - (ignore ? 0 : m.defense) - (m.def.kind === "crab" && m.state !== "dash" ? 3 : 0)));
+  dmg = Math.max(1, Math.round(dmg - (ignore ? 0 : m.defense * (1 - (o.defIgnore ?? 0))) - (m.def.kind === "crab" && m.state !== "dash" ? 3 : 0)));
   if (s.picks.executioner && !m.boss && !m.elite && m.hp - dmg <= m.maxHp * 0.2) dmg = m.hp;
   m.hp -= dmg; m.flash = 0.1;
   s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.6, kind: crit ? "crit" : "hit" });
@@ -347,6 +356,62 @@ function attackOnce(s: RaidState) {
   }
   if (s.picks.eclipse && p.attacks % 4 === 0) s.projectiles.push({ x: p.x, y: p.y, vx: Math.cos(p.aim) * 700, vy: Math.sin(p.aim) * 700, r: 26, damage: w.damage * 1.8, life: 2, mine: true, pierce: new Set(), left: 999, wave: true });
   if (s.picks["harvest-storm"] && p.attacks % 5 === 0) { p.stormUntil = s.t + 2; p.stormTick = 0; }
+}
+
+// ---------- 우클릭 특수 공격(52절) ----------
+const later = (s: RaidState, after: number, run: () => void, tag?: string) => s.actions.push({ at: s.t + after, run, tag });
+/** 같은 적 최대 n회(특수 공격 한 번 안에서). */
+function capHit(s: RaidState, m: Monster, n: number) { const k = s.special.hits[m.uid] ?? 0; if (k >= n) return false; s.special.hits[m.uid] = k + 1; return true; }
+function lineHit(s: RaidState, x: number, y: number, aim: number, len: number, width: number, dmg: number, o: HitOpts, knock = 0, each?: (m: Monster, along: number) => void) {
+  s.swings.push({ angle: aim, range: len, arc: 0, t: 0.3, kind: "line", width, x, y });
+  const hits = s.monsters.filter(m => m.hp > 0).map(m => ({ m, along: inAim({ x, y }, aim, m, len, width) })).filter(h => h.along >= 0).sort((a, b) => a.along - b.along);
+  hits.forEach(({ m, along }, i) => { if (each) each(m, along); else hitMonster(s, m, dmg, aim, knock, { ...o, noCombo: true, extra: (o.extra ?? 0) }); void i; });
+  return hits.map(h => h.m);
+}
+function counterBlast(s: RaidState, countered: boolean) {
+  const p = s.player, w = s.weapon;
+  if (countered) { blastSpecial(s, p.x, p.y, 150, w.damage * 3, 110); s.pops.push({ x: p.x, y: p.y - 40, text: "🛡️ 반격!", t: 1, kind: "info" }); }
+  else { s.swings.push({ angle: p.aim, range: 150, arc: 180, t: 0.25 }); for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, p.x, p.y) < 150 + m.r && angDiff(Math.atan2(m.y - p.y, m.x - p.x), p.aim) < Math.PI / 2) hitMonster(s, m, w.damage * 1.6, p.aim, 40, { noCrit: true, noCombo: true }); }
+}
+function blastSpecial(s: RaidState, x: number, y: number, r: number, dmg: number, knock: number, extra = 0, cap = 99) {
+  s.swings.push({ angle: 0, range: r, arc: 360, t: 0.3, kind: "circle", x, y });
+  for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, x, y) < r + m.r && capHit(s, m, cap)) hitMonster(s, m, dmg, Math.atan2(m.y - y, m.x - x), knock, { noCrit: true, noCombo: true, extra });
+}
+function castSpecial(s: RaidState) {
+  const p = s.player, sp = s.special, evo = s.evolution, w = s.weapon, D = w.damage;
+  if (!evo || !SPECIALS[evo]) return;
+  if (s.t < sp.readyAt) { sp.bump = s.t; return; }
+  sp.readyAt = s.t + SPECIALS[evo].cooldown; sp.hits = {}; p.swingCd = Math.max(p.swingCd, 0.18);
+  const aim = p.aim, tx = clamp(p.tx, 20, WORLD_W - 20), ty = clamp(p.ty, 20, WORLD_H - 20), boss = (m: Monster) => (m.boss ? 0.15 : 0);
+  s.pops.push({ x: p.x, y: p.y - 46, text: `${SPECIALS[evo].icon} ${SPECIALS[evo].name}`, t: 0.9, kind: "info" });
+  switch (evo) {
+    case "great-scythe": later(s, 0.15, () => lineHit(s, p.x, p.y, aim, 420, 70, D * 3.2, { noCrit: true }, 0, m => hitMonster(s, m, D * 3.2, aim, m.elite || m.boss ? 0 : 100, { noCrit: true, noCombo: true, extra: m.elite || m.boss ? 0.2 : 0 }))); break;
+    case "harvest-blade": sp.moveUntil = s.t + 1.5; sp.moveMul = 1.15; for (let i = 0; i < 6; i++) later(s, 0.25 * i, () => blastSpecial(s, p.x, p.y, 145, D * 0.55, 20, 0, 6)); break;
+    case "quake-hammer": s.swings.push({ angle: aim, range: 360, arc: 0, t: 0.45, kind: "line", width: 85, x: p.x, y: p.y }); { const ox = p.x, oy = p.y; later(s, 0.45, () => lineHit(s, ox, oy, aim, 360, 85, D * 2.6, { noCrit: true }, 0, m => { hitMonster(s, m, D * 2.6, aim, 20, { noCrit: true, noCombo: true }); if (!m.boss && !m.elite && m.hp > 0) { m.state = "stun"; m.stateT = 0.8; } })); } break;
+    case "rock-crusher": { const d0 = Math.min(240, dist(p.x, p.y, tx, ty)), cx = p.x + Math.cos(aim) * d0, cy = p.y + Math.sin(aim) * d0; for (let i = 0; i < 5; i++) { const a = rnd() * Math.PI * 2, r = rnd() * 70; later(s, 0.12 * i, () => blastSpecial(s, cx + Math.cos(a) * r, cy + Math.sin(a) * r, 32, D * 0.65, 15, 0, 3)); } break; }
+    case "water-cannon": sp.moveUntil = s.t + 1.2; sp.moveMul = 0.65; sp.lockAim = aim; sp.cancelable = true; for (let i = 0; i < 8; i++) later(s, 0.15 * i, () => lineHit(s, p.x, p.y, sp.lockAim ?? aim, 500, 55, D * 2.2, { noCrit: true }, 0, m => hitMonster(s, m, D * 2.2, sp.lockAim ?? aim, m.boss || m.elite ? 0 : 18, { noCrit: true, noCombo: true, extra: boss(m) })), "cancel"); later(s, 1.2, () => { sp.lockAim = null; sp.cancelable = false; }, "cancel"); break;
+    case "frost-sprayer": zoneAt(s, { kind: "frost", x: tx, y: ty, r: 150, t: 3, tele: 0, damage: 0, every: 0, slow: 0 }); for (let i = 0; i < 5; i++) later(s, 0.6 * i, () => { for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, tx, ty) < 150 + m.r) { hitMonster(s, m, D, 0, 0, { noCrit: true, noCombo: true }); m.expose += 1; if (m.boss) { m.slowUntil = s.t + 0.7; m.slowMul = 0.6; } else if (!m.elite && m.expose >= 3) { m.expose = 0; m.frozenUntil = s.t + 1.2; m.state = "stun"; m.stateT = 1.2; } } s.swings.push({ angle: 0, range: 150, arc: 360, t: 0.2, kind: "circle", x: tx, y: ty }); }); break;
+    case "toxic-sprayer": blastSpecial(s, tx, ty, 120, D * 1.4, 10); for (let i = 1; i <= 5; i++) later(s, i, () => { for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, tx, ty) < 120 + m.r) { hitMonster(s, m, D * 0.45, 0, 0, { noCrit: true, noCombo: true }); if (m.boss) { m.takenUntil = s.t + 1.1; m.takenBonus = Math.max(m.takenBonus, 0.1); } } }); zoneAt(s, { kind: "poison", x: tx, y: ty, r: 120, t: 5, tele: 0, damage: 0, every: 99, slow: 0, mine: { mul: 0 } }); break;
+    case "seed-launcher": for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4, x = tx + Math.cos(a) * 55, y = ty + Math.sin(a) * 55; zoneAt(s, { kind: "pbomb", x, y, r: 58, t: 0.1, tele: 0.8, damage: D * 0.85, every: 0, slow: 0, mine: { mul: 1 } }); } break;
+    case "trident": later(s, 0.15, () => lineHit(s, p.x, p.y, aim, 520, 42, D * 3, { noCrit: true }, 0, (m, along) => hitMonster(s, m, D * 3, aim, 20, { noCombo: true, noCrit: along <= 420, forceCrit: along > 420, extra: boss(m) }))); break;
+    case "chain-harpoon": later(s, 0.15, () => { const hit = lineHit(s, p.x, p.y, aim, 420, 40, D * 1.8, { noCrit: true }, 0, m => hitMonster(s, m, D * 1.8, aim, 0, { noCrit: true, noCombo: true })); for (const m of hit) { if (m.hp <= 0) continue; if (m.elite || m.boss) { m.slowUntil = s.t + 1.5; m.slowMul = 0.7; } else { m.x = p.x + Math.cos(aim) * 90 + (rnd() - 0.5) * 30; m.y = p.y + Math.sin(aim) * 90 + (rnd() - 0.5) * 30; } } later(s, 0.35, () => { for (const m of hit) if (m.hp > 0 && dist(m.x, m.y, p.x, p.y) < 160) hitMonster(s, m, D, aim + Math.PI, 0, { noCrit: true, noCombo: true }); }); }); break;
+    case "thunder-rod": { const alive = s.monsters.filter(m => m.hp > 0); const target = alive.filter(m => dist(m.x, m.y, tx, ty) < 70).sort((a, b) => dist(a.x, a.y, tx, ty) - dist(b.x, b.y, tx, ty))[0] ?? alive.filter(m => dist(m.x, m.y, p.x, p.y) < 260).sort((a, b) => dist(a.x, a.y, p.x, p.y) - dist(b.x, b.y, p.x, p.y))[0];
+      if (!target) { s.swings.push({ angle: Math.PI / 2, range: 80, arc: 0, t: 0.3, kind: "line", width: 6, x: tx, y: ty - 80 }); break; }
+      s.swings.push({ angle: Math.PI / 2, range: 80, arc: 0, t: 0.3, kind: "line", width: 6, x: target.x, y: target.y - 80 }); hitMonster(s, target, D * 1.7, 0, 0, { noCrit: true, noCombo: true });
+      const others = alive.filter(m => m !== target && m.hp > 0 && dist(m.x, m.y, target.x, target.y) < 200).slice(0, 5);
+      if (others.length) for (const m of others) { s.swings.push({ angle: Math.atan2(m.y - target.y, m.x - target.x), range: dist(m.x, m.y, target.x, target.y), arc: 0, t: 0.25, kind: "line", width: 3, x: target.x, y: target.y }); hitMonster(s, m, D * 0.85, 0, 0, { noCrit: true, noCombo: true }); }
+      else if (target.boss) for (let i = 1; i <= 2; i++) later(s, 0.15 * i, () => hitMonster(s, target, D * 0.45, 0, 0, { noCrit: true, noCombo: true }));
+      break; }
+    case "net-launcher": blastSpecial(s, tx, ty, 60, D * 0.8, 0); zoneAt(s, { kind: "net", x: tx, y: ty, r: 170, t: 4, tele: 0, damage: 0, every: 0, slow: 0.7 }); break;
+    case "longbow": sp.moveUntil = s.t + 0.55; sp.moveMul = 0.5; sp.cancelable = true; later(s, 0.55, () => { sp.cancelable = false; fire(s, p.aim, D * 3.8, { left: 999, r: 9, defIgnore: 0.5 } as Partial<Projectile>); }, "cancel"); break;
+    case "rapid-bow": for (let i = 0; i < 10; i++) later(s, 0.2 * i, () => { for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, tx, ty) < 135 + m.r && capHit(s, m, 6)) { hitMonster(s, m, D * 0.35, 0, 0, { noCrit: true, noCombo: true }); if (!m.boss) { m.slowUntil = s.t + 0.4; m.slowMul = 0.8; } } s.swings.push({ angle: 0, range: 135, arc: 360, t: 0.15, kind: "circle", x: tx, y: ty }); }); break;
+    case "rifle": later(s, 0.1, () => { let k = 0; lineHit(s, p.x, p.y, aim, 700, 30, D * 3.4, { noCrit: true }, 0, m => { if (k >= 6) return; hitMonster(s, m, D * 3.4 * (1 - 0.08 * k), aim, 20, { noCrit: true, noCombo: true, defIgnore: 0.7, extra: boss(m) }); k++; }); }); break;
+    case "siege-crossbow": fire(s, aim, D * 2.2, { r: 10, explode: 115, vx: Math.cos(aim) * 420, vy: Math.sin(aim) * 420, siege: true } as Partial<Projectile>); break;
+    case "twin-blades": { p.iframes = Math.max(p.iframes, 0.95); const targets = s.monsters.filter(m => m.hp > 0 && dist(m.x, m.y, p.x, p.y) < 260 && angDiff(Math.atan2(m.y - p.y, m.x - p.x), aim) < 1.2).slice(0, 6);
+      if (!targets.length) { const o = pushOut(p.x + Math.cos(aim) * 120, p.y + Math.sin(aim) * 120, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; swingHit(s, aim, 1.2); break; }
+      for (let i = 0; i < 6; i++) later(s, 0.15 * i, () => { const m = targets[i % targets.length]; if (!m || m.hp <= 0 || !capHit(s, m, 4)) return; const o = pushOut(m.x - Math.cos(aim) * 24, m.y - Math.sin(aim) * 24, PLAYER.radius, blockers(s.terrain)); if (dist(o.x, o.y, p.x, p.y) < 220) { p.x = o.x; p.y = o.y; } s.swings.push({ angle: aim, range: 60, arc: 120, t: 0.12 }); hitMonster(s, m, D * 0.6, aim, 10, { noCrit: true, noCombo: true }); }); break; }
+    case "greatsword": sp.stanceUntil = s.t + 1.2; sp.stanceHit = false; later(s, 1.2, () => { if (!sp.stanceHit) counterBlast(s, false); sp.stanceUntil = 0; }); break;
+  }
 }
 
 // ---------- 음식 ----------
@@ -546,7 +611,7 @@ function updateWorld(s: RaidState, dt: number) {
 
 // ---------- 한 스텝 ----------
 export function stepRaid(s: RaidState, dt: number, input: Input) {
-  if (s.over || s.paused || s.choices) { s.prevDash = input.dash; s.prevFood = input.food; return; }
+  if (s.over || s.paused || s.choices) { s.prevDash = input.dash; s.prevFood = input.food; s.special.prev = Boolean(input.special); return; }
   s.t += dt;
   const p = s.player, d = derived(s);
 
@@ -563,6 +628,11 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   // 입력 조준은 화면 좌표 → 월드 좌표
   p.aim = Math.atan2(input.aimY + s.cam.y - p.y, input.aimX + s.cam.x - p.x);
   p.tx = input.aimX + s.cam.x; p.ty = input.aimY + s.cam.y;
+  if (s.special.lockAim !== null) p.aim = s.special.lockAim;
+  // 특수 공격: 우클릭 누른 순간
+  if (input.special && !s.special.prev) castSpecial(s);
+  s.special.prev = Boolean(input.special);
+  if (input.dash && !s.prevDash && p.dashCd <= 0 && s.special.cancelable) { s.actions = s.actions.filter(x => x.tag !== "cancel"); if (s.evolution === "longbow") s.special.readyAt = s.t + 3; s.special.cancelable = false; s.special.lockAim = null; s.special.moveUntil = 0; }
   if (input.dash && !s.prevDash && p.dashCd <= 0) { p.gale = []; p.dashT = PLAYER.dashTime * (inMud(s.terrain, p.x, p.y) ? 0.8 : 1); p.dashDir = ml ? { x: mx, y: my } : { x: Math.cos(p.aim), y: Math.sin(p.aim) }; p.dashCd = d.dashCd; }
   s.prevDash = input.dash;
 
@@ -572,9 +642,11 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
     p.dashT -= dt; p.x += p.dashDir.x * PLAYER.dashSpeed * dt; p.y += p.dashDir.y * PLAYER.dashSpeed * dt; p.dashBonusUntil = s.t + 1;
     if (s.picks["gale-dance"]) for (const m of s.monsters) if (m.hp > 0 && !p.gale.includes(m.uid) && dist(m.x, m.y, p.x, p.y) < m.r + 24) { p.gale.push(m.uid); hitMonster(s, m, s.weapon.damage * 2, Math.atan2(p.dashDir.y, p.dashDir.x), 20, { noCombo: true }); }
   }
-  else { const sp = d.speed * (inPollen ? 1 - inPollen.slow : 1) * (p.slowUntil > s.t && !s.picks["quick-shot"] ? 1 - (s.weapon.fx?.selfSlow ?? PLAYER.attackSlow) : 1) * slowAt(s.terrain, p.x, p.y, true); p.x += mx * sp * dt; p.y += my * sp * dt; }
+  else { const sp = d.speed * (inPollen ? 1 - inPollen.slow : 1) * (p.slowUntil > s.t && !s.picks["quick-shot"] ? 1 - (s.weapon.fx?.selfSlow ?? PLAYER.attackSlow) : 1) * (s.special.moveUntil > s.t ? s.special.moveMul : 1) * slowAt(s.terrain, p.x, p.y, true); p.x += mx * sp * dt; p.y += my * sp * dt; }
   { const o = pushOut(p.x, p.y, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; }
   updateWorld(s, dt);
+  // 예약된 특수 공격 타격
+  if (s.actions.length) { const due = s.actions.filter(x => x.at <= s.t); s.actions = s.actions.filter(x => x.at > s.t); for (const x of due) x.run(); }
 
   // 공격: 누르고 있으면 간격마다 휘두른다. 시작 0.12초 뒤 판정.
   p.swingCd = Math.max(0, p.swingCd - dt);
@@ -630,14 +702,16 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   for (const pr of s.projectiles) {
     const w = windAt(s.terrain, pr.x, pr.y), sp = Math.hypot(pr.vx, pr.vy) || 1, along = w ? (pr.vx * w.dx + pr.vy * w.dy) / sp : 0, k = along > 0.5 ? 1.2 : along < -0.5 ? 0.85 : 1;
     const nx = pr.x + pr.vx * dt * k, ny = pr.y + pr.vy * dt * k;
-    if (segmentHits(s.terrain.walls, pr.x, pr.y, nx, ny)) { pr.life = 0; continue; }
+    if (segmentHits(s.terrain.walls, pr.x, pr.y, nx, ny)) { if (pr.mine && pr.siege) blastSpecial(s, pr.x, pr.y, pr.explode ?? 115, pr.damage / 2.2 * 1.4, 90); pr.life = 0; continue; }
     pr.x = nx; pr.y = ny; pr.life -= dt;
     if (pr.mine) {
       for (const m of s.monsters) {
         if (m.hp <= 0 || pr.pierce!.has(m.uid) || dist(pr.x, pr.y, m.x, m.y) >= pr.r + m.r || pr.life <= 0) continue;
         pr.pierce!.add(m.uid);
         const far = s.weapon.fx?.far && pr.ox !== undefined && dist(pr.ox, pr.oy!, m.x, m.y) >= 250 ? 1.25 : 1;
-        hitMonster(s, m, pr.damage * far, Math.atan2(pr.vy, pr.vx), pr.wave ? 0 : s.weapon.knockback, { ignoreDef: pr.ignoreDef, noCombo: pr.wave });
+        const farSp = pr.defIgnore && pr.ox !== undefined && dist(pr.ox, pr.oy!, m.x, m.y) >= 300 ? 1.25 : 1;
+        hitMonster(s, m, pr.damage * far * farSp, Math.atan2(pr.vy, pr.vx), pr.wave ? 0 : s.weapon.knockback, { ignoreDef: pr.ignoreDef, noCombo: pr.wave, defIgnore: pr.defIgnore, noCrit: Boolean(pr.defIgnore || pr.siege) });
+        if (pr.siege) { blastSpecial(s, m.x, m.y, pr.explode ?? 115, pr.damage / 2.2 * 1.4, 90); pr.life = 0; continue; }
         if (pr.explode) { blastAt(s, m.x, m.y, pr.explode, pr.damage * 0.6); if (s.picks["chain-blast"]) blastAt(s, m.x, m.y, pr.explode, pr.damage * 0.6); if (s.picks.shrapnel) for (let i = 0; i < 4; i++) { const a = rnd() * Math.PI * 2; blastAt(s, m.x + Math.cos(a) * 50, m.y + Math.sin(a) * 50, 16, pr.damage * 0.35, 8); } }
         if (!pr.wave) { if ((pr.left ?? 0) > 0) pr.left = (pr.left ?? 0) - 1; else pr.life = 0; }
       }
@@ -663,7 +737,8 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
       if (z.kind === "bolt") for (const w of s.zones) if (w.kind === "puddle" && w.tele <= 0 && dist(w.x, w.y, z.x, z.y) < w.r + z.r) zoneAt(s, { kind: "shock", x: w.x, y: w.y, r: w.r, t: 0.5, tele: 0, damage: 12, every: 0.5, slow: 0 });
     } continue; }
     z.t -= dt;
-    if (z.kind === "poison") { z.tick -= dt; if (z.tick <= 0) { z.tick = 1; for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, z.x, z.y) < z.r + m.r) hitMonster(s, m, z.damage, 0, 0, { noCombo: true }); } continue; }
+    if (z.kind === "frost") continue;
+    if (z.kind === "poison") { z.tick -= dt; if (z.tick <= 0) { z.tick = 1; if (z.damage > 0) for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, z.x, z.y) < z.r + m.r) hitMonster(s, m, z.damage, 0, 0, { noCombo: true }); } continue; }
     if (z.kind === "net") { for (const m of s.monsters) if (m.hp > 0) { const inside = dist(m.x, m.y, z.x, z.y) < z.r + m.r; if (inside) { m.inNet = true; m.slowUntil = s.t + 0.1; m.slowMul = 0.5; m.takenUntil = s.t + 0.1; m.takenBonus = Math.max(m.takenBonus, m.boss ? 0.08 : 0.15); } } continue; }
     if (z.mine) continue;
     if (z.damage && z.every && dist(z.x, z.y, p.x, p.y) < z.r) { z.tick -= dt; if (z.tick <= 0) { z.tick = z.every; hurtPlayer(s, z.damage, z.kind === "pollen" ? "꽃가루 장판" : "감전"); } }
