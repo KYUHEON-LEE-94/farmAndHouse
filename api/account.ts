@@ -72,7 +72,7 @@ export async function POST(request: Request) {
   try { body = (await request.json()) as Body; } catch { return json({ error: "잘못된 요청이에요." }, 400); }
   const id = String(body.id ?? "").trim().toLowerCase(), password = String(body.password ?? "");
   const save = typeof body.save === "string" ? body.save : null;
-  if (save && save.length > MAX_SAVE) return json({ error: "저장 데이터가 너무 커요. 아바타 이미지를 작게 바꿔 보세요." }, 413);
+  if (save && save.length > MAX_SAVE) return json({ error: "저장 데이터가 너무 커요. 게임을 새로고침한 뒤 다시 저장해 보세요." }, 413);
 
   try {
     switch (body.action) {

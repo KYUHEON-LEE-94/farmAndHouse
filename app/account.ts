@@ -28,14 +28,35 @@ export function writeCloudBase(id: string, at: number) {
   try { localStorage.setItem(CLOUD_BASE_KEY, JSON.stringify({ id, at })); } catch { /* 저장 불가 */ }
 }
 
+/** 계정에 올리는 저장은 gzip + base64로 줄여 보낸다("gz1:" 접두). 서버 저장 한도(900KB)를 넘지 않게. */
+const GZ = "gz1:";
+async function pipeText(data: BufferSource, stream: CompressionStream | DecompressionStream) {
+  return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(stream)).arrayBuffer());
+}
+async function compressSave(save: string) {
+  if (typeof CompressionStream === "undefined") return save;
+  const bytes = await pipeText(new TextEncoder().encode(save), new CompressionStream("gzip"));
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return GZ + btoa(binary);
+}
+async function expandSave(save: string | null | undefined) {
+  if (!save || !save.startsWith(GZ)) return save;
+  const binary = atob(save.slice(GZ.length)), bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(await pipeText(bytes, new DecompressionStream("gzip")));
+}
+
 export async function accountCall(body: Record<string, unknown>): Promise<Reply> {
   let response: Response;
+  const payload = typeof body.save === "string" ? { ...body, save: await compressSave(body.save) } : body;
   try {
-    response = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    response = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   } catch {
     throw new AccountError("서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.", 0);
   }
   const data = (await response.json().catch(() => ({}))) as Reply;
+  if (data.save) data.save = await expandSave(data.save).catch(() => null);
   if (!response.ok) throw new AccountError(data.error ?? `서버 오류(${response.status})`, response.status, data);
   return data;
 }

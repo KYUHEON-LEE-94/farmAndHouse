@@ -218,6 +218,12 @@ function getYoutubeId(value: string) {
 type LegacyItem = { id: string; instanceId: string; x: number; y?: number; z?: number; rot?: number; tint?: string; wall?: number; u?: number; h?: number; story?: number; host?: string; side?: number; locked?: boolean; nickname?: string; sx?: number; sz?: number };
 
 /** 저장된 가구를 최신 카탈로그와 합친다. 버전 5 미만의 2D 좌표(%)는 3D 방 좌표(m)로 옮긴다. */
+/** 저장용으로 줄인 가구: 정의(이름·아이콘 등)는 빼고 id와 놓인 자리만. 불러올 때 hydrateItem이 채운다. */
+const slimItem = (item: PlacedItem) => ({ id: item.id, instanceId: item.instanceId, x: Math.round(item.x * 1000) / 1000, z: Math.round(item.z * 1000) / 1000, rot: item.rot, tint: item.tint, wall: item.wall, u: item.u, h: item.h, story: item.story, host: item.host, side: item.side, locked: item.locked, nickname: item.nickname, sx: item.sx, sz: item.sz });
+
+/** 키울 수 있는 펫 수(가챠로 넘치게 뽑으면 넘친 만큼 자동 되팔기). */
+const PET_LIMIT = 100;
+
 function hydrateItem(raw: LegacyItem, version: number, room: Room): PlacedItem | null {
   const base = FURNITURE.find(item => item.id === raw.id);
   if (!base) return null;
@@ -485,7 +491,7 @@ export default function Home() {
   // 저장은 0.4초 모아서 한 번 쓴다(드래그로 여러 칸을 심을 때 매번 전체 저장을 직렬화하지 않게). 숨김·종료·계정 저장 직전에는 바로 쓴다.
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
+    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed: placed.map(slimItem), warehouse: warehouse.map(slimItem), wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
     const timer = window.setTimeout(flushSave, 400);
     return () => window.clearTimeout(timer);
   }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
@@ -1799,12 +1805,29 @@ export default function Home() {
   }
   useEffect(() => { effectDrawLock.current = false; }, [effectResult]);
 
-  function drawPet() {
-    if (money < GACHA_PRICE) return setNotice(`펫 뽑기는 ${GACHA_PRICE.toLocaleString()}원이에요.`);
-    const pet = rollPet(), instanceId = `${pet.id}-${Date.now()}`;
-    setMoney(m => m - GACHA_PRICE);
-    setPlaced(items => [...items, fitToRoom({ ...pet, instanceId, x: 0, z: 0, rot: 0, ...defaultSpot(pet, items.length) }, room, yardLevel)]);
-    setGachaResult({ item: pet, at: Date.now() });
+  function drawPet(count = 1) {
+    if (money < GACHA_PRICE * count) return setNotice(`펫 뽑기 ${count}회는 ${(GACHA_PRICE * count).toLocaleString()}원이에요.`);
+    // 펫은 최대 PET_LIMIT마리. 넘치는 만큼은 뽑자마자 자동으로 되판다(저장 용량 보호).
+    const owned = [...placed, ...warehouse].filter(item => item.pet).length, room0 = Math.max(0, PET_LIMIT - owned);
+    if (room0 < count && !window.confirm(`펫은 최대 ${PET_LIMIT}마리까지 키울 수 있어요(지금 ${owned}마리).\n${room0 ? `이번에 뽑는 펫 중 ${count - room0}마리는` : "이번에 뽑는 펫은 모두"} 뽑자마자 자동으로 되팔려요(가치의 50%).\n계속 뽑을까요?`)) return;
+    const now = Date.now(), pets = Array.from({ length: count }, rollPet), kept = pets.slice(0, room0), sold = pets.slice(room0), refund = sold.reduce((total, pet) => total + Math.round(pet.price * 0.5), 0);
+    setMoney(m => m - GACHA_PRICE * count + refund);
+    setPlaced(items => [...items, ...kept.map((pet, i) => fitToRoom({ ...pet, instanceId: `${pet.id}-${now}-${i}`, x: 0, z: 0, rot: 0, ...defaultSpot(pet, items.length + i) }, room, yardLevel))]);
+    if (sold.length) {
+      const best = pets.find(pet => pet.legend) ?? pets.find(pet => pet.rare) ?? pets[0];
+      setGachaResult({ item: best, at: now });
+      return setNotice(`🎰 ${pets.map(pet => pet.icon).join("")} · 펫 ${PET_LIMIT}마리가 넘어 ${sold.length}마리(${sold.map(pet => pet.icon).join("")})는 자동으로 ${refund.toLocaleString()}원에 되팔았어요.`);
+    }
+    if (count > 1) {
+      // 10회 뽑기: 가장 좋은 펫을 결과 창에 보여 주고 나머지는 알림으로 요약한다.
+      const best = pets.find(pet => pet.legend) ?? pets.find(pet => pet.rare) ?? pets[0];
+      setGachaResult({ item: best, at: now });
+      const legend = pets.filter(pet => pet.legend).length, rare = pets.filter(pet => pet.rare).length;
+      playCoinSound(legend ? [523, 659, 784, 1047, 1319, 1568, 2093] : rare ? [660, 880, 1100, 1320, 1760] : [740, 990]);
+      return setNotice(`🎰 ${count}회 뽑기: ${pets.map(pet => pet.icon).join("")}${legend ? ` · 🌈 전설 ${legend}` : ""}${rare ? ` · ✨ 능력 ${rare}` : ""}`);
+    }
+    const pet = pets[0];
+    setGachaResult({ item: pet, at: now });
     playCoinSound(pet.legend ? [523, 659, 784, 1047, 1319, 1568, 2093] : pet.rare ? [660, 880, 1100, 1320, 1760] : [740, 990]);
     if (pet.legend) return setNotice(`🌈🌈 전설!!! 0.1%의 기적, ${pet.icon} ${josa(pet.name, "이가")} 나타났어요!! ${PET_BUFFS[pet.id].title}: ${PET_BUFFS[pet.id].text}`);
     setNotice(pet.rare ? `✨ 대박! 능력 펫 ${pet.icon} ${josa(pet.name, "이가")} 나왔어요! ${PET_BUFFS[pet.id].title}: ${PET_BUFFS[pet.id].text}` : `${pet.icon} ${josa(pet.name, "이가")} 나왔어요. 집 안을 귀엽게 돌아다녀요.`);
@@ -1834,6 +1857,24 @@ export default function Home() {
     if (selectedFurniture === item.instanceId) setSelectedFurniture(null);
     setMoney(value => value + refund);
     setNotice(`${item.icon} ${josa(item.name, "을를")} 새 가족에게 보내고 ${refund.toLocaleString()}원을 받았어요.`);
+  }
+  /** 펫 한꺼번에 되팔기(잠금 제외). "common"은 일반 펫 전부, "dupes"는 종류마다 1마리(레벨 높은 순으로 남김)만 남긴다. */
+  function sellPetsBulk(mode: "common" | "dupes") {
+    const all = [...placed, ...warehouse].filter(item => item.pet && !item.locked), keep = new Set<string>();
+    if (mode === "dupes") {
+      const owned = [...placed, ...warehouse].filter(item => item.pet);
+      for (const id of new Set(owned.map(item => item.id))) { const locked = owned.find(item => item.id === id && item.locked); keep.add((locked ?? owned.find(item => item.id === id && placed.includes(item)) ?? owned.find(item => item.id === id))!.instanceId); }
+    }
+    const sell = all.filter(item => !keep.has(item.instanceId) && (mode === "dupes" || (!item.rare && !item.legend)));
+    if (!sell.length) return setNotice(mode === "dupes" ? "되팔 중복 펫이 없어요." : "되팔 일반 펫이 없어요(잠긴 펫 제외).");
+    const refund = sell.reduce((total, item) => total + Math.round(item.price * 0.5), 0);
+    if (!window.confirm(`${mode === "dupes" ? "중복 펫" : "일반 펫"} ${sell.length.toLocaleString()}마리를 ${refund.toLocaleString()}원에 되팔까요? 잠긴 펫은 팔지 않아요.`)) return;
+    const gone = new Set(sell.map(item => item.instanceId));
+    setPlaced(items => items.filter(entry => !gone.has(entry.instanceId)));
+    setWarehouse(items => items.filter(entry => !gone.has(entry.instanceId)));
+    if (selectedFurniture && gone.has(selectedFurniture)) setSelectedFurniture(null);
+    setMoney(value => value + refund);
+    setNotice(`🐾 펫 ${sell.length.toLocaleString()}마리를 새 가족에게 보내고 ${refund.toLocaleString()}원을 받았어요.`);
   }
 
   function buyFurniture(item: Furniture) {
@@ -2012,9 +2053,9 @@ export default function Home() {
     return { take, mats, gold };
   };
   /** 강화 가공(51.4): n개를 만들 때 실제로 쓸 재료. 모자라면 null. */
-  const takeTag = (tag: string, count: number): Plan | null => { const sources = forgeSources().filter(x => x.tag === tag); let left = count; const take: Plan["take"] = []; for (const src of sources) { const k = Math.min(left, src.n); if (k) { take.push({ src, n: k }); left -= k; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; };
+  const takeTag = (tag: string, count: number): Plan | null => { const tags = tag.split("|"), sources = forgeSources().filter(x => tags.includes(x.tag)).sort((a, b) => a.value - b.value); let left = count; const take: Plan["take"] = []; for (const src of sources) { const k = Math.min(left, src.n); if (k) { take.push({ src, n: k }); left -= k; } if (!left) break; } return left ? null : { take, mats: {}, gold: 0 }; };
   const LIFE_NEED: Record<string, (n: number) => Plan | null> = {
-    "farm-fiber": n => takeTag("crop0", 5 * n),
+    "farm-fiber": n => takeTag("crop0|goodcrop", 5 * n),
     "fish-oil": n => takeTag("fish", 3 * n),
     "tanned-leather": n => takeTag("hunt", 3 * n),
     "artisan-core": n => planFor({ "farm-fiber": n, "fish-oil": n, "tanned-leather": n, goods: n }),
@@ -2037,10 +2078,10 @@ export default function Home() {
   const craftStock: Record<string, [number, number]> = (() => {
     const src = forgeSources(), sum = (tag: string) => src.filter(x => x.tag === tag).reduce((total, x) => total + x.n, 0);
     let crop0 = 0, fish = 0;
-    for (const [key, n] of Object.entries(produce)) { const q = parseProduceKey(key); if (q.quality === 0 && !q.golden) crop0 += n; }
+    for (const [key, n] of Object.entries(produce)) { const q = parseProduceKey(key); if (!q.golden) crop0 += n; }
     for (const [id, n] of Object.entries(fishStock)) { const f = ALL_FISH.find(x => x.id === id); if (f && f.rarity !== "전설" && f.rarity !== "신화") fish += n; }
     const hunt = HUNT_COMMON_LOOT.reduce((total, id) => total + (huntStock[id] ?? 0), 0);
-    return { "farm-fiber": [sum("crop0"), crop0], "fish-oil": [sum("fish"), fish], "tanned-leather": [sum("hunt"), hunt], "artisan-core": [sum("goods"), Object.values(goods).reduce((t, n) => t + n, 0)] };
+    return { "farm-fiber": [sum("crop0") + sum("goodcrop"), crop0], "fish-oil": [sum("fish"), fish], "tanned-leather": [sum("hunt"), hunt], "artisan-core": [sum("goods"), Object.values(goods).reduce((t, n) => t + n, 0)] };
   })();
   { const src = forgeSources(); forgeHave["rare-hunt"] = src.filter(x => x.tag === "rarehunt").reduce((sum, x) => sum + x.n, 0); forgeHave.goods = src.filter(x => x.tag === "goods").reduce((sum, x) => sum + x.n, 0); forgeHave["good-crop"] = src.filter(x => x.tag === "goodcrop").reduce((sum, x) => sum + x.n, 0); }
   const forge: ForgeActions = {
@@ -2369,7 +2410,7 @@ export default function Home() {
           <div key={gachaResult?.at ?? 0} className={`gacha-machine ${gachaResult ? (gachaResult.item.legend ? "legend" : gachaResult.item.rare ? "rare" : "common") : ""}`}>
             {gachaResult ? <><span className="furniture-thumb" style={{ "--c": gachaResult.item.color } as CSSProperties}><FurnitureArt id={gachaResult.item.id} /></span><strong>{gachaResult.item.name}</strong><em>{gachaResult.item.legend ? "🌈 전설 펫!!!" : gachaResult.item.rare ? "✨ 능력 펫!" : "일반 펫"}</em>{(gachaResult.item.rare || gachaResult.item.legend) && <small>{PET_BUFFS[gachaResult.item.id].title} · {PET_BUFFS[gachaResult.item.id].text}</small>}</> : <><b>🐾</b><small>어떤 친구가 나올까요?</small></>}
           </div>
-          <button className="gacha-button" onClick={drawPet} disabled={money < GACHA_PRICE}>🎰 펫 뽑기 · {GACHA_PRICE.toLocaleString()}원</button>
+          <div className="gacha-buttons"><button className="gacha-button" onClick={() => drawPet(1)} disabled={money < GACHA_PRICE}>🎰 펫 뽑기 · {GACHA_PRICE.toLocaleString()}원</button><button className="gacha-button" onClick={() => drawPet(10)} disabled={money < GACHA_PRICE * 10}>🎰 10회 뽑기 · {(GACHA_PRICE * 10).toLocaleString()}원</button></div>
           <p className="hint">전설 {GACHA_LEGEND_CHANCE * 100}% · 능력 {Math.round(GACHA_RARE_CHANCE * 100)}% · 일반 {(100 - GACHA_LEGEND_CHANCE * 100 - GACHA_RARE_CHANCE * 100).toFixed(1)}% · 중복 가능 · 되팔기는 가치의 50%</p>
           <details className="gacha-odds"><summary>뽑을 수 있는 펫 보기</summary>
             <b>🌈 전설 펫 (각 {(GACHA_LEGEND_CHANCE * 100 / FURNITURE.filter(item => item.legend).length).toFixed(2)}%)</b>
@@ -2379,8 +2420,12 @@ export default function Home() {
             <b>일반 펫 (각 {((1 - GACHA_RARE_CHANCE - GACHA_LEGEND_CHANCE) * 100 / FURNITURE.filter(item => item.pet && !item.rare && !item.legend).length).toFixed(2)}%)</b>
             <ul className="common">{FURNITURE.filter(item => item.pet && !item.rare && !item.legend).map(item => <li key={item.id}>{item.icon} {item.name}</li>)}</ul>
           </details>
-          <b className="my-pets-title">우리 집 펫 <em>{[...placed, ...warehouse].filter(item => item.pet).length}</em></b>
-          <div className="my-pets">{[...placed, ...warehouse].filter(item => item.pet).map(item => <div key={item.instanceId} className={item.legend ? "legend" : item.rare ? "rare" : ""}><span>{item.icon}</span><b>{item.name}</b><small>{warehouse.includes(item) ? "창고 (효과 없음)" : item.rare || item.legend ? PET_BUFFS[item.id].title : "일반"}</small><button onClick={() => sellPet(item)}>{Math.round(item.price / 2).toLocaleString()}원에 되팔기</button></div>)}</div>
+          <b className="my-pets-title">우리 집 펫 <em>{[...placed, ...warehouse].filter(item => item.pet).length} / {PET_LIMIT}</em></b>
+          <div className="pet-bulk"><button className="ghost-button small" onClick={() => sellPetsBulk("dupes")}>중복 펫 모두 되팔기</button><button className="ghost-button small" onClick={() => sellPetsBulk("common")}>일반 펫 모두 되팔기</button><small>잠긴 펫은 팔지 않아요</small></div>
+          {/* 같은 종류는 한 줄로 묶는다(수천 마리여도 가볍게). 되팔기는 창고·잠금 안 된 것부터 1마리. */}
+          <div className="my-pets">{(() => { const pets = [...placed, ...warehouse].filter(item => item.pet), groups = new Map<string, PlacedItem[]>(); for (const pet of pets) groups.set(pet.id, [...(groups.get(pet.id) ?? []), pet]);
+            return [...groups.values()].sort((a, b) => Number(Boolean(b[0].legend)) - Number(Boolean(a[0].legend)) || Number(Boolean(b[0].rare)) - Number(Boolean(a[0].rare))).map(list => { const item = list[0], next = list.find(pet => !pet.locked && warehouse.includes(pet)) ?? list.find(pet => !pet.locked), stored = list.filter(pet => warehouse.includes(pet)).length;
+              return <div key={item.id} className={item.legend ? "legend" : item.rare ? "rare" : ""}><span>{item.icon}</span><b>{item.name}{list.length > 1 && <em> ×{list.length}</em>}</b><small>{stored === list.length ? "창고 (효과 없음)" : item.rare || item.legend ? PET_BUFFS[item.id].title : "일반"}{stored && stored < list.length ? ` · 창고 ${stored}` : ""}</small><button disabled={!next} onClick={() => next && sellPet(next)}>{Math.round(item.price / 2).toLocaleString()}원에 1마리 되팔기</button></div>; }); })()}</div>
         </section>
         <section className="panel gacha">
           <div className="panel-heading"><div><span className="eyebrow">FURNITURE GACHA</span><h3>가구 뽑기</h3></div><span className="plot-count">가챠 전용</span></div>
