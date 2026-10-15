@@ -30,7 +30,7 @@ import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, work
 import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, OVERFLOW_RATE, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_BASE, petBugPenalty, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session, readCloudBase, writeCloudBase } from "./account";
-import { AVATAR_STORAGE_KEY, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
+import { AVATAR_STORAGE_KEY, BLACKCAT_AVATAR, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
 import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import { EffectBurst, EffectGacha, EquipmentPanel } from "./EquipmentPanel";
@@ -1720,7 +1720,7 @@ export default function Home() {
   function resetAvatar() {
     setAvatar({ src: DEFAULT_AVATAR, pixelated: false });
     try { localStorage.removeItem(AVATAR_STORAGE_KEY); } catch { /* ignore */ }
-    setNotice("🐈‍⬛ 기본 검은 고양이로 돌아왔어요.");
+    setNotice("🐈‍⬛ 기본 농부 고양이로 돌아왔어요.");
   }
 
   // ---------- 집 ----------
@@ -2864,7 +2864,7 @@ export default function Home() {
         <p>상단 프로필, 낚시터, 3D 집에 나오는 내 캐릭터예요. 아래에서 고르거나, 좋아하는 캐릭터 이미지를 <b>PNG(배경 투명)</b>로 올려 주세요(최대 5MB, 256px로 줄여 저장).</p>
         <div className="avatar-preview">{avatarImg}</div>
         <div className="avatar-presets" role="group" aria-label="기본 캐릭터">
-          <button className={avatar.src === DEFAULT_AVATAR ? "on" : ""} onClick={resetAvatar} aria-label="검은 고양이(기본)"><img src={DEFAULT_AVATAR} alt="" /></button><button className={avatar.src === PIXEL_CAT_AVATAR ? "on" : ""} onClick={() => { const next = { src: PIXEL_CAT_AVATAR, pixelated: true }; setAvatar(next); try { localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(next)); } catch { /* 이번 접속에서만 */ } setNotice("🐱 픽셀 고양이로 바꿨어요."); }} aria-label="픽셀 고양이"><img src={PIXEL_CAT_AVATAR} alt="" className="pixelated" /></button>
+          <button className={avatar.src === DEFAULT_AVATAR ? "on" : ""} onClick={resetAvatar} aria-label="농부 고양이(기본)"><img src={DEFAULT_AVATAR} alt="" /></button><button className={avatar.src === BLACKCAT_AVATAR ? "on" : ""} onClick={() => { const next = { src: BLACKCAT_AVATAR, pixelated: false }; setAvatar(next); try { localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(next)); } catch { /* 이번 접속에서만 */ } setNotice("🐈‍⬛ 검은 고양이로 바꿨어요."); }} aria-label="검은 고양이"><img src={BLACKCAT_AVATAR} alt="" /></button><button className={avatar.src === PIXEL_CAT_AVATAR ? "on" : ""} onClick={() => { const next = { src: PIXEL_CAT_AVATAR, pixelated: true }; setAvatar(next); try { localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(next)); } catch { /* 이번 접속에서만 */ } setNotice("🐱 픽셀 고양이로 바꿨어요."); }} aria-label="픽셀 고양이"><img src={PIXEL_CAT_AVATAR} alt="" className="pixelated" /></button>
           {PRESET_AVATARS.map(preset => <button key={preset.id} className={avatar.preset === preset.id ? "on" : ""} onClick={() => pickPresetAvatar(preset)} aria-label={preset.name} title={preset.name}>{preset.emoji}</button>)}
         </div>
         <input ref={avatarInput} type="file" accept="image/png,.png" hidden onChange={event => uploadAvatar(event.target.files?.[0])} />

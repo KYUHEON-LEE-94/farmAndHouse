@@ -1,4 +1,7 @@
-export const DEFAULT_AVATAR = "avatar-blackcat.svg";
+/** 기본 아바타: 밀짚모자 농부 고양이(원본 public/avatar-farmer-cat-v2.png를 384px로 줄인 것). */
+export const DEFAULT_AVATAR = "avatar-farmer-cat.png";
+/** 예전 기본 아바타(검은 고양이). 아바타 고르기에서 계속 선택할 수 있다. */
+export const BLACKCAT_AVATAR = "avatar-blackcat.svg";
 /** 예전 기본 아바타(픽셀 고양이). 아바타 고르기에서 계속 선택할 수 있다. */
 export const PIXEL_CAT_AVATAR = "avatar-cat.png";
 export const AVATAR_STORAGE_KEY = "wolru-farm-avatar";
