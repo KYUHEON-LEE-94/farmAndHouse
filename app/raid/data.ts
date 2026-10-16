@@ -442,6 +442,10 @@ export type RaidSave = {
   battlePets?: Record<string, { level: number }>; petPity?: number;
   armorOwned: string[];
   stabilizers: number; towerSeals: number; contractShards: number;
+  /** 특수공격 숙련 별(진화 id → 0~5, 11.6절) */
+  mastery?: Record<string, number>;
+  /** 층별 기록(최고 실패·마지막 실패·첫 클리어, 3.4절 성장 돌파) */
+  progress?: Record<number, import("./progress").FloorProgress>;
   /** 보스 재료 연속 미획득 횟수(재료 id → 횟수, BOSS_DROP_PITY) */
   bossMiss?: Record<string, number>;
   /** 최근 30판 기록(밸런스 확인용, RAID_FLOOR_20_EXPANSION_AUDIT 13절) */
@@ -454,8 +458,21 @@ export type RaidRunLog = {
 export const EMPTY_RAID: RaidSave = { balanceVersion: RAID_BALANCE_VERSION, highestFloor: 0, unlockedFloor: 1, firstClears: [], weapons: { "raid-scythe": { enhancement: 0, evolution: null, unlockedEnhancements: [] } }, equipped: { weapon: "raid-scythe", head: null, body: null, legs: null, battlePet: null }, battlePets: {}, petPity: 0, armorOwned: [], stabilizers: 0, towerSeals: 0, contractShards: 0 };
 
 /** 착용한 방어구 능력 합계. */
+/**
+ * 특수공격 숙련(RAID_FLOOR_30_EXPANSION_AUDIT 11.6): 진화 무기마다 ★1~★5, 확정 성공. 골드 + 탑의 인장.
+ * 효과는 누적값(★n의 피해·재사용). ★3부터 잔향 폭발(특수 공격 0.6초 뒤 조준 지점 반지름 90에 기본 피해 120%).
+ * 개방: ★1~2 언제나, ★3~4 30층 클리어, ★5 51층(어려움 구간) 공개 때.
+ */
+export const SPECIAL_MASTERY = [
+  { star: 1, gold: 300000, seals: 6, dmg: 0.04, cd: 0, unlock: 0 },
+  { star: 2, gold: 600000, seals: 10, dmg: 0.08, cd: 0.01, unlock: 0 },
+  { star: 3, gold: 900000, seals: 15, dmg: 0.12, cd: 0.02, unlock: 30 },
+  { star: 4, gold: 1200000, seals: 22, dmg: 0.16, cd: 0.03, unlock: 30 },
+  { star: 5, gold: 1800000, seals: 30, dmg: 0.2, cd: 0.04, unlock: 51 },
+];
 export function gearOf(raid: RaidSave) {
-  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0, freezeResist: 0, hazardCut: 0, bossDamage: 0 };
+  const evo = raid.weapons[raid.equipped.weapon]?.evolution, star = evo ? raid.mastery?.[evo] ?? 0 : 0, mst = SPECIAL_MASTERY[star - 1];
+  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0, freezeResist: 0, hazardCut: 0, bossDamage: 0, specialDmg: mst?.dmg ?? 0, specialCd: mst?.cd ?? 0, specialEcho: star >= 3 ? 1 : 0 };
   for (const slot of ["head", "body", "legs"] as ArmorSlot[]) {
     const a = ARMORS.find(item => item.id === raid.equipped[slot]);
     if (a) for (const [k, v] of Object.entries(a.stats)) g[k as keyof typeof g] += v ?? 0;

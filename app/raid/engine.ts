@@ -18,7 +18,7 @@ export type Input = { up: boolean; down: boolean; left: boolean; right: boolean;
   /** 모바일 가상 스틱(−1~1, 길이 1 이하). 있으면 방향키 대신 쓴다. */
   moveX?: number; moveY?: number };
 /** 방어구 합계 능력(26절). */
-export type Gear = { hp: number; defense: number; crit: number; absorb: number; xpGain?: number; speed: number; dashCd: number; startShield: number; freezeResist?: number; hazardCut?: number; bossDamage?: number };
+export type Gear = { hp: number; defense: number; crit: number; absorb: number; xpGain?: number; speed: number; dashCd: number; startShield: number; freezeResist?: number; hazardCut?: number; bossDamage?: number; /** 특수공격 숙련: 피해·재사용 감소·잔향(★3) */ specialDmg?: number; specialCd?: number; specialEcho?: number };
 export const NO_GEAR: Gear = { hp: 0, defense: 0, crit: 0, absorb: 0, speed: 0, dashCd: 0, startShield: 0 };
 export type FoodSlot = { dishId: string; grade: number; key: string; effect: FoodEffect; icon: string; name: string } | null;
 
@@ -113,7 +113,7 @@ export type RaidState = {
   /** 판 기록: 보스 등장 순간 체력 비율, 회피 횟수, 입력 방식 */
   waveEndHp: number | null; dodges: number; input: "pc" | "mobile";
   /** 53절 카드 진행 상태 */
-  ext: { dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
+  ext: { /** 같은 층 직전 최고 실패 기록(3.4.3 비교 표식) */ prevBest?: { waveTime: number; bossHpRatio: number }; prevBeat?: boolean; dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
     specialHitAt: number; castId: number; firstHitCast: number; perfectUntil: number; dashBoostUntil: number; cut: number[]; wasDashing: boolean };
   kills: number; damageTaken: Record<string, number>; uid: number; prevDash: boolean; prevFood: [boolean, boolean, boolean]; bossHpAtEnd: number;
 };
@@ -585,10 +585,12 @@ function castSpecial(s: RaidState) {
   if (ready && pick(s, "special-shield")) { const p = s.player; p.shield += 15; p.shieldUntil = Math.max(p.shieldUntil, s.t + 4); }
 }
 function castSpecialInner(s: RaidState) {
-  const p = s.player, sp = s.special, evo = s.evolution, w = s.weapon, D = w.damage;
+  const p = s.player, sp = s.special, evo = s.evolution, w = s.weapon, D = w.damage * (1 + (s.gear.specialDmg ?? 0));
   if (!evo || !SPECIALS[evo]) return;
   if (s.t < sp.readyAt) { sp.bump = s.t; return; }
-  sp.readyAt = s.t + SPECIALS[evo].cooldown * Math.max(0.65, 1 - 0.02 * pick(s, "endless-haste") - 0.15 * pick(s, "special-haste")); sp.hits = {}; p.swingCd = Math.max(p.swingCd, 0.18);
+  sp.readyAt = s.t + SPECIALS[evo].cooldown * Math.max(0.65, 1 - 0.02 * pick(s, "endless-haste") - 0.15 * pick(s, "special-haste") - (s.gear.specialCd ?? 0));
+  // 숙련 ★3 잔향: 0.6초 뒤 조준 지점에 작은 폭발
+  if (s.gear.specialEcho) { const ex = clamp(p.tx, 20, WORLD_W - 20), ey = clamp(p.ty, 20, WORLD_H - 20), ed = D * 1.2; later(s, 0.6, () => { s.pops.push({ x: ex, y: ey - 30, text: "✨ 잔향", t: 0.5, kind: "info" }); blastSpecial(s, ex, ey, 90, ed, 20); }); } sp.hits = {}; p.swingCd = Math.max(p.swingCd, 0.18);
   const aim = p.aim, tx = clamp(p.tx, 20, WORLD_W - 20), ty = clamp(p.ty, 20, WORLD_H - 20), boss = (m: Monster) => (m.boss ? 0.15 : 0);
   sp.castAt = s.t; sp.castX = tx; sp.castY = ty; sp.castAim = aim;
   s.pops.push({ x: p.x, y: p.y - 46, text: `${SPECIALS[evo].icon} ${SPECIALS[evo].name}`, t: 0.9, kind: "info" });

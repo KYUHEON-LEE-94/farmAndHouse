@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY } from "./data";
+import { zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY, MONSTERS, SPECIAL_MASTERY } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance, pityChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -11,6 +11,7 @@ import { RAID_WEAPONS, SPECIALS, WEAPON_CRAFT, dps, weaponDef, type WeaponStats 
 import { WeaponIcon } from "./weaponArt";
 import { hasArmorPrerequisite } from "./armorRequirements";
 import { shareRaidCard, type ShareCardData } from "./shareCard";
+import { diagnose, gearChanges, recordOf } from "./progress";
 import { ArmorIcon } from "./armorArt";
 
 let runSeq = 0;
@@ -32,6 +33,8 @@ export type ForgeActions = {
   /** 강화 가공 재료 현황: [쓸 수 있는 수, 가진 수(잠금·주문 예약 포함)] */
   craftStock: Record<string, [number, number]>;
   enhance: (useStabilizer: boolean) => void;
+  /** 특수공격 숙련 별 올리기(지금 진화 무기) */
+  masteryUp: () => void;
   openStep: () => void;
   evolve: (evolution: Evolution) => void;
   craftArmor: (id: string) => void;
@@ -113,7 +116,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
     <p className="raid-keys">🎯 <b>{EVOLUTIONS[running.training].name}</b> {TRAINING_SECONDS}초 체험 · 쓰러지지 않고 보상도 없어요 · <kbd>P</kbd> 일시정지에서 그만둘 수 있어요</p>
   </div>;
   if (running) return <div className="raid-run">
-    <RaidGame key={running.id} floor={floor} weapon={stats} evolution={evo} foods={running.foods} gear={gear} pet={petFor(raid)} avatar={avatar} hold={hold} speed={TEST_MODE ? testSpeed : 1} onFinish={finish} onQuit={finish} />
+    <RaidGame key={running.id} floor={floor} weapon={stats} evolution={evo} foods={running.foods} gear={gear} pet={petFor(raid)} avatar={avatar} hold={hold} prev={raid.progress?.[floor.floor]?.best && !raid.progress?.[floor.floor]?.clear ? { waveTime: raid.progress[floor.floor].best!.waveTime, bossHpRatio: raid.progress[floor.floor].best!.bossHpRatio } : null} speed={TEST_MODE ? testSpeed : 1} onFinish={finish} onQuit={finish} />
     <p className="raid-keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 🖱 조준 · 공격은 자동 · <kbd>Space</kbd> 회피 · 🖱 우클릭 특수 공격(진화 무기) · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 음식 · <kbd>P</kbd> 일시정지 · <kbd>Esc</kbd> 보스키</p>
   </div>;
 
@@ -136,10 +139,29 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
         {outcome && <div className={`raid-result ${outcome.result.cleared ? "clear" : "fail"}`}>
           <b>{outcome.result.cleared ? `🎉 ${outcome.result.floor}층 돌파!` : outcome.result.abandoned ? `🏳 ${outcome.result.floor}층 도전 포기` : `💥 ${outcome.result.floor}층 실패`}</b>
           <span>처치 {outcome.result.kills} · 각성 Lv.{outcome.result.level}{!outcome.result.cleared && outcome.result.bossHpLeft < 1 ? ` · 보스 체력 ${Math.round(outcome.result.bossHpLeft * 100)}% 남음` : ""}</span>
-          {!outcome.result.cleared && !outcome.result.abandoned && outcome.result.reason.length > 0 && <span className="raid-why">💡 {outcome.result.reason.join(" · ")}</span>}
-          {outcome.lines.length > 0 && <ul>{outcome.lines.map(line => <li key={line}>{line}</li>)}</ul>}
+          {(() => {
+            // 패배 진단(3.4.1): 실제 기록에서 최대 두 가지 + 즉시 재도전·강화 바로가기
+            if (outcome.result.cleared || outcome.result.abandoned) return null;
+            const f = FLOORS[outcome.result.floor - 1], names = f ? [...f.monsters.map(id => MONSTERS[id]?.name), f.elite ? MONSTERS[f.elite.id]?.name : "", f.boss.name].filter(Boolean) as string[] : [];
+            const target = outcome.result.floor <= 20 ? 30 : outcome.result.floor === 30 ? 70 : outcome.result.floor % 5 === 0 ? 50 : 40;
+            const dx = diagnose(outcome.result, scythe.enhancement, target, names);
+            return <div className="raid-diagnosis">
+              {dx.lines.length ? dx.lines.map(d => <p key={d.title}><b>💡 {d.title}</b><span>{d.hint}</span></p>) : outcome.result.reason.length > 0 && <span className="raid-why">💡 {outcome.result.reason.join(" · ")}</span>}
+              <div className="raid-diagnosis-actions"><button className={dx.retryFirst ? "go" : ""} onClick={start}>⚔️ {outcome.result.floor}층 바로 재도전</button><button onClick={() => setView("forge")}>⚒️ 강화·방어구</button></div>
+            </div>;
+          })()}
+          {outcome.lines.length > 0 && <ul className={outcome.lines.some(l => l.startsWith("🚀")) ? "raid-breakthrough" : ""}>{outcome.lines.map(line => <li key={line}>{line}</li>)}</ul>}
           {!outcome.result.abandoned && outcome.result.floor > 0 && <button className="raid-share" onClick={() => shareCard(outcome.result)}>📤 결과 카드 공유</button>}
         </div>}
+        {(() => {
+          // 성장 재도전 안내(3.4.2): 이 층에서 실패한 뒤 장비가 달라졌으면 크게 보여 준다
+          const pg = raid.progress?.[floor.floor], last = pg?.lastFail;
+          if (!last || pg?.clear) return null;
+          const w = raid.weapons[raid.equipped.weapon], now = recordOf({ floor: floor.floor, cleared: false, kills: 0, usedFoods: [], bossHpLeft: 1, hpLeft: 0, level: 0, reason: [] }, { weaponId: raid.equipped.weapon, evo: w?.evolution ?? null, enh: w?.enhancement ?? 0, armor: [raid.equipped.head, raid.equipped.body, raid.equipped.legs] });
+          const ch = gearChanges(last, now, id => ARMORS.find(a => a.id === id)?.name ?? id, id => weaponDef(id).name);
+          if (!ch.length) return null;
+          return <div className="raid-grown"><b>💪 성장했어요! {floor.floor}층 재도전</b><span>{ch.join(" · ")} · 지난 기록: {pg?.best && pg.best.bossHpRatio < 1 ? `보스 HP ${Math.round(pg.best.bossHpRatio * 100)}% 남음` : `웨이브 ${pg?.best?.waveTime ?? last.waveTime}초`}</span><button className="go" onClick={start}>⚔️ 성장 재도전</button></div>;
+        })()}
         {!outcome && raid.highestFloor > 0 && <button className="raid-share ghost" onClick={() => shareCard()}>📤 내 탑 기록 공유 (최고 {raid.highestFloor}층)</button>}
         {shareMsg && <small className="raid-share-msg" role="status">{shareMsg}</small>}
 
@@ -307,6 +329,22 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
           <button className="raid-hammer" disabled={!affordable} onClick={() => (needsOpen ? forge.openStep() : forge.enhance(useStab))}>{needsOpen ? `🔓 +${step.to} 단계 개방` : `🔨 +${step.to} 강화하기`}</button>
           {w.enhancement >= 10 && <small className="raid-floor-note">+10에 한 번 도달한 무기는 이후 강화에 실패해도 +10 아래로 내려가지 않습니다.</small>}
         </>}
+      {w.evolution && (() => {
+        // 특수공격 숙련 ★(11.6절): 확정 성공, 골드 + 탑의 인장
+        const star = raid.mastery?.[w.evolution] ?? 0, next = SPECIAL_MASTERY[star], cur = SPECIAL_MASTERY[star - 1], sp = SPECIALS[w.evolution];
+        const locked = next && next.unlock > 0 && !(next.unlock <= 30 ? raid.firstClears.includes(next.unlock) : raid.highestFloor >= next.unlock);
+        const ok = next && !locked && forge.money >= next.gold && raid.towerSeals >= next.seals;
+        return <div className="raid-mastery"><b>⭐ 특수공격 숙련 <small>{sp?.icon} {sp?.name}</small></b>
+          <span className="raid-stars">{[1, 2, 3, 4, 5].map(i => <i key={i} className={i <= star ? "on" : ""}>★</i>)}</span>
+          <small>{cur ? `지금: 특수 피해 +${Math.round(cur.dmg * 100)}% · 재사용 −${Math.round(cur.cd * 100)}%${star >= 3 ? " · 잔향 폭발" : ""}` : "아직 숙련이 없어요"}</small>
+          {next ? <>
+            <small>다음 ★{next.star}: 특수 피해 +{Math.round(next.dmg * 100)}% · 재사용 −{Math.round(next.cd * 100)}%{next.star === 3 ? " · ✨ 잔향 폭발 해금" : ""}</small>
+            <div className="raid-cost big"><em className={forge.money >= next.gold ? "ok" : "lack"}>💰 {next.gold.toLocaleString()}원</em><em className={raid.towerSeals >= next.seals ? "ok" : "lack"}>🔖 탑의 인장 {raid.towerSeals}/{next.seals}</em></div>
+            {locked ? <small className="raid-mastery-lock">🔒 {next.unlock === 51 ? "어려움 구간(51층) 공개 때 열려요" : `${next.unlock}층을 클리어하면 열려요`}</small> : <button className="raid-hammer small" disabled={!ok} onClick={forge.masteryUp}>⭐ ★{next.star} 숙련 올리기(확정)</button>}
+          </> : <small>최고 숙련이에요!</small>}
+          <small className="raid-mastery-note">숙련은 후반용 성장이에요. 막힌 층은 무기 강화·방어구가 먼저예요.</small>
+        </div>;
+      })()}
       {w.evolution && <div className="raid-evo-change"><b>🔁 진화 바꾸기</b><small>강화 단계와 개방한 단계는 그대로예요 · 횟수 제한 없음</small>
         {(() => { const other = wDef.evos.map(e => e.id).find(id => id !== w.evolution)!, need: Record<string, number> = { ...EVOLUTION_CHANGE.need, ...(w.enhancement >= 13 ? EVOLUTION_CHANGE.upper : {}) }, ok = forge.money >= EVOLUTION_CHANGE.gold && canPay(need, forge.have);
           return <><div className="raid-cost big"><em className={forge.money >= EVOLUTION_CHANGE.gold ? "ok" : "lack"}>💰 {EVOLUTION_CHANGE.gold.toLocaleString()}원</em>{Object.entries(need).map(([id, n]) => <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</div>

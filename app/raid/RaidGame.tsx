@@ -97,7 +97,8 @@ type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; pixelated: 
  * 탑 토벌 전투 화면. canvas + requestAnimationFrame 고정 스텝 루프로 그리고,
  * React 상태는 각성 선택·일시정지·결과처럼 바뀔 때만 갱신한다. 캐릭터는 유저가 고른 아바타로 그린다.
  */
-export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = null, avatar, hold, speed = 1, autoPause = true, onFinish, onQuit }: {
+export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = null, avatar, hold, speed = 1, autoPause = true, prev = null, onFinish, onQuit }: {
+  /** 같은 층 직전 최고 실패 기록(재도전 비교) */ prev?: { waveTime: number; bossHpRatio: number } | null;
   floor: FloorDef; weapon: WeaponStats; evolution: Evolution | null; foods: FoodSlot[]; gear?: Gear; pet?: { id: string; mult: number; icon: string } | null; avatar: Avatar;
   /** 보스키·다른 탭 등 바깥에서 멈춰야 할 때 true. */
   hold: boolean; speed?: number; autoPause?: boolean;
@@ -120,6 +121,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   // 전투 시작(한 번)
   useEffect(() => {
     stateRef.current = createRaid(floor, weapon, evolution, foods, gear, pet ? { id: pet.id, mult: pet.mult } : null);
+    if (prev) stateRef.current.ext.prevBest = prev;
     const petIcon = pet?.icon ?? "";
     doneRef.current = false;
     const canvas = canvasRef.current!, ctx = canvas.getContext("2d")!;
@@ -585,8 +587,12 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.textAlign = "center"; ctx.font = `800 14px ${UI_FONT}`; ctx.fillStyle = "#ffe19a"; ctx.fillText(`${s.boss.icon} ${s.boss.name}`, W / 2, 24);
     ctx.font = "800 11px sans-serif"; ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.fillText(`보스전 ${fmt(s.t - BOSS_AT)}`, bx + bw, 24); ctx.textAlign = "left"; ctx.fillText(`💀 ${s.kills}`, bx, 24);
     bar(ctx, bx, 34, bw, 14, s.boss.hp / s.boss.maxHp, "#d8432f");
+    // 재도전 비교(3.4.3): 직전 최고 실패에서 보스 체력이 남은 지점 표식, 넘어서면 한 번만 알림
+    const pb = s.ext.prevBest;
+    if (pb && pb.bossHpRatio < 1) { const x = bx + bw * pb.bossHpRatio; ctx.fillStyle = "#fff"; ctx.fillRect(x - 1, 31, 2, 20); ctx.font = "700 9px sans-serif"; ctx.textAlign = "center"; ctx.fillText("지난 기록", x, 62); if (!s.ext.prevBeat && s.boss.hp / s.boss.maxHp < pb.bossHpRatio) { s.ext.prevBeat = true; s.pops.push({ x: s.player.x, y: s.player.y - 70, text: "🔥 이전 기록 돌파!", t: 1.6, kind: "info" }); } }
     ctx.textAlign = "center"; ctx.font = "800 10px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`${Math.ceil(s.boss.hp).toLocaleString()} / ${s.boss.maxHp.toLocaleString()}`, W / 2, 41);
-    if (tele) { ctx.globalAlpha = 0.6 + 0.4 * Math.sin(clock * 14); ctx.font = `800 13px ${UI_FONT}`; ctx.fillStyle = "#ff7a5a"; ctx.fillText("⚠ 패턴 예고! 피하세요", W / 2, 60); ctx.globalAlpha = 1; }
+    const hazardTele = s.hazards.some(h => h.age < h.tele);
+    if (tele || hazardTele) { ctx.globalAlpha = 0.6 + 0.4 * Math.sin(clock * 14); ctx.font = `800 13px ${UI_FONT}`; ctx.fillStyle = "#ff7a5a"; ctx.fillText("⚠ 패턴 예고! 피하세요", W / 2, 60); ctx.globalAlpha = 1; }
     ctx.textAlign = "left";
   } else {
     const total = s.floor.training ? (s.floor.duration ?? 60) : BOSS_AT, prog = Math.min(1, s.t / total), bw = 300, bx = (W - bw) / 2;
@@ -597,6 +603,9 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     bar(ctx, bx, 38, bw, 10, prog, prog > 0.85 ? "#ff9a4a" : "#ffd84a");
     // 정예 등장 예정 표시(진행 게이지 위 작은 눈금)
     if (!s.floor.training) for (const at of [40, 80]) { const x = bx + bw * (at / total); ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(x - 1, 36, 2, 14); }
+    // 재도전 비교: 지난번 보스 전에 쓰러진 지점
+    const pw = s.ext.prevBest;
+    if (pw && pw.bossHpRatio >= 1 && pw.waveTime < total) { const x = bx + bw * (pw.waveTime / total); ctx.fillStyle = "#ff8a6a"; ctx.fillRect(x - 1, 34, 2, 18); if (!s.ext.prevBeat && s.t > pw.waveTime) { s.ext.prevBeat = true; s.pops.push({ x: s.player.x, y: s.player.y - 70, text: "🔥 이전 기록 돌파!", t: 1.6, kind: "info" }); } }
     ctx.textAlign = "left";
   }
 
