@@ -216,13 +216,16 @@ export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActi
           {worn ? <button disabled>사용 중</button> : own ? <button onClick={() => forge.equipWeapon(def.id)}>들기</button> : <button className="make" disabled={forge.money < WEAPON_CRAFT.gold || (forge.have["artisan-core"] ?? 0) < WEAPON_CRAFT.core || (forge.have[def.craft?.lifeMat ?? ""] ?? 0) < WEAPON_CRAFT.mat} onClick={() => forge.craftWeapon(def.id)}>만들기</button>}
         </div>; })}</div>
     </div>}
-    {kind === "armor" && <div className="raid-armors">{ARMORS.map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, prerequisite = ARMORS.find(item => item.id === a.prerequisite), ready = hasArmorPrerequisite(a, raid.armorOwned), ok = ready && canPay(a.need, forge.have) && forge.money >= a.gold;
+    {kind === "armor" && <div className="raid-armor-groups">{(["head", "body", "legs"] as const).map(slot => <section key={slot} className="raid-armor-group">
+      <h4>{{ head: "🧢", body: "🦺", legs: "👢" }[slot]} {SLOT_NAME[slot]} <small>왼쪽부터 순서대로 만들어요 · 아래 단계를 가지고 있어야 다음 단계를 만들 수 있어요(소모 안 함)</small></h4>
+      <div className="raid-armors">{ARMORS.filter(a => a.slot === slot).sort((x, y) => x.tier - y.tier).map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, prerequisite = ARMORS.find(item => item.id === a.prerequisite), ready = hasArmorPrerequisite(a, raid.armorOwned), ok = ready && canPay(a.need, forge.have) && forge.money >= a.gold;
       return <div key={a.id} className={`raid-armor ${worn ? "worn" : owned ? "owned" : ""}`}>
         <span className="raid-armor-icon"><ArmorIcon id={a.id} size={48} /></span>
-        <div><b>{a.name} <small>{SLOT_NAME[a.slot]} · {["", "가죽", "강화 가죽", "단풍 추적자", "설산 방벽"][a.tier]}</small></b><span>{a.text}</span>
+        <div><i className={`raid-armor-tier t${a.tier}`}>{a.tier}단계 · {["", "가죽", "강화 가죽", "단풍 추적자", "설산 방벽"][a.tier]}</i><b>{a.name}</b><span>{a.text}</span>
           {!owned && <span className="raid-cost">{prerequisite && <em className={ready ? "ok" : "lack"}>🔒 선행: {prerequisite.name} {ready ? "보유" : "필요"}</em>}<em className={forge.money >= a.gold ? "ok" : "lack"}>💰 {a.gold.toLocaleString()}</em>{Object.entries(a.need).map(([id, n]) => <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</span>}</div>
         {worn ? <button disabled>착용 중</button> : owned ? <button onClick={() => forge.equip(a.slot, a.id)}>착용</button> : <button className="make" disabled={!ok} onClick={() => forge.craftArmor(a.id)}>만들기</button>}
-      </div>; })}</div>}
+      </div>; })}</div>
+    </section>)}</div>}
     <p className="hint">🐾 전투펫은 <b>펫</b> 탭에서 데려가기·레벨업하고, <b>상점 › 가챠</b>에서 뽑아요.</p>
     </div>
   </div>;
