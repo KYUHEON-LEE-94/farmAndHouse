@@ -1225,3 +1225,9 @@ button { color:inherit; }
 .hunt-result.toast{left:auto!important;top:12px!important;right:12px;transform:none!important;animation:catchIn .2s ease-out}
 .hunt-recent{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 0}.hunt-recent b{font-size:12.5px}
 .hunt-recent span{padding:3px 9px;border-radius:999px;background:#f3ecdc;border:1px solid var(--line);font-size:11.5px}.hunt-recent span.great{background:#fff3c9;border-color:#e8c35a}.hunt-recent span.escape{color:#a5302a;opacity:.8}
+
+/* 모바일: HUD 재배치(76절) 뒤 음식 버튼은 캔버스 왼쪽 세로 칸(펫 아래), 일시정지는 오른쪽 위 따로 */
+.raid-game.touch{--ch:min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)),calc(100vw * 9 / 16));--cw:calc(var(--ch) * 16 / 9)}
+.raid-game.touch .raid-touch-foods{right:auto;left:calc(50% - var(--cw) / 2 + 10px);top:calc(50% - var(--ch) / 2 + var(--ch) * 0.27);flex-direction:column}
+.raid-game.touch .raid-touch-pause{position:absolute;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 56px);width:48px;height:48px;border-radius:12px;background:rgba(24,28,20,.7);color:#fff;font-size:20px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.raid-rotate small{max-width:86vw;line-height:1.5}

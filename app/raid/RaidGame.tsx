@@ -249,7 +249,8 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     {touchMode && !ui.over && <div className="raid-touch" ref={overlayRef} onPointerDown={onTouchDown} onPointerMove={onTouchMove} onPointerUp={onTouchUp} onPointerCancel={releaseAll}>
       {stickView ? <span className="raid-stick" style={{ left: stickView.x0, top: stickView.y0 }}><i style={{ transform: `translate(${stickView.x - stickView.x0}px, ${stickView.y - stickView.y0}px)` }} /></span> : <span className="raid-stick idle"><i /></span>}
       <div className="raid-touch-foods">{foods.map((f, i) => f && <button key={i} onPointerDown={event => { event.stopPropagation(); tapFood(i); }} aria-label={`${f.name} 먹기`}>{f.icon}</button>)}
-        <button className="raid-touch-pause" onPointerDown={event => { event.stopPropagation(); const s = stateRef.current; if (s && !s.over) s.paused = true; }} aria-label="일시정지">⏸</button></div>
+</div>
+      <button className="raid-touch-pause" onPointerDown={event => { event.stopPropagation(); const s = stateRef.current; if (s && !s.over) s.paused = true; }} aria-label="일시정지">⏸</button>
       <button ref={dashBtnRef} className="raid-touch-dash" onPointerDown={event => { event.stopPropagation(); inputRef.current.dash = true; }} onPointerUp={() => { inputRef.current.dash = false; }} onPointerCancel={() => { inputRef.current.dash = false; }} aria-label="회피">💨</button>
       <button ref={specialBtnRef} className="raid-touch-special" onPointerDown={onSpecialDown} onPointerMove={onSpecialMove} onPointerUp={onSpecialUp} onPointerCancel={() => { touchRef.current.special = null; }} aria-label="특수 공격">{evolution ? SPECIALS[evolution]?.icon ?? "✨" : "🔒"}</button>
     </div>}
