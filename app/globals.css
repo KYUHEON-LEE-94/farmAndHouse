@@ -1205,3 +1205,7 @@ button { color:inherit; }
 .raid-gear-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.raid-gear-modal-head b{font-size:17px}.raid-gear-modal-head span{display:flex;gap:6px;align-items:center}
 .raid-gear-modal-close{border:0;background:none;font-size:18px;cursor:pointer;color:#7a6a4a}
 @media (max-width:760px){.raid-gear{grid-template-columns:1fr}}
+
+/* HUD 재배치(75절): 포기·소리 버튼은 왼쪽 아래로(미니맵·보조무기와 겹치지 않게) */
+.raid-game:not(.touch) .raid-giveup{top:auto;right:auto;left:14px;bottom:14px}
+.raid-game:not(.touch) .raid-sfx{top:auto;right:auto;left:84px;bottom:12px}

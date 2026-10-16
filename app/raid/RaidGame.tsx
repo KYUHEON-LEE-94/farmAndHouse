@@ -497,44 +497,64 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   // 체력이 낮으면 붉은 테두리
   if (p.hp / p.maxHp < 0.3) { const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.6); v.addColorStop(0, "rgba(200,0,0,0)"); v.addColorStop(1, `rgba(200,20,20,${0.25 + pulse * 0.15})`); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H); }
 
-  // ---------- HUD ----------
+  // ---------- HUD (WEAPON_CARD_UI_DESIGN_SPEC 2절: 위 = 층·진행·각성, 왼쪽 = 체력·펫·음식, 오른쪽 = 특수 공격·보조무기) ----------
   ctx.textAlign = "left"; ctx.textBaseline = "middle";
   // 왼쪽 위: 내 카드(아바타 · 체력 · 각성)
-  panel(ctx, 12, 12, 270, 70);
-  ctx.save(); roundRect(ctx, 20, 20, 54, 54, 10); ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fill(); ctx.clip(); drawAvatar(ctx, art, 47, 47, 50, false); ctx.restore();
-  ctx.font = `700 13px ${UI_FONT}`; ctx.fillStyle = "#fff6d0"; ctx.fillText(s.floor.training ? `🎯 ${s.floor.zone}` : `${s.floor.floor}층 · ${s.floor.zone}`, 84, 28);
-  bar(ctx, 84, 40, 186, 13, p.hp / p.maxHp, p.hp / p.maxHp < 0.3 ? "#ff5040" : "#ef5a43");
-  if (p.shield > 0) bar(ctx, 84, 40, 186, 5, p.shield / p.maxHp, "rgba(140,210,255,.95)", "rgba(0,0,0,0)");
-  ctx.font = "700 10px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`♥ ${Math.ceil(p.hp)} / ${p.maxHp}${p.shield > 0 ? `  🛡 ${Math.ceil(p.shield)}` : ""}`, 90, 47);
+  panel(ctx, 12, 12, 252, 66);
+  ctx.save(); roundRect(ctx, 20, 18, 52, 52, 10); ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fill(); ctx.clip(); drawAvatar(ctx, art, 46, 44, 48, false); ctx.restore();
+  bar(ctx, 82, 22, 172, 15, p.hp / p.maxHp, p.hp / p.maxHp < 0.3 ? "#ff5040" : "#ef5a43");
+  if (p.shield > 0) bar(ctx, 82, 22, 172, 5, p.shield / p.maxHp, "rgba(140,210,255,.95)", "rgba(0,0,0,0)");
+  ctx.font = "800 11px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`♥ ${Math.ceil(p.hp)} / ${p.maxHp}${p.shield > 0 ? `  🛡 ${Math.ceil(p.shield)}` : ""}`, 88, 30);
   const nextXp = xpForLevel(s.level + 1), prevXp = xpForLevel(s.level);
-  bar(ctx, 84, 60, 186, 8, (s.xp - prevXp) / Math.max(1, nextXp - prevXp), s.xpFlash > 0 ? "#b8ffd0" : "#4fd27e");
-  if (s.xpFlash > 0) { ctx.save(); ctx.globalAlpha = s.xpFlash / 0.18; ctx.strokeStyle = "#b8ffd0"; ctx.lineWidth = 2; ctx.shadowColor = "#7dffa8"; ctx.shadowBlur = 10; ctx.strokeRect(83, 59, 188, 10); ctx.restore(); }
-  ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}`, 84, 75);
-  s.auxes.forEach((aux, i) => {
-    const def = AUX_WEAPONS[aux.id], cx = 258 - i * 24, cy = 72, left = Math.max(0, aux.readyAt - s.t), ratio = 1 - Math.min(1, left / def.cd);
-    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio); ctx.strokeStyle = ratio >= 1 ? "#e6c38a" : "rgba(230,195,138,.55)"; ctx.lineWidth = 2.5; ctx.stroke();
-    ctx.fillStyle = "#000"; ctx.font = `12px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText(def.icon, cx, cy + 1); ctx.textAlign = "left";
+  ctx.font = `800 12px ${UI_FONT}`; ctx.fillStyle = "#c9f7d6"; ctx.fillText(`각성 Lv.${s.level}`, 82, 52);
+  bar(ctx, 82, 60, 172, 9, (s.xp - prevXp) / Math.max(1, nextXp - prevXp), s.xpFlash > 0 ? "#b8ffd0" : "#4fd27e");
+  if (s.xpFlash > 0) { ctx.save(); ctx.globalAlpha = s.xpFlash / 0.18; ctx.strokeStyle = "#b8ffd0"; ctx.lineWidth = 2; ctx.shadowColor = "#7dffa8"; ctx.shadowBlur = 10; ctx.strokeRect(81, 59, 174, 11); ctx.restore(); }
+
+  // 왼쪽 세로: 전투펫 · 음식 3칸(모바일은 음식이 화면 버튼이라 펫만)
+  let ly = 86;
+  if (s.pet && petIcon) {
+    panel(ctx, 12, ly, 52, 52);
+    ctx.fillStyle = "#000"; ctx.font = `26px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText(petIcon, 38, ly + 24);
+    ctx.font = `700 9px ${UI_FONT}`; ctx.fillStyle = "#d9cfae"; ctx.fillText("전투펫", 38, ly + 44); ctx.textAlign = "left";
+    ly += 58;
+  }
+  if (!compactHud) s.foods.forEach((f, i) => {
+    const y = ly + i * 56, used = !f || s.foodUsed[i];
+    panel(ctx, 12, y, 52, 50);
+    ctx.globalAlpha = used ? 0.3 : 1; ctx.textAlign = "center";
+    ctx.fillStyle = f ? "#000" : "#ccc"; ctx.font = `24px ${EMOJI_FONT}`; ctx.fillText(f ? f.icon : "·", 38, y + 24);
+    ctx.globalAlpha = 1;
+    roundRect(ctx, 46, y + 34, 14, 14, 4); ctx.fillStyle = used ? "rgba(255,255,255,.2)" : "#ffd84a"; ctx.fill();
+    ctx.font = "800 10px sans-serif"; ctx.fillStyle = "#2a2010"; ctx.fillText(String(i + 1), 53, y + 42);
+    if (f && s.foodUsed[i]) { ctx.font = "700 9px sans-serif"; ctx.fillStyle = "#ddd"; ctx.fillText("사용", 38, y + 43); }
+    ctx.textAlign = "left";
   });
 
-  // 가운데 위: 남은 시간 / 보스 체력
-  const left = s.floor.training ? (s.floor.duration ?? 60) - s.t : BOSS_AT - s.t, bossTime = !s.floor.training && s.t >= BOSS_AT;
-  if (s.boss && s.boss.hp > 0) {
-    const bw = 400, bx = (W - bw) / 2;
-    panel(ctx, bx - 10, 12, bw + 20, 46);
-    ctx.textAlign = "center"; ctx.font = `700 13px ${UI_FONT}`; ctx.fillStyle = "#ffe19a"; ctx.fillText(`${s.boss.icon} ${s.boss.name}`, W / 2 - 40, 26);
-    ctx.font = "800 13px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`보스전 ${fmt(s.t - BOSS_AT)}`, W / 2 + 140, 26);
-    bar(ctx, bx, 38, bw, 10, s.boss.hp / s.boss.maxHp, "#d8432f");
+  // 위 가운데: 층 · 2분 진행도 · 처치 수 / 보스전에는 보스 체력·패턴 예고가 우선
+  const bossAlive = Boolean(s.boss && s.boss.hp > 0), bossTime = !s.floor.training && s.t >= BOSS_AT;
+  if (bossAlive && s.boss) {
+    const bw = 420, bx = (W - bw) / 2, tele = s.boss.state === "tele";
+    panel(ctx, bx - 12, 10, bw + 24, 58);
+    ctx.textAlign = "center"; ctx.font = `800 14px ${UI_FONT}`; ctx.fillStyle = "#ffe19a"; ctx.fillText(`${s.boss.icon} ${s.boss.name}`, W / 2, 24);
+    ctx.font = "800 11px sans-serif"; ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.fillText(`보스전 ${fmt(s.t - BOSS_AT)}`, bx + bw, 24); ctx.textAlign = "left"; ctx.fillText(`💀 ${s.kills}`, bx, 24);
+    bar(ctx, bx, 34, bw, 14, s.boss.hp / s.boss.maxHp, "#d8432f");
+    ctx.textAlign = "center"; ctx.font = "800 10px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`${Math.ceil(s.boss.hp).toLocaleString()} / ${s.boss.maxHp.toLocaleString()}`, W / 2, 41);
+    if (tele) { ctx.globalAlpha = 0.6 + 0.4 * Math.sin(clock * 14); ctx.font = `800 13px ${UI_FONT}`; ctx.fillStyle = "#ff7a5a"; ctx.fillText("⚠ 패턴 예고! 피하세요", W / 2, 60); ctx.globalAlpha = 1; }
     ctx.textAlign = "left";
   } else {
-    panel(ctx, W / 2 - 70, 12, 140, 40);
-    ctx.textAlign = "center"; ctx.font = "800 20px sans-serif"; ctx.fillStyle = bossTime ? "#ff7a6a" : "#fff"; ctx.fillText(bossTime ? `보스전 ${fmt(s.t - BOSS_AT)}` : fmt(left), W / 2, 30);
-    ctx.font = `700 9px ${UI_FONT}`; ctx.fillStyle = "#d9cfae"; ctx.fillText(s.floor.training ? "진화 체험 중" : s.t < BOSS_AT ? `보스까지 ${fmt(BOSS_AT - s.t)}` : "보스 등장!", W / 2, 45);
+    const total = s.floor.training ? (s.floor.duration ?? 60) : BOSS_AT, prog = Math.min(1, s.t / total), bw = 300, bx = (W - bw) / 2;
+    panel(ctx, bx - 12, 10, bw + 24, 52);
+    ctx.textAlign = "center"; ctx.font = `800 14px ${UI_FONT}`; ctx.fillStyle = "#fff6d0"; ctx.fillText(s.floor.training ? `🎯 ${s.floor.zone}` : `${s.floor.floor}층 · ${s.floor.zone}`, W / 2, 24);
+    ctx.font = "800 11px sans-serif"; ctx.textAlign = "left"; ctx.fillStyle = "#fff"; ctx.fillText(`💀 ${s.kills}`, bx, 24);
+    ctx.textAlign = "right"; ctx.fillStyle = bossTime ? "#ff7a6a" : "#ffe19a"; ctx.fillText(bossTime ? "보스 등장!" : `${fmt(Math.max(0, total - s.t))}`, bx + bw, 24);
+    bar(ctx, bx, 38, bw, 10, prog, prog > 0.85 ? "#ff9a4a" : "#ffd84a");
+    // 정예 등장 예정 표시(진행 게이지 위 작은 눈금)
+    if (!s.floor.training) for (const at of [40, 80]) { const x = bx + bw * (at / total); ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(x - 1, 36, 2, 14); }
     ctx.textAlign = "left";
   }
-  // 오른쪽 위: 처치 수 · 미니맵(플레이어·정예·보스·주요 지형만)
-  panel(ctx, W - 112, 12, 100, 32); ctx.font = `700 13px ${UI_FONT}`; ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(`💀 ${s.kills}`, W - 62, 28); ctx.textAlign = "left";
-  { const mw = 168, mh = 96, mx0 = W - mw - 12, my0 = 50, k = mw / WORLD_W;
+
+  // 오른쪽 위: 미니맵
+  { const mw = 168, mh = 96, mx0 = W - mw - 12, my0 = 16, k = mw / WORLD_W;
     panel(ctx, mx0 - 4, my0 - 4, mw + 8, mh + 8);
     ctx.save(); roundRect(ctx, mx0, my0, mw, mh, 6); ctx.clip();
     ctx.fillStyle = T.zone === "canal" ? "rgba(140,180,170,.35)" : "rgba(150,200,120,.3)"; ctx.fillRect(mx0, my0, mw, mh);
@@ -549,6 +569,13 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.restore();
     if (s.pressure.stage > 0) { ctx.font = `700 11px ${UI_FONT}`; ctx.fillStyle = "#ff9a6a"; ctx.textAlign = "right"; ctx.fillText(`⚠ 탑의 압박 ${s.pressure.stage}단계 · 자리를 옮기세요`, W - 12, my0 + mh + 16); ctx.textAlign = "left"; }
   }
+  // 오른쪽: 자동 보조무기(세로)
+  s.auxes.forEach((aux, i) => {
+    const def = AUX_WEAPONS[aux.id], cx = W - 34, cy = 156 + i * 46, left = Math.max(0, aux.readyAt - s.t), ratio = 1 - Math.min(1, left / def.cd);
+    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.fillStyle = "rgba(24,28,20,.62)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio); ctx.strokeStyle = ratio >= 1 ? "#e6c38a" : "rgba(230,195,138,.55)"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "#000"; ctx.font = `18px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText(def.icon, cx, cy + 1); ctx.textAlign = "left";
+  });
   // 화면 밖 정예·보스·예고 방향 표시
   const pointers = [...s.monsters.filter(m => m.hp > 0 && (m.elite || m.boss)).map(m => ({ x: m.x, y: m.y, color: m.boss ? "#ff4a3a" : "#f0a030", icon: m.icon })), ...s.warns.map(w => ({ x: w.x, y: w.y, color: "#f0a030", icon: "!" }))];
   for (const t of pointers) {
@@ -559,42 +586,30 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.fillStyle = "#000"; ctx.font = `14px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText(t.icon, ex - Math.cos(a) * 16, ey - Math.sin(a) * 16); ctx.textAlign = "left";
   }
 
-  // 아래: 회피 · 음식 칸 · 버프
-  const by = H - 62;
-  // 모바일은 회피·특수·음식이 화면 버튼으로 있으니 캔버스 아래 칸은 그리지 않는다.
+  // 오른쪽 아래: 특수 공격(크게) · 회피(모바일은 화면 버튼)
   if (!compactHud) {
-  panel(ctx, 12, by, 64, 50);
-  const ready = p.dashCd <= 0, cdRatio = ready ? 1 : 1 - p.dashCd / d.dashCd;
-  ctx.beginPath(); ctx.arc(44, by + 21, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cdRatio); ctx.strokeStyle = ready ? "#9fe8ff" : "rgba(160,200,220,.6)"; ctx.lineWidth = 3; ctx.stroke();
-  ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("💨", 44, by + 21);
-  ctx.font = "700 9px sans-serif"; ctx.fillStyle = ready ? "#fff" : "#aaa"; ctx.fillText(ready ? "SPACE" : p.dashCd.toFixed(1), 44, by + 43);
-  // 우클릭 특수 공격(진화 무기만)
-  const spec = s.evolution ? SPECIALS[s.evolution] : null;
-  if (spec) {
-    const sx0 = 266, left = Math.max(0, s.special.readyAt - s.t), ready = left <= 0, shake = s.t - s.special.bump < 0.2 ? Math.sin(clock * 80) * 2 : 0;
-    panel(ctx, sx0 + shake, by, 58, 50);
-    ctx.beginPath(); ctx.arc(sx0 + 29 + shake, by + 21, 16, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (ready ? 1 : 1 - left / spec.cooldown)); ctx.strokeStyle = ready ? "#ffd84a" : "rgba(255,216,74,.45)"; ctx.lineWidth = 3; ctx.stroke();
-    if (ready) { ctx.beginPath(); ctx.arc(sx0 + 29, by + 21, 19 + Math.sin(clock * 6) * 1.5, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,216,74,.35)"; ctx.lineWidth = 2; ctx.stroke(); }
-    ctx.fillStyle = "#000"; ctx.font = `17px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.globalAlpha = ready ? 1 : 0.5; ctx.fillText(spec.icon, sx0 + 29 + shake, by + 21); ctx.globalAlpha = 1;
-    ctx.font = "700 9px sans-serif"; ctx.fillStyle = ready ? "#ffe19a" : "#aaa"; ctx.fillText(ready ? "우클릭" : left.toFixed(1), sx0 + 29 + shake, by + 43); ctx.textAlign = "left";
+    const spec = s.evolution ? SPECIALS[s.evolution] : null, sx = W - 52, sy = H - 52;
+    ctx.beginPath(); ctx.arc(sx, sy, 34, 0, Math.PI * 2); ctx.fillStyle = "rgba(24,28,20,.68)"; ctx.fill();
+    if (spec) {
+      const left = Math.max(0, s.special.readyAt - s.t), ready = left <= 0, shake = s.t - s.special.bump < 0.2 ? Math.sin(clock * 80) * 2 : 0;
+      ctx.beginPath(); ctx.arc(sx + shake, sy, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (ready ? 1 : 1 - left / spec.cooldown)); ctx.strokeStyle = ready ? "#ffd84a" : "rgba(255,216,74,.45)"; ctx.lineWidth = 4; ctx.stroke();
+      if (ready) { ctx.beginPath(); ctx.arc(sx, sy, 36 + Math.sin(clock * 6) * 2, 0, Math.PI * 2); ctx.strokeStyle = "rgba(255,216,74,.35)"; ctx.lineWidth = 2; ctx.stroke(); }
+      ctx.fillStyle = "#000"; ctx.font = `26px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.globalAlpha = ready ? 1 : 0.5; ctx.fillText(spec.icon, sx + shake, sy - 3); ctx.globalAlpha = 1;
+      ctx.font = "800 10px sans-serif"; ctx.fillStyle = ready ? "#ffe19a" : "#ccc"; ctx.fillText(ready ? "우클릭" : left.toFixed(1), sx + shake, sy + 20);
+    } else { ctx.font = `700 10px ${UI_FONT}`; ctx.fillStyle = "#aaa"; ctx.textAlign = "center"; ctx.fillText("+10 진화", sx, sy - 4); ctx.fillText("특수 공격", sx, sy + 9); }
+    const dx = W - 120, dy = H - 40, ready = p.dashCd <= 0, cdRatio = ready ? 1 : 1 - p.dashCd / d.dashCd;
+    ctx.beginPath(); ctx.arc(dx, dy, 22, 0, Math.PI * 2); ctx.fillStyle = "rgba(24,28,20,.62)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(dx, dy, 20, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * cdRatio); ctx.strokeStyle = ready ? "#9fe8ff" : "rgba(160,200,220,.6)"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.fillText("💨", dx, dy - 3);
+    ctx.font = "700 8px sans-serif"; ctx.fillStyle = ready ? "#fff" : "#aaa"; ctx.fillText(ready ? "SPACE" : p.dashCd.toFixed(1), dx, dy + 12);
+    ctx.textAlign = "left";
   }
-  s.foods.forEach((f, i) => {
-    const x = 84 + i * 58, used = !f || s.foodUsed[i];
-    panel(ctx, x, by, 50, 50);
-    ctx.globalAlpha = used ? 0.3 : 1;
-    ctx.fillStyle = f ? "#000" : "#ccc"; ctx.font = `24px ${EMOJI_FONT}`; ctx.fillText(f ? f.icon : "·", x + 25, by + 24);
-    ctx.globalAlpha = 1;
-    roundRect(ctx, x + 34, by + 34, 14, 14, 4); ctx.fillStyle = used ? "rgba(255,255,255,.2)" : "#ffd84a"; ctx.fill();
-    ctx.font = "800 10px sans-serif"; ctx.fillStyle = "#2a2010"; ctx.fillText(String(i + 1), x + 41, by + 42);
-    if (f && s.foodUsed[i]) { ctx.font = "700 9px sans-serif"; ctx.fillStyle = "#ddd"; ctx.fillText("사용", x + 25, by + 43); }
-  });
-  }
-  ctx.textAlign = "left";
+  // 아래 가운데: 음식 버프
   const buffs = s.buffs.filter(b => b.until > s.t);
   if (buffs.length) {
-    const text = buffs.map(b => `${{ attack: "⚔ 공격", speed: "👟 이속", haste: "⚡ 공속", all: "🌟 전체", heal: "", shield: "", regen: "", crit: "🎯 치명", armor: "🛡 경감" }[b.kind]} +${b.value}% · ${Math.ceil(b.until - s.t)}s`).join("   ");
+    const text = buffs.map(b => `${{ attack: "⚔ 공격", speed: "👟 이속", haste: "⚡ 공속", all: "🌟 전체", heal: "💚 회복", shield: "🛡 보호막", regen: "💚 회복", crit: "🎯 치명", armor: "🛡 경감" }[b.kind]}${b.kind === "regen" ? ` ${b.value}/s` : ` +${b.value}%`} · ${Math.ceil(b.until - s.t)}s`).join("   ");
     ctx.font = `700 12px ${UI_FONT}`; const w = ctx.measureText(text).width + 24;
-    panel(ctx, 332, by + 10, w, 30); ctx.fillStyle = "#ffe19a"; ctx.fillText(text, 344, by + 26);
+    panel(ctx, (W - w) / 2, H - 42, w, 30); ctx.fillStyle = "#ffe19a"; ctx.textAlign = "center"; ctx.fillText(text, W / 2, H - 26); ctx.textAlign = "left";
   }
 }
 
