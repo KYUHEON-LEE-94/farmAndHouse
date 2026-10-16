@@ -291,7 +291,7 @@ export const FLOOR_REWARDS: Record<number, { firstGold: number; first: Drop[]; r
   12: { firstGold: 1000, first: [["maple-fragment", 3, 3]], repeat: [["maple-fragment", 1, 3]], stabilizer: 0.01 },
   13: { firstGold: 1200, first: [["maple-fragment", 3, 3], ["maze-amber", 1, 1]], repeat: [["maple-fragment", 2, 3], ["maze-amber", 1, 1, 0.2]], stabilizer: 0.02 },
   14: { firstGold: 1500, first: [["maze-amber", 2, 2]], repeat: [["maple-fragment", 2, 4], ["maze-amber", 1, 1]], stabilizer: 0.03 },
-  15: { firstGold: 3500, first: [["maze-amber", 3, 3], ["crimson-antler", 1, 1]], repeat: [["maze-amber", 1, 2], ["crimson-antler", 1, 1, 0.3]], stabilizer: 0.05 },
+  15: { firstGold: 3500, first: [["maze-amber", 3, 3], ["crimson-antler", 1, 1]], repeat: [["maze-amber", 1, 2], ["crimson-antler", 1, 1, 0.4]], stabilizer: 0.05 },
   16: { firstGold: 1200, first: [["frost-ore", 3, 3]], repeat: [["frost-ore", 1, 2]], stabilizer: 0.01 },
   17: { firstGold: 1400, first: [["frost-ore", 3, 3]], repeat: [["frost-ore", 1, 3]], stabilizer: 0.02 },
   18: { firstGold: 1600, first: [["frost-ore", 3, 3], ["glacier-crystal", 1, 1]], repeat: [["frost-ore", 2, 3], ["glacier-crystal", 1, 1, 0.2]], stabilizer: 0.02 },
