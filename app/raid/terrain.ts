@@ -10,7 +10,7 @@ export type Rect = { x: number; y: number; w: number; h: number };
 export type Flower = { x: number; y: number; hits: number; dmg: number; exploded: boolean; golden?: boolean };
 export type Gate = { rect: Rect; closed: boolean; next: number; moving: boolean };
 export type Terrain = {
-  seed: number; zone: "field" | "canal";
+  seed: number; zone: "field" | "canal" | "maple" | "frost";
   walls: Rect[]; grass: Rect[]; mud: Rect[]; wind: (Rect & { dx: number; dy: number })[];
   flowers: Flower[];
   deep: Rect[]; bridges: Rect[]; shallow: Rect[]; puddles: { x: number; y: number; r: number }[]; gates: Gate[];
@@ -23,8 +23,8 @@ const inside = (r: Rect, x: number, y: number, pad = 0) => x > r.x - pad && x < 
 const nearStart = (r: Rect) => { const cx = Math.max(r.x, Math.min(START.x, r.x + r.w)), cy = Math.max(r.y, Math.min(START.y, r.y + r.h)); return Math.hypot(cx - START.x, cy - START.y) < SAFE_RADIUS; };
 
 export function makeTerrain(floor: number, seed: number): Terrain {
-  const r = rng(seed * 7919 + floor * 104729), canal = floor > 5;
-  const t: Terrain = { seed, zone: canal ? "canal" : "field", walls: [], grass: [], mud: [], wind: [], flowers: [], deep: [], bridges: [], shallow: [], puddles: [], gates: [], chance: null };
+  const r = rng(seed * 7919 + floor * 104729), canal = floor > 5 && floor <= 10, zone = floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : "frost";
+  const t: Terrain = { seed, zone, walls: [], grass: [], mud: [], wind: [], flowers: [], deep: [], bridges: [], shallow: [], puddles: [], gates: [], chance: null };
   const template = Math.floor(r() * 3);
   const place = (list: Rect[], make: () => Rect, n: number, avoid: Rect[][] = []) => {
     for (let k = 0, tries = 0; k < n && tries < 80; tries++) {
@@ -34,7 +34,18 @@ export function makeTerrain(floor: number, seed: number): Terrain {
       list.push(rect); k++;
     }
   };
-  if (!canal) {
+  if (zone === "maple") {
+    // 단풍 미궁(11~15층): 덤불 울타리 미로 + 낙엽 더미(적 감속) + 단풍 덤불(모두 감속). 층이 오를수록 울타리가 늘어난다.
+    place(t.walls, () => { const horiz = r() < 0.5, len = 150 + r() * 120; return horiz ? { x: r() * WORLD_W, y: r() * WORLD_H, w: len, h: 24 } : { x: r() * WORLD_W, y: r() * WORLD_H, w: 24, h: len }; }, 5 + (floor - 11), [t.walls]);
+    place(t.grass, () => ({ x: r() * WORLD_W, y: r() * WORLD_H, w: 150 + r() * 120, h: 100 + r() * 90 }), 2, [t.walls]);
+    if (floor >= 12) place(t.mud, () => ({ x: r() * WORLD_W, y: r() * WORLD_H, w: 130 + r() * 90, h: 90 + r() * 70 }), 2 + (floor >= 14 ? 1 : 0), [t.walls]);
+    if (floor >= 14) place(t.wind as Rect[], () => { const a = [0, Math.PI / 2, Math.PI, -Math.PI / 2][Math.floor(r() * 4)]; return Object.assign({ x: r() * WORLD_W, y: r() * WORLD_H, w: 260, h: 120 }, { dx: Math.cos(a), dy: Math.sin(a) }); }, 1, [t.walls]);
+  } else if (zone === "frost") {
+    // 서리 광산(16~20층): 얼음 기둥(짧은 벽) + 눈 더미(모두 감속) + 빙판 웅덩이(적 감속).
+    place(t.walls, () => { const w = 50 + r() * 50, h = 50 + r() * 50; return { x: r() * WORLD_W, y: r() * WORLD_H, w, h }; }, 6 + (floor - 16), [t.walls]);
+    place(t.shallow, () => ({ x: r() * WORLD_W, y: r() * WORLD_H, w: 160 + r() * 110, h: 100 + r() * 80 }), 3, [t.walls]);
+    if (floor >= 17) place(t.mud, () => ({ x: r() * WORLD_W, y: r() * WORLD_H, w: 130 + r() * 90, h: 90 + r() * 70 }), 2, [t.walls, t.shallow]);
+  } else if (!canal) {
     // 1층: 긴 풀·폭발 꽃 → 2층 돌담 → 3층 진흙 → 4층 바람길 → 5층 전부(50.3)
     place(t.grass, () => ({ x: r() * WORLD_W, y: r() * WORLD_H, w: 160 + r() * 140, h: 110 + r() * 100 }), 2 + Math.floor(r() * 3));
     if (floor >= 2) place(t.walls, () => { const horiz = (template + Math.floor(r() * 2)) % 2 === 0, len = 100 + r() * 80; return horiz ? { x: r() * WORLD_W, y: r() * WORLD_H, w: len, h: 22 } : { x: r() * WORLD_W, y: r() * WORLD_H, w: 22, h: len }; }, 3 + Math.floor(r() * 3), [t.walls]);
@@ -67,6 +78,9 @@ export function makeTerrain(floor: number, seed: number): Terrain {
   }
   return t;
 }
+
+/** 기회 지형이 폭발 꽃(들판·단풍)인지, 회복 샘(수로·서리 모닥불)인지 */
+export const fieldLike = (t: Pick<Terrain, "zone">) => t.zone === "field" || t.zone === "maple";
 
 /** 이동을 막는 사각형(돌담·깊은 물·닫힌 수문). */
 export function blockers(t: Terrain): Rect[] { return [...t.walls, ...t.deep, ...t.gates.filter(g => g.closed).map(g => g.rect)]; }

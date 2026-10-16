@@ -930,6 +930,7 @@ button { color:inherit; }
 .raid-tower-base{text-align:center;font:700 11px "Gowun Dodum";color:#a99cbf;padding-top:6px;border-top:2px dashed rgba(255,255,255,.15)}
 .raid-storey{display:grid;grid-template-columns:40px 1fr 18px;align-items:center;gap:6px;padding:8px 10px;border:0;border-radius:10px;cursor:pointer;text-align:left;font:inherit;color:#f3ecdc;background:linear-gradient(90deg,rgba(120,170,90,.35),rgba(120,170,90,.15));transition:transform .12s,background .12s}
 .raid-storey.canal{background:linear-gradient(90deg,rgba(90,150,170,.38),rgba(90,150,170,.15))}
+.raid-storey.maple{background:linear-gradient(90deg,rgba(210,110,50,.42),rgba(210,110,50,.15))}.raid-storey.frost{background:linear-gradient(90deg,rgba(170,205,230,.38),rgba(170,205,230,.13))}
 .raid-storey.boss{box-shadow:inset 0 0 0 2px rgba(255,200,80,.55)}
 .raid-storey b{font:800 14px "Gowun Batang";color:#fff}.raid-storey span{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.raid-storey i{font-style:normal;font-size:11px;color:#9fe8a6;text-align:right}
 .raid-storey:hover:not(:disabled){transform:translateX(3px)}
@@ -938,6 +939,9 @@ button { color:inherit; }
 .raid-side{display:grid;gap:12px;min-width:0}
 .raid-floor-card{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:16px 18px;border-radius:16px;color:#fff;background:linear-gradient(120deg,#5d8c3e,#87b45c);box-shadow:0 8px 20px rgba(60,90,30,.2)}
 .raid-floor-card.canal{background:linear-gradient(120deg,#3c6d7c,#6aa0a8);box-shadow:0 8px 20px rgba(30,70,90,.2)}
+.raid-floor-card.maple{background:linear-gradient(120deg,#9c4321,#d9823c);box-shadow:0 8px 20px rgba(120,50,20,.22)}.raid-floor-card.frost{background:linear-gradient(120deg,#4c7591,#8fb8cf);box-shadow:0 8px 20px rgba(40,80,110,.22)}
+/* 20층: 탑 목록이 길어져 스크롤 */
+.raid-tower{max-height:min(78vh,760px);overflow-y:auto}
 .raid-floor-card .raid-floor-no{font:800 34px "Gowun Batang";text-shadow:0 2px 0 rgba(0,0,0,.2)}
 .raid-floor-card small{display:block;font-size:11px;opacity:.85}.raid-floor-card b{display:block;font:700 18px "Gowun Batang"}.raid-floor-card span{font-size:12px;opacity:.9}
 .raid-floor-card em{font-style:normal;font:700 11px "Gowun Dodum";padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.2)}.raid-floor-card em.first{background:#ffd84a;color:#4a3a10}
@@ -1266,3 +1270,4 @@ button { color:inherit; }
 /* 각성 카드: 호환 태그(공용·베기형·충격형…)와 바뀌는 수치 */
 .raid-choices button .aw-tag{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:10px;font-weight:800;color:#fff;background:#8a7a5a}.raid-choices button .aw-tag.mode{background:#b5403a}
 .raid-choices button .aw-preview{display:block;margin-top:4px;padding:3px 6px;border-radius:6px;background:#eef6e6;color:#2f6a24;font-size:11px;font-weight:800}
+.armor-art.maple{border-color:#d9772f;background:radial-gradient(circle at 35% 25%,#fff8ec 0 28%,#f3cfa0 72%,#d58a45 100%)}.armor-art.frost{border-color:#8fb8cf;background:radial-gradient(circle at 35% 25%,#ffffff 0 28%,#dcecf5 72%,#9cc0d6 100%)}

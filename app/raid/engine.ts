@@ -9,7 +9,7 @@ import {
 import { SPECIALS } from "./weapons";
 import { AUX_WEAPONS, rollChoices, type AuxId } from "./awakenings";
 import { AUX_POWER, FODDER_HP, MOB_SHOT_DAMAGE, MOB_SHOT_INTERVAL, floorBand, type RaidRunLog } from "./data";
-import { FLOW_CELL, START, WORLD_H, WORLD_W, blockedAt, blockers, buildFlow, clearLine, flowNext, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, type Flow, type Terrain } from "./terrain";
+import { FLOW_CELL, START, WORLD_H, WORLD_W, blockedAt, blockers, buildFlow, clearLine, flowNext, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, type Flow, type Terrain, fieldLike } from "./terrain";
 
 export type Input = { up: boolean; down: boolean; left: boolean; right: boolean; aimX: number; aimY: number; attack: boolean; dash: boolean; food: [boolean, boolean, boolean];
   /** 우클릭 특수 공격(누른 순간 한 번) */
@@ -17,14 +17,16 @@ export type Input = { up: boolean; down: boolean; left: boolean; right: boolean;
   /** 모바일 가상 스틱(−1~1, 길이 1 이하). 있으면 방향키 대신 쓴다. */
   moveX?: number; moveY?: number };
 /** 방어구 합계 능력(26절). */
-export type Gear = { hp: number; defense: number; crit: number; absorb: number; xpGain?: number; speed: number; dashCd: number; startShield: number };
+export type Gear = { hp: number; defense: number; crit: number; absorb: number; xpGain?: number; speed: number; dashCd: number; startShield: number; freezeResist?: number; hazardCut?: number };
 export const NO_GEAR: Gear = { hp: 0, defense: 0, crit: 0, absorb: 0, speed: 0, dashCd: 0, startShield: 0 };
 export type FoodSlot = { dishId: string; grade: number; key: string; effect: FoodEffect; icon: string; name: string } | null;
 
 type Telegraph = { kind: "line"; x: number; y: number; dx: number; dy: number; len: number; width: number } | { kind: "circle"; x: number; y: number; r: number };
 export type Monster = {
   uid: number; def: MonsterDef; name: string; icon: string; x: number; y: number; r: number; hp: number; maxHp: number; damage: number; defense: number; speed: number;
-  elite: boolean; boss: "mini" | "pollen-boar" | "storm-catfish" | null; xp: number;
+  elite: boolean; boss: "mini" | "pollen-boar" | "storm-catfish" | "maple-stag" | "iron-bear" | null; xp: number;
+  /** 보스 패턴 사이 최소 공백(초), 철갑곰 철갑 방어 끝 시각 */
+  gap?: number; armorUntil?: number;
   /** 행동 타이머·상태 */
   timer: number; state: "move" | "tele" | "dash" | "stun"; stateT: number; dir: { x: number; y: number }; tele: Telegraph | null;
   rate: number; split: boolean; summoned: boolean; flash: number; shots: number;
@@ -45,7 +47,9 @@ export type Projectile = { x: number; y: number; vx: number; vy: number; r: numb
   left?: number; explode?: number; ox?: number; oy?: number; ignoreDef?: boolean; wave?: boolean; defIgnore?: number; siege?: boolean; debris?: boolean;
   /** 피해 원천(기본·특수·보조무기), 보조무기 벌의 추적 대상 */
   src?: HitSource; homing?: number; ricochet?: boolean };
-export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "tshock" | "blast" | "pbomb" | "poison" | "net" | "rain" | "frost" | "spray";
+export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "tshock" | "blast" | "pbomb" | "poison" | "net" | "rain" | "frost" | "spray" | "leaf" | "ice";
+  /** 맞았을 때 피해 원인 이름(없으면 종류별 기본값) */
+  label?: string;
   /** 피해 원천(보조무기 씨앗탄·싹 장판은 "aux") */
   src?: HitSource;
   /** 내 공격 장판: 폭발 배율·독·그물 반지름 등 */
@@ -185,9 +189,9 @@ function spawnElite(s: RaidState, at: { x: number; y: number }) {
 }
 function spawnBoss(s: RaidState) {
   const b: BossDef = s.floor.boss;
-  const base = MONSTERS[b.base ?? (b.id === "pollen-boar" ? "boarling" : "shock-eel")];
+  const base = MONSTERS[b.base ?? ({ "pollen-boar": "boarling", "storm-catfish": "shock-eel", "maple-stag": "leaf-wolf", "iron-bear": "frost-miner" } as Record<string, string>)[b.id] ?? "shock-eel"];
   const m = spawn(s, base.id, { name: b.name, icon: b.icon, hp: b.hp, maxHp: b.hp, damage: b.damage, defense: b.defense, r: b.id === "mini" ? 30 : 40, xp: 0, elite: true,
-    boss: b.id === "mini" ? "mini" : (b.id as "pollen-boar" | "storm-catfish"), rate: b.id === "mini" ? 1.5 : 1, speed: b.id === "mini" ? base.speed * 0.9 : 60, timer: 2, t2: 3, t3: 5, t4: 7 }, spawnPoint(s));
+    boss: b.id === "mini" ? "mini" : (b.id as "pollen-boar" | "storm-catfish" | "maple-stag" | "iron-bear"), rate: b.id === "mini" ? 1.5 : 1, speed: b.id === "mini" ? base.speed * 0.9 : 60, timer: 2, t2: 3, t3: 5, t4: 7 }, spawnPoint(s));
   s.boss = m; s.bossSpawned = true; s.waveEndHp = Math.round((s.player.hp / s.player.maxHp) * 100) / 100;
   s.pops.push({ x: s.cam.x + ARENA_W / 2, y: s.cam.y + 80, text: `${b.icon} ${b.name} 등장!`, t: 2.5, kind: "info" });
 }
@@ -216,7 +220,7 @@ const ATTACK_SPEED_MUL = 0.85;
 const DAMAGE_MUL_CAP = 3;
 /** 방어 1당 계수(방어 4 ≈ 24%, 8 ≈ 39%, 15 ≈ 55% 감소) */
 const DEFENSE_K = 8;
-const HAZARD_SOURCES = ["꽃가루 장판", "감전", "전도성 웅덩이"];
+const HAZARD_SOURCES = ["꽃가루 장판", "감전", "전도성 웅덩이", "낙엽 회오리", "빙판"];
 /** 피해를 실제로 받았으면 true(회피·무적이면 false). */
 function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = false): boolean {
   const p = s.player;
@@ -224,6 +228,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   // 회피(대시) 중과 직후 0.2초는 무적: 맞을 뻔하면 "회피!"
   if (p.dashT > 0 || s.t < p.dodgeUntil) { if (s.t - p.dodgePop > 0.5) { p.dodgePop = s.t; s.pops.push({ x: p.x, y: p.y - 34, text: "회피!", t: 0.6, kind: "info" }); } return false; }
   if (p.iframes > 0) return false;
+  if (s.gear.hazardCut && HAZARD_SOURCES.includes(source)) raw *= 1 - s.gear.hazardCut; // 설산 장화: 바닥 피해 감소
   // 피해 감소 합계 85% 상한(53.9)
   raw *= 1 - Math.min(0.85, (s.weapon.fx?.guard ?? 0) + (s.picks["frost-veil"] && p.holdT > 0 ? 0.25 : 0) + buffSum(s, ["armor"]) + (pick(s, "safe-route") && HAZARD_SOURCES.includes(source) ? 0.3 : 0));
   if (s.special.stanceUntil > s.t) { raw *= 0.2; if (!s.special.stanceHit) { s.special.stanceHit = true; s.special.stanceUntil = 0; counterBlast(s, true); } }
@@ -671,14 +676,15 @@ function updateMonster(s: RaidState, m: Monster, dt: number) {
   m.flash = Math.max(0, m.flash - dt);
   if (m.kvx || m.kvy) { m.x += m.kvx * dt; m.y += m.kvy * dt; const f = Math.exp(-12 * dt); m.kvx *= f; m.kvy *= f; if (Math.abs(m.kvx) + Math.abs(m.kvy) < 4) { m.kvx = 0; m.kvy = 0; } }
   // 상태 진행(예고 → 돌진 → 이동)
-  if (m.state === "tele") { m.stateT -= dt; if (m.stateT <= 0) { m.state = "dash"; m.stateT = m.boss === "pollen-boar" ? 1.4 : m.boss === "storm-catfish" ? 1.1 : 0.6; m.tele = null; } return; }
+  if (m.state === "tele") { m.stateT -= dt; if (m.stateT <= 0) { m.state = "dash"; m.stateT = m.boss === "pollen-boar" ? 1.4 : m.boss === "storm-catfish" ? 1.1 : m.boss === "maple-stag" ? 1.2 : m.boss === "iron-bear" ? 0.9 : 0.6; m.tele = null; } return; }
   if (m.state === "stun") { m.stateT -= dt; if (m.stateT <= 0) m.state = "move"; return; }
   if (m.state === "dash") {
-    const sp = m.boss === "pollen-boar" ? 420 : m.boss === "storm-catfish" ? 380 : m.def.kind === "hop" ? 260 : m.def.kind === "eel" ? 360 : m.def.kind === "crab" ? 250 : 320;
+    const sp = m.boss === "pollen-boar" ? 420 : m.boss === "storm-catfish" ? 380 : m.boss === "maple-stag" ? 470 : m.boss === "iron-bear" ? 360 : m.def.kind === "hop" ? 260 : m.def.kind === "eel" ? 360 : m.def.kind === "crab" ? 250 : 320;
     m.x += m.dir.x * sp * dt; m.y += m.dir.y * sp * dt; m.stateT -= dt;
     if (m.boss === "storm-catfish" && Math.random() < dt * 3) zoneAt(s, { kind: "puddle", x: m.x, y: m.y, r: 50, t: 6, tele: 0, damage: 0, every: 0, slow: 0.3 });
     const wall = m.x < m.r || m.x > WORLD_W - m.r || m.y < m.r || m.y > WORLD_H - m.r || blockedAt(s.terrain, m.x, m.y, m.r * 0.6);
     if (wall && m.boss === "pollen-boar") { m.state = "stun"; m.stateT = 1; s.pops.push({ x: m.x, y: m.y - 50, text: "기절!", t: 1, kind: "info" }); }
+    else if (wall && m.boss === "iron-bear") { m.state = "move"; exposeBear(s, m); }
     else if (m.stateT <= 0 || wall) { m.state = "move"; if (m.def.kind === "elite" && !m.boss) zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 50, t: 3, tele: 0, damage: 6, every: 0.5, slow: 0.25 }); }
     { const o = pushOut(m.x, m.y, m.r, blockers(s.terrain)); m.x = o.x; m.y = o.y; }
     return;
@@ -688,6 +694,8 @@ function updateMonster(s: RaidState, m: Monster, dt: number) {
   const slow = (s.zones.some(z => z.kind === "puddle" && z.tele <= 0 && dist(z.x, z.y, m.x, m.y) < z.r) && !m.boss ? 0.85 : 1) * (m.boss ? 1 : slowAt(s.terrain, m.x, m.y, false)) * (m.slowUntil > s.t ? m.slowMul : 1);
   if (m.boss === "pollen-boar") return updatePollenBoar(s, m, dt);
   if (m.boss === "storm-catfish") return updateCatfish(s, m, dt);
+  if (m.boss === "maple-stag") return updateMapleStag(s, m, dt);
+  if (m.boss === "iron-bear") return updateIronBear(s, m, dt);
   m.timer -= dt * rate;
   const far = dist(m.x, m.y, p.x, p.y);
   switch (m.def.kind) {
@@ -737,6 +745,63 @@ function updateCatfish(s: RaidState, m: Monster, dt: number) {
   else if (m.t4 <= 0) { m.t4 = 14; const n = Math.min(2, 6 - summoned(s, "shock-eel")); for (let i = 0; i < n; i++) spawn(s, "shock-eel", { summoned: true }, { x: m.x + (i ? 30 : -30), y: m.y + 20 }); }
 }
 
+/** 50% 아래에서 패턴 간격 −10%(5.4절) */
+const enrage = (m: Monster) => (m.hp < m.maxHp * 0.5 ? 0.9 : 1);
+/** 15층 단풍 뿔사슴: 분신 돌진(본체 돌진 + 위아래 분신 가로 돌진) · 낙엽 회오리 · 표식 폭발 · 잎새 늑대 소환. 패턴 뒤 0.8초 공백. */
+function updateMapleStag(s: RaidState, m: Monster, dt: number) {
+  const p = s.player, k = enrage(m);
+  moveToward(m, p.x, p.y, m.speed, dt, 1);
+  m.timer -= dt; m.t2 -= dt; m.t3 -= dt; m.t4 -= dt; m.gap = (m.gap ?? 0) - dt;
+  if (m.gap > 0) return;
+  if (m.timer <= 0) {
+    m.timer = 7 * k; m.gap = 1.2 + 1.2 + 0.8; startCharge(m, p.x, p.y, 1.0, 560);
+    for (const off of [-140, 140]) zoneAt(s, { kind: "line", x: s.cam.x, y: clamp(p.y + off, 40, WORLD_H - 40), r: 24, t: 0.4, tele: 1.3, damage: Math.round(m.damage * 0.8), every: 0, slow: 0, dx: 1, dy: 0, len: ARENA_W, label: "분신 돌진" });
+  } else if (m.t2 <= 0) {
+    m.t2 = 9 * k; m.gap = 0.7 + 0.8;
+    for (let i = 0; i < 3; i++) zoneAt(s, { kind: "leaf", ...nearPlayer(s, 300), r: 65, t: 3.5, tele: 0.7, damage: 7, every: 0.5, slow: 0.3 });
+  } else if (m.t3 <= 0) {
+    m.t3 = 12 * k; m.gap = 1.1 + 1.2 + 0.8;
+    s.pops.push({ x: p.x, y: p.y - 40, text: "🍁 표식!", t: 1, kind: "info" });
+    for (let i = 0; i < 3; i++) later(s, 0.6 * i, () => zoneAt(s, { kind: "bolt", x: s.player.x, y: s.player.y, r: 62, t: 0.15, tele: 1.1, damage: 28, every: 0, slow: 0, label: "표식 폭발" }));
+  } else if (m.t4 <= 0) {
+    m.t4 = 14 * k; m.gap = 0.8; const n = Math.min(2, 6 - summoned(s, "leaf-wolf"));
+    for (let i = 0; i < n; i++) spawn(s, "leaf-wolf", { summoned: true }, { x: m.x + (i ? 30 : -30), y: m.y + 20 });
+  }
+}
+/** 20층 설산 철갑곰 약점 노출: 3초간 받는 피해 +20% */
+function exposeBear(s: RaidState, m: Monster) {
+  m.takenUntil = s.t + 3; m.takenBonus = Math.max(m.takenBonus, 0.2);
+  s.pops.push({ x: m.x, y: m.y - 56, text: "약점 노출! 받는 피해 +20%", t: 1.6, kind: "info" });
+}
+/** 20층 설산 철갑곰: 내려찍기(뒤에 약점 노출) · 빙결 숨결(직선 폭발 + 빙판) · 철갑 방어(4초간 방어 5 → 10) · 서리 광부 소환. */
+function updateIronBear(s: RaidState, m: Monster, dt: number) {
+  const p = s.player, k = enrage(m), armored = (m.armorUntil ?? 0) > s.t;
+  m.defense = armored ? 10 : s.floor.boss.defense;
+  moveToward(m, p.x, p.y, m.speed * (armored ? 0.6 : 1), dt, 1);
+  m.timer -= dt; m.t2 -= dt; m.t3 -= dt; m.t4 -= dt; m.gap = (m.gap ?? 0) - dt;
+  if (m.gap > 0) return;
+  if (m.timer <= 0) {
+    m.timer = 8 * k; m.gap = 1.3 + 0.8;
+    const x = p.x, y = p.y;
+    zoneAt(s, { kind: "bolt", x, y, r: 110, t: 0.2, tele: 1.3, damage: m.damage, every: 0, slow: 0, label: "내려찍기" });
+    later(s, 1.3, () => { if (m.hp > 0) exposeBear(s, m); });
+  } else if (m.t2 <= 0) {
+    m.t2 = 10 * k; m.gap = 1.4 + 0.8;
+    const a = Math.atan2(p.y - m.y, p.x - m.x);
+    for (let i = 1; i <= 4; i++) {
+      const x = clamp(m.x + Math.cos(a) * 75 * i, 30, WORLD_W - 30), y = clamp(m.y + Math.sin(a) * 75 * i, 30, WORLD_H - 30);
+      zoneAt(s, { kind: "bolt", x, y, r: 52, t: 0.15, tele: 0.9 + 0.1 * i, damage: Math.round(m.damage * 0.55), every: 0, slow: 0, label: "빙결 숨결" });
+      zoneAt(s, { kind: "ice", x, y, r: 60, t: 4, tele: 1 + 0.1 * i, damage: 0, every: 0, slow: 0.4 });
+    }
+  } else if (m.t3 <= 0) {
+    m.t3 = 16; m.gap = 0.8; m.armorUntil = s.t + 4;
+    s.pops.push({ x: m.x, y: m.y - 56, text: "🛡️ 철갑 방어! (방어 10)", t: 1.6, kind: "info" });
+  } else if (m.t4 <= 0) {
+    m.t4 = 15 * k; m.gap = 0.8; const n = Math.min(2, 6 - summoned(s, "frost-miner"));
+    for (let i = 0; i < n; i++) spawn(s, "frost-miner", { summoned: true }, { x: m.x + (i ? 30 : -30), y: m.y + 20 });
+  }
+}
+
 /** 1·2·3분 보스 간접 개입. */
 function intervention(s: RaidState, n: number) {
   const f = s.floor.floor, p = s.player;
@@ -748,6 +813,14 @@ function intervention(s: RaidState, n: number) {
     if (n === 1) for (let i = 0; i < 6; i++) zoneAt(s, { kind: "puddle", ...nearPlayer(s, 700), r: 70, t: 6, tele: 0.5, damage: 0, every: 0, slow: 0.3 });
     if (n === 2) for (let i = 0; i < 3; i++) { const at = nearPlayer(s, 200); zoneAt(s, { kind: "bolt", ...at, r: 55, t: 0.15, tele: 1.0 + i * 0.5, damage: 26, every: 0, slow: 0 }); }
     if (n === 3) for (let i = 0; i < 4; i++) spawn(s, "shock-eel");
+  } else if (f === 15) {
+    if (n === 1) for (let i = 0; i < 4; i++) zoneAt(s, { kind: "leaf", ...nearPlayer(s, 420), r: 65, t: 3.5, tele: 0.7, damage: 7, every: 0.5, slow: 0.3 });
+    if (n === 2) zoneAt(s, { kind: "line", x: s.cam.x, y: p.y, r: 28, t: 0.4, tele: 1.2, damage: 30, every: 0, slow: 0, dx: 1, dy: 0, len: ARENA_W, label: "분신 돌진" });
+    if (n === 3) for (let i = 0; i < 4; i++) spawn(s, "leaf-wolf");
+  } else if (f === 20) {
+    if (n === 1) for (let i = 0; i < 5; i++) zoneAt(s, { kind: "ice", ...nearPlayer(s, 640), r: 70, t: 6, tele: 0.5, damage: 0, every: 0, slow: 0.4 });
+    if (n === 2) for (let i = 0; i < 3; i++) { const at = nearPlayer(s, 220); zoneAt(s, { kind: "bolt", ...at, r: 70, t: 0.15, tele: 1.1 + i * 0.5, damage: 30, every: 0, slow: 0, label: "내려찍기" }); }
+    if (n === 3) for (let i = 0; i < 4; i++) spawn(s, "frost-miner");
   } else {
     const id = s.floor.boss.base ?? s.floor.monsters[0];
     for (let i = 0; i < 4; i++) spawn(s, MONSTERS[id].kind === "elite" || MONSTERS[id].kind === "canal-elite" ? s.floor.monsters[s.floor.monsters.length - 1] : id);
@@ -861,11 +934,11 @@ function updateWorld(s: RaidState, dt: number) {
     for (let i = 0; i < 20; i++) {
       const x = 120 + rnd() * (WORLD_W - 240), y = 120 + rnd() * (WORLD_H - 240);
       if (blockedAt(T, x, y, 60) || dist(x, y, p.x, p.y) < 200) continue;
-      T.chance = { x, y, r: T.zone === "field" ? 22 : 80, next: s.t + 25 + rnd() * 10, used: false }; break;
+      T.chance = { x, y, r: fieldLike(T) ? 22 : 80, next: s.t + 25 + rnd() * 10, used: false }; break;
     }
   }
   // 수로 기회 지형 "정령 샘": 안에 있으면 초당 체력 2 회복, 전투펫 재사용 진행 +20%
-  if (T.chance && T.zone === "canal" && dist(p.x, p.y, T.chance.x, T.chance.y) < T.chance.r) { p.hp = Math.min(p.maxHp, p.hp + 2 * dt); if (s.pet) s.pet.timer -= dt * 0.2; }
+  if (T.chance && !fieldLike(T) && dist(p.x, p.y, T.chance.x, T.chance.y) < T.chance.r) { p.hp = Math.min(p.maxHp, p.hp + 2 * dt); if (s.pet) s.pet.timer -= dt * 0.2; }
 }
 
 // ---------- 한 스텝 ----------
@@ -898,14 +971,15 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   s.prevDash = input.dash;
 
   // 이동(장판 둔화, 공격 중 둔화)
-  const inPollen = s.zones.find(z => (z.kind === "pollen" || z.kind === "puddle") && z.tele <= 0 && dist(z.x, z.y, p.x, p.y) < z.r);
+  const inPollen = s.zones.find(z => (z.kind === "pollen" || z.kind === "puddle" || z.kind === "leaf" || z.kind === "ice") && z.tele <= 0 && dist(z.x, z.y, p.x, p.y) < z.r);
+  const zoneSlow = inPollen ? inPollen.slow * (inPollen.kind === "ice" ? 1 - (s.gear.freezeResist ?? 0) : 1) : 0; // 설산 투구: 빙판 둔화 감소
   if (p.dashT > 0) {
     const dashSp = PLAYER.dashSpeed * (1 + 0.25 * pick(s, "long-dash"));
     p.dashT -= dt; p.x += p.dashDir.x * dashSp * dt; p.y += p.dashDir.y * dashSp * dt; p.dashBonusUntil = s.t + 1;
     if (pick(s, "cutting-trail")) for (const m of s.monsters) if (m.hp > 0 && !s.ext.cut.includes(m.uid) && dist(m.x, m.y, p.x, p.y) < m.r + 26) { s.ext.cut.push(m.uid); hitMonster(s, m, s.weapon.damage * 0.8, Math.atan2(p.dashDir.y, p.dashDir.x), 10, { noCrit: true, noCombo: true }); }
     if (s.picks["gale-dance"]) for (const m of s.monsters) if (m.hp > 0 && !p.gale.includes(m.uid) && dist(m.x, m.y, p.x, p.y) < m.r + 24) { p.gale.push(m.uid); hitMonster(s, m, s.weapon.damage * 2, Math.atan2(p.dashDir.y, p.dashDir.x), 20, { noCombo: true }); }
   }
-  else { const sp = d.speed * (inPollen ? 1 - inPollen.slow : 1) * (p.slowUntil > s.t && !s.picks["quick-shot"] ? 1 - (s.weapon.fx?.selfSlow ?? PLAYER.attackSlow) : 1) * (s.special.moveUntil > s.t ? s.special.moveMul : 1) * (pick(s, "terrain-boots") ? 1 - (1 - slowAt(s.terrain, p.x, p.y, true)) * 0.5 : slowAt(s.terrain, p.x, p.y, true)); p.x += mx * sp * dt; p.y += my * sp * dt; }
+  else { const sp = d.speed * (1 - zoneSlow) * (p.slowUntil > s.t && !s.picks["quick-shot"] ? 1 - (s.weapon.fx?.selfSlow ?? PLAYER.attackSlow) : 1) * (s.special.moveUntil > s.t ? s.special.moveMul : 1) * (pick(s, "terrain-boots") ? 1 - (1 - slowAt(s.terrain, p.x, p.y, true)) * 0.5 : slowAt(s.terrain, p.x, p.y, true)); p.x += mx * sp * dt; p.y += my * sp * dt; }
   if (s.ext.wasDashing && p.dashT <= 0 && pick(s, "long-dash")) s.ext.dashBoostUntil = s.t + 1;
   s.ext.wasDashing = p.dashT > 0;
   { const o = pushOut(p.x, p.y, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; }
@@ -1018,7 +1092,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
     hitSource = z.src ?? "basic";
     if (z.tele > 0) { z.tele -= dt; if (z.tele <= 0 && (z.kind === "bolt" || z.kind === "line" || z.kind === "tshock" || z.kind === "pbomb" || z.kind === "rain")) {
       const inside = z.kind === "line" ? Math.abs(p.y - z.y) < z.r && p.x > z.x && p.x < z.x + (z.len ?? ARENA_W) : dist(z.x, z.y, p.x, p.y) < z.r;
-      if (inside && !z.mine && z.kind !== "tshock") hurtPlayer(s, z.damage, z.kind === "line" ? "돌진 예고" : "번개");
+      if (inside && !z.mine && z.kind !== "tshock") hurtPlayer(s, z.damage, z.label ?? (z.kind === "line" ? "돌진 예고" : "번개"), Boolean(z.label));
       if (z.kind === "bolt") for (const w of s.terrain.puddles) if (dist(w.x, w.y, z.x, z.y) < w.r + z.r) zoneAt(s, { kind: "tshock", x: w.x, y: w.y, r: w.r, t: 0.3, tele: 0.5, damage: z.damage, every: 0, slow: 0 });
       if (z.kind === "pbomb" && z.mine && z.src === "aux") {
         // 톡톡 씨앗탄: 최대 5명, 잔재주면 2초 싹 장판(초당 2)
@@ -1039,7 +1113,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
     if (z.kind === "poison") { z.tick -= dt; if (z.tick <= 0) { z.tick = 1; if (z.damage > 0) for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, z.x, z.y) < z.r + m.r) hitMonster(s, m, z.damage, 0, 0, { noCombo: true }); } continue; }
     if (z.kind === "net") { for (const m of s.monsters) if (m.hp > 0) { const inside = dist(m.x, m.y, z.x, z.y) < z.r + m.r; if (inside) { m.inNet = true; m.slowUntil = s.t + 0.1; m.slowMul = 0.5; m.takenUntil = s.t + 0.1; m.takenBonus = Math.max(m.takenBonus, m.boss ? 0.08 : 0.15); } } continue; }
     if (z.mine) continue;
-    if (z.damage && z.every && dist(z.x, z.y, p.x, p.y) < z.r) { z.tick -= dt; if (z.tick <= 0) { z.tick = z.every; hurtPlayer(s, z.damage, z.kind === "pollen" ? "꽃가루 장판" : "감전"); } }
+    if (z.damage && z.every && dist(z.x, z.y, p.x, p.y) < z.r) { z.tick -= dt; if (z.tick <= 0) { z.tick = z.every; hurtPlayer(s, z.damage, z.label ?? (z.kind === "pollen" ? "꽃가루 장판" : z.kind === "leaf" ? "낙엽 회오리" : "감전")); } }
   }
   hitSource = "basic";
   s.zones = s.zones.filter(z => z.tele > 0 || z.t > 0);

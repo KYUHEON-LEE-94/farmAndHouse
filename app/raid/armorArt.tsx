@@ -11,8 +11,12 @@ const ART: Record<string, string> = {
   "leather-boots": path("M18 8H31L29 39L40 49C43 52 41 57 37 57H10C7 57 6 53 9 50L17 42Z", LEATHER) + path("M35 8H48L47 42L55 50C58 53 57 57 53 57H34C31 57 30 53 33 50L38 45Z", DARK) + line("M17 20H29M36 20H47", FUR, 4),
   "reinforced-boots": path("M15 7H31L29 39L40 49C44 53 42 58 37 58H8C5 58 4 53 8 49L15 42Z", DARK) + path("M34 7H50L48 42L56 50C60 54 57 58 53 58H33C29 58 29 53 32 49L38 44Z", DARK) + path("M14 16H31L29 27H14Z", METAL) + path("M34 16H50L48 27H34Z", METAL) + path("M8 48H38L42 53L37 58H8Z", LIGHT) + path("M33 48H55L59 53L53 58H33Z", LIGHT) + line("M18 10L27 24M38 10L47 24", GOLD, 2.5),
 };
+// 단풍 추적자·설산 방벽: 강화 가죽 모양에 구역 색을 입힌다.
+const tint = (svg: string, map: Record<string, string>) => Object.entries(map).reduce((out, [from, to]) => out.split(`"${from}"`).join(`"${to}"`), svg);
+const MAPLE = { [DARK]: "#a3401f", [LEATHER]: "#d9772f", [METAL]: "#e6a23c", [FUR]: "#f6d9a8" }, FROST = { [DARK]: "#4f7d99", [LEATHER]: "#8fb8cf", [METAL]: "#d8eef8", [FUR]: "#ffffff" };
+for (const slot of ["hood", "vest", "boots"]) { ART[`maple-${slot}`] = tint(ART[`reinforced-${slot}`], MAPLE); ART[`frost-${slot}`] = tint(ART[`reinforced-${slot}`], FROST); }
 
 export function armorSvg(id: string) { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${ART[id] ?? ART["leather-hood"]}</svg>`; }
 export function ArmorIcon({ id, size = 40, className = "" }: { id: string; size?: number; className?: string }) {
-  return <span className={`armor-art ${id.startsWith("reinforced-") ? "reinforced" : "leather"} ${className}`} style={{ width: size, height: size }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: armorSvg(id) }} />;
+  return <span className={`armor-art ${id.startsWith("leather-") ? "leather" : id.split("-")[0]} ${className}`} style={{ width: size, height: size }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: armorSvg(id) }} />;
 }

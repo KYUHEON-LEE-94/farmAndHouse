@@ -6,15 +6,16 @@ import { GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE } from "../house";
  */
 export const RAID_RELEASED = true;
 export const RAID_ENABLED = RAID_RELEASED || TEST_MODE;
-export const RAID_BALANCE_VERSION = 2; // 2026-10-16 1~10층 곡선 복구·구간 상향(RAID_FLOOR_20_EXPANSION_AUDIT 5절)
+export const RAID_BALANCE_VERSION = 3; // 2: 2026-10-16 1~10층 곡선 복구·구간 상향(RAID_FLOOR_20_EXPANSION_AUDIT 5절) · 3: 같은 날 11~20층 개방
 /** 층 구간 배율: 일반 몹 체력, 정예 체력, 정예 등장 간격(작을수록 자주). 1~3층은 유지. */
 export function floorBand(floor: number) {
+  if (floor >= 11) return { fodder: 1, elite: 1, eliteTime: 1 }; // 11층부터는 층 표 자체가 상위 수치
   if (floor >= 8) return { fodder: 1.1, elite: 1.12, eliteTime: 0.9 };
   if (floor >= 6) return { fodder: 1.07, elite: 1.1, eliteTime: 0.95 };
   if (floor >= 4) return { fodder: 1.05, elite: 1.08, eliteTime: 0.95 };
   return { fodder: 1, elite: 1, eliteTime: 1 };
 }
-export const RAID_MAX_FLOOR = 10;
+export const RAID_MAX_FLOOR = 20; // 2026-10-16 11~20층 개방(RAID_FLOOR_20_EXPANSION_AUDIT)
 
 export const ARENA_W = 960, ARENA_H = 540;
 /** 2분 고밀도 웨이브 + 제한 없는 보스전(59절). FLOOR_SECONDS는 훈련장 외에는 쓰지 않는다(보스전 시간 초과 없음). */
@@ -52,6 +53,18 @@ export const MONSTERS: Record<string, MonsterDef> = {
   "dart-frog": { id: "dart-frog", name: "물총 개구리", icon: "🐸", kind: "frog", hp: 46, damage: 14, defense: 1, speed: 52, radius: 13, xp: 1 },
   "shell-crab": { id: "shell-crab", name: "껍질 게", icon: "🦀", kind: "crab", hp: 95, damage: 17, defense: 5, speed: 34, radius: 17, xp: 2 },
   "canal-elite": { id: "canal-elite", name: "수로 포식자", icon: "🐊", kind: "canal-elite", hp: 300, damage: 25, defense: 4, speed: 55, radius: 24, xp: 12 },
+  // 11~15층 단풍 미궁(9.1절 원본값: 일반 몹 체력은 엔진이 ×0.5)
+  "maple-goblin": { id: "maple-goblin", name: "단풍 도깨비", icon: "👹", kind: "chase", hp: 72, damage: 16, defense: 1, speed: 56, radius: 13, xp: 1 },
+  "leaf-wolf": { id: "leaf-wolf", name: "잎새 늑대", icon: "🐺", kind: "hop", hp: 58, damage: 18, defense: 0, speed: 94, radius: 13, xp: 1 },
+  "lantern-crow": { id: "lantern-crow", name: "등불 까마귀", icon: "🐦‍⬛", kind: "ranged", hp: 65, damage: 17, defense: 0, speed: 62, radius: 12, xp: 1 },
+  "bark-golem": { id: "bark-golem", name: "나무껍질 골렘", icon: "🪵", kind: "crab", hp: 135, damage: 21, defense: 4, speed: 36, radius: 18, xp: 2 },
+  "maze-keeper": { id: "maze-keeper", name: "미궁지기", icon: "👺", kind: "elite", hp: 440, damage: 30, defense: 5, speed: 46, radius: 25, xp: 12 },
+  // 16~20층 서리 광산
+  "frost-miner": { id: "frost-miner", name: "서리 광부", icon: "🥶", kind: "chase", hp: 105, damage: 20, defense: 2, speed: 56, radius: 14, xp: 1 },
+  "ice-bat": { id: "ice-bat", name: "얼음 박쥐", icon: "🦇", kind: "eel", hp: 82, damage: 22, defense: 0, speed: 88, radius: 12, xp: 1 },
+  "icicle-sprite": { id: "icicle-sprite", name: "고드름 정령", icon: "❄️", kind: "frog", hp: 92, damage: 21, defense: 1, speed: 54, radius: 13, xp: 1 },
+  "ice-golem": { id: "ice-golem", name: "빙갑 골렘", icon: "🧊", kind: "crab", hp: 190, damage: 26, defense: 5, speed: 32, radius: 19, xp: 2 },
+  "mine-warden": { id: "mine-warden", name: "광산 감시자", icon: "🗿", kind: "canal-elite", hp: 620, damage: 36, defense: 7, speed: 50, radius: 26, xp: 12 },
 };
 
 // ---------- 층(24절 웨이브) ----------
@@ -66,7 +79,7 @@ export type FloorDef = {
   /** 진화 훈련장: 보스·간접 개입 없음, 체력이 1 아래로 내려가지 않는다. */
   training?: boolean;
 };
-const z1 = "꽃가루 들판", z2 = "침수된 수로";
+const z1 = "꽃가루 들판", z2 = "침수된 수로", z3 = "단풍 미궁", z4 = "서리 광산";
 export const FLOORS: FloorDef[] = [
   { floor: 1, zone: z1, monsters: ["pollen-mite"], spawnRate: 0.8, maxAlive: 16, elite: null, boss: { id: "mini", name: "강화 진드기", icon: "🐞", hp: 300, damage: 10, defense: 0, base: "pollen-mite" } },
   { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 520, damage: 12, defense: 0, base: "thorn-rabbit" } },
@@ -78,7 +91,20 @@ export const FLOORS: FloorDef[] = [
   { floor: 8, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog"], spawnRate: 1.25, maxAlive: 24, elite: { id: "dart-frog", hp: 400, count: 2 }, boss: { id: "mini", name: "물총 개구리왕", icon: "🐸", hp: 2300, damage: 25, defense: 1, base: "dart-frog" } },
   { floor: 9, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.35, maxAlive: 27, elite: { id: "canal-elite", hp: 300, every: 30 }, boss: { id: "mini", name: "수로 포식자 우두머리", icon: "🐊", hp: 2550, damage: 27, defense: 4, base: "canal-elite" } },
   { floor: 10, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.5, maxAlive: 30, elite: { id: "canal-elite", hp: 300, every: 25 }, boss: { id: "storm-catfish", name: "폭풍 메기왕", icon: "🐟", hp: 3200, damage: 32, defense: 4 } },
+  // 11~20층(9.2절: 구간 첫 층 생성 -15%, 다섯째 층 +10%, 정예 28초·26초 주기)
+  { floor: 11, zone: z3, monsters: ["maple-goblin", "leaf-wolf"], spawnRate: 1.15, maxAlive: 30, elite: { id: "maze-keeper", hp: 440, count: 2 }, boss: { id: "mini", name: "도깨비 두목", icon: "👹", hp: 2900, damage: 30, defense: 2, base: "maple-goblin" } },
+  { floor: 12, zone: z3, monsters: ["maple-goblin", "leaf-wolf", "lantern-crow"], spawnRate: 1.35, maxAlive: 30, elite: { id: "maze-keeper", hp: 440, every: 28 }, boss: { id: "mini", name: "늑대 우두머리", icon: "🐺", hp: 3100, damage: 31, defense: 1, base: "leaf-wolf" } },
+  { floor: 13, zone: z3, monsters: ["maple-goblin", "leaf-wolf", "lantern-crow", "bark-golem"], spawnRate: 1.45, maxAlive: 30, elite: { id: "maze-keeper", hp: 440, every: 28 }, boss: { id: "mini", name: "등불 까마귀 여왕", icon: "🐦‍⬛", hp: 3300, damage: 32, defense: 1, base: "lantern-crow" } },
+  { floor: 14, zone: z3, monsters: ["maple-goblin", "leaf-wolf", "lantern-crow", "bark-golem"], spawnRate: 1.55, maxAlive: 30, elite: { id: "maze-keeper", hp: 440, every: 28 }, boss: { id: "mini", name: "고목 골렘", icon: "🪵", hp: 3500, damage: 33, defense: 6, base: "bark-golem" } },
+  { floor: 15, zone: z3, monsters: ["maple-goblin", "leaf-wolf", "lantern-crow", "bark-golem"], spawnRate: 1.7, maxAlive: 30, elite: { id: "maze-keeper", hp: 440, every: 28 }, boss: { id: "maple-stag", name: "단풍 뿔사슴", icon: "🦌", hp: 4200, damage: 34, defense: 6 } },
+  { floor: 16, zone: z4, monsters: ["frost-miner", "ice-bat"], spawnRate: 1.25, maxAlive: 32, elite: { id: "mine-warden", hp: 620, count: 2 }, boss: { id: "mini", name: "서리 광부 반장", icon: "🥶", hp: 3900, damage: 36, defense: 3, base: "frost-miner" } },
+  { floor: 17, zone: z4, monsters: ["frost-miner", "ice-bat", "icicle-sprite"], spawnRate: 1.45, maxAlive: 32, elite: { id: "mine-warden", hp: 620, every: 26 }, boss: { id: "mini", name: "얼음 박쥐 군주", icon: "🦇", hp: 4200, damage: 37, defense: 1, base: "ice-bat" } },
+  { floor: 18, zone: z4, monsters: ["frost-miner", "ice-bat", "icicle-sprite", "ice-golem"], spawnRate: 1.55, maxAlive: 32, elite: { id: "mine-warden", hp: 620, every: 26 }, boss: { id: "mini", name: "고드름 대정령", icon: "❄️", hp: 4500, damage: 38, defense: 2, base: "icicle-sprite" } },
+  { floor: 19, zone: z4, monsters: ["frost-miner", "ice-bat", "icicle-sprite", "ice-golem"], spawnRate: 1.65, maxAlive: 32, elite: { id: "mine-warden", hp: 620, every: 26 }, boss: { id: "mini", name: "빙갑 거신", icon: "🧊", hp: 4800, damage: 40, defense: 8, base: "ice-golem" } },
+  { floor: 20, zone: z4, monsters: ["frost-miner", "ice-bat", "icicle-sprite", "ice-golem"], spawnRate: 1.85, maxAlive: 32, elite: { id: "mine-warden", hp: 620, every: 26 }, boss: { id: "iron-bear", name: "설산 철갑곰", icon: "🐻‍❄️", hp: 6000, damage: 42, defense: 5 } },
 ];
+/** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리 */
+export const zoneOf = (floor: number): "field" | "canal" | "maple" | "frost" => floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : "frost";
 
 // ---------- 전투 각성(25절) ----------
 export const AWAKEN_XP = [0, 8, 20, 36, 56]; // Lv.1~5 누적(59절). Lv.6부터는 xpForLevel.
@@ -244,6 +270,8 @@ export const MAX_HEAL_FOODS = 2;
 export const RAID_ITEMS: Record<string, { name: string; icon: string }> = {
   "pollen-clump": { name: "꽃가루 뭉치", icon: "🌼" }, "field-essence": { name: "들판 정수", icon: "🌿" }, "pollen-tusk": { name: "꽃가루 멧돼지 엄니", icon: "🦷" },
   "canal-moss": { name: "수로 이끼", icon: "💧" }, "mist-crystal": { name: "물안개 결정", icon: "🔷" }, "storm-whisker": { name: "폭풍 메기 수염", icon: "⚡" },
+  "maple-fragment": { name: "단풍 파편", icon: "🍁" }, "maze-amber": { name: "미궁 호박", icon: "🟠" }, "crimson-antler": { name: "붉은 뿔", icon: "🦌" },
+  "frost-ore": { name: "서리 광석", icon: "🧊" }, "glacier-crystal": { name: "빙하 결정", icon: "💎" }, "ironbear-core": { name: "철갑곰의 핵", icon: "🐻" },
 };
 /** [id, 최소, 최대, 확률(없으면 1)] */
 export type Drop = [string, number, number, number?];
@@ -258,8 +286,19 @@ export const FLOOR_REWARDS: Record<number, { firstGold: number; first: Drop[]; r
   8: { firstGold: 800, first: [["canal-moss", 3, 3], ["mist-crystal", 1, 1]], repeat: [["canal-moss", 2, 3], ["mist-crystal", 1, 1, 0.2]], stabilizer: 0.01 },
   9: { firstGold: 1000, first: [["mist-crystal", 2, 2]], repeat: [["canal-moss", 2, 4], ["mist-crystal", 1, 1]], stabilizer: 0.03 },
   10: { firstGold: 2500, first: [["mist-crystal", 3, 3], ["storm-whisker", 1, 1]], repeat: [["mist-crystal", 1, 2], ["storm-whisker", 1, 1, 0.3]], stabilizer: 0.05 },
+  // 11~20층(RAID_FLOOR_20_EXPANSION_AUDIT 12절)
+  11: { firstGold: 900, first: [["maple-fragment", 3, 3]], repeat: [["maple-fragment", 1, 2]], stabilizer: 0.01 },
+  12: { firstGold: 1000, first: [["maple-fragment", 3, 3]], repeat: [["maple-fragment", 1, 3]], stabilizer: 0.01 },
+  13: { firstGold: 1200, first: [["maple-fragment", 3, 3], ["maze-amber", 1, 1]], repeat: [["maple-fragment", 2, 3], ["maze-amber", 1, 1, 0.2]], stabilizer: 0.02 },
+  14: { firstGold: 1500, first: [["maze-amber", 2, 2]], repeat: [["maple-fragment", 2, 4], ["maze-amber", 1, 1]], stabilizer: 0.03 },
+  15: { firstGold: 3500, first: [["maze-amber", 3, 3], ["crimson-antler", 1, 1]], repeat: [["maze-amber", 1, 2], ["crimson-antler", 1, 1, 0.3]], stabilizer: 0.05 },
+  16: { firstGold: 1200, first: [["frost-ore", 3, 3]], repeat: [["frost-ore", 1, 2]], stabilizer: 0.01 },
+  17: { firstGold: 1400, first: [["frost-ore", 3, 3]], repeat: [["frost-ore", 1, 3]], stabilizer: 0.02 },
+  18: { firstGold: 1600, first: [["frost-ore", 3, 3], ["glacier-crystal", 1, 1]], repeat: [["frost-ore", 2, 3], ["glacier-crystal", 1, 1, 0.2]], stabilizer: 0.02 },
+  19: { firstGold: 2000, first: [["glacier-crystal", 2, 2]], repeat: [["frost-ore", 2, 4], ["glacier-crystal", 1, 1]], stabilizer: 0.04 },
+  20: { firstGold: 4500, first: [["glacier-crystal", 3, 3], ["ironbear-core", 1, 1]], repeat: [["glacier-crystal", 1, 2], ["ironbear-core", 1, 1, 0.3]], stabilizer: 0.06 },
 };
-export const zoneCommon = (floor: number) => (floor <= 5 ? "pollen-clump" : "canal-moss");
+export const zoneCommon = (floor: number) => ({ field: "pollen-clump", canal: "canal-moss", maple: "maple-fragment", frost: "frost-ore" })[zoneOf(floor)];
 
 // ---------- 생활 재료(27절) ----------
 export const LIFE_MATS: Record<string, { name: string; icon: string; recipe: string }> = {
@@ -292,7 +331,7 @@ export const ENHANCE: EnhanceStep[] = [
   { to: 14, chance: 0.22, drop: 0.04, gold: 130000, need: { "frost-ore": 2, "glacier-crystal": 1 }, open: { gold: 55000, need: { "ironbear-core": 2 } } },
   { to: 15, chance: 0.15, drop: 0.05, gold: 170000, need: { "ancient-bark": 2, "spirit-crystal": 1 }, open: { gold: 80000, need: { "guardian-seed": 2 } } },
 ];
-/** 11~15층 이상 재료(아직 층이 없어 이름만). */
+/** 11층 이상 재료(11~20층은 탑 상자에서, 21층 이상은 아직 이름만). */
 export const UPPER_ITEMS: Record<string, { name: string; icon: string }> = {
   "maple-fragment": { name: "단풍 파편", icon: "🍁" }, "maze-amber": { name: "미궁 호박", icon: "🟠" }, "crimson-antler": { name: "붉은 뿔", icon: "🦌" },
   "frost-ore": { name: "서리 광석", icon: "🧊" }, "glacier-crystal": { name: "빙하 결정", icon: "💎" }, "ironbear-core": { name: "철갑곰의 핵", icon: "🐻" },
@@ -303,14 +342,22 @@ export const EVOLUTION_CHANGE = { gold: 30000, need: { "artisan-core": 3 } as Re
 
 // ---------- 방어구(26절) ----------
 export type ArmorSlot = "head" | "body" | "legs";
-export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2; prerequisite?: string; gold: number; need: Record<string, number>;
-  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number }; text: string };
+export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2 | 3 | 4; prerequisite?: string; gold: number; need: Record<string, number>;
+  /** freezeResist: 빙판·빙결 둔화 감소, hazardCut: 바닥(장판·감전) 피해 감소 */
+  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number; freezeResist?: number; hazardCut?: number }; text: string };
 export const ARMORS: ArmorDef[] = [
   { id: "leather-hood", slot: "head", name: "가죽 두건", icon: "🧢", tier: 1, gold: 2000, need: { rabbitfur: 8, foxfur: 3 }, stats: { crit: 0.05, xpGain: 0.03 }, text: "치명타 +5% · 경험치 +3%" },
   { id: "reinforced-hood", prerequisite: "leather-hood", slot: "head", name: "강화 가죽 두건", icon: "⛑️", tier: 2, gold: 5000, need: { rabbitfur: 12, foxfur: 8, antler: 2, "field-essence": 2 }, stats: { crit: 0.1, xpGain: 0.05 }, text: "치명타 +10% · 경험치 +5%" },
   { id: "leather-vest", slot: "body", name: "가죽 조끼", icon: "🦺", tier: 1, gold: 2500, need: { boarhair: 8, bearfur: 2 }, stats: { hp: 20, defense: 2 }, text: "최대 체력 +20 · 방어력 +2" },
   { id: "reinforced-vest", prerequisite: "leather-vest", slot: "body", name: "강화 가죽 조끼", icon: "🥋", tier: 2, gold: 6000, need: { boarhair: 12, bearfur: 6, tusk: 1, "field-essence": 2 }, stats: { hp: 35, defense: 4, startShield: 15 }, text: "최대 체력 +35 · 방어력 +4 · 시작 보호막 15" },
   { id: "leather-boots", slot: "legs", name: "가죽 장화", icon: "👢", tier: 1, gold: 2000, need: { rabbitfur: 6, foxfur: 3, antler: 2 }, stats: { speed: 0.08, dashCd: 0.1 }, text: "이동속도 +8% · 회피 재사용 −10%" },
+  // 단풍 추적자(10.1절)·설산 방벽(10.2절): 하위 부위를 가지고 있어야 만들 수 있다(소모 안 함). 보스 핵은 요구하지 않는다.
+  { id: "maple-hood", prerequisite: "reinforced-hood", slot: "head", name: "단풍 추적자 두건", icon: "🍁", tier: 3, gold: 7000, need: { "maple-fragment": 4, "maze-amber": 2 }, stats: { crit: 0.12, xpGain: 0.06 }, text: "치명타 +12% · 경험치 +6%" },
+  { id: "maple-vest", prerequisite: "reinforced-vest", slot: "body", name: "단풍 추적자 조끼", icon: "🍂", tier: 3, gold: 9000, need: { "maple-fragment": 5, "maze-amber": 2 }, stats: { hp: 45, defense: 6, startShield: 20 }, text: "최대 체력 +45 · 방어력 +6 · 시작 보호막 20" },
+  { id: "maple-boots", prerequisite: "reinforced-boots", slot: "legs", name: "단풍 추적자 장화", icon: "🥾", tier: 3, gold: 7000, need: { "maple-fragment": 3, "maze-amber": 2 }, stats: { speed: 0.15, dashCd: 0.22 }, text: "이동속도 +15% · 회피 재사용 −22%" },
+  { id: "frost-hood", prerequisite: "maple-hood", slot: "head", name: "설산 방벽 투구", icon: "❄️", tier: 4, gold: 10000, need: { "frost-ore": 5, "glacier-crystal": 2 }, stats: { crit: 0.13, xpGain: 0.07, freezeResist: 0.3 }, text: "치명타 +13% · 경험치 +7% · 빙판·빙결 둔화 −30%" },
+  { id: "frost-vest", prerequisite: "maple-vest", slot: "body", name: "설산 방벽 갑옷", icon: "🛡️", tier: 4, gold: 13000, need: { "frost-ore": 6, "glacier-crystal": 3 }, stats: { hp: 60, defense: 9, startShield: 25 }, text: "최대 체력 +60 · 방어력 +9 · 시작 보호막 25" },
+  { id: "frost-boots", prerequisite: "maple-boots", slot: "legs", name: "설산 방벽 장화", icon: "🧊", tier: 4, gold: 10000, need: { "frost-ore": 4, "glacier-crystal": 2 }, stats: { speed: 0.14, dashCd: 0.24, hazardCut: 0.2 }, text: "이동속도 +14% · 회피 재사용 −24% · 바닥 피해 −20%" },
   { id: "reinforced-boots", prerequisite: "leather-boots", slot: "legs", name: "강화 가죽 장화", icon: "🥾", tier: 2, gold: 5000, need: { rabbitfur: 10, foxfur: 6, antler: 4, "field-essence": 2 }, stats: { speed: 0.14, dashCd: 0.2 }, text: "이동속도 +14% · 회피 재사용 −20% · 밀려남 −25%" },
 ];
 export const SLOT_NAME: Record<ArmorSlot, string> = { head: "머리", body: "몸통", legs: "다리" };
@@ -334,7 +381,7 @@ export const EMPTY_RAID: RaidSave = { balanceVersion: RAID_BALANCE_VERSION, high
 
 /** 착용한 방어구 능력 합계. */
 export function gearOf(raid: RaidSave) {
-  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0 };
+  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0, freezeResist: 0, hazardCut: 0 };
   for (const slot of ["head", "body", "legs"] as ArmorSlot[]) {
     const a = ARMORS.find(item => item.id === raid.equipped[slot]);
     if (a) for (const [k, v] of Object.entries(a.stats)) g[k as keyof typeof g] += v ?? 0;
