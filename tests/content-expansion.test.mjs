@@ -25,7 +25,9 @@ test('special crops remain long-growing and expensive across market cycles', () 
     if (crop.seasonalLimit) {
       assert.ok(quote.seconds >= 180 && quote.seconds <= 300);
       assert.equal(quote.seconds, crop.seconds); assert.equal(quote.seed, crop.seed);
-      assert.ok(quote.price >= Math.round(crop.sell * .9) && quote.price <= Math.round(crop.sell * 1.1));
+      // 시세 폭 90~110%에 계절 한정 판매가 인상 배율(SEASONAL_SELL_BOOST)을 곱한다
+      const boost = farm.SEASONAL_SELL_BOOST;
+      assert.ok(quote.price >= Math.round(crop.sell * .9 * boost) && quote.price <= Math.round(crop.sell * 1.1 * boost), `${crop.name}: ${quote.price}`);
     } else assert.ok(quote.seconds >= 20 && quote.seconds <= 65);
   }
 });

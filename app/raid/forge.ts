@@ -12,7 +12,8 @@ export const realDropChance = (step: EnhanceStep) => (1 - step.chance) * step.dr
 export type EnhanceRoll = { success: boolean; dropped: boolean; saved: boolean };
 /**
  * 강화 판정(11·14절). 성공이면 +1, 실패 후 하락 판정이 나면 −1(안정화석을 쓰기로 했으면 1개 소모하고 유지).
- * +10에 한 번 도달하면 +9 이하로 내려가지 않는다.
+ * +10에 한 번 도달한 무기는 이후 강화에 실패해도 +10 아래로 내려가지 않는다(IMPLEMENTATION_GAP_AUDIT 10.1).
+ * +10→+11 실패는 하락 판정 자체가 없고, +11 이상에서 하락해도 최저 +10이다. 그래서 안정화석은 +11 이상에서만 쓰인다.
  */
 export function rollEnhance(enhancement: number, step: EnhanceStep, useStabilizer: boolean, stabilizers: number, random = Math.random): EnhanceRoll {
   if (random() < step.chance) return { success: true, dropped: false, saved: false };

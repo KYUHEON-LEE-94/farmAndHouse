@@ -28,6 +28,10 @@ const huntAll = new Set(hunt.ANIMALS.flatMap(a => [a.loot.id, a.rare.id, ...(a.m
 const floorDrops = new Set(Object.entries(raid.FLOOR_REWARDS).filter(([floor]) => Number(floor) <= raid.RAID_MAX_FLOOR)
   .flatMap(([, reward]) => [...reward.first, ...reward.repeat].map(([id]) => id)));
 const virtualNeeds = new Set(['goods', 'rare-hunt', 'good-crop']);
+/** 재료 id → 그 재료가 나오는 층 목록 */
+const dropFloors = new Map();
+for (const [floor, reward] of Object.entries(raid.FLOOR_REWARDS)) if (Number(floor) <= raid.RAID_MAX_FLOOR)
+  for (const [id] of [...reward.first, ...reward.repeat]) dropFloors.set(id, [...(dropFloors.get(id) ?? []), Number(floor)]);
 
 test('every current hunting material belongs to an actual animal drop', () => {
   raid.HUNT_COMMON_LOOT.forEach(id => assert.ok(huntBase.has(id), `common hunting material has no animal: ${id}`));
@@ -41,8 +45,8 @@ test('every armor ingredient has a current acquisition source', () => {
   }
 });
 
-test('every enhancement ingredient through +12 has a current source', () => {
-  for (const step of raid.ENHANCE.filter(step => step.to <= 12)) {
+test('every enhancement ingredient through +14 has a current source', () => {
+  for (const step of raid.ENHANCE.filter(step => step.to <= 14)) {
     const ids = [...Object.keys(step.need), ...Object.keys(step.open?.need ?? {})];
     for (const id of ids) assert.ok(id in raid.LIFE_MATS || floorDrops.has(id) || huntAll.has(id) || virtualNeeds.has(id), `+${step.to}: no source for ${id}`);
   }
@@ -52,8 +56,11 @@ test('every configured floor drop is a registered raid item', () => {
   for (const id of floorDrops) assert.ok(id in raid.RAID_ITEMS, `unregistered floor drop: ${id}`);
 });
 
-test('+13 to +15 materials are explicitly reserved for post-beta floors', () => {
-  const upperNeeds = new Set(raid.ENHANCE.filter(step => step.to >= 13).flatMap(step => [...Object.keys(step.need), ...Object.keys(step.open?.need ?? {})]));
+test('+13 materials drop on floors 11-15, +14 on floors 16-20, and +15 stays reserved for floors 21+', () => {
+  const needsOf = to => { const step = raid.ENHANCE.find(s => s.to === to); return [...Object.keys(step.need), ...Object.keys(step.open?.need ?? {})]; };
+  const upperNeeds = new Set([13, 14, 15].flatMap(needsOf));
   assert.deepEqual([...upperNeeds].sort(), Object.keys(raid.UPPER_ITEMS).sort());
-  for (const id of upperNeeds) assert.equal(floorDrops.has(id), false, `${id} unexpectedly drops in floors 1-${raid.RAID_MAX_FLOOR}`);
+  for (const id of needsOf(13)) { const floors = dropFloors.get(id) ?? []; assert.ok(floors.length && floors.every(f => f >= 11 && f <= 15), `+13 ${id}: ${floors}`); }
+  for (const id of needsOf(14)) { const floors = dropFloors.get(id) ?? []; assert.ok(floors.length && floors.every(f => f >= 16 && f <= 20), `+14 ${id}: ${floors}`); }
+  for (const id of needsOf(15)) assert.equal(floorDrops.has(id), false, `+15 ${id} unexpectedly drops in floors 1-${raid.RAID_MAX_FLOOR}`);
 });
