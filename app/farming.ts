@@ -254,6 +254,17 @@ const SEED_RATIO: Record<string, number> = { 쉬움: 0.575, 보통: 0.525, 어�
 export const SELL_BOOST: Record<string, number> = { 쉬움: 1.05, 보통: 1.065, 어려움: 1.08 };
 /** 계절 한정 작물 판매가 인상 */
 export const SEASONAL_SELL_BOOST = 1.065;
+/**
+ * 난이도별 시장 기준가(WORKSHOP_PROCESSING_REDESIGN 7절): 위 5분 시세 공식(판매가 인상 포함)의 장기 기댓값을 미리 계산한 상수.
+ * 가공·미션·공방 표시가 같은 기준을 쓴다. PROFIT_PER_SEC·SEED_RATIO·재배 시간·시세 폭·SELL_BOOST가 바뀌면
+ * tests/workshop.test.mjs가 실패하므로 다시 계산해 버전을 올린다.
+ */
+export const CROP_REFERENCE_PRICE: Record<string, number> = { 쉬움: 190, 보통: 180, 어려움: 185 };
+export const CROP_REFERENCE_VERSION = 1;
+/** 작물 1개(보통 품질)의 시장 기준가. 계절 한정 작물은 고정 가격 × 인상 배율. */
+export function cropReferencePrice(crop: Crop) {
+  return crop.seasonalLimit ? Math.round(crop.sell * SEASONAL_SELL_BOOST) : CROP_REFERENCE_PRICE[crop.difficulty] ?? 185;
+}
 export function cycleCrop(crop: Crop, bucket: number) {
   if (crop.seasonalLimit) return { price: Math.round(crop.sell * (0.9 + cycleRoll(crop, bucket, 17) * 0.2) * SEASONAL_SELL_BOOST), seconds: crop.seconds, seed: crop.seed };
   const seconds = Math.round(20 + cycleRoll(crop, bucket, 41) * 45);

@@ -603,6 +603,24 @@ button { color:inherit; }
 .recipe>button{justify-self:end;border:0;border-radius:9px;padding:6px 12px;background:#24372b;color:#fff;font:700 11.5px "Gowun Dodum";cursor:pointer}
 .recipe>button:disabled{background:#c9c2ad;cursor:default}
 .goods-list{display:grid;gap:6px;margin-top:12px}
+/* 생활 가공 개편(WORKSHOP_V2) */
+.proc-v2 .proc-tabs{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 6px}
+.proc-filters{display:flex;flex-wrap:wrap;gap:12px;margin:0 0 8px;font-size:11.5px;color:#5d5641}.proc-filters label{display:flex;align-items:center;gap:4px;cursor:pointer}
+.proc-kind{font:400 10px "Gowun Dodum";color:#8a7c5c;margin-left:4px}
+.recipe.open{box-shadow:0 0 0 2px rgba(201,154,46,.35);border-color:#c99a2e}
+.proc-editor{display:grid;gap:7px;padding-top:6px;border-top:1px dashed var(--line)}
+.proc-count{font:700 12px "Gowun Dodum";color:#24372b}
+.proc-chips{display:flex;flex-wrap:wrap;gap:5px;max-height:190px;overflow:auto}
+.proc-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 3px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:11px}
+.proc-chip.on{background:#eef6e6;border-color:#8fb86f}.proc-chip.golden{border-color:#e8c35a}
+.proc-chip b{font-weight:700}.proc-chip small{color:#8a7c5c;font-size:10px}
+.proc-chip button{width:22px;height:22px;border:0;border-radius:50%;background:#f1ebdc;font:700 13px/1 "Gowun Dodum";cursor:pointer}.proc-chip button:disabled{opacity:.35;cursor:default}
+.proc-preview{margin:0;font-size:11.5px;line-height:1.5}.proc-preview em{font-style:normal;color:#4f8a2c;font-weight:700}.proc-preview.lack{color:#a5302a}
+.proc-actions{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
+.proc-actions button,.proc-confirm button{border:1px solid var(--line);border-radius:9px;padding:6px 10px;background:#fff;font:700 11.5px "Gowun Dodum";cursor:pointer}
+.proc-actions button.go,.proc-confirm button.go{background:#24372b;border-color:#24372b;color:#fff}.proc-actions button:disabled{background:#c9c2ad;border-color:#c9c2ad;cursor:default}
+.proc-confirm{display:grid;gap:6px;margin-top:8px;padding:10px 12px;border:2px solid #c99a2e;border-radius:12px;background:#fff8e6;font-size:12px}
+.proc-confirm .warn{color:#a5302a;font-weight:700}.proc-confirm div{display:flex;gap:6px;justify-content:flex-end}
 .goods-item{display:grid;grid-template-columns:30px 1fr auto auto;grid-template-rows:auto auto;column-gap:6px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:#fffdf8}
 .goods-item>span{grid-row:1/3;font-size:22px}.goods-item b{font-size:12px}.goods-item small{grid-column:2;font-size:10.5px;color:#6b6450}
 .goods-item button{grid-row:1/3;border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fff;font:700 10.5px "Gowun Dodum";cursor:pointer}

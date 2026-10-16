@@ -1,5 +1,6 @@
 /** 농사와 낚시가 함께 쓰는 일일 미션. 납품은 시장 포화를 올리지 않는다. */
-import { CROPS, CROP_PRICE_SCALE, QUALITIES } from "./farming";
+import { CROPS, CROP_PRICE_SCALE, QUALITIES, cropReferencePrice } from "./farming";
+import { WORKSHOP_V2_ENABLED } from "./workshop";
 import { ALL_FISH, FISH } from "./fishing";
 
 export type Npc = { id: string; name: string; icon: string; lines: string[] };
@@ -18,14 +19,20 @@ export type OrderBonus = { kind: "fert" | "food"; id: string; count: number };
 export type Order = { id: string; npc: Npc; line: string; items: OrderItem[]; reward: number; bonus?: OrderBonus; special: boolean };
 
 function seeded(text: string) { let h = 2166136261; for (const char of text) h = Math.imul(h ^ char.charCodeAt(0), 16777619); return () => { h += 0x6d2b79f5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const itemValue = (item: OrderItem) => item.kind === "crop" ? CROPS.find(c => c.id === item.cropId)!.sell * CROP_PRICE_SCALE * QUALITIES[item.minQuality].multiplier * item.count : ALL_FISH.find(f => f.id === item.fishId)!.price * item.count;
+/**
+ * 2026-10-16 미션 작물 가치를 공통 시장 기준가로 바꾼다(WORKSHOP_PROCESSING_REDESIGN 7.2, 공방 개편과 함께 공개).
+ * 기준가가 예전 값보다 높아 그대로 쓰면 보상이 오르므로, 365일 고정 시드 시뮬레이션으로 일일 총보상이 현행과 같아지는 배율을 곱한다.
+ */
+export const ORDER_REFERENCE_SCALE = 0.85; // 365일 시뮬: 일일 총보상 평균 -1.0% · 중앙값 +0.9%, 유형별 ±2% 이내
+const cropOrderUnit = (cropId: string, v2 = WORKSHOP_V2_ENABLED) => { const crop = CROPS.find(c => c.id === cropId)!; return v2 ? cropReferencePrice(crop) * ORDER_REFERENCE_SCALE : crop.sell * CROP_PRICE_SCALE; };
+const itemValue = (item: OrderItem, v2 = WORKSHOP_V2_ENABLED) => item.kind === "crop" ? cropOrderUnit(item.cropId, v2) * QUALITIES[item.minQuality].multiplier * item.count : ALL_FISH.find(f => f.id === item.fishId)!.price * item.count;
 const round10 = (value: number) => Math.round(value / 10) * 10;
 
-export function dailyOrders(dateKey: string): Order[] {
+export function dailyOrders(dateKey: string, v2 = WORKSHOP_V2_ENABLED): Order[] {
   const random = seeded(`wolru-missions-${dateKey}`), pick = <T,>(list: T[]) => list[Math.floor(random() * list.length)];
   const crops = CROPS.filter(crop => !crop.seasonalLimit).sort(() => random() - .5), fish = FISH.filter(item => item.rarity !== "전설").sort(() => random() - .5), npcs = [...NPCS].sort(() => random() - .5);
   const cropItem = (quality = 0): CropOrderItem => ({ kind: "crop", cropId: crops.shift()!.id, count: 3 + Math.floor(random() * 4), minQuality: quality });
   const fishItem = (): FishOrderItem => ({ kind: "fish", fishId: fish.shift()!.id, count: 1 + Math.floor(random() * 3) });
-  const make = (id: string, npc: Npc, items: OrderItem[], special = false): Order => ({ id: `${dateKey}-${id}`, npc, line: pick(npc.lines), items, reward: round10(items.reduce((sum, item) => sum + itemValue(item), 0) * (special ? 1.8 : 1.45)), bonus: special ? { kind: "fert", id: "golden", count: 3 } : random() < .5 ? { kind: "fert", id: "compost", count: 3 } : { kind: "food", id: "kibble", count: 2 }, special });
+  const make = (id: string, npc: Npc, items: OrderItem[], special = false): Order => ({ id: `${dateKey}-${id}`, npc, line: pick(npc.lines), items, reward: round10(items.reduce((sum, item) => sum + itemValue(item, v2), 0) * (special ? 1.8 : 1.45)), bonus: special ? { kind: "fert", id: "golden", count: 3 } : random() < .5 ? { kind: "fert", id: "compost", count: 3 } : { kind: "food", id: "kibble", count: 2 }, special });
   return [make("farm", npcs[0], [cropItem(), cropItem()]), make("fish", npcs[1], [fishItem(), fishItem()]), make("mixed", npcs[2], [cropItem(), fishItem()]), make("special", FESTIVAL, [cropItem(1), cropItem(1), fishItem()], true)];
 }

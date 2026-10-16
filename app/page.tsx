@@ -27,7 +27,8 @@ import { KitchenPanel } from "./KitchenPanel";
 import { DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rollGrade, type Dish } from "./kitchen";
 import { migrateInventory, pickCategory, replaceCategory, type Inventory, type ItemCategory } from "./items";
 import { dailyOrders, type Order } from "./orders";
-import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, goodsPrice, rawValue, workshopSlotPrice, type Recipe, type Workshop } from "./workshop";
+import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, WORKSHOP_V2_ENABLED, goodsInfo, goodsPrice, jobInfo, processResult, rawValue, workshopSlotPrice, type Recipe, type Stock, type Workshop } from "./workshop";
+import WorkshopLifePanel, { type ProcBatch } from "./WorkshopLifePanel";
 import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, OVERFLOW_RATE, demandLeft, freeLeft, nextFactor, normalizeMarket, saturationOf, sellMany, takeOne, type MarketState } from "./market";
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_BASE, petBugPenalty, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session, readCloudBase, writeCloudBase } from "./account";
@@ -1253,21 +1254,38 @@ export default function Home() {
     playPlop();
     setNotice(`🏺 ${recipe.icon} ${josa(recipe.name, "을를")} 담그기 시작했어요! ${recipe.minutes}분 뒤에 꺼낼 수 있어요.`);
   }
-  function collectJob(index: number) {
-    const job = workshop.jobs[index], recipe = job && RECIPES.find(r => r.id === job.recipeId);
-    if (!job || !recipe || job.doneAt > Date.now()) return;
-    setWorkshop(shop => ({ ...shop, jobs: shop.jobs.filter((_, i) => i !== index) }));
-    setGoods(stock => ({ ...stock, [recipe.id]: (stock[recipe.id] ?? 0) + 1 }));
-    playCoinSound([660, 880]);
-    setNotice(`🏺 ${recipe.icon} ${josa(recipe.name, "이가")} 잘 익었어요! 가공품 칸에서 팔 수 있어요.`);
+  /** 개편 가공: 고른 재료로 여러 항아리를 한 번에 담근다. 담글 때 완성품 이름·가격을 확정해 작업에 저장한다. */
+  function startProcessing(batches: ProcBatch[]) {
+    const room = workshop.slots - workshop.jobs.length;
+    if (room <= 0) return setNotice("🏺 항아리가 모두 담그는 중이에요. 다 되면 꺼내거나 항아리를 늘려 주세요.");
+    const list = batches.slice(0, room), next = { ...produce }, now = Date.now(), jobs: Workshop["jobs"] = [];
+    for (const batch of list) for (const input of batch.inputs) {
+      const key = produceKey(input.cropId, input.quality, input.golden), usable = isLocked(key) ? 0 : (next[key] ?? 0) - (reserved[key] ?? 0);
+      if (usable < input.count) return setNotice("🏺 재료가 모자라요. 창고를 다시 확인해 주세요(잠금·주문 예약분은 쓰지 않아요).");
+      next[key] -= input.count; if (next[key] <= 0) delete next[key];
+    }
+    for (const batch of list) { const product = processResult(batch.recipe, batch.inputs); jobs.push({ recipeId: batch.recipe.id, doneAt: now + batch.recipe.minutes * 60000, key: product.key, name: product.name, icon: product.icon, price: product.price, minutes: batch.recipe.minutes }); }
+    setProduce(next);
+    setWorkshop(shop => ({ ...shop, jobs: [...shop.jobs, ...jobs] }));
+    playPlop();
+    setNotice(jobs.length > 1 ? `🏺 항아리 ${jobs.length}개에 담그기 시작했어요! (완성품 합계 ${jobs.reduce((t, j) => t + (j.price ?? 0), 0).toLocaleString()}원)` : `🏺 ${jobs[0].icon} ${josa(jobs[0].name ?? "가공품", "을를")} 담그기 시작했어요! ${list[0].recipe.minutes}분 뒤에 꺼낼 수 있어요.`);
   }
-  function sellGoods(recipe: Recipe, count: number) {
-    const n = Math.min(goods[recipe.id] ?? 0, count);
+  function collectJob(index: number) {
+    const job = workshop.jobs[index], info = job && jobInfo(job);
+    if (!job || !info || job.doneAt > Date.now()) return;
+    setWorkshop(shop => ({ ...shop, jobs: shop.jobs.filter((_, i) => i !== index) }));
+    setGoods(stock => ({ ...stock, [info.key]: (stock[info.key] ?? 0) + 1 }));
+    playCoinSound([660, 880]);
+    setNotice(`🏺 ${info.icon} ${josa(info.name, "이가")} 잘 익었어요! 가공품 칸에서 팔 수 있어요.`);
+  }
+  /** 가공품 판매(키 단위). 시장 포화·수요를 쓰지 않는 고정가. */
+  function sellGoods(key: string, count: number) {
+    const n = Math.min(goods[key] ?? 0, count), info = goodsInfo(key);
     if (n <= 0) return;
-    const amount = goodsPrice(recipe) * n;
-    setGoods(stock => { const next = { ...stock, [recipe.id]: (stock[recipe.id] ?? 0) - n }; if (next[recipe.id] <= 0) delete next[recipe.id]; return next; });
+    const amount = info.price * n;
+    setGoods(stock => { const next = { ...stock, [key]: (stock[key] ?? 0) - n }; if (next[key] <= 0) delete next[key]; return next; });
     setMoney(m => m + amount); playCoinSound([880, 1100, 1320]);
-    setNotice(`짤랑~ ${recipe.icon} ${recipe.name} ${n}개를 ${amount.toLocaleString()}원에 팔았어요! (가공품은 시세·포화와 상관없는 고정가)`);
+    setNotice(`짤랑~ ${info.icon} ${info.name} ${n}개를 ${amount.toLocaleString()}원에 팔았어요! (가공품은 시세·포화와 상관없는 고정가)`);
   }
   function buyWorkshopSlot() {
     if (workshop.slots >= WORKSHOP_MAX_SLOTS) return setNotice("항아리는 최대 개수예요.");
@@ -2031,6 +2049,8 @@ export default function Home() {
     return out;
   }, [fishStock, orders, doneToday, ordersDone, orderDate]);
   const sellableOf = (key: string) => (isLocked(key) ? 0 : Math.max(0, (produce[key] ?? 0) - (reserved[key] ?? 0)));
+  /** 가공에 쓸 수 있는 창고 묶음(잠금·주문 예약분 제외) */
+  const procStock: Stock[] = Object.keys(produce).map(key => { const { cropId, quality, golden } = parseProduceKey(key); return { cropId, quality, golden, n: sellableOf(key) }; }).filter(s => s.n > 0);
 
   // ---------- 토벌 장비·대장간 ----------
   /** 대장간에 쓸 수 있는 재료(잠금·주문 예약분 제외). value가 낮은 것부터 쓴다. */
@@ -2051,8 +2071,8 @@ export default function Home() {
       if (loot && n > 0) list.push({ kind: "hunt", id, n, value: loot.price, name: `${loot.icon} ${loot.name}`, tag: HUNT_COMMON_LOOT.includes(id) ? "hunt" : HUNT_RARE_LOOT.includes(id) ? "rarehunt" : "other" });
     }
     for (const [id, n] of Object.entries(goods)) {
-      const recipe = RECIPES.find(r => r.id === id);
-      if (n > 0) list.push({ kind: "goods", id, n, value: recipe ? goodsPrice(recipe) : 0, name: recipe ? `${recipe.icon} ${recipe.name}` : id, tag: "goods" });
+      const info = goodsInfo(id);
+      if (n > 0) list.push({ kind: "goods", id, n, value: info.price, name: `${info.icon} ${info.name}`, tag: "goods" });
     }
     return list.sort((a, b) => a.value - b.value);
   };
@@ -2512,10 +2532,10 @@ export default function Home() {
       {tab === "workshop" && <section className="panel workshop-panel">
         <div className="panel-heading"><div><span className="eyebrow">WORKSHOP</span><h3>🏭 공방</h3></div>
           <div className="shop-tabs" role="tablist">{([["life", "🏺 생활 가공"], ...(RAID_ENABLED ? [["raid", "⚒️ 강화 가공"]] as const : []), ...(KITCHEN_ENABLED ? [["cook", "🍳 요리"]] as const : [])] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={workshopView === id} className={workshopView === id ? "active" : ""} onClick={() => setWorkshopView(id)}>{label}</button>)}</div></div>
-        {workshopView === "raid" && RAID_ENABLED ? <RaidCraftView forge={forge} onForge={() => switchTab("raid")} /> : workshopView === "cook" && KITCHEN_ENABLED ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} huntHave={id => huntStock[id] ?? 0} huntName={id => { const loot = ALL_LOOT.find(l => l.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }} dishStock={dishStock} onCook={startCooking} /> : <div className="workshop-view">
+        {workshopView === "raid" && RAID_ENABLED ? <RaidCraftView forge={forge} onForge={() => switchTab("raid")} /> : workshopView === "cook" && KITCHEN_ENABLED ? <KitchenPanel cropHave={usableOf} fishHave={cookFishCount()} huntHave={id => huntStock[id] ?? 0} huntName={id => { const loot = ALL_LOOT.find(l => l.id === id); return loot ? `${loot.icon} ${loot.name}` : id; }} dishStock={dishStock} onCook={startCooking} /> : WORKSHOP_V2_ENABLED ? <WorkshopLifePanel workshop={workshop} nowMs={nowMs} stock={procStock} goods={goods} slotPrice={workshopSlotPrice(workshop.slots)} maxSlots={WORKSHOP_MAX_SLOTS} formatClock={formatClock} onStart={startProcessing} onCollect={collectJob} onSell={sellGoods} onBuySlot={buyWorkshopSlot} /> : <div className="workshop-view">
             <div className="panel-heading"><div><span className="eyebrow">WORKSHOP · 절임 항아리</span><h3>가공 공방</h3></div><span className="plot-count">항아리 {workshop.slots}개</span></div>
             <p className="hint">창고 작물을 담가 비싼 가공품으로 만들어요. <b>여러 작물을 섞을수록 배율이 높아요</b>(단일 ×1.25 → 4종 ×1.9). 가공품은 시세·포화와 상관없는 고정가예요. 잠금·주문 예약분은 쓰지 않아요.</p>
-            <div className="jar-row">{Array.from({ length: workshop.slots }).map((_, i) => { const job = workshop.jobs[i], recipe = job && RECIPES.find(r => r.id === job.recipeId);
+            <div className="jar-row">{Array.from({ length: workshop.slots }).map((_, i) => { const job = workshop.jobs[i], recipe = job && jobInfo(job);
               if (!job || !recipe) return <div key={i} className="jar empty"><span>🏺</span><small>비어 있어요</small></div>;
               const left = Math.max(0, Math.ceil((job.doneAt - nowMs) / 1000)), total = recipe.minutes * 60, done = left <= 0;
               return <div key={i} className={`jar ${done ? "done" : ""}`}><span>{recipe.icon}</span><b>{recipe.name}</b>{done ? <button onClick={() => collectJob(i)}>꺼내기 ✨</button> : <><span className="jar-bar"><i style={{ width: `${(1 - left / total) * 100}%` }} /></span><small>{formatClock(left)} 남음</small></>}</div>; })}
@@ -2527,7 +2547,7 @@ export default function Home() {
                   return <li key={input.cropId} className={have >= input.count ? "ok" : ""}>{crop.icon} {crop.name} <b>{Math.min(have, input.count)}/{input.count}</b><small>{crop.seasons.join("·")}</small></li>; })}</ul>
                 <button onClick={() => startRecipe(recipe)} disabled={!ok || workshop.jobs.length >= workshop.slots}>{workshop.jobs.length >= workshop.slots ? "항아리 가득" : ok ? "🏺 담그기" : "재료 모으는 중"}</button>
               </div>; })}</div>
-            <div className="goods-list"><b className="tool-shop-sub">🎁 만든 가공품</b>{Object.keys(goods).filter(id => goods[id] > 0).length === 0 ? <p className="empty">아직 만든 가공품이 없어요.</p> : RECIPES.filter(recipe => (goods[recipe.id] ?? 0) > 0).map(recipe => <div key={recipe.id} className="goods-item"><span>{recipe.icon}</span><b>{recipe.name} ×{goods[recipe.id]}</b><small>개당 {goodsPrice(recipe).toLocaleString()}원</small><button onClick={() => sellGoods(recipe, 1)}>1개</button><button className="all" onClick={() => sellGoods(recipe, goods[recipe.id])}>전부 {(goodsPrice(recipe) * goods[recipe.id]).toLocaleString()}원</button></div>)}</div>
+            <div className="goods-list"><b className="tool-shop-sub">🎁 만든 가공품</b>{Object.keys(goods).filter(id => goods[id] > 0).length === 0 ? <p className="empty">아직 만든 가공품이 없어요.</p> : RECIPES.filter(recipe => (goods[recipe.id] ?? 0) > 0).map(recipe => <div key={recipe.id} className="goods-item"><span>{recipe.icon}</span><b>{recipe.name} ×{goods[recipe.id]}</b><small>개당 {goodsPrice(recipe).toLocaleString()}원</small><button onClick={() => sellGoods(recipe.id, 1)}>1개</button><button className="all" onClick={() => sellGoods(recipe.id, goods[recipe.id])}>전부 {(goodsPrice(recipe) * goods[recipe.id]).toLocaleString()}원</button></div>)}</div>
           </div>}
       </section>}
 
