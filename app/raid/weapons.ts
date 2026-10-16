@@ -111,22 +111,22 @@ export const WEAPON_CRAFT = { gold: 5000, core: 2, mat: 3 };
 export type WeaponSpecial = { id: string; name: string; icon: string; cooldown: number; text: string };
 export const SPECIALS: Record<string, WeaponSpecial> = {
   "great-scythe": { id: "eclipse-cleave", name: "월식 가르기", icon: "🌘", cooldown: 10, text: "320% · 길이 420 폭 70 참격(지형 통과), 정예·보스 +20%" },
-  "harvest-blade": { id: "harvest-whirl", name: "수확 회오리", icon: "🌀", cooldown: 11, text: "1.5초간 0.25초마다 주변 145px 55%, 이속 +15%" },
-  "quake-hammer": { id: "earth-rift", name: "대지 균열", icon: "⛰️", cooldown: 11, text: "0.45초 뒤 직선 360·폭 85 균열 260%, 일반 적 0.8초 경직" },
-  "rock-crusher": { id: "rock-barrage", name: "바위 난타", icon: "🪨", cooldown: 9, text: "커서 주변에 바위 5개(각 65%), 같은 적 최대 3회" },
+  "harvest-blade": { id: "harvest-whirl", name: "수확 회오리", icon: "🌀", cooldown: 11, text: "1.5초간 0.25초마다 주변 165px 70%, 이속 +15%" },
+  "quake-hammer": { id: "earth-rift", name: "대지 균열", icon: "⛰️", cooldown: 11, text: "0.3초 뒤 직선 360·폭 120 균열 260%, 일반 적 0.8초 경직" },
+  "rock-crusher": { id: "rock-barrage", name: "바위 난타", icon: "🪨", cooldown: 9, text: "커서 주변에 바위 6개(반지름 50, 각 100%), 같은 적 최대 3회" },
   "water-cannon": { id: "tidal-blast", name: "해일 분사", icon: "🌊", cooldown: 12, text: "1.2초 고정 방향 물대포 220%×8, 보스 +15%(대시로 취소)" },
   "frost-sprayer": { id: "glacier-garden", name: "빙하 정원", icon: "❄️", cooldown: 13, text: "커서에 반경 150 냉기 3초(100%×5), 3번 맞은 일반 적 빙결" },
   "toxic-sprayer": { id: "toxic-bloom", name: "독성 개화", icon: "🌺", cooldown: 13, text: "커서에 큰 독꽃 140% + 초당 45%×5초, 보스 받는 피해 +10%" },
   "seed-launcher": { id: "giant-seeds", name: "거대 씨앗 폭격", icon: "🌰", cooldown: 11, text: "커서 주변 씨앗 4개가 0.8초 뒤 폭발(각 85%)" },
   trident: { id: "sea-pierce", name: "해신 관통", icon: "🔱", cooldown: 10, text: "길이 520 관통 300%, 끝 100px은 확정 치명타, 보스 +15%" },
   "chain-harpoon": { id: "anchor-sweep", name: "닻줄 휩쓸기", icon: "⚓", cooldown: 11, text: "닻 180%로 일반 적을 앞으로 모으고 되감기 100%" },
-  "thunder-rod": { id: "storm-fishing", name: "폭풍 낚시", icon: "🌩️", cooldown: 10, text: "커서 근처 적에 낙뢰 170% + 연쇄 85%×5" },
+  "thunder-rod": { id: "storm-fishing", name: "폭풍 낚시", icon: "🌩️", cooldown: 10, text: "커서 근처 적에 낙뢰 170% + 연쇄 110%×5" },
   "net-launcher": { id: "great-trawl", name: "대형 저인망", icon: "🕸️", cooldown: 14, text: "커서에 반경 170 그물 4초(일반 −70%·+20%, 보스 −25%·+8%)" },
   longbow: { id: "still-breath", name: "숨결 멈추기", icon: "🎯", cooldown: 12, text: "0.55초 조준 후 무한 관통 380%, 300px 이상 +25%, 정예·보스 방어 50% 무시" },
   "rapid-bow": { id: "arrow-storm", name: "화살비", icon: "🏹", cooldown: 11, text: "커서 반경 135에 2초간 화살 35%×10, 일반 적 둔화" },
   rifle: { id: "ap-shot", name: "철갑 관통탄", icon: "💥", cooldown: 11, text: "340% 6마리 관통(관통마다 −8%), 방어 70% 무시, 보스 +15%" },
   "siege-crossbow": { id: "siege-bolt", name: "공성 폭발촉", icon: "🎆", cooldown: 12, text: "직격 220% + 반경 115 폭발 140%" },
-  "twin-blades": { id: "shadow-dance", name: "그림자 난무", icon: "🌑", cooldown: 10, text: "0.9초 무적, 적들을 오가며 60%×6" },
-  greatsword: { id: "iron-counter", name: "철벽 반격", icon: "🛡️", cooldown: 12, text: "1.2초 받는 피해 −80%, 맞으면 360° 300% 반격, 안 맞으면 160% 내려치기" },
+  "twin-blades": { id: "shadow-dance", name: "그림자 난무", icon: "🌑", cooldown: 10, text: "0.9초 무적, 적들을 오가며 160%×6" },
+  greatsword: { id: "iron-counter", name: "철벽 반격", icon: "🛡️", cooldown: 12, text: "1.2초 받는 피해 −80%, 맞으면 360° 300% 반격, 안 맞으면 220% 내려치기" },
 };
 
