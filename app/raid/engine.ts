@@ -1027,10 +1027,10 @@ BOSS_SCRIPTS["core-guardian"] = {
   tick: (s, m) => {
     if (m.overloadDone || m.hp > m.maxHp * 0.2) return;
     m.overloadDone = true; m.gap = Math.max(m.gap ?? 0, 4.5); s.pops.push({ x: m.x, y: m.y - m.r - 30, text: "⚠ 핵 과부하! 초록 틈으로!", t: 2, kind: "info" });
-    ringAt(s, m.x, m.y, 0, 1300, 220, 1.5, 1.2, 0.4, "핵 과부하", 0.7); later(s, 2.2, () => { if (m.hp > 0) ringAt(s, m.x, m.y, 0, 1300, 220, 1.5, 1.2, 0.4, "핵 과부하", 0.7); });
+    ringAt(s, m.x, m.y, 0, 1300, 220, 1.5, 1.2, 0.32, "핵 과부하", 0.7); later(s, 2.2, () => { if (m.hp > 0) ringAt(s, m.x, m.y, 0, 1300, 220, 1.5, 1.2, 0.32, "핵 과부하", 0.7); });
   },
   patterns: {
-    riftBeams: s => { const a = rnd() * Math.PI; beamCross(s, s.player.x, s.player.y, a, 820, 44, 1.0, 0.18, "균열 광선"); beamCross(s, s.player.x, s.player.y, a + Math.PI / 2.4, 820, 44, 1.0, 0.18, "균열 광선"); return 1.3; },
+    riftBeams: s => { const a = rnd() * Math.PI; beamCross(s, s.player.x, s.player.y, a, 820, 44, 1.0, 0.15, "균열 광선"); beamCross(s, s.player.x, s.player.y, a + Math.PI / 2.4, 820, 44, 1.0, 0.15, "균열 광선"); return 1.3; },
     spinWall: (s, m) => { addHazard(s, hazard({ kind: "spin", x: m.x, y: m.y, angle: aimP(s, m), len: 300, width: 30, tele: 1.2, life: 8, spin: Math.PI / 4, every: 1, damage: bossPct(s, 0.08), label: "회전 벽", owner: m.uid })); return 1.5; },
     shards: (s, m) => { later(s, 0.4, () => { if (m.hp > 0) radial(s, m, 6, rnd() * 6, 200, bossPct(s, 0.1)); }); later(s, 0.9, () => { if (m.hp > 0) radial(s, m, 6, rnd() * 6, 200, bossPct(s, 0.1)); }); return 1.3; },
     gravity: (s, m) => { s.ext.pullUntil = s.t + 1.5; s.ext.pullX = m.x; s.ext.pullY = m.y; for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2 + rnd(); trackAt(s, m.x + Math.cos(a) * 110, m.y + Math.sin(a) * 110, 70, 1.2, 0, 0, 0.12, "중력 당김"); } return 1.8; },

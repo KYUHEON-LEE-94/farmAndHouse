@@ -90,10 +90,20 @@ const lerp = (a: WeaponStats, b: WeaponStats, t: number): WeaponStats => ({
   interval: Math.round((a.interval + (b.interval - a.interval) * t) * 100) / 100, radius: a.radius !== undefined && b.radius !== undefined ? Math.round(a.radius + (b.radius - a.radius) * t) : b.radius,
   width: a.width !== undefined && b.width !== undefined ? Math.round(a.width + (b.width - a.width) * t) : b.width,
 });
+/**
+ * 보통 구간(21층~) 진화별 화력 보정: +15 이상에서만 피해에 곱한다(1~20층 권장 +13~+14 수치는 그대로).
+ * 2026-10-16 raid-30 21·25·30층 측정(공격 빌드·표준 방어구)에서 0~100%로 벌어진 무기 간 격차를 줄이기 위한 1차 값.
+ */
+export const LATE_MUL: Record<string, number> = {
+  "water-cannon": 1.5, "frost-sprayer": 1.4, "toxic-sprayer": 1.3, "seed-launcher": 1.4, "rapid-bow": 1.45, "thunder-rod": 1.35, "siege-crossbow": 1.4,
+  "twin-blades": 1.15, longbow: 1.2, "net-launcher": 1.05, "chain-harpoon": 1.1, trident: 1.05,
+  "great-scythe": 0.88, "harvest-blade": 0.92, "quake-hammer": 0.88, greatsword: 0.9, "rock-crusher": 0.95, rifle: 0.95,
+};
 /** 무기 수치: 진화했으면 진화 +10~+15, 아니면 +0~+10. */
 export function raidWeaponStats(weaponId: string, enhancement: number, evolution: string | null): WeaponStats {
   const w = weaponDef(weaponId), evo = w.evos.find(e => e.id === evolution), e = Math.max(0, Math.min(10, enhancement));
-  const st = evo && enhancement >= 10 ? lerp(evo.s10, evo.s15, Math.min(5, enhancement - 10) / 5) : w.table ? w.table[e] : e <= 5 ? lerp(w.s0, w.s5, e / 5) : lerp(w.s5, w.s10, (e - 5) / 5);
+  let st = evo && enhancement >= 10 ? lerp(evo.s10, evo.s15, Math.min(5, enhancement - 10) / 5) : w.table ? w.table[e] : e <= 5 ? lerp(w.s0, w.s5, e / 5) : lerp(w.s5, w.s10, (e - 5) / 5);
+  if (evo && enhancement >= 15 && LATE_MUL[evo.id]) st = { ...st, damage: Math.round(st.damage * LATE_MUL[evo.id] * 10) / 10 };
   if (evo && enhancement > 15) {
     // +16~+18(RAID_FLOOR_30_EXPANSION_AUDIT 7.2): +15 수치에서 단계당 피해 ×1.08, 사거리·반경·폭·투사체 속도 ×1.02, 간격 ×0.985
     const n = enhancement - 15, g = (v: number | undefined, k: number) => (v === undefined ? v : Math.round(v * Math.pow(k, n)));
