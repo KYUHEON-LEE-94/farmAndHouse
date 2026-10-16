@@ -1273,3 +1273,4 @@ button { color:inherit; }
 .armor-art.maple{border-color:#d9772f;background:radial-gradient(circle at 35% 25%,#fff8ec 0 28%,#f3cfa0 72%,#d58a45 100%)}.armor-art.frost{border-color:#8fb8cf;background:radial-gradient(circle at 35% 25%,#ffffff 0 28%,#dcecf5 72%,#9cc0d6 100%)}
 
 .raid-pity-bonus{display:block;font-style:normal;font-size:10px;opacity:.8}.raid-pity-note{margin:6px 0 0;padding:6px 10px;border-radius:10px;background:rgba(255,216,74,.14);font-size:12px}
+.raid-share{justify-self:start;margin-top:6px;border:0;border-radius:10px;padding:7px 12px;background:#24372b;color:#fff;font:700 12px "Gowun Dodum";cursor:pointer}.raid-share.ghost{background:rgba(36,55,43,.08);color:#24372b;border:1px solid rgba(36,55,43,.25)}.raid-share-msg{font-size:11.5px;color:#5d5641}

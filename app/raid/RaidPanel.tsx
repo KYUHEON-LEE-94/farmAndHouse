@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { zoneOf, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY } from "./data";
+import { zoneOf, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance, pityChance } from "./forge";
 import RaidGame from "./RaidGame";
 import { RAID_WEAPONS, SPECIALS, WEAPON_CRAFT, dps, weaponDef, type WeaponStats } from "./weapons";
 import { WeaponIcon } from "./weaponArt";
 import { hasArmorPrerequisite } from "./armorRequirements";
+import { shareRaidCard, type ShareCardData } from "./shareCard";
 import { ArmorIcon } from "./armorArt";
 
 let runSeq = 0;
@@ -63,6 +64,20 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   const [running, setRunning] = useState<{ foods: FoodSlot[]; id: number; training?: Evolution } | null>(null);
   const [outcome, setOutcome] = useState<RaidOutcome | null>(null);
   const [testSpeed, setTestSpeed] = useState(1);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
+  /** 공유 카드 정보: 탑 최고층·장비·펫(+이번 도전). 계정·골드 정보는 넣지 않는다. */
+  const shareCard = async (result?: RaidResult) => {
+    const wid = raid.equipped.weapon, w = raid.weapons[wid], petId = raid.equipped.battlePet;
+    const data: ShareCardData = {
+      highest: raid.highestFloor,
+      run: result && !result.abandoned && result.floor > 0 ? { floor: result.floor, cleared: result.cleared, bossTime: result.log?.bossTime ?? null, time: result.log?.time ?? null, bossHpLeft: result.bossHpLeft, level: result.level } : null,
+      weapon: `${w?.evolution ? EVOLUTIONS[w.evolution].name : weaponDef(wid).name} +${w?.enhancement ?? 0}`,
+      armor: (["head", "body", "legs"] as const).map(slot => ARMORS.find(a => a.id === raid.equipped[slot])?.name).filter((name): name is string => Boolean(name)),
+      pet: petId ? `${BATTLE_PETS.find(p => p.id === petId)?.name ?? petId} Lv.${raid.battlePets?.[petId]?.level ?? 1}` : null,
+      version: RAID_BALANCE_VERSION, at: Date.now(),
+    };
+    setShareMsg("카드를 만드는 중…"); setShareMsg(await shareRaidCard(data));
+  };
   const [testEnh, setTestEnh] = useState<number | null>(null);
   const [testEvo, setTestEvo] = useState<Evolution | null>(null);
 
@@ -121,7 +136,10 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
           <span>처치 {outcome.result.kills} · 각성 Lv.{outcome.result.level}{!outcome.result.cleared && outcome.result.bossHpLeft < 1 ? ` · 보스 체력 ${Math.round(outcome.result.bossHpLeft * 100)}% 남음` : ""}</span>
           {!outcome.result.cleared && !outcome.result.abandoned && outcome.result.reason.length > 0 && <span className="raid-why">💡 {outcome.result.reason.join(" · ")}</span>}
           {outcome.lines.length > 0 && <ul>{outcome.lines.map(line => <li key={line}>{line}</li>)}</ul>}
+          {!outcome.result.abandoned && outcome.result.floor > 0 && <button className="raid-share" onClick={() => shareCard(outcome.result)}>📤 결과 카드 공유</button>}
         </div>}
+        {!outcome && raid.highestFloor > 0 && <button className="raid-share ghost" onClick={() => shareCard()}>📤 내 탑 기록 공유 (최고 {raid.highestFloor}층)</button>}
+        {shareMsg && <small className="raid-share-msg" role="status">{shareMsg}</small>}
 
         <div className={`raid-floor-card ${zoneOf(floor.floor)}`}>
           <span className="raid-floor-no">{floor.floor}F</span>
