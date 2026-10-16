@@ -298,6 +298,11 @@ export const FLOOR_REWARDS: Record<number, { firstGold: number; first: Drop[]; r
   19: { firstGold: 2000, first: [["glacier-crystal", 2, 2]], repeat: [["frost-ore", 2, 4], ["glacier-crystal", 1, 1]], stabilizer: 0.04 },
   20: { firstGold: 4500, first: [["glacier-crystal", 3, 3], ["ironbear-core", 1, 1]], repeat: [["glacier-crystal", 1, 2], ["ironbear-core", 1, 1, 0.3]], stabilizer: 0.06 },
 };
+/**
+ * 보스 재료 불운 방지(RAID_FLOOR_30_EXPANSION_AUDIT 7.3): 반복 클리어에서 이 재료를 misses번 연속 못 받으면 다음 반복 클리어에 확정.
+ * 받으면(확률·확정) 0으로. 재료별로 따로 센다. 25층(수호자의 씨앗)은 층 구현 때 추가한다.
+ */
+export const BOSS_DROP_PITY: Record<number, { id: string; misses: number }> = { 15: { id: "crimson-antler", misses: 3 }, 20: { id: "ironbear-core", misses: 3 } };
 export const zoneCommon = (floor: number) => ({ field: "pollen-clump", canal: "canal-moss", maple: "maple-fragment", frost: "frost-ore" })[zoneOf(floor)];
 
 // ---------- 생활 재료(27절) ----------
@@ -384,6 +389,8 @@ export type RaidSave = {
   battlePets?: Record<string, { level: number }>; petPity?: number;
   armorOwned: string[];
   stabilizers: number; towerSeals: number; contractShards: number;
+  /** 보스 재료 연속 미획득 횟수(재료 id → 횟수, BOSS_DROP_PITY) */
+  bossMiss?: Record<string, number>;
   /** 최근 30판 기록(밸런스 확인용, RAID_FLOOR_20_EXPANSION_AUDIT 13절) */
   log?: RaidRunLog[];
 };

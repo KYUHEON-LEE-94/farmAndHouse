@@ -247,11 +247,22 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
 /** 고정 피해(가시 갑옷·전투펫 등): 방어만 빼고 배율·치명타 없음. */
 function flatHit(s: RaidState, m: Monster, raw: number, src: HitSource, kind: Pop["kind"] = "hit") {
   if (m.hp <= 0) return;
-  const dmg = Math.max(1, Math.round(raw - effDefense(s, m)));
+  const dmg = mitigate(raw, effDefense(s, m));
   m.hp -= dmg; m.flash = 0.1; s.dmgBy[src] += dmg; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.5, kind });
   if (m.hp <= 0) killMonster(s, m);
 }
 /** 갑옷 균열을 반영한 방어(0 아래로는 안 내려감). */
+/**
+ * 몬스터 방어 계산(RAID_FLOOR_30_EXPANSION_AUDIT 11.4). 운영은 "flat"(피해 − 방어), "ratio"는 시뮬레이터 전용 숨김 검증용(RAID_DEFENSE_V2):
+ * 피해 × 100 ÷ (100 + 유효 방어 × 6). 방어형(게)의 추가 3도 유효 방어에 더한다. 모든 플레이어 피해 경로가 이 함수를 쓴다.
+ */
+export let DEFENSE_MODE: "flat" | "ratio" = "flat";
+export function setDefenseMode(mode: "flat" | "ratio") { DEFENSE_MODE = mode; }
+export const MONSTER_DEFENSE_K = 6;
+export function mitigate(raw: number, defense: number, extra = 0) {
+  const d = Math.max(0, defense) + extra;
+  return DEFENSE_MODE === "ratio" ? Math.max(1, Math.round(raw * 100 / (100 + d * MONSTER_DEFENSE_K))) : Math.max(1, Math.round(raw - d));
+}
 const effDefense = (s: RaidState, m: Monster) => Math.max(0, m.defense - ((m.crackUntil ?? 0) > s.t ? m.crack ?? 0 : 0));
 type HitOpts = { critAdd?: number; ignoreDef?: boolean; noCombo?: boolean; noCrit?: boolean; forceCrit?: boolean; defIgnore?: number; extra?: number };
 function burst(s: RaidState, x: number, y: number, n: number, color: string, speed: number, ang?: number) {
@@ -299,7 +310,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   mul = Math.min(DAMAGE_MUL_CAP, mul);
   let dmg = base * mul * (crit ? Math.max(s.picks["vital-stab"] ? 2 : 0, PLAYER.critMul + 0.25 * pick(s, "critical-force")) : 1) * (m.state === "stun" ? 1.3 : 1);
   const ignore = m.boss && (o.ignoreDef || (crit && s.picks["vital-pierce"]));
-  dmg = Math.max(1, Math.round(dmg - (ignore ? 0 : effDefense(s, m) * (1 - (o.defIgnore ?? 0))) - (m.def.kind === "crab" && m.state !== "dash" ? 3 : 0)));
+  dmg = mitigate(dmg, ignore ? 0 : effDefense(s, m) * (1 - (o.defIgnore ?? 0)), m.def.kind === "crab" && m.state !== "dash" ? 3 : 0);
   if (s.picks.executioner && !m.boss && !m.elite && m.hp - dmg <= m.maxHp * 0.2) dmg = m.hp;
   m.hp -= dmg; m.flash = 0.12; s.dmgBy[src] += dmg;
   if (src === "basic" && pick(s, "armor-crack") && rnd() < 0.1) { m.crack = Math.min(3, ((m.crackUntil ?? 0) > s.t ? m.crack ?? 0 : 0) + 1); m.crackUntil = s.t + 5; }
@@ -376,7 +387,7 @@ function explodeFlower(s: RaidState, f: Terrain["flowers"][number]) {
   if (f.exploded) return;
   f.exploded = true;
   zoneAt(s, { kind: "blast", x: f.x, y: f.y, r: 75, t: 0.3, tele: 0, damage: 0, every: 0, slow: 0 });
-  for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, f.x, f.y) < 75 + m.r) { const dmg = Math.max(1, Math.round(35 * (1 + 0.3 * pick(s, "opportunity-master"))) - m.defense); m.hp -= dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.6, kind: "hit" }); if (m.hp <= 0) killMonster(s, m); }
+  for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, f.x, f.y) < 75 + m.r) { const dmg = mitigate(35 * (1 + 0.3 * pick(s, "opportunity-master")), m.defense); m.hp -= dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.6, kind: "hit" }); if (m.hp <= 0) killMonster(s, m); }
   for (const g of s.terrain.flowers) if (!g.exploded && dist(g.x, g.y, f.x, f.y) < 75) explodeFlower(s, g);
 }
 
@@ -831,7 +842,7 @@ function intervention(s: RaidState, n: number) {
 // ---------- 전투펫(31절) ----------
 function petHit(s: RaidState, m: Monster, raw: number) {
   if (m.hp <= 0) return;
-  const dmg = Math.max(1, Math.round(raw * (m.markUntil > s.t ? 1.1 : 1) - effDefense(s, m)));
+  const dmg = mitigate(raw * (m.markUntil > s.t ? 1.1 : 1), effDefense(s, m));
   m.hp -= dmg; s.dmgBy.pet += dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.5, kind: "hit" });
   if (m.hp <= 0) killMonster(s, m);
 }
@@ -1105,7 +1116,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
         if (z.mine.seedChain && s.picks["chain-sprout"] && rnd() < 0.3) zoneAt(s, { kind: "pbomb", x: z.x + (rnd() - 0.5) * 70, y: z.y + (rnd() - 0.5) * 70, r: z.r, t: 0.1, tele: 0.35, damage: z.damage, every: 0, slow: 0, mine: { mul: 1 } });
       }
       if (z.kind === "rain" && z.mine) blastAt(s, z.x, z.y, z.r, z.damage, 10);
-      if (z.kind === "tshock") { if (dist(z.x, z.y, p.x, p.y) < z.r) hurtPlayer(s, Math.round(z.damage * 0.5), "전도성 웅덩이"); for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, z.x, z.y) < z.r + m.r) { m.hp -= Math.max(1, z.damage - m.defense); m.flash = 0.1; if (m.hp <= 0) killMonster(s, m); } }
+      if (z.kind === "tshock") { if (dist(z.x, z.y, p.x, p.y) < z.r) hurtPlayer(s, Math.round(z.damage * 0.5), "전도성 웅덩이"); for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, z.x, z.y) < z.r + m.r) { m.hp -= mitigate(z.damage, m.defense); m.flash = 0.1; if (m.hp <= 0) killMonster(s, m); } }
       if (z.kind === "bolt") for (const w of s.zones) if (w.kind === "puddle" && w.tele <= 0 && dist(w.x, w.y, z.x, z.y) < w.r + z.r) zoneAt(s, { kind: "shock", x: w.x, y: w.y, r: w.r, t: 0.5, tele: 0, damage: 12, every: 0.5, slow: 0 });
     } continue; }
     z.t -= dt;

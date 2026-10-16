@@ -15,7 +15,7 @@ import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
 import { ALL_RAID_ITEMS, RAID_BALANCE_VERSION, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
-import { applyEnhance, nextStep, rollEnhance, setEvolution, pityChance } from "./raid/forge";
+import { applyEnhance, nextStep, rollEnhance, setEvolution, pityChance, rollDrops } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
 import type { ForgeActions } from "./raid/RaidPanel";
 import type { FoodSlot, RaidResult } from "./raid/engine";
@@ -1331,7 +1331,14 @@ export default function Home() {
     let gold = 0, seals = 0, stabilizer = 0;
     if (result.cleared) {
       const reward = FLOOR_REWARDS[result.floor], first = !raid.firstClears.includes(result.floor);
-      if (first) { gold = reward.firstGold; roll(reward.first); seals = 2 + (result.floor % 5 === 0 ? 5 : 0); } else { roll(reward.repeat); seals = 1; }
+      if (first) { gold = reward.firstGold; roll(reward.first); seals = 2 + (result.floor % 5 === 0 ? 5 : 0); }
+      else {
+        // 반복: 보스 재료 연속 미획득 천장(15·20층)
+        const box = rollDrops(reward.repeat, result.floor, true, raid.bossMiss ?? {});
+        Object.entries(box.gain).forEach(([id, n]) => { gain[id] = (gain[id] ?? 0) + n; }); seals = 1;
+        if (box.forced) lines.push("🎯 보스 재료 천장! 이번 상자에 확정으로 들어 있어요.");
+        setRaid(r => ({ ...r, bossMiss: box.bossMiss }));
+      }
       if (Math.random() < reward.stabilizer) stabilizer = 1;
       lines.push(first ? "🎁 첫 클리어 상자를 열었어요!" : "📦 반복 클리어 상자");
       setRaid(r => ({ ...r, firstClears: first ? [...r.firstClears, result.floor] : r.firstClears, highestFloor: Math.max(r.highestFloor, result.floor), unlockedFloor: Math.max(r.unlockedFloor, Math.min(RAID_MAX_FLOOR, result.floor + 1)), towerSeals: r.towerSeals + seals, stabilizers: r.stabilizers + stabilizer }));

@@ -59,7 +59,9 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
 }) {
   const [view, setView] = useState<"tower" | "forge">("tower");
   const [gearOpen, setGearOpen] = useState(false);
-  const [floorNo, setFloorNo] = useState(Math.min(raid.unlockedFloor, RAID_MAX_FLOOR));
+  /** 테스트 모드(로컬 개발 서버)에서는 모든 층을 열어 바로 체험한다. 운영 빌드에서는 TEST_MODE가 꺼진다. */
+  const unlockedFloor = TEST_MODE ? RAID_MAX_FLOOR : raid.unlockedFloor;
+  const [floorNo, setFloorNo] = useState(Math.min(unlockedFloor, RAID_MAX_FLOOR));
   const [slots, setSlots] = useState<(string | null)[]>([null, null, null]);
   const [running, setRunning] = useState<{ foods: FoodSlot[]; id: number; training?: Evolution } | null>(null);
   const [outcome, setOutcome] = useState<RaidOutcome | null>(null);
@@ -86,7 +88,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   const evo = TEST_MODE && testEnh !== null ? (testEnh >= 10 ? (wDef.evos.some(e => e.id === testEvo) ? testEvo : wDef.evos[0].id) : null) : scythe.evolution;
   const stats = weaponStats(enh, evo, weaponId);
   const gear = gearOf(raid);
-  const floor = FLOORS[Math.min(floorNo, raid.unlockedFloor) - 1];
+  const floor = FLOORS[Math.min(floorNo, unlockedFloor) - 1];
 
   const foodOptions = Object.entries(dishStock).filter(([key, n]) => n > 0 && FOOD_EFFECTS[key.split("|")[0]]).map(([key, n]) => {
     const [id, grade] = key.split("|"), dish = DISHES.find(d => d.id === id)!, effect = FOOD_EFFECTS[id];
@@ -122,7 +124,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
       {/* 탑: 아래가 1층, 위로 올라간다 */}
       <div className="raid-tower" role="radiogroup" aria-label="층 선택">
         <div className="raid-tower-top">🏯 월루탑</div>
-        {[...FLOORS].reverse().map(f => { const locked = f.floor > raid.unlockedFloor, boss = f.floor % 5 === 0, cleared = raid.firstClears.includes(f.floor);
+        {[...FLOORS].reverse().map(f => { const locked = f.floor > unlockedFloor, boss = f.floor % 5 === 0, cleared = raid.firstClears.includes(f.floor);
           return <button key={f.floor} role="radio" aria-checked={floor.floor === f.floor} disabled={locked} onClick={() => setFloorNo(f.floor)}
             className={`raid-storey ${floor.floor === f.floor ? "on" : ""} ${boss ? "boss" : ""} ${cleared ? "cleared" : ""} ${zoneOf(f.floor)}`}>
             <b>{f.floor}F</b><span>{locked ? "🔒 잠김" : boss ? `${f.boss.icon} ${f.boss.name}` : f.zone}</span><i>{cleared ? "✔" : locked ? "" : "▶"}</i>
