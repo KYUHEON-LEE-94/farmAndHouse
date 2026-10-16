@@ -331,6 +331,19 @@ export const ENHANCE: EnhanceStep[] = [
   { to: 14, chance: 0.22, drop: 0.04, gold: 130000, need: { "frost-ore": 2, "glacier-crystal": 1 }, open: { gold: 55000, need: { "ironbear-core": 2 } } },
   { to: 15, chance: 0.15, drop: 0.05, gold: 170000, need: { "ancient-bark": 2, "spirit-crystal": 1 }, open: { gold: 80000, need: { "guardian-seed": 2 } } },
 ];
+/**
+ * 강화 실패 누적 보정·천장(IMPLEMENTATION_GAP_AUDIT 10.2): +11~+15만. 무기별·목표 단계별 실패 횟수로
+ * start회 실패 뒤부터 실패 1회당 step씩(최대 max) 성공률을 더하고, ceiling번째 시도는 반드시 성공한다.
+ * 단계가 하락해도 그 목표 단계의 실패 횟수는 유지, 그 단계 성공 시 0. 안정화석과 무관하게 센다.
+ * 20만 회 시뮬레이션(첫 +15, 개방비 포함): 평균 307만 → 283만, 하위 10% 502만 → 431만, 하위 1% 822만 → 594만.
+ */
+export const ENHANCE_PITY: Record<number, { start: number; step: number; max: number; ceiling: number }> = {
+  11: { start: 3, step: 0.05, max: 0.1, ceiling: 6 },
+  12: { start: 4, step: 0.04, max: 0.12, ceiling: 8 },
+  13: { start: 5, step: 0.03, max: 0.12, ceiling: 10 },
+  14: { start: 6, step: 0.02, max: 0.12, ceiling: 13 },
+  15: { start: 7, step: 0.02, max: 0.12, ceiling: 15 },
+};
 /** 11층 이상 재료(11~20층은 탑 상자에서, 21층 이상은 아직 이름만). */
 export const UPPER_ITEMS: Record<string, { name: string; icon: string }> = {
   "maple-fragment": { name: "단풍 파편", icon: "🍁" }, "maze-amber": { name: "미궁 호박", icon: "🟠" }, "crimson-antler": { name: "붉은 뿔", icon: "🦌" },
@@ -365,7 +378,8 @@ export const SLOT_NAME: Record<ArmorSlot, string> = { head: "머리", body: "몸
 /** 저장(42절 중 1~10층 범위). */
 export type RaidSave = {
   balanceVersion: number; highestFloor: number; unlockedFloor: number; firstClears: number[];
-  weapons: Record<string, { enhancement: number; evolution: Evolution | null; unlockedEnhancements: number[] }>;
+  /** fails: 목표 단계 → 누적 실패 횟수(강화 천장, +11~+15) */
+  weapons: Record<string, { enhancement: number; evolution: Evolution | null; unlockedEnhancements: number[]; fails?: Record<number, number> }>;
   equipped: { weapon: string; head: string | null; body: string | null; legs: string | null; battlePet?: string | null };
   battlePets?: Record<string, { level: number }>; petPity?: number;
   armorOwned: string[];

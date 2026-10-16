@@ -1271,3 +1271,5 @@ button { color:inherit; }
 .raid-choices button .aw-tag{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:10px;font-weight:800;color:#fff;background:#8a7a5a}.raid-choices button .aw-tag.mode{background:#b5403a}
 .raid-choices button .aw-preview{display:block;margin-top:4px;padding:3px 6px;border-radius:6px;background:#eef6e6;color:#2f6a24;font-size:11px;font-weight:800}
 .armor-art.maple{border-color:#d9772f;background:radial-gradient(circle at 35% 25%,#fff8ec 0 28%,#f3cfa0 72%,#d58a45 100%)}.armor-art.frost{border-color:#8fb8cf;background:radial-gradient(circle at 35% 25%,#ffffff 0 28%,#dcecf5 72%,#9cc0d6 100%)}
+
+.raid-pity-bonus{display:block;font-style:normal;font-size:10px;opacity:.8}.raid-pity-note{margin:6px 0 0;padding:6px 10px;border-radius:10px;background:rgba(255,216,74,.14);font-size:12px}

@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { zoneOf, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave } from "./data";
+import { zoneOf, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
-import { canPay, nextStep, realDropChance } from "./forge";
+import { canPay, nextStep, realDropChance, pityChance } from "./forge";
 import RaidGame from "./RaidGame";
 import { RAID_WEAPONS, SPECIALS, WEAPON_CRAFT, dps, weaponDef, type WeaponStats } from "./weapons";
 import { WeaponIcon } from "./weaponArt";
@@ -258,6 +258,7 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
   const cost = step ? (needsOpen ? step.open! : { gold: step.gold, need: step.need }) : null;
   const affordable = !!cost && forge.money >= cost.gold && canPay(cost.need, forge.have);
   const stats = weaponStats(w.enhancement, w.evolution, weaponId), next = step ? weaponStats(step.to, w.evolution, weaponId) : null;
+  const pity = step ? pityChance(step, w.fails?.[step.to] ?? 0) : pityChance(ENHANCE[0]);
 
   return <div className="raid-forge">
     {picking && needEvolution && <EvolutionPicker weaponId={weaponId} onTrain={id => { setPicking(false); onTrain(id); }} onPick={id => { setPicking(false); forge.evolve(id); }} onClose={() => setPicking(false)} />}
@@ -273,9 +274,10 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
         : !step ? <p className="raid-max">최대 강화(+15)에 도달했어요!</p>
         : <>
           <div className="raid-odds">
-            <span>목표<b>+{step.to}</b></span><span>성공<b className="ok">{pct(step.chance)}</b></span>
-            <span>실패 후 하락<b>{pct(step.drop)}</b></span><span>이번 시도 실제 하락<b className="bad">{pct(realDropChance(step))}</b></span>
+            <span>목표<b>+{step.to}</b></span><span>성공<b className="ok">{pct(pity.chance)}</b>{pity.bonus > 0 && <i className="raid-pity-bonus">기본 {pct(pity.base)} + 보정 {pct(pity.bonus)}</i>}</span>
+            <span>실패 후 하락<b>{pct(step.drop)}</b></span><span>이번 시도 실제 하락<b className="bad">{pct(realDropChance({ ...step, chance: pity.chance }))}</b></span>
           </div>
+          {pity.left !== null && !needsOpen && <p className="raid-pity-note">{pity.guaranteed ? <>🎯 <b>천장 도달!</b> 이번 강화는 반드시 성공해요.</> : <>🎯 실패 누적 {pity.fails}회 · 천장까지 <b>{pity.left}번</b>{pity.bonus > 0 ? ` · 누적 보정 +${pct(pity.bonus)}` : ` · ${ENHANCE_PITY[step.to].start}번 실패부터 성공률이 올라요`}</>}</p>}
           {needsOpen && <p className="raid-open-note">🔓 +{step.to} 단계는 처음 한 번 <b>개방</b>해야 해요(보스 재료). 개방한 뒤에는 실패·하락해도 다시 내지 않아요.</p>}
           <div className="raid-cost big"><em className={forge.money >= cost!.gold ? "ok" : "lack"} title={forge.money < cost!.gold ? `보유 ${forge.money.toLocaleString()} / 필요 ${cost!.gold.toLocaleString()}` : undefined}>💰 {cost!.gold.toLocaleString()}원{forge.money < cost!.gold && <small> · {(cost!.gold - forge.money).toLocaleString()}원 부족</small>}</em>{Object.entries(cost!.need).map(([id, n]) => LIFE_MATS[id] && (forge.have[id] ?? 0) < n ? <button key={id} className="raid-cost-link" onClick={onOpenWorkshop} title="공방에서 만들기">{nameOf(id)} {forge.have[id] ?? 0}/{n} ↗</button> : <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</div>
           {!needsOpen && step.drop > 0 && <label className="raid-stab"><input type="checkbox" checked={useStab} onChange={event => setUseStab(event.target.checked)} disabled={raid.stabilizers < 1} /> 🪨 안정화석 사용 (실제로 하락할 때만 1개 소모 · 보유 {raid.stabilizers})</label>}
@@ -293,8 +295,8 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
       {Object.entries(LIFE_MATS).map(([id, m]) => <div key={id} className="raid-life-row"><span className="raid-armor-icon">{m.icon}</span><div><b>{m.name} <small>보유 {forge.have[id] ?? 0}</small></b><span>{m.recipe}</span></div><button onClick={onOpenWorkshop}>공방에서 만들기</button></div>)}
     </div>
 
-    <details className="raid-table"><summary>강화표 전체 보기</summary><table><thead><tr><th>목표</th><th>성공</th><th>하락</th><th>골드</th><th>재료</th></tr></thead><tbody>
-      {ENHANCE.map(e => <tr key={e.to} className={e.to === w.enhancement + 1 ? "now" : e.to <= w.enhancement ? "done" : ""}><td>+{e.to}</td><td>{pct(e.chance)}</td><td>{pct(e.drop)}</td><td>{e.gold.toLocaleString()}</td><td>{Object.entries(e.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")}{e.open ? ` · 개방: ${Object.entries(e.open.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")} + ${e.open.gold.toLocaleString()}원` : ""}</td></tr>)}
+    <details className="raid-table"><summary>강화표 전체 보기</summary><table><thead><tr><th>목표</th><th>성공</th><th>하락</th><th>천장</th><th>골드</th><th>재료</th></tr></thead><tbody>
+      {ENHANCE.map(e => <tr key={e.to} className={e.to === w.enhancement + 1 ? "now" : e.to <= w.enhancement ? "done" : ""}><td>+{e.to}</td><td>{pct(e.chance)}</td><td>{pct(e.drop)}</td><td>{ENHANCE_PITY[e.to] ? `${ENHANCE_PITY[e.to].ceiling}번째` : "-"}</td><td>{e.gold.toLocaleString()}</td><td>{Object.entries(e.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")}{e.open ? ` · 개방: ${Object.entries(e.open.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")} + ${e.open.gold.toLocaleString()}원` : ""}</td></tr>)}
     </tbody></table></details>
   </div>;
 }

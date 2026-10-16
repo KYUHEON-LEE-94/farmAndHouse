@@ -15,7 +15,7 @@ import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
 import { ALL_RAID_ITEMS, RAID_BALANCE_VERSION, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
-import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
+import { applyEnhance, nextStep, rollEnhance, setEvolution, pityChance } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
 import type { ForgeActions } from "./raid/RaidPanel";
 import type { FoodSlot, RaidResult } from "./raid/engine";
@@ -2144,9 +2144,9 @@ export default function Home() {
       if (!step || (w.enhancement >= 10 && !w.evolution) || (step.open && !w.unlockedEnhancements.includes(step.to))) return;
       const plan = planFor(step.need, step.gold); if (!plan) return setNotice("강화 재료나 돈이 모자라요.");
       spendPlan(plan);
-      const roll = rollEnhance(w.enhancement, step, useStabilizer, raid.stabilizers);
+      const pity = pityChance(step, w.fails?.[step.to] ?? 0), roll = rollEnhance(w.enhancement, step, useStabilizer, raid.stabilizers, Math.random, pity.fails);
       setRaid(r => applyEnhance(r, r.equipped.weapon, roll));
-      if (roll.success) { playCoinSound([660, 880, 1100, 1320, 1760]); setNotice(`🔨✨ 강화 성공! ${weaponDef(raid.equipped.weapon).name} +${step.to}${step.to === 10 ? " — 이제 진화 방향을 고를 수 있어요!" : ""}`); }
+      if (roll.success) { playCoinSound([660, 880, 1100, 1320, 1760]); setNotice(`🔨✨ 강화 성공! ${weaponDef(raid.equipped.weapon).name} +${step.to}${pity.guaranteed ? " (천장 도달 확정 성공)" : ""}${step.to === 10 ? " — 이제 진화 방향을 고를 수 있어요!" : ""}`); }
       else if (roll.dropped) { playSadTrombone(); setNotice(`💥 강화 실패… 단계가 내려가 +${w.enhancement - 1}이 됐어요.`); }
       else if (roll.saved) { playCoinSound([440, 660]); setNotice("🪨 강화 실패! 하락할 뻔했지만 안정화석이 막아 줬어요(1개 소모)."); }
       else { playCoinSound([440, 330]); setNotice(`🔨 강화 실패… +${w.enhancement} 그대로예요. (재료와 돈은 사용됐어요)`); }
