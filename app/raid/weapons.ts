@@ -43,7 +43,7 @@ export const RAID_WEAPONS: RaidWeaponDef[] = [
     s0: S("channel", 2.6, 120, 40, 0.15, { knockback: 0, fx: { slow: 0.15, selfSlow: 0.25 } }), s5: S("channel", 3.9, 130, 42, 0.15, { knockback: 0, fx: { slow: 0.15, selfSlow: 0.25 } }), s10: S("channel", 6, 140, 45, 0.15, { knockback: 0, fx: { slow: 0.15, selfSlow: 0.25 } }),
     evos: [
       { id: "water-cannon", name: "고압 물대포", note: "직선 관통, 밀어내기, 보스 피해 +15%", s10: S("beam", 5.5, 260, 0, 0.15, { width: 22, knockback: 0, fx: { knockTick: 15, boss: 0.15, selfSlow: 0.25 } }), s15: S("beam", 8.5, 300, 0, 0.15, { width: 26, knockback: 0, fx: { knockTick: 15, boss: 0.15, selfSlow: 0.25 } }) },
-      { id: "frost-sprayer", name: "빙결 분사기", note: "같은 적을 2초 맞히면 1초 빙결, 빙결된 적 받는 피해 +20%", s10: S("channel", 7, 130, 60, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }), s15: S("channel", 9.8, 140, 70, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }) },
+      { id: "frost-sprayer", name: "빙결 분사기", note: "같은 적을 2초 맞히면 1초 빙결, 빙결된 적 받는 피해 +20%", s10: S("channel", 7.7, 145, 60, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }), s15: S("channel", 10.8, 155, 70, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }) },
     ] },
   { id: "raid-spreader", name: "비료 살포기", icon: "🧴", difficulty: "보통", style: "커서 위치로 비료 폭탄 투척", craft: { lifeMat: "farm-fiber" },
     s0: S("lob", 15, 230, 0, 0.95, { radius: 45, knockback: 20 }), s5: S("lob", 22, 240, 0, 0.92, { radius: 48, knockback: 20 }), s10: S("lob", 34, 250, 0, 0.85, { radius: 52, knockback: 20 }),
@@ -55,18 +55,18 @@ export const RAID_WEAPONS: RaidWeaponDef[] = [
     s0: S("thrust", 14, 130, 0, 0.7, { width: 24, knockback: 20 }), s5: S("thrust", 21, 138, 0, 0.66, { width: 26, knockback: 20 }), s10: S("thrust", 31, 148, 0, 0.62, { width: 28, knockback: 20 }),
     evos: [
       { id: "trident", name: "삼지창", note: "끝 30px 적중 시 치명타 +15%, 보스 피해 +15%", s10: S("thrust", 40, 155, 0, 0.66, { width: 30, knockback: 20, fx: { tip: true, boss: 0.15 } }), s15: S("thrust", 64, 170, 0, 0.6, { width: 34, knockback: 20, fx: { tip: true, boss: 0.15 } }) },
-      { id: "chain-harpoon", name: "사슬 작살", note: "처음 맞은 일반 적을 끌어오고 주변 40px에 50%", s10: S("thrust", 42, 220, 0, 0.62, { width: 34, knockback: 0, fx: { pullSplash: true } }), s15: S("thrust", 64, 250, 0, 0.56, { width: 36, knockback: 0, fx: { pullSplash: true } }) },
+      { id: "chain-harpoon", name: "사슬 작살", note: "처음 맞은 일반 적을 끌어오고 주변 40px에 50%", s10: S("thrust", 48, 230, 0, 0.62, { width: 40, knockback: 0, fx: { pullSplash: true } }), s15: S("thrust", 74, 260, 0, 0.56, { width: 42, knockback: 0, fx: { pullSplash: true } }) },
     ] },
   { id: "raid-rod", name: "낚싯대", icon: "🎣", difficulty: "보통", style: "긴 사거리로 던져 끌어오기", craft: { lifeMat: "fish-oil" },
     s0: S("hook", 12, 170, 0, 0.68, { width: 16, knockback: 0, fx: { pull: 30 } }), s5: S("hook", 18, 180, 0, 0.64, { width: 16, knockback: 0, fx: { pull: 30 } }), s10: S("hook", 27, 195, 0, 0.6, { width: 16, knockback: 0, fx: { pull: 30 } }),
     evos: [
       { id: "thunder-rod", name: "번개 낚싯대", note: "2마리에게 번개 연쇄(각 50%), 감전된 보스 받는 피해 +10%", s10: S("hook", 30, 210, 0, 0.62, { width: 16, knockback: 0, fx: { pull: 30, chain: true } }), s15: S("hook", 48, 230, 0, 0.56, { width: 16, knockback: 0, fx: { pull: 30, chain: true } }) },
-      { id: "net-launcher", name: "포획 그물 발사기", note: "반지름 70 그물 2초(이속 −50%, 받는 피해 +15%, 보스 +8%)", s10: S("hook", 38, 210, 0, 0.6, { width: 20, knockback: 0, fx: { pull: 15, net: true } }), s15: S("hook", 55, 230, 0, 0.55, { width: 20, knockback: 0, fx: { pull: 15, net: true } }) },
+      { id: "net-launcher", name: "포획 그물 발사기", note: "반지름 70 그물 2초(이속 −50%, 받는 피해 +15%, 보스 +8%)", s10: S("hook", 48, 230, 0, 0.6, { width: 26, knockback: 0, fx: { pull: 15, net: true } }), s15: S("hook", 70, 250, 0, 0.55, { width: 26, knockback: 0, fx: { pull: 15, net: true } }) },
     ] },
   { id: "raid-bow", name: "사냥 활", icon: "🏹", difficulty: "쉬움", style: "원거리 화살", craft: { lifeMat: "tanned-leather" },
     s0: S("arrow", 10, 420, 0, 0.55, { speed: 600, knockback: 10 }), s5: S("arrow", 15, 440, 0, 0.52, { speed: 600, knockback: 10 }), s10: S("arrow", 22, 460, 0, 0.48, { speed: 600, knockback: 10 }),
     evos: [
-      { id: "longbow", name: "저격 장궁", note: "2마리 관통, 250px 이상 피해 +25%, 정예·보스 치명타 +20%", s10: S("arrow", 52, 600, 0, 1.0, { speed: 750, knockback: 20, fx: { pierce: 2, far: true, eliteCrit: 0.2 } }), s15: S("arrow", 84, 650, 0, 0.92, { speed: 750, knockback: 20, fx: { pierce: 2, far: true, eliteCrit: 0.2 } }) },
+      { id: "longbow", name: "저격 장궁", note: "3마리 관통, 250px 이상 피해 +25%, 정예·보스 치명타 +20%", s10: S("arrow", 57, 600, 0, 1.0, { speed: 750, knockback: 20, fx: { pierce: 3, far: true, eliteCrit: 0.2 } }), s15: S("arrow", 92, 650, 0, 0.92, { speed: 750, knockback: 20, fx: { pierce: 3, far: true, eliteCrit: 0.2 } }) },
       { id: "rapid-bow", name: "연사궁", note: "세 발마다 3갈래 화살(추가 화살 55%)", s10: S("arrow", 15.5, 420, 0, 0.24, { speed: 650, knockback: 5, fx: { triple: true } }), s15: S("arrow", 23.5, 440, 0, 0.21, { speed: 650, knockback: 5, fx: { triple: true } }) },
     ] },
   { id: "raid-shotgun", name: "엽총", icon: "🔫", difficulty: "보통", style: "근거리 산탄 5발", craft: { lifeMat: "tanned-leather" },
