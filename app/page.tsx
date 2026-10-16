@@ -14,7 +14,7 @@ import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
-import { ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
+import { ALL_RAID_ITEMS, RAID_BALANCE_VERSION, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
 import type { ForgeActions } from "./raid/RaidPanel";
@@ -1301,6 +1301,11 @@ export default function Home() {
     if (used.length) {
       setDishStock(stock => { const next = { ...stock }; used.forEach(f => { next[f.key] = (next[f.key] ?? 0) - 1; if (next[f.key] <= 0) delete next[f.key]; }); return next; });
       lines.push(`🍱 사용한 음식: ${used.map(f => `${f.icon} ${f.name}`).join(", ")}`);
+    }
+    // 판 기록(최근 30판, 밸런스 확인용): 무기·장비·펫·음식을 더해 토벌 저장에 남긴다
+    if (result.log) {
+      const w = raid.weapons[raid.equipped.weapon], log = result.log;
+      setRaid(r => ({ ...r, log: [...(r.log ?? []), { ...log, v: RAID_BALANCE_VERSION, at: Date.now(), weapon: r.equipped.weapon, evo: w?.evolution ?? null, enh: w?.enhancement ?? 0, armor: [r.equipped.head, r.equipped.body, r.equipped.legs], pet: r.equipped.battlePet ? `${r.equipped.battlePet}:${r.battlePets?.[r.equipped.battlePet]?.level ?? 1}` : null, foods: used.map(f => f.key) }].slice(-30) }));
     }
     if (result.abandoned) return lines;
     const gain: Record<string, number> = {};

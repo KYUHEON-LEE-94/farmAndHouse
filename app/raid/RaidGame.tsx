@@ -125,6 +125,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = ARENA_W * dpr; canvas.height = ARENA_H * dpr;
     ctx.scale(dpr, dpr);
+    stateRef.current.input = touchMode ? "mobile" : "pc";
     const art: Art = { bg: paintWorld(stateRef.current.terrain), avatar: null, pixelated: avatar.pixelated };
     const img = new Image(); img.onload = () => { art.avatar = img; }; img.src = avatar.src;
     // 들고 있는 무기 그림(진화했으면 진화 그림)

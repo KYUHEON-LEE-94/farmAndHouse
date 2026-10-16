@@ -6,7 +6,14 @@ import { GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE } from "../house";
  */
 export const RAID_RELEASED = true;
 export const RAID_ENABLED = RAID_RELEASED || TEST_MODE;
-export const RAID_BALANCE_VERSION = 1;
+export const RAID_BALANCE_VERSION = 2; // 2026-10-16 1~10층 곡선 복구·구간 상향(RAID_FLOOR_20_EXPANSION_AUDIT 5절)
+/** 층 구간 배율: 일반 몹 체력, 정예 체력, 정예 등장 간격(작을수록 자주). 1~3층은 유지. */
+export function floorBand(floor: number) {
+  if (floor >= 8) return { fodder: 1.1, elite: 1.12, eliteTime: 0.9 };
+  if (floor >= 6) return { fodder: 1.07, elite: 1.1, eliteTime: 0.95 };
+  if (floor >= 4) return { fodder: 1.05, elite: 1.08, eliteTime: 0.95 };
+  return { fodder: 1, elite: 1, eliteTime: 1 };
+}
 export const RAID_MAX_FLOOR = 10;
 
 export const ARENA_W = 960, ARENA_H = 540;
@@ -62,15 +69,15 @@ export type FloorDef = {
 const z1 = "꽃가루 들판", z2 = "침수된 수로";
 export const FLOORS: FloorDef[] = [
   { floor: 1, zone: z1, monsters: ["pollen-mite"], spawnRate: 0.8, maxAlive: 16, elite: null, boss: { id: "mini", name: "강화 진드기", icon: "🐞", hp: 300, damage: 10, defense: 0, base: "pollen-mite" } },
-  { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 500, damage: 12, defense: 0, base: "thorn-rabbit" } },
-  { floor: 3, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee"], spawnRate: 1.15, maxAlive: 23, elite: { id: "spore-bee", hp: 260, count: 2 }, boss: { id: "mini", name: "포자 여왕", icon: "🐝", hp: 700, damage: 14, defense: 0, base: "spore-bee" } },
-  { floor: 4, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.3, maxAlive: 26, elite: { id: "field-brute", hp: 180, every: 30 }, boss: { id: "mini", name: "난폭종 우두머리", icon: "🦬", hp: 1000, damage: 17, defense: 3, base: "field-brute" } },
-  { floor: 5, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.4, maxAlive: 28, elite: { id: "field-brute", hp: 180, every: 25 }, boss: { id: "pollen-boar", name: "꽃가루 멧돼지", icon: "🐗", hp: 1650, damage: 20, defense: 3 } },
-  { floor: 6, zone: z2, monsters: ["moss-slime"], spawnRate: 1.05, maxAlive: 22, elite: null, boss: { id: "mini", name: "거대 이끼괴물", icon: "🟢", hp: 1800, damage: 21, defense: 1, base: "moss-slime" } },
-  { floor: 7, zone: z2, monsters: ["moss-slime", "shock-eel"], spawnRate: 1.1, maxAlive: 21, elite: { id: "shock-eel", hp: 350, count: 2 }, boss: { id: "mini", name: "전기 뱀장어 우두머리", icon: "⚡", hp: 850, damage: 23, defense: 0, base: "shock-eel" } },
-  { floor: 8, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog"], spawnRate: 1.25, maxAlive: 24, elite: { id: "dart-frog", hp: 400, count: 2 }, boss: { id: "mini", name: "물총 개구리왕", icon: "🐸", hp: 1150, damage: 25, defense: 1, base: "dart-frog" } },
-  { floor: 9, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.35, maxAlive: 27, elite: { id: "canal-elite", hp: 300, every: 30 }, boss: { id: "mini", name: "수로 포식자 우두머리", icon: "🐊", hp: 1500, damage: 27, defense: 4, base: "canal-elite" } },
-  { floor: 10, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.5, maxAlive: 30, elite: { id: "canal-elite", hp: 300, every: 25 }, boss: { id: "storm-catfish", name: "폭풍 메기왕", icon: "🐟", hp: 2750, damage: 30, defense: 4 } },
+  { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 520, damage: 12, defense: 0, base: "thorn-rabbit" } },
+  { floor: 3, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee"], spawnRate: 1.15, maxAlive: 23, elite: { id: "spore-bee", hp: 260, count: 2 }, boss: { id: "mini", name: "포자 여왕", icon: "🐝", hp: 750, damage: 14, defense: 0, base: "spore-bee" } },
+  { floor: 4, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.3, maxAlive: 26, elite: { id: "field-brute", hp: 180, every: 30 }, boss: { id: "mini", name: "난폭종 우두머리", icon: "🦬", hp: 1100, damage: 17, defense: 3, base: "field-brute" } },
+  { floor: 5, zone: z1, monsters: ["pollen-mite", "thorn-rabbit", "spore-bee", "boarling"], spawnRate: 1.4, maxAlive: 28, elite: { id: "field-brute", hp: 180, every: 25 }, boss: { id: "pollen-boar", name: "꽃가루 멧돼지", icon: "🐗", hp: 1850, damage: 20, defense: 3 } },
+  { floor: 6, zone: z2, monsters: ["moss-slime"], spawnRate: 1.05, maxAlive: 22, elite: null, boss: { id: "mini", name: "거대 이끼괴물", icon: "🟢", hp: 1950, damage: 21, defense: 1, base: "moss-slime" } },
+  { floor: 7, zone: z2, monsters: ["moss-slime", "shock-eel"], spawnRate: 1.1, maxAlive: 21, elite: { id: "shock-eel", hp: 350, count: 2 }, boss: { id: "mini", name: "전기 뱀장어 우두머리", icon: "⚡", hp: 2100, damage: 23, defense: 0, base: "shock-eel" } },
+  { floor: 8, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog"], spawnRate: 1.25, maxAlive: 24, elite: { id: "dart-frog", hp: 400, count: 2 }, boss: { id: "mini", name: "물총 개구리왕", icon: "🐸", hp: 2300, damage: 25, defense: 1, base: "dart-frog" } },
+  { floor: 9, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.35, maxAlive: 27, elite: { id: "canal-elite", hp: 300, every: 30 }, boss: { id: "mini", name: "수로 포식자 우두머리", icon: "🐊", hp: 2550, damage: 27, defense: 4, base: "canal-elite" } },
+  { floor: 10, zone: z2, monsters: ["moss-slime", "shock-eel", "dart-frog", "shell-crab"], spawnRate: 1.5, maxAlive: 30, elite: { id: "canal-elite", hp: 300, every: 25 }, boss: { id: "storm-catfish", name: "폭풍 메기왕", icon: "🐟", hp: 3200, damage: 32, defense: 4 } },
 ];
 
 // ---------- 전투 각성(25절) ----------
@@ -268,21 +275,22 @@ export const HUNT_RARE_LOOT = ["luckyfoot", "foxbead", "goldantler", "tusk", "ho
 /** need: 탑 재료·생활 재료 id → 개수. 특수 키: "rare-hunt"(희귀 사냥 소재 아무거나), "goods"(가공품 아무거나), "good-crop"(좋은 품질 이상 농산물). */
 export type EnhanceStep = { to: number; chance: number; drop: number; gold: number; need: Record<string, number>; open?: { gold: number; need: Record<string, number> } };
 export const ENHANCE: EnhanceStep[] = [
-  { to: 1, chance: 1, drop: 0, gold: 300, need: { "farm-fiber": 1 } },
-  { to: 2, chance: 1, drop: 0, gold: 450, need: { "fish-oil": 1 } },
-  { to: 3, chance: 1, drop: 0, gold: 650, need: { "tanned-leather": 1 } },
-  { to: 4, chance: 0.95, drop: 0.01, gold: 900, need: { "farm-fiber": 1, "fish-oil": 1 } },
-  { to: 5, chance: 0.95, drop: 0.01, gold: 1300, need: { "tanned-leather": 2 } },
-  { to: 6, chance: 0.85, drop: 0.01, gold: 1900, need: { "farm-fiber": 2, goods: 1 } },
-  { to: 7, chance: 0.85, drop: 0.01, gold: 2700, need: { "fish-oil": 2, "tanned-leather": 1 } },
-  { to: 8, chance: 0.75, drop: 0.02, gold: 3800, need: { "artisan-core": 1 } },
-  { to: 9, chance: 0.75, drop: 0.02, gold: 5200, need: { "artisan-core": 1, "rare-hunt": 1 } },
-  { to: 10, chance: 0.65, drop: 0.02, gold: 7500, need: { "artisan-core": 2, "rare-hunt": 1, "good-crop": 2 } },
-  { to: 11, chance: 0.5, drop: 0.03, gold: 8000, need: { "pollen-clump": 2, "field-essence": 1 }, open: { gold: 3000, need: { "pollen-tusk": 1 } } },
-  { to: 12, chance: 0.4, drop: 0.03, gold: 10000, need: { "canal-moss": 2, "mist-crystal": 1 }, open: { gold: 4000, need: { "storm-whisker": 1 } } },
-  { to: 13, chance: 0.3, drop: 0.04, gold: 13000, need: { "maple-fragment": 2, "maze-amber": 1 }, open: { gold: 5000, need: { "crimson-antler": 2 } } },
-  { to: 14, chance: 0.22, drop: 0.04, gold: 17000, need: { "frost-ore": 2, "glacier-crystal": 1 }, open: { gold: 7000, need: { "ironbear-core": 2 } } },
-  { to: 15, chance: 0.15, drop: 0.05, gold: 22000, need: { "ancient-bark": 2, "spirit-crystal": 1 }, open: { gold: 10000, need: { "guardian-seed": 2 } } },
+  // 2026-10-16 골드 대폭 인상(구 수치 약 ×6.7, ENHANCEMENT_GOLD_REBALANCE.md): 강화를 장기 골드 회수처로. 재료·확률·하락률은 그대로
+  { to: 1, chance: 1, drop: 0, gold: 2000, need: { "farm-fiber": 1 } },
+  { to: 2, chance: 1, drop: 0, gold: 3000, need: { "fish-oil": 1 } },
+  { to: 3, chance: 1, drop: 0, gold: 4500, need: { "tanned-leather": 1 } },
+  { to: 4, chance: 0.95, drop: 0.01, gold: 6000, need: { "farm-fiber": 1, "fish-oil": 1 } },
+  { to: 5, chance: 0.95, drop: 0.01, gold: 9000, need: { "tanned-leather": 2 } },
+  { to: 6, chance: 0.85, drop: 0.01, gold: 13000, need: { "farm-fiber": 2, goods: 1 } },
+  { to: 7, chance: 0.85, drop: 0.01, gold: 18000, need: { "fish-oil": 2, "tanned-leather": 1 } },
+  { to: 8, chance: 0.75, drop: 0.02, gold: 26000, need: { "artisan-core": 1 } },
+  { to: 9, chance: 0.75, drop: 0.02, gold: 36000, need: { "artisan-core": 1, "rare-hunt": 1 } },
+  { to: 10, chance: 0.65, drop: 0.02, gold: 50000, need: { "artisan-core": 2, "rare-hunt": 1, "good-crop": 2 } },
+  { to: 11, chance: 0.5, drop: 0.03, gold: 60000, need: { "pollen-clump": 2, "field-essence": 1 }, open: { gold: 20000, need: { "pollen-tusk": 1 } } },
+  { to: 12, chance: 0.4, drop: 0.03, gold: 75000, need: { "canal-moss": 2, "mist-crystal": 1 }, open: { gold: 30000, need: { "storm-whisker": 1 } } },
+  { to: 13, chance: 0.3, drop: 0.04, gold: 100000, need: { "maple-fragment": 2, "maze-amber": 1 }, open: { gold: 40000, need: { "crimson-antler": 2 } } },
+  { to: 14, chance: 0.22, drop: 0.04, gold: 130000, need: { "frost-ore": 2, "glacier-crystal": 1 }, open: { gold: 55000, need: { "ironbear-core": 2 } } },
+  { to: 15, chance: 0.15, drop: 0.05, gold: 170000, need: { "ancient-bark": 2, "spirit-crystal": 1 }, open: { gold: 80000, need: { "guardian-seed": 2 } } },
 ];
 /** 11~15층 이상 재료(아직 층이 없어 이름만). */
 export const UPPER_ITEMS: Record<string, { name: string; icon: string }> = {
@@ -315,6 +323,12 @@ export type RaidSave = {
   battlePets?: Record<string, { level: number }>; petPity?: number;
   armorOwned: string[];
   stabilizers: number; towerSeals: number; contractShards: number;
+  /** 최근 30판 기록(밸런스 확인용, RAID_FLOOR_20_EXPANSION_AUDIT 13절) */
+  log?: RaidRunLog[];
+};
+export type RaidRunLog = {
+  v: number; at: number; floor: number; cleared: boolean; weapon: string; evo: string | null; enh: number; armor: (string | null)[]; pet: string | null; foods: string[];
+  level: number; picks: string[]; auxes: string[]; dmg: Record<string, number>; taken: Record<string, number>; waveEndHp: number | null; bossTime: number | null; kills: number; dodges: number; time: number; input: "pc" | "mobile";
 };
 export const EMPTY_RAID: RaidSave = { balanceVersion: RAID_BALANCE_VERSION, highestFloor: 0, unlockedFloor: 1, firstClears: [], weapons: { "raid-scythe": { enhancement: 0, evolution: null, unlockedEnhancements: [] } }, equipped: { weapon: "raid-scythe", head: null, body: null, legs: null, battlePet: null }, battlePets: {}, petPity: 0, armorOwned: [], stabilizers: 0, towerSeals: 0, contractShards: 0 };
 
