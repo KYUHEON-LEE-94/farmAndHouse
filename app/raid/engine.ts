@@ -267,7 +267,8 @@ function flatHit(s: RaidState, m: Monster, raw: number, src: HitSource, kind: Po
  * 몬스터 방어 계산(RAID_FLOOR_30_EXPANSION_AUDIT 11.4). 운영은 "flat"(피해 − 방어), "ratio"는 시뮬레이터 전용 숨김 검증용(RAID_DEFENSE_V2):
  * 피해 × 100 ÷ (100 + 유효 방어 × 6). 방어형(게)의 추가 3도 유효 방어에 더한다. 모든 플레이어 피해 경로가 이 함수를 쓴다.
  */
-export let DEFENSE_MODE: "flat" | "ratio" = "flat";
+/** raid-30: (b)안 확정에 따라 기본을 비율식으로(1~20층 보스 체력 보정과 함께). 운영 반영은 승인 후 */
+export let DEFENSE_MODE: "flat" | "ratio" = "ratio";
 export function setDefenseMode(mode: "flat" | "ratio") { DEFENSE_MODE = mode; }
 export const MONSTER_DEFENSE_K = 6;
 export function mitigate(raw: number, defense: number, extra = 0) {
