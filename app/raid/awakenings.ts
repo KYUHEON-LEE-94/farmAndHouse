@@ -8,10 +8,17 @@ import type { AttackMode } from "./weapons";
 export type AwakenCategory = "basic" | "special" | "auxiliary" | "survival" | "mobility" | "terrain" | "pet";
 export type AwakenTier = "basic" | "advanced" | "rare";
 /** 등장 조건 키(모두 만족해야 후보) */
-export type AwakenReq = "evo" | "pet" | "food" | "shieldSrc" | "melee" | "ranged" | "area" | "slowTerrain" | "flowers" | "noAux" | "hasAux";
+export type AwakenReq = "evo" | "pet" | "food" | "shieldSrc" | "melee" | "ranged" | "area" | "slowTerrain" | "flowers" | "noAux" | "hasAux" | "poison" | "longReach";
 /** 쾌속: 한 판 보조무기 최대 칸 */
 export const MAX_AUX = 3;
-export type AwakenMeta = { cat: AwakenCategory; tier: AwakenTier; minLevel?: number; req?: AwakenReq[]; excludes?: string[]; weight?: number };
+/** modes: 이 공격 방식에서만 제시(WEAPON_CARD_UI_DESIGN_SPEC 1절 allowedModes). 있으면 "공격 방식 전용 카드". */
+export type AwakenMeta = { cat: AwakenCategory; tier: AwakenTier; minLevel?: number; req?: AwakenReq[]; excludes?: string[]; weight?: number; modes?: AttackMode[] };
+/** 공격 방식 묶음과 카드 호환 태그 */
+const ARC: AttackMode[] = ["arc"], SLAM: AttackMode[] = ["slam"], SPRAY: AttackMode[] = ["channel", "beam"], LOB: AttackMode[] = ["lob"], LINE: AttackMode[] = ["thrust", "hook"], SHOT: AttackMode[] = ["arrow", "bolt"], GUN: AttackMode[] = ["bullet", "spread"];
+export const MODE_TAG: Record<AttackMode, string> = { arc: "베기형", slam: "충격형", channel: "분사형", beam: "분사형", lob: "투척형", thrust: "찌르기형", hook: "찌르기형", arrow: "투사체형", bolt: "투사체형", bullet: "총기형", spread: "총기형" };
+/** 카드가 공격 방식 전용이면 그 태그, 아니면 "공용" */
+export const cardTag = (id: string) => { const m = AWAKEN_META[id]?.modes; return m?.length ? MODE_TAG[m[0]] : "공용"; };
+export const isModeCard = (id: string) => Boolean(AWAKEN_META[id]?.modes?.length);
 
 export const CATEGORY_LABEL: Record<AwakenCategory, { icon: string; name: string }> = {
   basic: { icon: "⚔️", name: "기본 공격" }, special: { icon: "🌟", name: "특수 공격" }, auxiliary: { icon: "🪃", name: "보조무기" },
@@ -24,19 +31,53 @@ export const AWAKEN_META: Record<string, AwakenMeta> = {
   // 기본 공격(53.2·53.3)
   "keen-edge": { cat: "basic", tier: "basic" },
   "quick-grip": { cat: "basic", tier: "basic" },
-  "long-handle": { cat: "basic", tier: "basic" },
+  // ---- 공격 방식 전용(WEAPON_CARD_UI_DESIGN_SPEC 1절) ----
+  // 베기형(arc): 자루 연장·베기 각도·연속 베기·휩쓸기
+  "long-handle": { cat: "basic", tier: "basic", modes: ARC },
+  "wide-arc": { cat: "basic", tier: "basic", modes: ARC },
   "critical-eye": { cat: "basic", tier: "basic" },
   "first-strike": { cat: "basic", tier: "basic" },
   "heavy-swing": { cat: "basic", tier: "advanced", req: ["melee"] },
-  "double-cut": { cat: "basic", tier: "advanced" },
+  "double-cut": { cat: "basic", tier: "advanced", modes: ARC },
   "critical-force": { cat: "basic", tier: "advanced" },
   "boss-hunter": { cat: "basic", tier: "advanced" },
   "close-instinct": { cat: "basic", tier: "advanced", req: ["melee"], excludes: ["keep-distance"] },
-  "keep-distance": { cat: "basic", tier: "advanced", req: ["ranged"], excludes: ["close-instinct"] },
+  // 거리 유지: 실제로 260px 밖을 맞힐 수 있는 무기만(낚싯대처럼 사거리가 짧으면 효과 0)
+  "keep-distance": { cat: "basic", tier: "advanced", req: ["ranged", "longReach"], excludes: ["close-instinct"] },
   "battle-tempo": { cat: "basic", tier: "advanced" },
   "armor-crack": { cat: "basic", tier: "advanced" },
   "focused-swing": { cat: "basic", tier: "advanced" },
-  "sweeping-edge": { cat: "basic", tier: "advanced", req: ["area"] },
+  "sweeping-edge": { cat: "basic", tier: "advanced", modes: ARC },
+  // 충격형(slam): 충격 반경·내려찍기 거리·여진·경직
+  "impact-radius": { cat: "basic", tier: "basic", modes: SLAM },
+  "slam-reach": { cat: "basic", tier: "basic", modes: SLAM },
+  aftershock: { cat: "basic", tier: "advanced", modes: SLAM },
+  "stun-slam": { cat: "basic", tier: "advanced", modes: SLAM },
+  // 분사형(channel·beam): 분사 길이·분사 폭·틱 속도·집중 피해
+  "spray-length": { cat: "basic", tier: "basic", modes: SPRAY },
+  "spray-width": { cat: "basic", tier: "basic", modes: SPRAY },
+  "spray-tick": { cat: "basic", tier: "advanced", modes: SPRAY },
+  "focus-spray": { cat: "basic", tier: "advanced", modes: SPRAY },
+  // 투척형(lob): 투척 거리·폭발 반경·추가 투사체·장판 지속시간(독 장판 무기만)
+  "throw-range": { cat: "basic", tier: "basic", modes: LOB },
+  "blast-radius": { cat: "basic", tier: "basic", modes: LOB },
+  "extra-bomb": { cat: "basic", tier: "advanced", modes: LOB },
+  lingering: { cat: "basic", tier: "advanced", modes: LOB, req: ["poison"] },
+  // 찌르기형(thrust·hook): 찌르기 길이·폭, 관통(낚싯줄), 2차 타격, 연쇄 대상
+  "line-reach": { cat: "basic", tier: "basic", modes: LINE },
+  "pierce-line": { cat: "basic", tier: "advanced", modes: ["hook"] },
+  "line-double": { cat: "basic", tier: "advanced", modes: LINE },
+  "chain-target": { cat: "basic", tier: "advanced", modes: LINE },
+  // 투사체형(arrow·bolt): 사거리·탄속·다중 발사·관통
+  "shot-range": { cat: "basic", tier: "basic", modes: SHOT },
+  "shot-speed": { cat: "basic", tier: "basic", modes: SHOT },
+  "multi-shot": { cat: "basic", tier: "advanced", modes: SHOT },
+  "pierce-shot": { cat: "basic", tier: "advanced", modes: SHOT },
+  // 총기형(bullet·spread): 발사 간격·추가 탄환·주기적 강화탄·집탄(산탄만)
+  "gun-rate": { cat: "basic", tier: "basic", modes: GUN },
+  "extra-pellet": { cat: "basic", tier: "basic", modes: GUN },
+  "power-round": { cat: "basic", tier: "advanced", modes: GUN },
+  "tight-spread": { cat: "basic", tier: "advanced", modes: ["spread"] },
   // 특수 공격(53.4)
   "special-force": { cat: "special", tier: "basic", req: ["evo"] },
   "special-haste": { cat: "special", tier: "basic", req: ["evo"] },
@@ -84,7 +125,6 @@ export const AWAKEN_META: Record<string, AwakenMeta> = {
   "auxiliary-mastery": { cat: "auxiliary", tier: "rare", req: ["hasAux"], weight: 8 },
 };
 export const isAuxCard = (id: string) => AWAKEN_META[id]?.cat === "auxiliary";
-const ATTACK_CATS: AwakenCategory[] = ["basic", "special", "auxiliary"];
 
 // ---------- 자동 보조무기(62.2) ----------
 export type AuxId = "aux-slingshot" | "aux-hand-sickle" | "aux-seed-bomb" | "aux-sprinkler" | "aux-beehive" | "aux-scarecrow";
@@ -112,6 +152,8 @@ export type ChoiceContext = {
   mode: AttackMode; evo: boolean; pet: boolean; food: boolean; shieldSrc: boolean; slowTerrain: boolean; flowers: boolean;
   /** 이미 가진 보조무기 수, 첫 보조무기를 얻은 레벨 */
   auxCount: number; auxLevel: number; random: () => number;
+  /** 무기 특수 효과 키(예: poison), 최대 타격 거리(사거리 + 폭발 반경) */
+  fx?: string[]; reach?: number;
 };
 function reqOk(r: AwakenReq, c: ChoiceContext) {
   switch (r) {
@@ -119,12 +161,15 @@ function reqOk(r: AwakenReq, c: ChoiceContext) {
     case "melee": return MELEE.includes(c.mode); case "ranged": return RANGED.includes(c.mode); case "area": return AREA.includes(c.mode);
     case "slowTerrain": return c.slowTerrain; case "flowers": return c.flowers;
     case "noAux": return c.auxCount < MAX_AUX; case "hasAux": return c.auxCount > 0 && c.level > c.auxLevel;
+    case "poison": return Boolean(c.fx?.includes("poison"));
+    case "longReach": return (c.reach ?? 0) >= 260;
   }
 }
 /** 지금 레벨에서 제시할 수 있는 카드(중첩 미만·조건 만족·배타 카드 없음). */
 export function validCards(c: ChoiceContext) {
   return Object.entries(AWAKEN_META).filter(([id, m]) => (c.picks[id] ?? 0) < c.maxOf(id)
     && c.level >= (m.minLevel ?? TIER_MIN_LEVEL[m.tier])
+    && (!m.modes || m.modes.includes(c.mode))
     && (m.req ?? []).every(r => reqOk(r, c))
     && !(m.excludes ?? []).some(x => (c.picks[x] ?? 0) > 0)).map(([id]) => id);
 }
@@ -152,11 +197,11 @@ export function rollChoices(c: ChoiceContext, count = 3, extraPool?: string[]) {
     if (cand.length) out.push(weighted(cand, c.random));
   };
   const cat = (id: string) => AWAKEN_META[id].cat, tier = (id: string) => AWAKEN_META[id].tier;
-  const pickedCats = new Set(Object.keys(c.picks).filter(id => (c.picks[id] ?? 0) > 0 && AWAKEN_META[id]).map(cat));
-  if (c.level === 2) { take(id => ATTACK_CATS.includes(cat(id))); take(id => cat(id) === "survival" || cat(id) === "mobility"); }
-  else if (c.level === 3) { take(id => ATTACK_CATS.includes(cat(id))); take(id => tier(id) !== "basic"); take(id => !pickedCats.has(cat(id))); }
-  else if (c.level === 4) { take(id => cat(id) === "basic" || cat(id) === "special" || cat(id) === "auxiliary"); take(id => cat(id) === "survival"); take(id => tier(id) !== "basic"); }
+  // WEAPON_CARD_UI_DESIGN_SPEC 1절 제시 구성
+  if (c.level === 2) { take(id => cat(id) === "basic"); take(id => cat(id) === "survival" || cat(id) === "mobility"); }
+  else if (c.level === 3 || c.level === 4) { take(isModeCard); }
   else if (c.level === 5) { take(id => tier(id) !== "basic"); }
+  else { take(isModeCard); take(id => !isModeCard(id)); take(id => !isModeCard(id)); }
   while (out.length < count) { const before = out.length; take(() => true); if (out.length === before) break; }
   // 보여 주는 순서는 섞는다
   return out.sort(() => c.random() - 0.5);

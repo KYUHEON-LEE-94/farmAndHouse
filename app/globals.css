@@ -1244,3 +1244,7 @@ button { color:inherit; }
 .plots.lite .ripe-sparkle{display:none}
 .plots.lite .plot.ready::after{animation:none;opacity:.85}
 @media (prefers-reduced-motion:reduce){.plant{animation:none!important}.plot.ready::after{animation:none;opacity:.85}.ripe-sparkle{display:none}}
+
+/* 각성 카드: 호환 태그(공용·베기형·충격형…)와 바뀌는 수치 */
+.raid-choices button .aw-tag{display:inline-block;margin-right:5px;padding:0 6px;border-radius:999px;font-size:10px;font-weight:800;color:#fff;background:#8a7a5a}.raid-choices button .aw-tag.mode{background:#b5403a}
+.raid-choices button .aw-preview{display:block;margin-top:4px;padding:3px 6px;border-radius:6px;background:#eef6e6;color:#2f6a24;font-size:11px;font-weight:800}

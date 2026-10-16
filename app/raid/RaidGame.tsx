@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, segmentHits, type Terrain } from "./terrain";
 import { SPECIALS } from "./weapons";
-import { AUX_WEAPONS, AWAKEN_META, CATEGORY_LABEL } from "./awakenings";
+import { AUX_WEAPONS, AWAKEN_META, CATEGORY_LABEL, cardTag } from "./awakenings";
 import { weaponArtUrl } from "./weaponArt";
-import { chooseAwakening, createRaid, derived, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
+import { chooseAwakening, createRaid, derived, previewCard, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
 const STEP = 1 / 60;
 /** 터치 기기(손가락이 주 입력)면 모바일 조작(가상 스틱·자동 공격·버튼)을 쓴다(HUNTING_RAID.md 65절). */
@@ -86,7 +86,9 @@ const fmt = (sec: number) => { const s = Math.max(0, Math.ceil(sec)); return `${
 const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
 const UI_FONT = '"Gowun Dodum", "Pretendard", sans-serif';
 
-type Ui = { choices: AwakenId[] | null; paused: boolean; over: RaidState["over"]; level: number; picks: Partial<Record<AwakenId, number>> };
+type Ui = { choices: AwakenId[] | null; paused: boolean; over: RaidState["over"]; level: number; picks: Partial<Record<AwakenId, number>>;
+  /** 카드별 "지금 무기 기준 바뀌는 수치"(WEAPON_CARD_UI_DESIGN_SPEC) */
+  previews: Record<string, string | null> };
 type Avatar = { src: string; pixelated: boolean };
 type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; pixelated: boolean; weapon?: HTMLImageElement };
 
@@ -106,7 +108,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   const holdRef = useRef(hold), speedRef = useRef(speed), finishRef = useRef(onFinish), doneRef = useRef(false), overAtRef = useRef(0);
   const [sfxOn, setSfxOn] = useState(readSfxOn), sfxOnRef = useRef(sfxOn);
   useEffect(() => { sfxOnRef.current = sfxOn; try { localStorage.setItem(SFX_KEY, sfxOn ? "on" : "off"); } catch { /* 저장 불가 */ } }, [sfxOn]);
-  const [ui, setUi] = useState<Ui>({ choices: null, paused: false, over: null, level: 1, picks: {} });
+  const [ui, setUi] = useState<Ui>({ choices: null, paused: false, over: null, level: 1, picks: {}, previews: {} });
   // 모바일 조작 상태(렌더와 상관없는 값은 ref로)
   const [touchMode] = useState(isTouchDevice), [portraitOk, setPortraitOk] = useState(false);
   const touchRef = useRef<Touchy>({ stick: null, aim: null, manualUntil: 0, aimAngle: 0, special: null, fire: false });
@@ -145,7 +147,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
       draw(ctx, s, art, now / 1000, petIcon);
       if (s.over && overAtRef.current) drawEnd(ctx, s, art, Math.min(1, (now - overAtRef.current) / END_FX_MS), now / 1000);
       const key = `${s.choices?.join(",") ?? ""}|${s.paused}|${s.over ?? ""}`;
-      if (key !== uiKey) { uiKey = key; setUi({ choices: s.choices ? [...s.choices] : null, paused: s.paused, over: s.over, level: s.level, picks: { ...s.picks } }); }
+      if (key !== uiKey) { uiKey = key; setUi({ choices: s.choices ? [...s.choices] : null, paused: s.paused, over: s.over, level: s.level, picks: { ...s.picks }, previews: Object.fromEntries((s.choices ?? []).map(id => [id, previewCard(s, id)])) }); }
       // 끝나면 바로 넘기지 않고 쓰러짐·성공 연출을 2.4초 보여 준다(결과 보기로 건너뛸 수 있음).
       if (s.over && !doneRef.current) {
         if (!overAtRef.current) overAtRef.current = now;
@@ -259,7 +261,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
       <span className="raid-ov-eyebrow">AWAKENING</span><b>⚔️ 전투 각성 Lv.{ui.level}</b><small>하나를 고르세요 · 고르는 동안 전투가 멈춰요</small>
       <div>{ui.choices.map((id, i) => { const meta = AWAKEN_META[id], cat = meta ? CATEGORY_LABEL[meta.cat] : null;
         return <button key={id} onClick={() => choose(id)} className={`${AWAKENINGS[id].final ? "final" : ""} ${meta ? `tier-${meta.tier} cat-${meta.cat}` : ""}`} style={{ animationDelay: `${i * 0.06}s` }}>
-        <i>{AWAKENINGS[id].final ? "✨" : cat?.icon ?? "♾️"}</i>{cat && <small className="aw-cat">{cat.name}{meta!.tier === "advanced" ? " · 고급" : meta!.tier === "rare" ? " · 희귀" : ""}</small>}<strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>
+        <i>{AWAKENINGS[id].final ? "✨" : cat?.icon ?? "♾️"}</i>{cat && <small className="aw-cat"><b className={`aw-tag ${cardTag(id) === "공용" ? "common" : "mode"}`}>{cardTag(id)}</b>{cat.name}{meta!.tier === "advanced" ? " · 고급" : meta!.tier === "rare" ? " · 희귀" : ""}</small>}<strong>{AWAKENINGS[id].name}</strong>{(ui.picks[id] ?? 0) > 0 && <em>{AWAKENINGS[id].max >= 999 ? `×${(ui.picks[id] ?? 0) + 1}` : `${(ui.picks[id] ?? 0) + 1}단계`}</em>}<span>{AWAKENINGS[id].text}</span>{ui.previews[id] && <small className="aw-preview">📈 {ui.previews[id]}</small>}
       </button>; })}</div>
     </div></div>}
     {!ui.over && <button className="raid-sfx" onClick={() => setSfxOn(on => !on)} title="타격 효과음">{sfxOn ? "🔊" : "🔇"}</button>}

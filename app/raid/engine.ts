@@ -37,6 +37,8 @@ export type Monster = {
   markUntil: number;
   /** 53절: 첫 타격 여부(선제타격), 갑옷 균열 중첩·만료 */
   struck?: boolean; crack?: number; crackUntil?: number;
+  /** 분사형: 마지막 분사 적중 시각, 연속 적중 시간 */
+  sprayAt?: number; sprayT?: number;
 };
 export type Projectile = { x: number; y: number; vx: number; vy: number; r: number; damage: number; life: number; mine: boolean; pierce: Set<number> | null;
   /** 내 투사체: 남은 관통 수, 폭발, 쏜 자리(먼 거리 보너스), 보스 방어 무시 */
@@ -101,7 +103,7 @@ export type RaidState = {
   kills: number; damageTaken: Record<string, number>; uid: number; prevDash: boolean; prevFood: [boolean, boolean, boolean]; bossHpAtEnd: number;
 };
 
-const rnd = Math.random;
+const rnd = () => Math.random();
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
 const angDiff = (a: number, b: number) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
@@ -128,13 +130,15 @@ let hitSource: HitSource = "basic";
 function withSource<T>(src: HitSource | undefined, run: () => T): T { const prev = hitSource; hitSource = src ?? "basic"; try { return run(); } finally { hitSource = prev; } }
 
 // ---------- 파생 능력치 ----------
+const isSpray = (s: RaidState) => s.weapon.mode === "channel" || s.weapon.mode === "beam";
 const pick = (s: RaidState, id: AwakenId) => s.picks[id] ?? 0;
 const buffSum = (s: RaidState, kinds: FoodEffect["kind"][]) => s.buffs.filter(b => b.until > s.t && kinds.includes(b.kind)).reduce((sum, b) => sum + b.value / 100, 0);
 export const derived = (s: RaidState) => ({
   damageMul: 1 + 0.22 * pick(s, "keen-edge") + 0.06 * pick(s, "endless-edge") + buffSum(s, ["attack", "all"]),
-  interval: Math.max(0.2, s.weapon.interval * ATTACK_SPEED_MUL * Math.max(0.65, 1 - 0.14 * pick(s, "quick-grip") - 0.03 * pick(s, "endless-haste") - buffSum(s, ["haste", "all"]) - (pick(s, "battle-tempo") && s.t < s.ext.tempoUntil ? 0.03 * s.ext.tempo : 0))),
+  // 공격 간격 하한: 분사형(channel·beam) 0.10초, 그 밖 0.20초(WEAPON_CARD_UI_DESIGN_SPEC 2절)
+  interval: Math.max(isSpray(s) ? 0.1 : 0.2, s.weapon.interval * ATTACK_SPEED_MUL * Math.max(0.65, 1 - 0.14 * pick(s, "quick-grip") - 0.03 * pick(s, "endless-haste") - buffSum(s, ["haste", "all"]) - (pick(s, "battle-tempo") && s.t < s.ext.tempoUntil ? 0.03 * s.ext.tempo : 0) - 0.12 * pick(s, "spray-tick") - 0.1 * pick(s, "gun-rate"))),
   range: s.weapon.range * (1 + 0.22 * pick(s, "long-handle") + 0.18 * pick(s, "sweeping-edge")),
-  arc: Math.min(360, s.weapon.angle + 10 * pick(s, "long-handle")),
+  arc: Math.min(360, s.weapon.angle + 10 * pick(s, "long-handle") + 25 * pick(s, "wide-arc")),
   knockback: s.weapon.knockback * (1 + 0.5 * pick(s, "heavy-swing")),
   // 이동속도 증가 합계 +60% 상한(53.9)
   speed: PLAYER.speed * (1 + Math.min(0.6, 0.12 * pick(s, "wind-step") + s.gear.speed + buffSum(s, ["speed", "all"]) + (s.t < s.ext.dashBoostUntil ? 0.15 : 0)
@@ -370,8 +374,8 @@ function explodeFlower(s: RaidState, f: Terrain["flowers"][number]) {
 
 // ---------- 무기별 공격(49절) ----------
 /** 긴 자루·휩쓸기: 사거리 배율, 범위(반지름) 배율, 묵직한 휘두르기: 밀어내기 배율(감사 문서 4·6절) */
-const reachMul = (s: RaidState) => 1 + 0.22 * pick(s, "long-handle") + 0.18 * pick(s, "sweeping-edge");
-const areaMul = (s: RaidState) => 1 + 0.11 * pick(s, "long-handle") + 0.18 * pick(s, "sweeping-edge");
+const reachMul = (s: RaidState) => 1 + 0.22 * pick(s, "long-handle") + 0.18 * pick(s, "sweeping-edge") + 0.22 * pick(s, "slam-reach") + 0.2 * pick(s, "spray-length") + 0.25 * pick(s, "throw-range") + 0.22 * pick(s, "line-reach") + 0.25 * pick(s, "shot-range");
+const areaMul = (s: RaidState) => 1 + 0.11 * pick(s, "long-handle") + 0.18 * pick(s, "sweeping-edge") + 0.15 * pick(s, "impact-radius") + 0.15 * pick(s, "blast-radius");
 const knockMul = (s: RaidState) => 1 + 0.5 * pick(s, "heavy-swing");
 /** 휩쓸기: 기본 공격 한 번에 3마리 이상 맞히면 +12% */
 const sweepBonus = (s: RaidState, n: number) => (hitSource === "basic" && pick(s, "sweeping-edge") && n >= 3 ? 0.12 : 0);
@@ -387,28 +391,35 @@ function blastAt(s: RaidState, x: number, y: number, r: number, dmg: number, kno
 function slamHit(s: RaidState, mul: number, radiusMul = 1) {
   const p = s.player, w = s.weapon, reach = w.range * reachMul(s), cx = p.x + Math.cos(p.aim) * reach, cy = p.y + Math.sin(p.aim) * reach, r = (w.radius ?? 50) * radiusMul * areaMul(s);
   blastAt(s, cx, cy, r, w.damage * mul, w.knockback * knockMul(s));
+  if (pick(s, "stun-slam")) for (const m of s.monsters) if (m.hp > 0 && !m.boss && dist(m.x, m.y, cx, cy) < r + m.r && (m.state === "move" || m.state === "stun")) { const add = m.elite ? 0.3 : 0.5; if (m.state === "stun") m.stateT += 0.3; else { m.state = "stun"; m.stateT = add; } }
   if (w.fx?.quake && p.attacks % 3 === 0) blastAt(s, cx, cy, s.picks["earth-split"] ? 160 : 110, w.damage * 0.6, 30);
   const frags = w.fx?.fragments ? (s.picks["rock-rain"] ? 6 : w.fx.fragments) : 0;
   for (let i = 0; i < frags; i++) { const a = rnd() * Math.PI * 2, d = 30 + rnd() * 60; blastAt(s, cx + Math.cos(a) * d, cy + Math.sin(a) * d, 18, w.damage * 0.35, 10); }
 }
 function channelTick(s: RaidState) {
-  const p = s.player, w = s.weapon, fx = w.fx ?? {}, range = w.range * reachMul(s), angle = w.angle + 10 * pick(s, "long-handle");
+  const p = s.player, w = s.weapon, fx = w.fx ?? {}, range = w.range * reachMul(s), angle = w.angle + 15 * pick(s, "spray-width"), tick = derived(s).interval, focus = pick(s, "focus-spray") > 0;
+  /** 같은 적 연속 적중 시간(틱이 끊기면 처음부터): 빙결 2초·집중 피해 1초에 쓴다 */
+  const keep = (m: Monster) => { if (s.t - (m.sprayAt ?? -9) > tick * 2.5) { m.sprayT = 0; m.expose = 0; } m.sprayAt = s.t; m.sprayT = (m.sprayT ?? 0) + tick; };
   // 이중 베기(채널): 세 번째 틱마다 피해 +55%
   p.tickN = (p.tickN ?? 0) + 1; const tickMul = pick(s, "double-cut") && p.tickN % 3 === 0 ? 1.55 : 1;
   if (w.mode === "beam") {
     s.swings.push({ angle: p.aim, range, arc: 0, t: 0.16, kind: "line", width: w.width });
-    const hits = s.monsters.filter(m => m.hp > 0 && inAim(p, p.aim, m, range, w.width ?? 22) >= 0), extra = sweepBonus(s, hits.length);
-    for (const m of hits) hitMonster(s, m, w.damage * tickMul, p.aim, (fx.knockTick ?? 0) * knockMul(s), { noCombo: true, extra });
+    const beamW = (w.width ?? 22) * (1 + 0.3 * pick(s, "spray-width"));
+    s.swings[s.swings.length - 1].width = beamW;
+    const hits = s.monsters.filter(m => m.hp > 0 && inAim(p, p.aim, m, range, beamW) >= 0), extra = sweepBonus(s, hits.length);
+    for (const m of hits) { keep(m); hitMonster(s, m, w.damage * tickMul, p.aim, (fx.knockTick ?? 0) * knockMul(s), { noCombo: true, extra: extra + (focus && (m.sprayT ?? 0) >= 1 ? 0.25 : 0) }); }
     return;
   }
   s.swings.push({ angle: p.aim, range, arc: angle, t: 0.16, kind: "cone" });
   const cone = s.monsters.filter(m => { if (m.hp <= 0) return false; const r = dist(p.x, p.y, m.x, m.y), a = Math.atan2(m.y - p.y, m.x - p.x); return !(r > range + m.r || angDiff(a, p.aim) > (angle / 2) * Math.PI / 180 + Math.atan2(m.r, Math.max(1, r))); }), extra = sweepBonus(s, cone.length);
   for (const m of cone) {
     const a = Math.atan2(m.y - p.y, m.x - p.x);
-    hitMonster(s, m, w.damage * tickMul, a, 0, { noCombo: true, extra });
+    keep(m);
+    hitMonster(s, m, w.damage * tickMul, a, 0, { noCombo: true, extra: extra + (focus && (m.sprayT ?? 0) >= 1 ? 0.25 : 0) });
     m.slowUntil = s.t + 0.4; m.slowMul = Math.min(m.slowMul, 1 - (fx.slow ?? 0.15));
     if (fx.freeze) {
-      m.expose += w.interval;
+      // 빙결: 무기 원본 간격이 아니라 실제 틱 시간을 더해, 빠른 손잡이·틱 속도와 상관없이 2초 연속 적중에 언다
+      m.expose += tick;
       if (m.expose >= 2) {
         m.expose = 0;
         const freeze = (t: Monster) => { if (t.boss) { t.slowUntil = s.t + 1; t.slowMul = 0.5; t.takenUntil = s.t + 1; t.takenBonus = Math.max(t.takenBonus, 0.1); } else if (!t.elite) { t.frozenUntil = s.t + 1; t.state = "stun"; t.stateT = 1; } };
@@ -422,13 +433,15 @@ function throwBomb(s: RaidState, tx: number, ty: number) {
   const p = s.player, w = s.weapon, fx = w.fx ?? {}, d = Math.min(w.range * reachMul(s), dist(p.x, p.y, tx, ty)), a = Math.atan2(ty - p.y, tx - p.x), area = areaMul(s);
   const x = p.x + Math.cos(a) * d, y = p.y + Math.sin(a) * d, big = s.picks["giant-seed"] && p.attacks % 5 === 0;
   const seeds = fx.seeds ?? 1;
+  // 추가 투사체: 옆에 작은 폭탄 1개(50%·반경 70%)
+  if (pick(s, "extra-bomb")) { const a2 = a + (rnd() < 0.5 ? 1 : -1) * 0.5; zoneAt(s, { kind: "pbomb", x: p.x + Math.cos(a2) * d * 0.85, y: p.y + Math.sin(a2) * d * 0.85, r: (w.radius ?? 45) * 0.7 * area, t: 0.1, tele: 0.4, damage: w.damage * 0.5, every: 0, slow: 0, mine: { mul: 1, poison: fx.poison } }); }
   for (let i = 0; i < seeds; i++) {
     const off = seeds > 1 ? { x: (rnd() - 0.5) * 80, y: (rnd() - 0.5) * 80 } : { x: 0, y: 0 };
     zoneAt(s, { kind: "pbomb", x: x + off.x, y: y + off.y, r: (w.radius ?? 45) * (big ? 2 : 1) * area, t: 0.1, tele: 0.35, damage: w.damage * (big ? 2 : 1), every: 0, slow: 0, mine: { mul: 1, poison: fx.poison, seedChain: Boolean(fx.seeds), big: Boolean(big) } });
   }
 }
 function thrustHit(s: RaidState, mul: number, lenMul = 1) {
-  const p = s.player, w = s.weapon, fx = w.fx ?? {}, len = w.range * lenMul * reachMul(s), width = w.width ?? 24;
+  const p = s.player, w = s.weapon, fx = w.fx ?? {}, len = w.range * lenMul * reachMul(s), width = (w.width ?? 24) * (1 + 0.2 * pick(s, "line-reach"));
   s.swings.push({ angle: p.aim, range: len, arc: 0, t: 0.18, kind: "line", width });
   const hits = s.monsters.filter(m => m.hp > 0).map(m => ({ m, along: inAim(p, p.aim, m, len, width) })).filter(h => h.along >= 0).sort((x, y) => x.along - y.along);
   let pulled = 0;
@@ -440,15 +453,28 @@ function thrustHit(s: RaidState, mul: number, lenMul = 1) {
       for (const o of s.monsters) if (o !== m && o.hp > 0 && dist(o.x, o.y, m.x, m.y) < 40 + o.r) hitMonster(s, o, w.damage * 0.5, p.aim, 10, { noCombo: true });
     } else if (fx.pullSplash && (m.elite || m.boss)) { m.slowUntil = s.t + 0.6; m.slowMul = 0.6; }
   }
+  if (mul >= 1 && hits[0]) chainFrom(s, hits[0].m);
+}
+/** 연쇄 대상: 맞힌 적 주변 140px 안 1명에게 50%. */
+function chainFrom(s: RaidState, from: Monster) {
+  if (!pick(s, "chain-target")) return;
+  const o = s.monsters.filter(m => m.hp > 0 && m !== from && dist(m.x, m.y, from.x, from.y) < 140).sort((x, y) => dist(x.x, x.y, from.x, from.y) - dist(y.x, y.y, from.x, from.y))[0];
+  if (!o) return;
+  s.swings.push({ angle: Math.atan2(o.y - from.y, o.x - from.x), range: dist(o.x, o.y, from.x, from.y), arc: 0, t: 0.2, kind: "line", width: 3, x: from.x, y: from.y });
+  hitMonster(s, o, s.weapon.damage * 0.5, 0, 0, { noCombo: true });
 }
 function hookHit(s: RaidState, mul = 1) {
   const p = s.player, w = s.weapon, fx = w.fx ?? {}, range = w.range * reachMul(s);
   s.swings.push({ angle: p.aim, range, arc: 0, t: 0.2, kind: "line", width: 4 });
-  const first = s.monsters.filter(m => m.hp > 0).map(m => ({ m, along: inAim(p, p.aim, m, range, w.width ?? 16) })).filter(h => h.along >= 0).sort((x, y) => x.along - y.along)[0];
-  const target = first?.m;
+  const lineW = (w.width ?? 16) * (1 + 0.2 * pick(s, "line-reach"));
+  const inLine = s.monsters.filter(m => m.hp > 0).map(m => ({ m, along: inAim(p, p.aim, m, range, lineW) })).filter(h => h.along >= 0).sort((x, y) => x.along - y.along);
+  const target = inLine[0]?.m;
   if (!target) return;
   hitMonster(s, target, w.damage * mul, p.aim, 0);
-  if (mul < 1) return; // 이중 베기 추가타는 끌어오기·그물 없이 피해만
+  // 관통: 낚싯줄이 뒤의 적도 꿰뚫는다
+  for (const h of inLine.slice(1, 1 + pick(s, "pierce-line"))) hitMonster(s, h.m, w.damage * mul * 0.8, p.aim, 0, { noCombo: true });
+  if (mul < 1) return; // 2차 타격은 끌어오기·그물 없이 피해만
+  chainFrom(s, target);
   if (target.hp > 0) { if (!target.elite && !target.boss) { const a = Math.atan2(p.y - target.y, p.x - target.x); target.x += Math.cos(a) * (fx.pull ?? 30); target.y += Math.sin(a) * (fx.pull ?? 30); } else { target.slowUntil = s.t + 0.5; target.slowMul = 0.7; } }
   if (fx.chain) {
     const near = s.monsters.filter(m => m.hp > 0 && m !== target && dist(m.x, m.y, target.x, target.y) < 140).sort((x, y) => dist(x.x, x.y, target.x, target.y) - dist(y.x, y.y, target.x, target.y)).slice(0, 2);
@@ -462,12 +488,14 @@ function hookHit(s: RaidState, mul = 1) {
   }
 }
 function fire(s: RaidState, angle: number, dmg: number, extra: Partial<Projectile> = {}) {
-  const p = s.player, w = s.weapon, sp = w.speed ?? 600;
-  s.projectiles.push({ src: hitSource, x: p.x, y: p.y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp, r: w.mode === "bolt" ? 8 : w.mode === "spread" ? 4 : 5, damage: dmg, life: (w.range * reachMul(s)) / sp, mine: true, pierce: new Set(), left: w.fx?.pierce ?? 0, explode: w.fx?.explode, ox: p.x, oy: p.y, ...extra });
+  const p = s.player, w = s.weapon, sp = (w.speed ?? 600) * (w.mode === "arrow" || w.mode === "bolt" ? 1 + 0.25 * pick(s, "shot-speed") : 1);
+  s.projectiles.push({ src: hitSource, x: p.x, y: p.y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp, r: w.mode === "bolt" ? 8 : w.mode === "spread" ? 4 : 5, damage: dmg, life: (w.range * reachMul(s)) / sp, mine: true, pierce: new Set(), left: (w.fx?.pierce ?? 0) + (w.mode === "arrow" || w.mode === "bolt" ? pick(s, "pierce-shot") : 0), explode: w.fx?.explode, ox: p.x, oy: p.y, ...extra });
 }
 /** 무기 한 번 공격(채널형 제외). */
 function attackOnce(s: RaidState) {
   const p = s.player, w = s.weapon, fx = w.fx ?? {};
+  // 주기적 강화탄(총기형): 네 번째 발사마다 +60%
+  const power = pick(s, "power-round") && p.attacks % 4 === 0 ? 1.6 : 1;
   switch (w.mode) {
     case "arc":
       swingHit(s, p.aim, 1);
@@ -475,24 +503,24 @@ function attackOnce(s: RaidState) {
       if (s.picks["double-cut"] && p.attacks % 3 === 0) swingHit(s, p.aim, 0.55);
       if (s.picks["whirl-slash"] && p.attacks % 4 === 0) swingHit(s, p.aim, 1, true);
       break;
-    case "slam": slamHit(s, 1); if (s.picks["double-cut"] && p.attacks % 3 === 0) later(s, 0.12, () => slamHit(s, 0.55, 0.6)); break;
-    case "lob": throwBomb(s, p.tx, p.ty); if (s.picks["double-cut"] && p.attacks % 3 === 0) { const a = Math.atan2(p.ty - p.y, p.tx - p.x), d0 = Math.min(s.weapon.range * reachMul(s), dist(p.x, p.y, p.tx, p.ty)); later(s, 0.2, () => blastAt(s, p.x + Math.cos(a) * d0, p.y + Math.sin(a) * d0, (w.radius ?? 45) * 0.6, w.damage * 0.55, 10)); } break;
-    case "thrust": { const sea = s.picks["sea-god"] && p.attacks % 4 === 0; thrustHit(s, sea ? 2 : 1, sea ? 2 : 1); if (s.picks["double-cut"] && p.attacks % 3 === 0) later(s, 0.12, () => thrustHit(s, 0.55)); if (s.picks["chain-spin"] && p.attacks % 5 === 0) blastAt(s, p.x, p.y, 120, w.damage, 30); break; }
-    case "hook": hookHit(s); if (s.picks["double-cut"] && p.attacks % 3 === 0) later(s, 0.12, () => hookHit(s, 0.55)); break;
+    case "slam": { slamHit(s, 1); if (pick(s, "aftershock")) { const aim = p.aim; later(s, 0.35, () => { const keepAim = p.aim; p.aim = aim; slamHit(s, 0.55); p.aim = keepAim; }); } break; }
+    case "lob": throwBomb(s, p.tx, p.ty); break;
+    case "thrust": { const sea = s.picks["sea-god"] && p.attacks % 4 === 0; thrustHit(s, sea ? 2 : 1, sea ? 2 : 1); if (pick(s, "line-double") && p.attacks % 3 === 0) later(s, 0.12, () => thrustHit(s, 0.55)); if (s.picks["chain-spin"] && p.attacks % 5 === 0) blastAt(s, p.x, p.y, 120, w.damage, 30); break; }
+    case "hook": hookHit(s); if (pick(s, "line-double") && p.attacks % 3 === 0) later(s, 0.12, () => hookHit(s, 0.55)); break;
     case "arrow": {
       const snipe = s.picks["pierce-snipe"] && p.attacks % 5 === 0;
       fire(s, p.aim, w.damage * (snipe ? 2.5 : 1), snipe ? { left: 999 } : {});
       if (fx.triple && p.attacks % 3 === 0) { fire(s, p.aim - 0.18, w.damage * 0.55); fire(s, p.aim + 0.18, w.damage * 0.55); }
       break;
     }
-    case "spread": { const reach = w.range * reachMul(s), near = s.monsters.filter(m => m.hp > 0 && dist(m.x, m.y, p.x, p.y) < reach && angDiff(Math.atan2(m.y - p.y, m.x - p.x), p.aim) < (w.angle / 2) * Math.PI / 180 + 0.1).length, bonus = 1 + sweepBonus(s, near);
-      for (let i = 0; i < (w.pellets ?? 5); i++) fire(s, p.aim + ((i / ((w.pellets ?? 5) - 1)) - 0.5) * (w.angle * Math.PI / 180), w.damage * bonus); break; }
-    case "bullet": fire(s, p.aim, w.damage, s.picks["ap-round"] && p.attacks % 3 === 0 ? { ignoreDef: true } : {}); break;
+    case "spread": { const pellets = (w.pellets ?? 5) + pick(s, "extra-pellet"), ang = w.angle * (1 - 0.25 * pick(s, "tight-spread")), dmg = w.damage * (1 + 0.08 * pick(s, "tight-spread")) * power;
+      for (let i = 0; i < pellets; i++) fire(s, p.aim + ((i / (pellets - 1)) - 0.5) * (ang * Math.PI / 180), dmg); break; }
+    case "bullet": fire(s, p.aim, w.damage * power, s.picks["ap-round"] && p.attacks % 3 === 0 ? { ignoreDef: true } : {}); for (let i = 1; i <= pick(s, "extra-pellet"); i++) fire(s, p.aim + (i % 2 ? 1 : -1) * 0.07 * Math.ceil(i / 2), w.damage * 0.5 * power); break;
     case "bolt": fire(s, p.aim, w.damage); break;
     default: break;
   }
-  // 이중 베기(투사체 무기): 세 번째마다 55% 추가 투사체
-  if (s.picks["double-cut"] && p.attacks % 3 === 0 && (w.mode === "arrow" || w.mode === "bullet" || w.mode === "bolt" || w.mode === "spread")) fire(s, p.aim + 0.05, w.damage * 0.55);
+  // 다중 발사(투사체형): 세 번째 공격마다 양옆으로 50% 2발
+  if (pick(s, "multi-shot") && p.attacks % 3 === 0 && (w.mode === "arrow" || w.mode === "bolt")) { fire(s, p.aim - 0.14, w.damage * 0.5); fire(s, p.aim + 0.14, w.damage * 0.5); }
   if (s.picks.eclipse && p.attacks % 4 === 0) s.projectiles.push({ x: p.x, y: p.y, vx: Math.cos(p.aim) * 700, vy: Math.sin(p.aim) * 700, r: 26, damage: w.damage * 1.8, life: 2, mine: true, pierce: new Set(), left: 999, wave: true });
   if (s.picks["harvest-storm"] && p.attacks % 5 === 0) { p.stormUntil = s.t + 2; p.stormTick = 0; }
 }
@@ -573,7 +601,7 @@ function useFood(s: RaidState, i: number) {
 }
 
 // ---------- 각성 ----------
-function choiceContext(s: RaidState) {
+export function choiceContext(s: RaidState) {
   const T = s.terrain;
   return {
     level: s.level, picks: s.picks, maxOf: (id: string) => AWAKENINGS[id]?.max ?? 0, mode: s.weapon.mode, evo: Boolean(s.evolution), pet: Boolean(s.pet),
@@ -581,6 +609,7 @@ function choiceContext(s: RaidState) {
     shieldSrc: s.gear.startShield > 0 || s.pet?.id === "battle-turtle" || s.pet?.id === "battle-tiger" || pick(s, "special-shield") + pick(s, "emergency-shield") + pick(s, "pet-guard") > 0 || s.foods.some(f => f?.effect.kind === "shield"),
     slowTerrain: T.mud.length + T.grass.length + T.shallow.length > 0, flowers: T.flowers.length > 0 || Boolean(T.chance),
     auxCount: s.auxes.length, auxLevel: s.auxLevel, random: rnd,
+    fx: Object.entries(s.weapon.fx ?? {}).filter(([, v]) => Boolean(v)).map(([k]) => k), reach: s.weapon.range + (s.weapon.radius ?? 0),
   };
 }
 function offerChoices(s: RaidState) {
@@ -994,7 +1023,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
         if (z.mine.seedChain) zoneAt(s, { kind: "poison", x: z.x, y: z.y, r: z.r * 0.8, t: 2, tele: 0, damage: 2, every: 1, slow: 0, src: "aux" });
       } else if (z.kind === "pbomb" && z.mine) {
         blastAt(s, z.x, z.y, z.r, z.damage);
-        if (z.mine.poison) { const old = s.zones.find(o => o.kind === "poison" && dist(o.x, o.y, z.x, z.y) < 20); if (old) old.t = 3; else zoneAt(s, { kind: "poison", x: z.x, y: z.y, r: z.r, t: 3, tele: 0, damage: z.damage * 0.3 * (s.picks["plague-field"] ? 1.5 : 1), every: 1, slow: 0, mine: { mul: 1 } }); }
+        if (z.mine.poison) { const old = s.zones.find(o => o.kind === "poison" && dist(o.x, o.y, z.x, z.y) < 20); const linger = 3 + 1.5 * pick(s, "lingering"); if (old) old.t = linger; else zoneAt(s, { kind: "poison", x: z.x, y: z.y, r: z.r, t: linger, tele: 0, damage: z.damage * 0.3 * (s.picks["plague-field"] ? 1.5 : 1), every: 1, slow: 0, mine: { mul: 1 } }); }
         if (z.mine.seedChain && s.picks["chain-sprout"] && rnd() < 0.3) zoneAt(s, { kind: "pbomb", x: z.x + (rnd() - 0.5) * 70, y: z.y + (rnd() - 0.5) * 70, r: z.r, t: 0.1, tele: 0.35, damage: z.damage, every: 0, slow: 0, mine: { mul: 1 } });
       }
       if (z.kind === "rain" && z.mine) blastAt(s, z.x, z.y, z.r, z.damage, 10);
@@ -1049,4 +1078,36 @@ export function raidResult(s: RaidState): RaidResult {
   if (s.over !== "clear" && s.foods.some((f, i) => f && !s.foodUsed[i])) reason.push("음식 미사용");
   if (s.over !== "clear" && s.level < 5) reason.push("각성 지연");
   return { floor: s.floor.floor, cleared: s.over === "clear", kills: s.kills, usedFoods, bossHpLeft: s.bossSpawned ? s.bossHpAtEnd : 1, hpLeft: s.player.hp / s.player.maxHp, level: s.level, reason };
+}
+
+// ---------- 각성 카드 수치 미리보기 ----------
+const fmtN = (v: number, d = 0) => (Math.round(v * 10 ** d) / 10 ** d).toString();
+/** 카드를 하나 더 고르면 바뀌는 대표 수치("사거리 110 → 134"). 행동형 카드는 null. */
+export function previewCard(s: RaidState, id: string): string | null {
+  const next: RaidState = { ...s, picks: { ...s.picks, [id]: (s.picks[id] ?? 0) + 1 } };
+  const a = derived(s), b = derived(next), w = s.weapon;
+  const ch = (label: string, x: number, y: number, unit = "", d = 0) => (fmtN(x, d) === fmtN(y, d) ? null : `${label} ${fmtN(x, d)}${unit} → ${fmtN(y, d)}${unit}`);
+  switch (id) {
+    case "long-handle": case "sweeping-edge": case "slam-reach": case "spray-length": case "throw-range": case "line-reach": case "shot-range":
+      return ch(w.mode === "slam" ? "충격 거리" : w.mode === "lob" ? "투척 거리" : "사거리", w.range * reachMul(s), w.range * reachMul(next));
+    case "impact-radius": case "blast-radius": return ch("반경", (w.radius ?? 50) * areaMul(s), (w.radius ?? 50) * areaMul(next));
+    case "wide-arc": return ch("공격각", a.arc, b.arc, "°");
+    case "spray-width": return w.mode === "beam" ? ch("물줄기 폭", (w.width ?? 22) * (1 + 0.3 * pick(s, id)), (w.width ?? 22) * (1 + 0.3 * pick(next, id))) : ch("분사각", w.angle + 15 * pick(s, id), w.angle + 15 * pick(next, id), "°");
+    case "quick-grip": case "spray-tick": case "gun-rate": case "endless-haste": return ch("공격 간격", a.interval, b.interval, "초", 2);
+    case "keen-edge": case "endless-edge": return ch("기본 공격 피해", w.damage * a.damageMul, w.damage * b.damageMul, "", 1);
+    case "critical-eye": return ch("치명타", a.crit * 100, b.crit * 100, "%");
+    case "critical-force": return ch("치명타 피해", (PLAYER.critMul + 0.25 * pick(s, id)) * 100, (PLAYER.critMul + 0.25 * pick(next, id)) * 100, "%");
+    case "wind-step": case "pressure-runner": return ch("이동속도", a.speed, b.speed);
+    case "quick-dash": return ch("회피 재사용", a.dashCd, b.dashCd, "초", 1);
+    case "hard-leather": case "close-instinct": return ch("받는 피해 감소", (1 - 100 / (100 + a.armor * DEFENSE_K)) * 100, (1 - 100 / (100 + b.armor * DEFENSE_K)) * 100, "%");
+    case "vitality": return ch("최대 체력", s.player.maxHp, s.player.maxHp + 25);
+    case "endless-life": return ch("최대 체력", s.player.maxHp, s.player.maxHp + 10);
+    case "shot-speed": return ch("탄속", (w.speed ?? 600) * (1 + 0.25 * pick(s, id)), (w.speed ?? 600) * (1 + 0.25 * pick(next, id)));
+    case "pierce-shot": return ch("관통", (w.fx?.pierce ?? 0) + pick(s, id), (w.fx?.pierce ?? 0) + pick(next, id), "명");
+    case "pierce-line": return ch("낚싯줄 관통", pick(s, id), pick(next, id), "명");
+    case "extra-pellet": return w.mode === "spread" ? ch("산탄 수", (w.pellets ?? 5) + pick(s, id), (w.pellets ?? 5) + pick(next, id), "발") : ch("추가 탄", pick(s, id), pick(next, id), "발");
+    case "tight-spread": return ch("산탄 퍼짐", w.angle * (1 - 0.25 * pick(s, id)), w.angle * (1 - 0.25 * pick(next, id)), "°");
+    case "special-haste": return s.evolution && SPECIALS[s.evolution] ? ch("특수 재사용", SPECIALS[s.evolution].cooldown * Math.max(0.65, 1 - 0.02 * pick(s, "endless-haste") - 0.15 * pick(s, id)), SPECIALS[s.evolution].cooldown * Math.max(0.65, 1 - 0.02 * pick(s, "endless-haste") - 0.15 * pick(next, id)), "초", 1) : null;
+    default: return null;
+  }
 }

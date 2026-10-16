@@ -13,6 +13,7 @@
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "test:content": "node --test tests/content-expansion.test.mjs",
     "test:equipment": "node --test tests/equipment.test.mjs",
+    "test:raid-cards": "node --test tests/raid-cards.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "widget:dev": "vite --config vite.widget.config.ts",

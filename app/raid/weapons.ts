@@ -42,8 +42,8 @@ export const RAID_WEAPONS: RaidWeaponDef[] = [
   { id: "raid-can", name: "물뿌리개", icon: "🚿", difficulty: "쉬움", style: "누르고 있는 동안 물줄기(부채꼴·둔화)", craft: { lifeMat: "fish-oil" },
     s0: S("channel", 2.6, 120, 40, 0.15, { knockback: 0, fx: { slow: 0.15, selfSlow: 0.25 } }), s5: S("channel", 3.9, 130, 42, 0.15, { knockback: 0, fx: { slow: 0.15, selfSlow: 0.25 } }), s10: S("channel", 6, 140, 45, 0.15, { knockback: 0, fx: { slow: 0.15, selfSlow: 0.25 } }),
     evos: [
-      { id: "water-cannon", name: "고압 물대포", note: "직선 관통, 밀어내기, 보스 피해 +15%", s10: S("beam", 8.5, 260, 0, 0.15, { width: 22, knockback: 0, fx: { knockTick: 15, boss: 0.15, selfSlow: 0.25 } }), s15: S("beam", 13, 300, 0, 0.15, { width: 26, knockback: 0, fx: { knockTick: 15, boss: 0.15, selfSlow: 0.25 } }) },
-      { id: "frost-sprayer", name: "빙결 분사기", note: "같은 적을 2초 맞히면 1초 빙결, 빙결된 적 받는 피해 +20%", s10: S("channel", 9, 130, 60, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }), s15: S("channel", 13, 140, 70, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }) },
+      { id: "water-cannon", name: "고압 물대포", note: "직선 관통, 밀어내기, 보스 피해 +15%", s10: S("beam", 5.5, 260, 0, 0.15, { width: 22, knockback: 0, fx: { knockTick: 15, boss: 0.15, selfSlow: 0.25 } }), s15: S("beam", 8.5, 300, 0, 0.15, { width: 26, knockback: 0, fx: { knockTick: 15, boss: 0.15, selfSlow: 0.25 } }) },
+      { id: "frost-sprayer", name: "빙결 분사기", note: "같은 적을 2초 맞히면 1초 빙결, 빙결된 적 받는 피해 +20%", s10: S("channel", 6, 130, 60, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }), s15: S("channel", 8.5, 140, 70, 0.15, { knockback: 0, fx: { slow: 0.15, freeze: true, selfSlow: 0.15 } }) },
     ] },
   { id: "raid-spreader", name: "비료 살포기", icon: "🧴", difficulty: "보통", style: "커서 위치로 비료 폭탄 투척", craft: { lifeMat: "farm-fiber" },
     s0: S("lob", 15, 230, 0, 0.95, { radius: 45, knockback: 20 }), s5: S("lob", 22, 240, 0, 0.92, { radius: 48, knockback: 20 }), s10: S("lob", 34, 250, 0, 0.85, { radius: 52, knockback: 20 }),
