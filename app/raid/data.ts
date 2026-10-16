@@ -125,7 +125,7 @@ export const FLOORS: FloorDef[] = [
   { floor: 27, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry"], spawnRate: 1.9, maxAlive: 36, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "rift-alpha", name: "균열 추적자 우두머리", icon: "🌀", hp: 11500, damage: 54, defense: 3, base: "rift-stalker" } },
   { floor: 28, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.05, maxAlive: 37, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "core-commander", name: "핵 파수꾼 지휘체", icon: "🔆", hp: 12750, damage: 56, defense: 4, base: "core-sentry" } },
   { floor: 29, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.2, maxAlive: 37, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "dark-colossus", name: "암흑 갑주 거신", icon: "🗿", hp: 14250, damage: 58, defense: 13, base: "dark-armor" } },
-  { floor: 30, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.1, maxAlive: 38, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "core-guardian", name: "탑의 핵 수호자", icon: "💠", hp: 17500, damage: 62, defense: 14, base: "heart-warden" } },
+  { floor: 30, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.1, maxAlive: 38, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "core-guardian", name: "탑의 핵 수호자", icon: "💠", hp: 16500, damage: 62, defense: 14, base: "heart-warden" } },
 ];
 /** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부 */
 export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core";

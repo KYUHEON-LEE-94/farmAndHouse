@@ -95,9 +95,9 @@ const lerp = (a: WeaponStats, b: WeaponStats, t: number): WeaponStats => ({
  * 2026-10-16 raid-30 21·25·30층 측정(공격 빌드·표준 방어구)에서 0~100%로 벌어진 무기 간 격차를 줄이기 위한 1차 값.
  */
 export const LATE_MUL: Record<string, number> = {
-  "water-cannon": 1.5, "frost-sprayer": 1.4, "toxic-sprayer": 1.3, "seed-launcher": 1.4, "rapid-bow": 1.45, "thunder-rod": 1.35, "siege-crossbow": 1.4,
-  "twin-blades": 1.15, longbow: 1.2, "net-launcher": 1.05, "chain-harpoon": 1.1, trident: 1.05,
-  "great-scythe": 0.88, "harvest-blade": 0.92, "quake-hammer": 0.88, greatsword: 0.9, "rock-crusher": 0.95, rifle: 0.95,
+  "water-cannon": 1.7, "frost-sprayer": 1.45, "toxic-sprayer": 1.4, "seed-launcher": 1.5, "rapid-bow": 1.5, "thunder-rod": 1.35, "siege-crossbow": 1.55,
+  "twin-blades": 1.15, longbow: 1.3, "net-launcher": 1.05, "chain-harpoon": 1.1, trident: 1.05,
+  "great-scythe": 0.88, "harvest-blade": 0.92, "quake-hammer": 0.88, greatsword: 0.9, "rock-crusher": 1.05, rifle: 0.95,
 };
 /** 무기 수치: 진화했으면 진화 +10~+15, 아니면 +0~+10. */
 export function raidWeaponStats(weaponId: string, enhancement: number, evolution: string | null): WeaponStats {
