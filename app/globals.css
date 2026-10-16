@@ -1281,3 +1281,27 @@ button { color:inherit; }
 .raid-armor-tier{display:inline-block;margin-bottom:3px;padding:1px 8px;border-radius:999px;font:700 10px "Gowun Dodum";font-style:normal;background:#efe4cc;color:#6b5434}
 .raid-armor-tier.t2{background:#e4d6c0;color:#5a3f22}.raid-armor-tier.t3{background:#f7d9bf;color:#9c4321}.raid-armor-tier.t4{background:#d9ebf5;color:#3f6a86}
 @media(max-width:700px){.raid-gear-right .raid-armor-group .raid-armors{grid-template-columns:repeat(4,minmax(220px,78vw));scroll-snap-type:x mandatory}.raid-gear-right .raid-armor-group .raid-armor{scroll-snap-align:start}}
+/* 사냥터 조작감 1단계(HUNTING_GROUND_REDESIGN): 조준점·흔적 예고·명중 점멸·흔들림 */
+.hunt-arena{container-type:inline-size}
+.hunt-arena.phase-trace,.hunt-arena.phase-animal,.hunt-arena.phase-result{cursor:none}
+.hunt-hud{margin:0 0 4px;font-size:12px;color:#4d4433}.hunt-help{margin:0 0 8px;font-size:11.5px;color:#6b6450}.hunt-help summary{cursor:pointer;font-weight:700;color:#7a5a2a}
+.hunt-crosshair{--cd:0;position:absolute;left:-99px;top:-99px;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;pointer-events:none;opacity:0;z-index:5;
+  background:radial-gradient(circle,#fff 0 2px,#e0533a 2.5px 3.5px,transparent 4px),conic-gradient(rgba(36,55,43,.75) calc(var(--cd) * 360deg),transparent 0);
+  -webkit-mask:radial-gradient(circle,#000 0 4px,transparent 4.5px 12px,#000 12.5px);mask:radial-gradient(circle,#000 0 4px,transparent 4.5px 12px,#000 12.5px);
+  box-shadow:0 0 0 2px rgba(255,255,255,.85),inset 0 0 0 2px rgba(224,83,58,.9)}
+.hunt-rustle{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;pointer-events:none;font-size:26px;animation:huntRustle .12s ease-in-out infinite alternate}
+.hunt-rustle.big{font-size:38px}.hunt-rustle b{position:absolute;font-size:.45em;top:38%;filter:drop-shadow(0 0 3px #fff8b0)}
+.hunt-animal.flash{animation:huntFlash .07s steps(1) 1}.hunt-animal.flash-block{animation:huntBlock .12s ease-out 1}
+.hunt-animal.caught{animation:huntCaught .18s ease-out forwards}
+.hunt-arena.shake-s{animation:huntShakeS .08s linear 1}.hunt-arena.shake-l{animation:huntShakeL .08s linear 1}
+.hunt-pop.block{color:#5d6b78;font-size:12px}.hunt-pop.wait{color:#7a6a4a;font-size:11px}.hunt-pop.miss{color:#6b6450;font-size:12px}.hunt-pop.hit{color:#e0533a;text-shadow:0 2px 0 #fff}
+.hunt-result{animation:huntResultUp .5s ease-out both}
+@keyframes huntTimer{0%{transform:scaleX(1);background:#f2c33a}74%{background:#f2c33a}75%{background:#e0533a}100%{transform:scaleX(0);background:#e0533a}}
+@keyframes huntRustle{from{transform:translate(-50%,-50%) rotate(-6deg)}to{transform:translate(-50%,-50%) rotate(6deg)}}
+@keyframes huntFlash{0%{filter:brightness(3) drop-shadow(0 0 6px #fff)}100%{filter:none}}
+@keyframes huntBlock{0%{filter:grayscale(1) brightness(1.4)}100%{filter:none}}
+@keyframes huntCaught{0%{filter:brightness(2.4)}100%{filter:brightness(1);transform:translate(-50%,-50%) scale(1.15)}}
+@keyframes huntShakeS{25%{transform:translate(1px,0)}75%{transform:translate(-1px,0)}}
+@keyframes huntShakeL{25%{transform:translate(2px,-1px)}75%{transform:translate(-2px,1px)}}
+@keyframes huntResultUp{0%{opacity:0;transform:translate(-50%,-90%)}20%{opacity:1;transform:translate(-50%,-110%)}100%{opacity:.9;transform:translate(-50%,-150%)}}
+@media (prefers-reduced-motion:reduce){.hunt-arena.shake-s,.hunt-arena.shake-l,.hunt-rustle{animation:none}.hunt-result{animation:none}}

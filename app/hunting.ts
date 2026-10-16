@@ -94,6 +94,17 @@ export const damageTo = (weapon: Weapon, animal: Animal) => Math.max(0, weapon.d
 export const HUNT_TICKET_PRICE = 3000;
 export const HUNT_TICKET_MINUTES = 1;
 
-/** 단계 시간(밀리초). */
-export const RESULT_MS = 1000;
-export const GAP_MS = 500;
+/**
+ * 단계 시간(밀리초). 2026-10-16 조작감 개선 1단계(HUNTING_GROUND_REDESIGN 3·7절):
+ * 결과 0.5초 뒤 빈 화면 없이 0.35초 흔적 예고로 바로 이어진다. 처치 순간 0.18초 멈춤(표현만).
+ */
+export const RESULT_MS = 500;
+export const GAP_MS = 0;
+export const TRACE_MS = 350;
+export const HITSTOP_MS = 180;
+/** 재사용 대기 중 클릭이 남은 시간 0.15초 이하면 한 발만 저장했다가 준비되는 즉시 쏜다. */
+export const INPUT_BUFFER_MS = 150;
+/** 명중 판정 반지름(사냥터 가로 %). 터치는 손가락이 가리므로 15% 넓게. */
+export const hitRadius = (animal: Animal, touch: boolean) => animal.size * (touch ? 1.15 : 1);
+/** 동물 그림 크기(사냥터 가로 대비 cqw): 판정 지름과 같은 기준이라 창 크기가 달라도 보이는 크기와 판정이 함께 변한다. */
+export const animalFontCqw = (animal: Animal) => animal.size * 1.7;
