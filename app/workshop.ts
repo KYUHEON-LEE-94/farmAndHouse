@@ -18,8 +18,9 @@ export const RECIPES: Recipe[] = [
 ];
 
 export const WORKSHOP_START_SLOTS = 1;
-export const WORKSHOP_MAX_SLOTS = 3;
-export function workshopSlotPrice(slots: number) { return slots === 1 ? 4000 : 8000; }
+export const WORKSHOP_MAX_SLOTS = 10; // 2026-10-16: 3 → 10
+/** 다음 항아리 값: 지금 개수 × 4,000원(2개째 4,000 · 3개째 8,000 · … · 10개째 36,000). */
+export function workshopSlotPrice(slots: number) { return slots * 4000; }
 
 export type Job = { recipeId: string; doneAt: number };
 export type Workshop = { slots: number; jobs: Job[] };
