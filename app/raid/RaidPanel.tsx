@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { zoneOf, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY } from "./data";
+import { zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance, pityChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -127,7 +127,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
         {[...FLOORS].reverse().map(f => { const locked = f.floor > unlockedFloor, boss = f.floor % 5 === 0, cleared = raid.firstClears.includes(f.floor);
           return <button key={f.floor} role="radio" aria-checked={floor.floor === f.floor} disabled={locked} onClick={() => setFloorNo(f.floor)}
             className={`raid-storey ${floor.floor === f.floor ? "on" : ""} ${boss ? "boss" : ""} ${cleared ? "cleared" : ""} ${zoneOf(f.floor)}`}>
-            <b>{f.floor}F</b><span>{locked ? "🔒 잠김" : boss ? `${f.boss.icon} ${f.boss.name}` : f.zone}</span><i>{cleared ? "✔" : locked ? "" : "▶"}</i>
+            <b>{f.floor}F</b><span>{locked ? "🔒 잠김" : boss ? `${f.boss.icon} ${f.boss.name}` : f.zone}{(f.floor === 1 || f.floor === 21 || f.floor === 51) && <em className={`raid-tier ${tierOf(f.floor)}`}>{TIER_NAME[tierOf(f.floor)]}</em>}</span><i>{cleared ? "✔" : locked ? "" : "▶"}</i>
           </button>; })}
         <div className="raid-tower-base">입구</div>
       </div>
@@ -145,7 +145,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
 
         <div className={`raid-floor-card ${zoneOf(floor.floor)}`}>
           <span className="raid-floor-no">{floor.floor}F</span>
-          <div><small>{floor.zone}</small><b>{floor.boss.icon} {floor.boss.name}</b><span>2분 버티면 보스 등장(체력 {floor.boss.hp.toLocaleString()}) · 보스전은 시간 제한 없음</span></div>
+          <div><small>{floor.zone} <em className={`raid-tier ${tierOf(floor.floor)}`}>{TIER_NAME[tierOf(floor.floor)]}</em></small><b>{floor.boss.icon} {floor.boss.name}</b><span>2분 버티면 보스 등장(체력 {floor.boss.hp.toLocaleString()}) · 보스전은 시간 제한 없음</span></div>
           {raid.firstClears.includes(floor.floor) ? <em>반복 클리어</em> : <em className="first">첫 클리어 보상</em>}
         </div>
 
@@ -223,7 +223,7 @@ export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActi
       <div className="raid-armors">{ARMORS.filter(a => a.slot === slot).sort((x, y) => x.tier - y.tier).map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, prerequisite = ARMORS.find(item => item.id === a.prerequisite), ready = hasArmorPrerequisite(a, raid.armorOwned), ok = ready && canPay(a.need, forge.have) && forge.money >= a.gold;
       return <div key={a.id} className={`raid-armor ${worn ? "worn" : owned ? "owned" : ""}`}>
         <span className="raid-armor-icon"><ArmorIcon id={a.id} size={48} /></span>
-        <div><i className={`raid-armor-tier t${a.tier}`}>{a.tier}단계 · {["", "가죽", "강화 가죽", "단풍 추적자", "설산 방벽"][a.tier]}</i><b>{a.name}</b><span>{a.text}</span>
+        <div><i className={`raid-armor-tier t${a.tier}`}>{a.tier}단계 · {["", "가죽", "강화 가죽", "단풍 추적자", "설산 방벽", "고대 수호자", "심장부 정복자"][a.tier]}</i><b>{a.name}</b><span>{a.text}</span>
           {!owned && <span className="raid-cost">{prerequisite && <em className={ready ? "ok" : "lack"}>🔒 선행: {prerequisite.name} {ready ? "보유" : "필요"}</em>}<em className={forge.money >= a.gold ? "ok" : "lack"}>💰 {a.gold.toLocaleString()}</em>{Object.entries(a.need).map(([id, n]) => <em key={id} className={(forge.have[id] ?? 0) >= n ? "ok" : "lack"}>{nameOf(id)} {forge.have[id] ?? 0}/{n}</em>)}</span>}</div>
         {worn ? <button disabled>착용 중</button> : owned ? <button onClick={() => forge.equip(a.slot, a.id)}>착용</button> : <button className="make" disabled={!ok} onClick={() => forge.craftArmor(a.id)}>만들기</button>}
       </div>; })}</div>

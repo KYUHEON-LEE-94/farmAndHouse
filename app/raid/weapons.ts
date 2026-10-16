@@ -94,6 +94,11 @@ const lerp = (a: WeaponStats, b: WeaponStats, t: number): WeaponStats => ({
 export function raidWeaponStats(weaponId: string, enhancement: number, evolution: string | null): WeaponStats {
   const w = weaponDef(weaponId), evo = w.evos.find(e => e.id === evolution), e = Math.max(0, Math.min(10, enhancement));
   const st = evo && enhancement >= 10 ? lerp(evo.s10, evo.s15, Math.min(5, enhancement - 10) / 5) : w.table ? w.table[e] : e <= 5 ? lerp(w.s0, w.s5, e / 5) : lerp(w.s5, w.s10, (e - 5) / 5);
+  if (evo && enhancement > 15) {
+    // +16~+18(RAID_FLOOR_30_EXPANSION_AUDIT 7.2): +15 수치에서 단계당 피해 ×1.08, 사거리·반경·폭·투사체 속도 ×1.02, 간격 ×0.985
+    const n = enhancement - 15, g = (v: number | undefined, k: number) => (v === undefined ? v : Math.round(v * Math.pow(k, n)));
+    return { ...st, damage: Math.round(st.damage * Math.pow(1.08, n) * 10) / 10, range: g(st.range, 1.02)!, radius: g(st.radius, 1.02), width: g(st.width, 1.02), speed: g(st.speed, 1.02), interval: Math.round(st.interval * Math.pow(0.985, n) * 100) / 100, icon: w.icon, art: evo.id };
+  }
   return { ...st, icon: w.icon, art: evo && enhancement >= 10 ? evo.id : w.id };
 }
 /** 단일 대상 초당 피해(표시용). */

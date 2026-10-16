@@ -1305,3 +1305,9 @@ button { color:inherit; }
 @keyframes huntShakeL{25%{transform:translate(2px,-1px)}75%{transform:translate(-2px,1px)}}
 @keyframes huntResultUp{0%{opacity:0;transform:translate(-50%,-90%)}20%{opacity:1;transform:translate(-50%,-110%)}100%{opacity:.9;transform:translate(-50%,-150%)}}
 @media (prefers-reduced-motion:reduce){.hunt-arena.shake-s,.hunt-arena.shake-l,.hunt-rustle{animation:none}.hunt-result{animation:none}}
+/* raid-30: 고대 숲·심장부 층 색, 난이도 구간 띠 */
+.raid-storey.ancient{background:linear-gradient(90deg,rgba(70,130,70,.45),rgba(70,130,70,.15))}.raid-storey.core{background:linear-gradient(90deg,rgba(110,80,190,.5),rgba(110,80,190,.15))}
+.raid-floor-card.ancient{background:linear-gradient(120deg,#2f5236,#6f9a5c)}.raid-floor-card.core{background:linear-gradient(120deg,#16122b,#4b3f7a)}
+.raid-tier{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;font:700 9.5px "Gowun Dodum";vertical-align:middle}
+.raid-tier.easy{background:#d9f0cf;color:#2f6a24}.raid-tier.normal{background:#ffe0b8;color:#9a4a12}.raid-tier.hard{background:#e6d6ff;color:#5a2f9a}
+.armor-art.ancient{border-color:#6f9a5c;background:radial-gradient(circle at 35% 25%,#fbfff4 0 28%,#d7e8c6 72%,#7fa56b 100%)}.armor-art.core{border-color:#6b58b0;background:radial-gradient(circle at 35% 25%,#fbf8ff 0 28%,#ddd3ff 72%,#7a68c0 100%)}
