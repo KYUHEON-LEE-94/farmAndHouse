@@ -13,7 +13,7 @@ export type Loot = { id: string; name: string; icon: string; price: number };
 export type Animal = { id: string; name: string; icon: string; weight: number; speed: number; hp: number; defense: number; move: MoveKind; moveName: string; window: number; size: number; loot: Loot; rare: Loot; /** 요리 재료(요리 공개 후에만 떨어진다) */ meat?: Loot };
 
 /** 토끼 속도(사냥터 가로 %/초). 다른 동물은 이 배수. */
-export const BASE_SPEED = 48;
+export const BASE_SPEED = 44; // 2026-10-16 난이도 소폭 완화: 48 → 44(−8%)
 
 export const ANIMALS: Animal[] = [
   { id: "rabbit", name: "토끼", icon: "🐇", weight: 30, speed: 1, hp: 2, defense: 0, move: "hop", moveName: "지그재그로 깡충", window: 3.5, size: 4.2, loot: { id: "rabbitfur", name: "토끼 털뭉치", icon: "🤍", price: 60 }, meat: { id: "rabbitmeat", name: "토끼고기", icon: "🍗", price: 35 }, rare: { id: "luckyfoot", name: "행운의 털", icon: "🍀", price: 300 } },
@@ -105,6 +105,8 @@ export const HITSTOP_MS = 180;
 /** 재사용 대기 중 클릭이 남은 시간 0.15초 이하면 한 발만 저장했다가 준비되는 즉시 쏜다. */
 export const INPUT_BUFFER_MS = 150;
 /** 명중 판정 반지름(사냥터 가로 %). 터치는 손가락이 가리므로 15% 넓게. */
-export const hitRadius = (animal: Animal, touch: boolean) => animal.size * (touch ? 1.15 : 1);
+/** 2026-10-16 난이도 소폭 완화: 판정을 그림보다 15% 넓게(HIT_EASE). 그림 크기는 그대로. */
+export const HIT_EASE = 1.15;
+export const hitRadius = (animal: Animal, touch: boolean) => animal.size * HIT_EASE * (touch ? 1.15 : 1);
 /** 동물 그림 크기(사냥터 가로 대비 cqw): 판정 지름과 같은 기준이라 창 크기가 달라도 보이는 크기와 판정이 함께 변한다. */
 export const animalFontCqw = (animal: Animal) => animal.size * 1.7;
