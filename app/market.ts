@@ -10,7 +10,7 @@
  *   넘는 물량은 농협이 그 시세의 OVERFLOW_RATE(70%)에 매입한다(포화보다 낮으면 그 값).
  * - 상태는 판매할 때 지난 주기만큼 한꺼번에 정리(normalize)하므로 접속하지 않아도 회복된다.
  */
-export const FREE_PER_CYCLE = 5;
+export const FREE_PER_CYCLE = 30; // 2026-10-16: 5 → 30
 export const SAT_PER_UNIT = 0.02;
 export const SAT_MAX = 0.25;
 export const SAT_SLOTS = 3;
