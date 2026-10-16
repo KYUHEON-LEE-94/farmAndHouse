@@ -55,7 +55,7 @@ export const CROPS: Crop[] = [
 export const FERTILIZERS: Fertilizer[] = [
   { id: "compost", name: "퇴비", icon: "🍂", price: 15, pack: 10, speed: 0.15, quality: 0, note: "남은 성장 시간 -15%" },
   { id: "premium", name: "고급 비료", icon: "🧪", price: 50, pack: 10, speed: 0.25, quality: 1, note: "남은 시간 -25% · 품질 +1" },
-  { id: "golden", name: "황금 비료", icon: "🌟", price: 140, pack: 5, speed: 0.3, quality: 2, waterSave: 1, note: "남은 시간 -30% · 품질 +2 · 물주기 1번 줄임" },
+  { id: "golden", name: "황금 비료", icon: "🌟", price: 100, pack: 5, speed: 0.3, quality: 2, waterSave: 1, note: "남은 시간 -30% · 품질 +2 · 물주기 1번 줄임" },
 ];
 
 /** 처음 시작할 때(또는 예전 저장) 주는 거름. */
@@ -250,13 +250,18 @@ function cycleRoll(crop: Crop, bucket: number, salt: number) {
  */
 const PROFIT_PER_SEC: Record<string, number> = { 쉬움: 1.8, 보통: 1.9, 어려움: 2.1 };
 const SEED_RATIO: Record<string, number> = { 쉬움: 0.575, 보통: 0.525, 어려움: 0.475 };
+/** 2026-10-16 판매가 1차 인상(난이도별). 씨앗값·재배 시간은 그대로 두고 시장 판매가에만 곱한다. */
+export const SELL_BOOST: Record<string, number> = { 쉬움: 1.05, 보통: 1.065, 어려움: 1.08 };
+/** 계절 한정 작물 판매가 인상 */
+export const SEASONAL_SELL_BOOST = 1.065;
 export function cycleCrop(crop: Crop, bucket: number) {
-  if (crop.seasonalLimit) return { price: Math.round(crop.sell * (0.9 + cycleRoll(crop, bucket, 17) * 0.2)), seconds: crop.seconds, seed: crop.seed };
+  if (crop.seasonalLimit) return { price: Math.round(crop.sell * (0.9 + cycleRoll(crop, bucket, 17) * 0.2) * SEASONAL_SELL_BOOST), seconds: crop.seconds, seed: crop.seed };
   const seconds = Math.round(20 + cycleRoll(crop, bucket, 41) * 45);
   const profit = seconds * (PROFIT_PER_SEC[crop.difficulty] ?? 1.9) * (0.75 + cycleRoll(crop, bucket, 17) * 0.5);
   const ratio = (SEED_RATIO[crop.difficulty] ?? 0.525) - 0.025 + cycleRoll(crop, bucket, 73) * 0.05;
-  const price = Math.round(profit / (1 - ratio));
-  return { price, seconds, seed: Math.max(10, Math.round(price * ratio)) };
+  const base = profit / (1 - ratio);
+  // 씨앗값은 인상 전 기준가로, 판매가에만 난이도별 인상 배율
+  return { price: Math.round(base * (SELL_BOOST[crop.difficulty] ?? 1.065)), seconds, seed: Math.max(10, Math.round(base * ratio)) };
 }
 
 
