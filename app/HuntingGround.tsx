@@ -24,6 +24,8 @@ export function HuntingGround({ effectId, weapon, paused, petCatch, petName, loo
   const [result, setResult] = useState<Result | null>(null);
   const [pops, setPops] = useState<Pop[]>([]);
   const [stats, setStats] = useState({ great: 0, success: 0, escape: 0 });
+  /** 최근 전리품(결과 팝업 대신 아래 줄에 쌓인다) */
+  const [recent, setRecent] = useState<{ at: number; outcome: HuntOutcome; loot: Record<string, number> }[]>([]);
   const arena = useRef<HTMLDivElement>(null), animalEl = useRef<HTMLSpanElement>(null), hpEl = useRef<HTMLSpanElement>(null);
   const roundRef = useRef<Round | null>(null), phaseRef = useRef<Phase>("idle"), motion = useRef<Motion | null>(null), timer = useRef(0), lastShot = useRef(0);
   const [spawn, setSpawn] = useState({ x: 50, y: 60 });
@@ -47,6 +49,7 @@ export function HuntingGround({ effectId, weapon, paused, petCatch, petName, loo
     if (outcome === "escape" && petCatch > 0 && rnd() < petCatch) { final = "success"; line = `${petName}이(가) 쫓아가 붙잡았어요!`; }
     const loot = rollLoot(r.animal, final);
     onLoot(loot, final, r.animal);
+    setRecent(list => [{ at: Date.now(), outcome: final, loot }, ...list].slice(0, 6));
     setStats(s => ({ ...s, [final]: s[final] + 1 }));
     const m = motion.current;
     setResult({ outcome: final, text: line, loot, x: m?.x ?? 50, y: m?.y ?? 60 }); setPhase("result"); phaseRef.current = "result";
@@ -108,9 +111,10 @@ export function HuntingGround({ effectId, weapon, paused, petCatch, petName, loo
         <span key={round.startAt} className="hunt-timer" style={{ animationDuration: `${round.animal.window}s` }} aria-hidden="true" />
       </>}
       {pops.map(pop => <span key={pop.id} className={`hunt-pop ${pop.hit ? "hit" : "miss"}`} style={{ left: `${pop.x}%`, top: `${pop.y}%` }}>{pop.hit && <EffectBurst id={effectId} />}{pop.text}</span>)}
-      {result && <div className={`hunt-result ${result.outcome}`} style={{ left: `${Math.max(12, Math.min(88, result.x))}%`, top: `${Math.max(30, result.y)}%` }}><b>{result.outcome === "great" ? "대성공!" : result.outcome === "success" ? "성공!" : "도주…"}</b><small>{result.text}</small>{Object.entries(result.loot).map(([id, n]) => <em key={id}>+{lootName(id)} ×{n}</em>)}</div>}
+      {result && <div className={`hunt-result toast ${result.outcome}`}><b>{result.outcome === "great" ? "대성공!" : result.outcome === "success" ? "성공!" : "도주…"}</b><small>{result.text}</small>{Object.entries(result.loot).map(([id, n]) => <em key={id}>+{lootName(id)} ×{n}</em>)}</div>}
       {phase !== "idle" && <button className="hunt-stop" onClick={stop} onPointerDown={event => event.stopPropagation()}>멈추기</button>}
     </div>
+    {recent.length > 0 && <div className="hunt-recent"><b>🎒 최근 전리품</b>{recent.map(r => <span key={r.at} className={r.outcome}>{Object.keys(r.loot).length ? Object.entries(r.loot).map(([id, n]) => `${lootName(id)} ×${n}`).join(" · ") : "도주…"}</span>)}</div>}
     <p className="hunt-stats">대성공 {stats.great} · 성공 {stats.success} · 도주 {stats.escape}</p>
     <ul className="hunt-animals">{ANIMALS.map(animal => <li key={animal.id}><span>{animal.icon}</span><b>{animal.name}</b><small>체력 {animal.hp} · 방어 {animal.defense}</small></li>)}</ul>
   </div>;

@@ -1209,3 +1209,19 @@ button { color:inherit; }
 /* HUD 재배치(75절): 포기·소리 버튼은 왼쪽 아래로(미니맵·보조무기와 겹치지 않게) */
 .raid-game:not(.touch) .raid-giveup{top:auto;right:auto;left:14px;bottom:14px}
 .raid-game:not(.touch) .raid-sfx{top:auto;right:auto;left:84px;bottom:12px}
+
+/* 낚시: 정보 한 줄, 작은 결과 카드, 최근 어획 목록 (WEAPON_CARD_UI_DESIGN_SPEC 2절) */
+.fish-summary{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}.fish-summary span{padding:4px 10px;border-radius:999px;background:#f3ecdc;border:1px solid var(--line);font-size:12px;font-weight:700;color:#4a3f2a}.fish-summary .legend{background:#fff3c9;border-color:#e8c35a}
+.catch-card{left:auto!important;top:auto!important;right:14px;bottom:14px;transform:none!important;min-width:0!important;padding:10px 14px!important;gap:2px!important;max-width:46%;animation:catchIn .25s ease-out}
+.catch-card .legend-fish-art{width:120px;height:92px}
+@keyframes catchIn{from{opacity:0;transform:translateY(10px)}}
+.recent-catch{margin-top:10px;display:grid;gap:6px}.recent-catch>b{font-size:13px}
+.recent-catch ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px}
+.recent-catch li{display:grid;grid-template-columns:34px 1fr;align-items:center;gap:6px;padding:7px 9px;border-radius:12px;background:#fffaf0;border:1px solid var(--line)}
+.recent-catch li.rarity-전설,.recent-catch li.rarity-신화{border-color:#e8c35a;background:#fff6dc}.recent-catch li.rarity-희귀{border-color:#9cbfe6}
+.recent-catch .rc-icon{font-size:24px;text-align:center}.recent-catch .rc-info b{display:block;font-size:12.5px}.recent-catch .rc-info small{font-size:11px;color:#6b5a3a}
+.recent-catch .rc-actions{grid-column:1 / -1;display:flex;gap:4px}.recent-catch .rc-actions button{flex:1;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}.recent-catch .rc-actions button:disabled{opacity:.45}
+/* 사냥: 결과는 오른쪽 위 토스트, 아래 최근 전리품 줄 */
+.hunt-result.toast{left:auto!important;top:12px!important;right:12px;transform:none!important;animation:catchIn .2s ease-out}
+.hunt-recent{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 0}.hunt-recent b{font-size:12.5px}
+.hunt-recent span{padding:3px 9px;border-radius:999px;background:#f3ecdc;border:1px solid var(--line);font-size:11.5px}.hunt-recent span.great{background:#fff3c9;border-color:#e8c35a}.hunt-recent span.escape{color:#a5302a;opacity:.8}

@@ -396,6 +396,8 @@ export default function Home() {
   const [gachaCollected, setGachaCollected] = useState<string[]>([]);
   const [cheer, setCheer] = useState<{ id: string; at: number } | undefined>(undefined);
   const [fishState, setFishState] = useState<FishState>({ phase: "idle" });
+  /** 이번 접속에서 최근에 낚은 물고기(결과 팝업 대신 목록으로 이어서 처리) */
+  const [recentCatches, setRecentCatches] = useState<{ id: string; fish: Fish; price: number; stored: boolean; perfect: boolean; at: number }[]>([]);
   const [fishLog, setFishLog] = useState<Record<string, number>>({});
   const [fishHarvestMode, setFishHarvestMode] = useState<"sell" | "store">("store");
   const [baits, setBaits] = useState<Record<string, number>>(STARTER_BAIT);
@@ -1530,6 +1532,7 @@ export default function Home() {
     if (stored) setFishStock(stock => ({ ...stock, [fish.id]: (stock[fish.id] ?? 0) + 1 }));
     else setMoney(value => value + price);
     setFishState({ phase: "result", fish, bait, perfect: result.perfect, price, stored, reward });
+    setRecentCatches(list => [{ id: fish.id, fish, price, stored, perfect: Boolean(result.perfect), at: Date.now() }, ...list].slice(0, 6));
     playCoinSound(fish.rarity === "신화" ? [523, 660, 880, 1100, 1320, 1760, 2093] : fish.rarity === "전설" ? [660, 880, 1100, 1320, 1760] : fish.rarity === "희귀" || result.perfect ? [880, 1100, 1320] : [880, 1320]);
     setNotice(`${fish.rarity === "신화" ? `🐲🌈 도감에도 없는 신화의 물고기, ${josa(fish.name, "을를")} 낚았어요!!!` : fish.rarity === "전설" ? `✨ 전설의 ${josa(fish.name, "을를")} 낚았어요!!` : `🎣 ${fish.name}(${fish.rarity})을(를) 낚았어요.`} ${stored ? "📦 통합 창고에 보관했어요." : `${price.toLocaleString()}원에 바로 팔았어요.`}${fishHarvestMode === "store" && !stored ? " 창고가 가득 찼어요." : ""}${reward ? ` · 보물: ${reward}` : ""}`);
   }
@@ -2335,7 +2338,7 @@ export default function Home() {
                 {status?.fert && !withered && <span className={`fert-tag fert-tag-${status.fert.id}`}>{status.fert.icon} {status.fert.name}</span>}
                 {crop && withered ? <><span className="plant">🥀</span><span className="plot-label">시듦 · 치우기</span></> : crop && status ? <>
                   <span className={`plant stage-${status.ready ? "ripe" : progress < 35 ? "sprout" : progress < 75 ? "grow" : "mature"}`}>{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span>{status.ready && <span className="ripe-sparkle" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i></span>}
-                  <span className="plot-label">{status.ready ? `수확하기 ${status.quality.stars}` : status.thirsty ? "💧 목말라요" : `${Math.floor(progress)}%`}</span>
+                  <span className="plot-label">{status.ready ? `수확하기 ${status.quality.stars}` : status.thirsty ? "💧 목말라요" : `⏱ ${status.remaining >= 60 ? formatClock(status.remaining) : `${status.remaining}초`}`}</span>
                   <span className="grow-bar"><i style={{ width: `${progress}%` }} /></span>
                   <span className="plot-badges">{Array.from({ length: status.total }).map((_, k) => <i key={k} className={k < status.satisfied ? "on" : ""}>💧</i>)}{plot?.bugHits ? <i className="hurt">🐛-{Math.round((1 - status.bugMultiplier) * 100)}%</i> : null}</span>
                 </> : <><span className="soil-lines">╱ ╱ ╱</span><span className="plot-label">{tool === "seed" ? `${selectedCropInfo.icon} 심기` : "빈 밭"}</span></>}
@@ -2374,6 +2377,7 @@ export default function Home() {
           <div className="panel-heading"><div><span className="eyebrow">FISHING SPOT</span><h3>{season} {currentSpot.name} {currentSpot.icon}</h3></div><div className="farm-actions"><button className="ghost-button small" onClick={() => setShowAvatar(true)}>🪞 캐릭터 바꾸기</button><span className="plot-count">전설 출현 {LEGEND_CHANCE * 100}% (고정)</span></div></div>
           <div className="spot-bar" role="group" aria-label="낚시 장소">{SPOTS.map(spot => { const left = spot.price > 0 ? Math.max(0, Math.ceil(((tickets[spot.id] ?? 0) - nowMs) / 1000)) : -1;
             return <button key={spot.id} className={`${spotId === spot.id ? "on" : ""} ${spot.price ? "paid" : ""}`} onClick={() => chooseSpot(spot)} title={spot.note}><b>{spot.icon}</b><span>{spot.name}</span><small>{spot.price === 0 ? "무료" : left > 0 ? `🎫 ${formatClock(left)}` : `${spot.price.toLocaleString()}원/${spot.minutes}분`}</small></button>; })}</div>
+          <div className="fish-summary"><span>📍 {currentSpot.name}</span><span>{currentRod.icon} {currentRod.name}</span><span>{currentBait.icon} {currentBait.name} {baits[currentBait.id] ?? 0}개</span><span className="legend">🌈 전설 {LEGEND_CHANCE * 100}%</span><span>{fishHarvestMode === "store" ? "📦 창고 보관" : "💰 바로 판매"}</span></div>
           <div className={`pond phase-${fishState.phase} spot-${currentSpot.id}`}>
             <div className="pond-scenery" aria-hidden="true"><span className="far" /><span className="mid" /><i className="deco d1" /><i className="deco d2" /><i className="deco d3" /></div>
             <div className="pond-bank" />
@@ -2393,6 +2397,9 @@ export default function Home() {
             <button className={`mode-toggle ${fishHarvestMode}`} onClick={() => setFishHarvestMode(mode => mode === "sell" ? "store" : "sell")}>{fishHarvestMode === "store" ? "📦 창고 보관" : "💰 바로 판매"} ⇄</button>
             {fishState.phase === "game" ? null : fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`reel-button ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기!</button> : <button className="reel-button" onClick={castLine} disabled={!isWorkTime || (!baits[currentBait.id] && !bareReady)}>{bareReady ? "🫳 맨손으로 던지기" : fishState.phase === "result" ? "다시 던지기" : "낚싯대 던지기"}</button>}
           </div>
+          {recentCatches.length > 0 && <div className="recent-catch"><b>🐟 최근 어획</b><ul>{recentCatches.map(c => { const left = fishStock[c.id] ?? 0, locked = Boolean(fishLocks[c.id]);
+            return <li key={c.at} className={`rarity-${c.fish.rarity}`}><span className="rc-icon">{c.fish.icon}</span><span className="rc-info"><b>{c.fish.name}{c.perfect ? " ✨" : ""}</b><small>{c.fish.rarity} · {c.stored ? `📦 창고 (보유 ${left})` : `💰 ${c.price.toLocaleString()}원 판매`}</small></span>
+              {c.stored && left > 0 && <span className="rc-actions"><button onClick={() => sellStoredFish(c.id, 1)} disabled={locked}>💰 1마리 판매</button><button onClick={() => setFishLocks(all => ({ ...all, [c.id]: !locked }))} aria-pressed={locked}>{locked ? "🔒 잠금" : "🔓 잠금"}</button></span>}</li>; })}</ul></div>}
         </section>
         <aside className="panel fish-book">
           <div className="panel-heading"><div><span className="eyebrow">FISHING ROD</span><h3>낚싯대</h3></div></div>
