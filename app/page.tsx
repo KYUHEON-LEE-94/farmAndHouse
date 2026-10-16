@@ -234,6 +234,9 @@ const slimItem = (item: PlacedItem) => ({ id: item.id, instanceId: item.instance
 /** 키울 수 있는 펫 수(가챠로 넘치게 뽑으면 넘친 만큼 자동 되팔기). */
 const PET_LIMIT = 100;
 
+/** 작물이 이만큼 이상 심겨 있으면 밭 연출을 가볍게(흔들림·반짝임 끔). */
+const LITE_FIELD_PLANTS = 16;
+
 function hydrateItem(raw: LegacyItem, version: number, room: Room): PlacedItem | null {
   const base = FURNITURE.find(item => item.id === raw.id);
   if (!base) return null;
@@ -2321,7 +2324,7 @@ export default function Home() {
           </div></div>
           {broke && lastBailout === today && <div className="broke-banner">💸 돈이 바닥났어요. 🦝 “지원금은 오늘 벌써 받았잖아~ 맨손으로 물고기나 잡아 ㅋㅋ” <b>🎣 강가 맨손 낚시</b>로 다시 벌어 봐요!<button onClick={() => { setSelectedBait(BARE_HAND.id); goBareFishing(); }}>맨손 낚시하러 가기</button></div>}
           <div className={`tool-banner tb-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>{toolBanner}</div>
-          <div ref={plotsRef} onPointerLeave={() => setHoverArea([])} className={`plots plots-${plotCount} cols-${fieldColumns(plotCount)} hand-${handId} planter-${planterId} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
+          <div ref={plotsRef} onPointerLeave={() => setHoverArea([])} className={`plots plots-${plotCount} cols-${fieldColumns(plotCount)} ${plots.filter(Boolean).length >= LITE_FIELD_PLANTS ? "lite" : ""} hand-${handId} planter-${planterId} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
             {Array.from({ length: plotCount }).map((_, index) => {
               const plot = plots[index] || null; const crop = plot ? CROPS.find(c => c.id === plot.cropId)! : null;
               const withered = Boolean(plot && seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod);
