@@ -55,7 +55,8 @@ test('효과형: 제시될 수 있는 공격·기동 카드는 수치나 전투 
   // 묵직한 휘두르기·집중 공격은 한두 대에 죽는 잡몹이 아니라 정예·보스 상대에서 작동하는 조건형이라 여기서 뺀다.
   const ALWAYS = new Set(['keen-edge', 'quick-grip', 'critical-eye', 'critical-force', 'first-strike', 'close-instinct', 'keep-distance', 'battle-tempo', 'armor-crack', 'wind-step']);
   // 경직(stun-slam)도 한 방에 죽지 않는 적(정예·후반 몹)에서 작동하는 조건형이다.
-  const CONDITIONAL = new Set(['stun-slam']);
+  // 집중 피해(focus-spray)는 같은 적을 1초 이상 맞혀야 해서, 비율식 방어(raid-30)에서 일반 몹이 1초 안에 쓰러지면 정예·보스 전용 조건형이 된다.
+  const CONDITIONAL = new Set(['stun-slam', 'focus-spray']);
   const failures = [];
   for (const weaponId of WEAPONS) {
     const base = makeRaid(weaponId);

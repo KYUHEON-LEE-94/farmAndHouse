@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, fieldLike, segmentHits, type Terrain } from "./terrain";
+import { ringRadius } from "./bossKit";
 import { SPECIALS } from "./weapons";
 import { AUX_WEAPONS, AWAKEN_META, CATEGORY_LABEL, cardTag } from "./awakenings";
 import { weaponArtUrl } from "./weaponArt";
@@ -96,7 +97,8 @@ type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; pixelated: 
  * 탑 토벌 전투 화면. canvas + requestAnimationFrame 고정 스텝 루프로 그리고,
  * React 상태는 각성 선택·일시정지·결과처럼 바뀔 때만 갱신한다. 캐릭터는 유저가 고른 아바타로 그린다.
  */
-export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = null, avatar, hold, speed = 1, autoPause = true, onFinish, onQuit }: {
+export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = null, avatar, hold, speed = 1, autoPause = true, prev = null, onFinish, onQuit }: {
+  /** 같은 층 직전 최고 실패 기록(재도전 비교) */ prev?: { waveTime: number; bossHpRatio: number } | null;
   floor: FloorDef; weapon: WeaponStats; evolution: Evolution | null; foods: FoodSlot[]; gear?: Gear; pet?: { id: string; mult: number; icon: string } | null; avatar: Avatar;
   /** 보스키·다른 탭 등 바깥에서 멈춰야 할 때 true. */
   hold: boolean; speed?: number; autoPause?: boolean;
@@ -119,6 +121,7 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
   // 전투 시작(한 번)
   useEffect(() => {
     stateRef.current = createRaid(floor, weapon, evolution, foods, gear, pet ? { id: pet.id, mult: pet.mult } : null);
+    if (prev) stateRef.current.ext.prevBest = prev;
     const petIcon = pet?.icon ?? "";
     doneRef.current = false;
     const canvas = canvasRef.current!, ctx = canvas.getContext("2d")!;
@@ -275,16 +278,24 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
 // ---------- 월드 배경(지형 포함, 한 번만 그려 둔다) ----------
 function paintWorld(T: Terrain) {
   const c = document.createElement("canvas"); c.width = WORLD_W; c.height = WORLD_H;
-  const g = c.getContext("2d")!, canal = T.zone === "canal", maple = T.zone === "maple", frost = T.zone === "frost";
+  const g = c.getContext("2d")!, canal = T.zone === "canal", maple = T.zone === "maple", frost = T.zone === "frost", ancient = T.zone === "ancient", core = T.zone === "core";
   // 구역별 색: 풀(단풍 덤불)·진흙(낙엽 더미/빙판)·얕은 물(눈 더미)·벽(울타리/얼음 기둥)
-  const P = maple ? { grass: "rgba(196,84,40,.42)", grassLine: "rgba(140,40,20,.5)", mud: "rgba(150,95,40,.55)", mudDot: "rgba(205,120,40,.6)", shallow: "rgba(255,255,255,.55)", wall: "#6b3f2a", wallHi: "#8d5a3b", wallLine: "#3f2416" }
+  const P = ancient ? { grass: "rgba(40,90,50,.5)", grassLine: "rgba(20,60,30,.55)", mud: "rgba(80,70,40,.5)", mudDot: "rgba(60,50,30,.5)", shallow: "rgba(150,110,170,.42)", wall: "#5a3f28", wallHi: "#7a5a38", wallLine: "#2f2014" }
+    : core ? { grass: "rgba(90,60,140,.4)", grassLine: "rgba(60,40,110,.5)", mud: "rgba(70,50,110,.5)", mudDot: "rgba(150,110,220,.5)", shallow: "rgba(120,90,200,.35)", wall: "#3b2f5c", wallHi: "#5a4a86", wallLine: "#1c1530" }
+    : maple ? { grass: "rgba(196,84,40,.42)", grassLine: "rgba(140,40,20,.5)", mud: "rgba(150,95,40,.55)", mudDot: "rgba(205,120,40,.6)", shallow: "rgba(255,255,255,.55)", wall: "#6b3f2a", wallHi: "#8d5a3b", wallLine: "#3f2416" }
     : frost ? { grass: "rgba(200,220,235,.5)", grassLine: "rgba(120,150,175,.5)", mud: "rgba(170,215,240,.6)", mudDot: "rgba(235,250,255,.8)", shallow: "rgba(250,252,255,.7)", wall: "#8fb6cc", wallHi: "#c4e2f0", wallLine: "#4e7890" }
     : { grass: "rgba(70,130,50,.45)", grassLine: "rgba(40,90,30,.55)", mud: "rgba(120,85,50,.55)", mudDot: "rgba(90,60,35,.5)", shallow: "rgba(110,170,210,.35)", wall: "#8a8578", wallHi: "#a8a294", wallLine: "#5e594e" };
   let seed = (T.seed % 9973) + 3; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   const base = g.createRadialGradient(WORLD_W / 2, WORLD_H / 2, 100, WORLD_W / 2, WORLD_H / 2, 1000);
-  if (canal) { base.addColorStop(0, "#94b9ad"); base.addColorStop(1, "#5b7f78"); } else if (maple) { base.addColorStop(0, "#e3b878"); base.addColorStop(1, "#b07a43"); } else if (frost) { base.addColorStop(0, "#eef6fb"); base.addColorStop(1, "#a9c3d3"); } else { base.addColorStop(0, "#b8dc8f"); base.addColorStop(1, "#86b562"); }
+  if (ancient) { base.addColorStop(0, "#6f9a5c"); base.addColorStop(1, "#2f5236"); } else if (core) { base.addColorStop(0, "#3a3360"); base.addColorStop(1, "#16122b"); } else if (canal) { base.addColorStop(0, "#94b9ad"); base.addColorStop(1, "#5b7f78"); } else if (maple) { base.addColorStop(0, "#e3b878"); base.addColorStop(1, "#b07a43"); } else if (frost) { base.addColorStop(0, "#eef6fb"); base.addColorStop(1, "#a9c3d3"); } else { base.addColorStop(0, "#b8dc8f"); base.addColorStop(1, "#86b562"); }
   g.fillStyle = base; g.fillRect(0, 0, WORLD_W, WORLD_H);
-  if (maple) {
+  if (ancient) {
+    for (let i = 0; i < 360; i++) { g.fillStyle = `rgba(${20 + r() * 40},${70 + r() * 60},${30 + r() * 30},${0.25 + r() * 0.3})`; g.beginPath(); g.ellipse(r() * WORLD_W, r() * WORLD_H, 5 + r() * 12, 3 + r() * 6, r() * 3, 0, Math.PI * 2); g.fill(); }
+    for (const a of T.moss ?? []) { g.fillStyle = "rgba(120,190,90,.35)"; roundRect(g, a.x, a.y, a.w, a.h, 26); g.fill(); g.fillStyle = "rgba(170,230,120,.35)"; for (let i = 0; i < a.w * a.h / 900; i++) { g.beginPath(); g.arc(a.x + r() * a.w, a.y + r() * a.h, 2 + r() * 3, 0, Math.PI * 2); g.fill(); } }
+  } else if (core) {
+    g.strokeStyle = "rgba(170,130,255,.18)"; g.lineWidth = 1; for (let x = 0; x < WORLD_W; x += 60) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, WORLD_H); g.stroke(); } for (let y = 0; y < WORLD_H; y += 60) { g.beginPath(); g.moveTo(0, y); g.lineTo(WORLD_W, y); g.stroke(); }
+    for (const a of T.boost ?? []) { g.fillStyle = "rgba(255,210,90,.16)"; roundRect(g, a.x, a.y, a.w, a.h, 16); g.fill(); g.strokeStyle = "rgba(255,220,120,.6)"; g.lineWidth = 2; for (let i = 0; i < 4; i++) { const x = a.x + 30 + i * (a.w - 60) / 3, y = a.y + a.h / 2; g.beginPath(); g.moveTo(x - 10, y - 12); g.lineTo(x + 6, y); g.lineTo(x - 10, y + 12); g.stroke(); } }
+  } else if (maple) {
     const leaves = ["#d9481f", "#e8792b", "#f2b134", "#a8321b"];
     for (let i = 0; i < 520; i++) { g.fillStyle = leaves[i % leaves.length]; g.globalAlpha = 0.35 + r() * 0.35; g.beginPath(); g.ellipse(r() * WORLD_W, r() * WORLD_H, 3 + r() * 4, 2 + r() * 2, r() * 3, 0, Math.PI * 2); g.fill(); }
     g.globalAlpha = 1;
@@ -372,7 +383,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.save(); ctx.translate(-Math.round(cam.x) + (sh ? (Math.random() - 0.5) * sh * 2 : 0), -Math.round(cam.y) + (sh ? (Math.random() - 0.5) * sh * 2 : 0));
   ctx.drawImage(art.bg, 0, 0);
   // 수문(닫힘·곧 바뀜 예고)
-  const gateSoon = T.gates.some(g => g.moving) && 45 - (s.t % 45) < 2;
+  const gp = T.gatePeriod ?? 45, gateSoon = T.gates.some(g => g.moving) && gp - (s.t % gp) < 2;
   for (const g of T.gates) {
     if (g.closed) { ctx.fillStyle = "#6b4a2a"; ctx.fillRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); ctx.strokeStyle = "#3a2614"; ctx.lineWidth = 3; ctx.strokeRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); }
     if (gateSoon) { ctx.strokeStyle = `rgba(255,200,60,${0.5 + 0.5 * Math.sin(clock * 12)})`; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.strokeRect(g.rect.x - 4, g.rect.y - 4, g.rect.w + 8, g.rect.h + 8); ctx.setLineDash([]); }
@@ -383,13 +394,34 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   if (T.chance && !T.chance.used) {
     const ch = T.chance, glow = 0.5 + 0.5 * Math.sin(clock * 4);
     ctx.beginPath(); ctx.arc(ch.x, ch.y, ch.r + 6 + glow * 4, 0, Math.PI * 2); ctx.fillStyle = fieldLike(T) ? `rgba(255,216,74,${0.18 + glow * 0.15})` : T.zone === "frost" ? `rgba(255,170,90,${0.2 + glow * 0.12})` : `rgba(150,230,255,${0.2 + glow * 0.12})`; ctx.fill();
-    ctx.fillStyle = "#000"; ctx.font = `${fieldLike(T) ? 30 : 34}px ${EMOJI_FONT}`; ctx.fillText({ field: "🌻", maple: "🍁", canal: "⛲", frost: "🔥" }[T.zone], ch.x, ch.y);
+    ctx.fillStyle = "#000"; ctx.font = `${fieldLike(T) ? 30 : 34}px ${EMOJI_FONT}`; ctx.fillText({ field: "🌻", maple: "🍁", canal: "⛲", frost: "🔥", ancient: "🌺", core: "💎" }[T.zone], ch.x, ch.y);
   }
   // 정예 예고(바닥 표시)
   for (const w of s.warns) { const left = w.at - s.t; ctx.beginPath(); ctx.arc(w.x, w.y, 30, 0, Math.PI * 2); ctx.strokeStyle = `rgba(240,150,40,${0.5 + 0.5 * Math.sin(clock * 10)})`; ctx.lineWidth = 3; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#f0a030"; ctx.font = "800 16px sans-serif"; ctx.fillText(`! ${Math.ceil(left)}`, w.x, w.y); }
 
   // 장판·예고(색 + 점선/실선 모양으로 구분)
   const pulse = 0.5 + 0.5 * Math.sin(clock * 10);
+  // 보스 전투 요소(bossKit): 예고는 붉은 점선 테두리 + 차오르는 채움, 발동은 진한 색
+  for (const h of s.hazards) {
+    const act = h.age >= h.tele, k = act ? 1 : Math.max(0, h.age / h.tele), fill = act ? "rgba(255,90,60,.6)" : `rgba(255,60,40,${0.1 + 0.12 * pulse})`;
+    ctx.save();
+    if (h.kind === "beam" || h.kind === "spin") {
+      ctx.translate(h.x, h.y); ctx.rotate(h.angle);
+      ctx.fillStyle = fill; ctx.fillRect(0, -h.width / 2, h.len, h.width);
+      if (!act) { ctx.fillStyle = "rgba(255,70,40,.35)"; ctx.fillRect(0, -h.width / 2, h.len * k, h.width); ctx.setLineDash([9, 6]); ctx.strokeStyle = "#ff6b4a"; ctx.lineWidth = 2; ctx.strokeRect(0, -h.width / 2, h.len, h.width); }
+      else { ctx.fillStyle = "rgba(255,240,220,.85)"; ctx.fillRect(0, -h.width / 6, h.len, h.width / 3); }
+    } else if (h.kind === "track") {
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r0, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
+      if (!act) { ctx.beginPath(); ctx.arc(h.x, h.y, h.r0 * k, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,70,40,.3)"; ctx.fill(); ctx.setLineDash([7, 5]); ctx.strokeStyle = h.followFor !== undefined && h.age < h.followFor ? "#ffb04a" : "#ff4a2a"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(h.x, h.y, h.r0, 0, Math.PI * 2); ctx.stroke(); }
+    } else {
+      // 고리: 예고 중에는 끝 반지름 점선 + 틈 표시, 발동 중에는 퍼져 나가는 띠
+      const gap = h.gapArc && h.gapAt !== undefined ? h.gapArc : 0, from = (h.gapAt ?? 0) + gap / 2, to = (h.gapAt ?? 0) + Math.PI * 2 - gap / 2;
+      if (!act) { ctx.setLineDash([8, 6]); ctx.strokeStyle = "#ff6b4a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(h.x, h.y, h.r1, from, to); ctx.stroke(); ctx.setLineDash([]); ctx.strokeStyle = `rgba(255,70,40,${0.25 + 0.3 * k})`; ctx.lineWidth = h.band; ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(1, h.r0), from, to); ctx.stroke(); }
+      else { ctx.strokeStyle = "rgba(255,110,70,.75)"; ctx.lineWidth = h.band; ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(1, ringRadius(h)), from, to); ctx.stroke(); }
+      if (gap) { ctx.setLineDash([]); ctx.strokeStyle = "rgba(120,255,160,.85)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(h.x, h.y, h.r1, to, from + Math.PI * 2); ctx.stroke(); }
+    }
+    ctx.restore();
+  }
   for (const z of s.zones) {
     ctx.save();
     if (z.kind === "line") {
@@ -555,8 +587,12 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.textAlign = "center"; ctx.font = `800 14px ${UI_FONT}`; ctx.fillStyle = "#ffe19a"; ctx.fillText(`${s.boss.icon} ${s.boss.name}`, W / 2, 24);
     ctx.font = "800 11px sans-serif"; ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.fillText(`보스전 ${fmt(s.t - BOSS_AT)}`, bx + bw, 24); ctx.textAlign = "left"; ctx.fillText(`💀 ${s.kills}`, bx, 24);
     bar(ctx, bx, 34, bw, 14, s.boss.hp / s.boss.maxHp, "#d8432f");
+    // 재도전 비교(3.4.3): 직전 최고 실패에서 보스 체력이 남은 지점 표식, 넘어서면 한 번만 알림
+    const pb = s.ext.prevBest;
+    if (pb && pb.bossHpRatio < 1) { const x = bx + bw * pb.bossHpRatio; ctx.fillStyle = "#fff"; ctx.fillRect(x - 1, 31, 2, 20); ctx.font = "700 9px sans-serif"; ctx.textAlign = "center"; ctx.fillText("지난 기록", x, 62); if (!s.ext.prevBeat && s.boss.hp / s.boss.maxHp < pb.bossHpRatio) { s.ext.prevBeat = true; s.pops.push({ x: s.player.x, y: s.player.y - 70, text: "🔥 이전 기록 돌파!", t: 1.6, kind: "info" }); } }
     ctx.textAlign = "center"; ctx.font = "800 10px sans-serif"; ctx.fillStyle = "#fff"; ctx.fillText(`${Math.ceil(s.boss.hp).toLocaleString()} / ${s.boss.maxHp.toLocaleString()}`, W / 2, 41);
-    if (tele) { ctx.globalAlpha = 0.6 + 0.4 * Math.sin(clock * 14); ctx.font = `800 13px ${UI_FONT}`; ctx.fillStyle = "#ff7a5a"; ctx.fillText("⚠ 패턴 예고! 피하세요", W / 2, 60); ctx.globalAlpha = 1; }
+    const hazardTele = s.hazards.some(h => h.age < h.tele);
+    if (tele || hazardTele) { ctx.globalAlpha = 0.6 + 0.4 * Math.sin(clock * 14); ctx.font = `800 13px ${UI_FONT}`; ctx.fillStyle = "#ff7a5a"; ctx.fillText("⚠ 패턴 예고! 피하세요", W / 2, 60); ctx.globalAlpha = 1; }
     ctx.textAlign = "left";
   } else {
     const total = s.floor.training ? (s.floor.duration ?? 60) : BOSS_AT, prog = Math.min(1, s.t / total), bw = 300, bx = (W - bw) / 2;
@@ -567,6 +603,9 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     bar(ctx, bx, 38, bw, 10, prog, prog > 0.85 ? "#ff9a4a" : "#ffd84a");
     // 정예 등장 예정 표시(진행 게이지 위 작은 눈금)
     if (!s.floor.training) for (const at of [40, 80]) { const x = bx + bw * (at / total); ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(x - 1, 36, 2, 14); }
+    // 재도전 비교: 지난번 보스 전에 쓰러진 지점
+    const pw = s.ext.prevBest;
+    if (pw && pw.bossHpRatio >= 1 && pw.waveTime < total) { const x = bx + bw * (pw.waveTime / total); ctx.fillStyle = "#ff8a6a"; ctx.fillRect(x - 1, 34, 2, 18); if (!s.ext.prevBeat && s.t > pw.waveTime) { s.ext.prevBeat = true; s.pops.push({ x: s.player.x, y: s.player.y - 70, text: "🔥 이전 기록 돌파!", t: 1.6, kind: "info" }); } }
     ctx.textAlign = "left";
   }
 
@@ -574,7 +613,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   { const mw = 168, mh = 96, mx0 = W - mw - 12, my0 = 16, k = mw / WORLD_W;
     panel(ctx, mx0 - 4, my0 - 4, mw + 8, mh + 8);
     ctx.save(); roundRect(ctx, mx0, my0, mw, mh, 6); ctx.clip();
-    ctx.fillStyle = { canal: "rgba(140,180,170,.35)", field: "rgba(150,200,120,.3)", maple: "rgba(220,150,80,.35)", frost: "rgba(210,230,245,.4)" }[T.zone]; ctx.fillRect(mx0, my0, mw, mh);
+    ctx.fillStyle = { canal: "rgba(140,180,170,.35)", field: "rgba(150,200,120,.3)", maple: "rgba(220,150,80,.35)", frost: "rgba(210,230,245,.4)", ancient: "rgba(70,120,70,.4)", core: "rgba(90,70,150,.45)" }[T.zone]; ctx.fillRect(mx0, my0, mw, mh);
     ctx.fillStyle = "rgba(50,110,170,.9)"; for (const a of T.deep) ctx.fillRect(mx0 + a.x * k, my0 + a.y * k, a.w * k, a.h * k);
     ctx.fillStyle = "#ccc"; for (const a of T.walls) ctx.fillRect(mx0 + a.x * k, my0 + a.y * k, Math.max(2, a.w * k), Math.max(2, a.h * k));
     ctx.fillStyle = "#6b4a2a"; for (const gt of T.gates) if (gt.closed) ctx.fillRect(mx0 + gt.rect.x * k, my0 + gt.rect.y * k, gt.rect.w * k, Math.max(2, gt.rect.h * k));

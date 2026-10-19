@@ -14,6 +14,8 @@ const ART: Record<string, string> = {
 // 단풍 추적자·설산 방벽: 강화 가죽 모양에 구역 색을 입힌다.
 const tint = (svg: string, map: Record<string, string>) => Object.entries(map).reduce((out, [from, to]) => out.split(`"${from}"`).join(`"${to}"`), svg);
 const MAPLE = { [DARK]: "#a3401f", [LEATHER]: "#d9772f", [METAL]: "#e6a23c", [FUR]: "#f6d9a8" }, FROST = { [DARK]: "#4f7d99", [LEATHER]: "#8fb8cf", [METAL]: "#d8eef8", [FUR]: "#ffffff" };
+const ANCIENT = { [DARK]: "#2f5236", [LEATHER]: "#6f9a5c", [METAL]: "#c9b16a", [FUR]: "#e6f0d0" }, CORE = { [DARK]: "#2a2150", [LEATHER]: "#6b58b0", [METAL]: "#ffd36a", [FUR]: "#d9ccff" };
+for (const slot of ["hood", "vest", "boots"]) { ART[`ancient-${slot}`] = tint(ART[`reinforced-${slot}`], ANCIENT); ART[`core-${slot}`] = tint(ART[`reinforced-${slot}`], CORE); }
 for (const slot of ["hood", "vest", "boots"]) { ART[`maple-${slot}`] = tint(ART[`reinforced-${slot}`], MAPLE); ART[`frost-${slot}`] = tint(ART[`reinforced-${slot}`], FROST); }
 
 export function armorSvg(id: string) { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${ART[id] ?? ART["leather-hood"]}</svg>`; }

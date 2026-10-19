@@ -14,9 +14,10 @@ import { QtyBuy } from "./qtyBuy";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
-import { ALL_RAID_ITEMS, RAID_BALANCE_VERSION, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
-import { applyEnhance, nextStep, rollEnhance, setEvolution, pityChance } from "./raid/forge";
+import { ALL_RAID_ITEMS, gearOf, SPECIAL_MASTERY, RAID_BALANCE_VERSION, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
+import { applyEnhance, nextStep, rollEnhance, setEvolution, pityChance, rollDrops } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
+import { breakthrough, gearChanges, recordOf, updateProgress } from "./raid/progress";
 import type { ForgeActions } from "./raid/RaidPanel";
 import type { FoodSlot, RaidResult } from "./raid/engine";
 import CoinGame from "./CoinGame";
@@ -1342,13 +1343,34 @@ export default function Home() {
       const w = raid.weapons[raid.equipped.weapon], log = result.log;
       setRaid(r => ({ ...r, log: [...(r.log ?? []), { ...log, v: RAID_BALANCE_VERSION, at: Date.now(), weapon: r.equipped.weapon, evo: w?.evolution ?? null, enh: w?.enhancement ?? 0, armor: [r.equipped.head, r.equipped.body, r.equipped.legs], pet: r.equipped.battlePet ? `${r.equipped.battlePet}:${r.battlePets?.[r.equipped.battlePet]?.level ?? 1}` : null, foods: used.map(f => f.key) }].slice(-30) }));
     }
+    // 성장 돌파(3.4절): 층별 기록 갱신, 장비가 달라진 뒤 처음 깨면 돌파 결과
+    if (!result.abandoned && result.floor > 0) {
+      const w = raid.weapons[raid.equipped.weapon], rec = recordOf(result, { weaponId: raid.equipped.weapon, evo: w?.evolution ?? null, enh: w?.enhancement ?? 0, armor: [raid.equipped.head, raid.equipped.body, raid.equipped.legs] });
+      const bt = breakthrough(raid.progress?.[result.floor], rec);
+      if (bt) {
+        lines.push(`🚀 ${result.floor}층 성장 돌파!`);
+        lines.push(`이전 최고: ${bt.before.bossHpRatio < 1 ? `보스 HP ${Math.round(bt.before.bossHpRatio * 100)}% 남음` : `웨이브 ${bt.before.waveTime}초에서 쓰러짐`} → 이번: ${rec.bossTime !== null ? `보스 ${rec.bossTime}초 만에 처치` : "클리어"}`);
+        const ch = gearChanges(bt.before, rec, id => ARMORS.find(a => a.id === id)?.name ?? id, id => weaponDef(id).name);
+        if (ch.length) lines.push(`그사이 성장: ${ch.join(" · ")}`);
+        const dmgBefore = bt.before.damageTaken, dmgNow = rec.damageTaken;
+        if (dmgBefore > 0) lines.push(`받은 피해 ${dmgNow < dmgBefore ? "−" : "+"}${Math.abs(Math.round((dmgNow / dmgBefore - 1) * 100))}%`);
+      }
+      setRaid(r => ({ ...r, progress: { ...(r.progress ?? {}), [result.floor]: updateProgress(r.progress?.[result.floor], rec) } }));
+    }
     if (result.abandoned) return lines;
     const gain: Record<string, number> = {};
     const roll = (drops: Drop[]) => drops.forEach(([id, min, max, chance]) => { if (Math.random() < (chance ?? 1)) gain[id] = (gain[id] ?? 0) + min + Math.floor(Math.random() * (max - min + 1)); });
     let gold = 0, seals = 0, stabilizer = 0;
     if (result.cleared) {
       const reward = FLOOR_REWARDS[result.floor], first = !raid.firstClears.includes(result.floor);
-      if (first) { gold = reward.firstGold; roll(reward.first); seals = 2 + (result.floor % 5 === 0 ? 5 : 0); } else { roll(reward.repeat); seals = 1; }
+      if (first) { gold = reward.firstGold; roll(reward.first); seals = 2 + (result.floor % 5 === 0 ? 5 : 0); }
+      else {
+        // 반복: 보스 재료 연속 미획득 천장(15·20층)
+        const box = rollDrops(reward.repeat, result.floor, true, raid.bossMiss ?? {});
+        Object.entries(box.gain).forEach(([id, n]) => { gain[id] = (gain[id] ?? 0) + n; }); seals = 1;
+        if (box.forced) lines.push("🎯 보스 재료 천장! 이번 상자에 확정으로 들어 있어요.");
+        setRaid(r => ({ ...r, bossMiss: box.bossMiss }));
+      }
       if (Math.random() < reward.stabilizer) stabilizer = 1;
       lines.push(first ? "🎁 첫 클리어 상자를 열었어요!" : "📦 반복 클리어 상자");
       setRaid(r => ({ ...r, firstClears: first ? [...r.firstClears, result.floor] : r.firstClears, highestFloor: Math.max(r.highestFloor, result.floor), unlockedFloor: Math.max(r.unlockedFloor, Math.min(RAID_MAX_FLOOR, result.floor + 1)), towerSeals: r.towerSeals + seals, stabilizers: r.stabilizers + stabilizer }));
@@ -2184,6 +2206,16 @@ export default function Home() {
       spendPlan(plan); setRaidItems(view => ({ ...view, [id]: (view[id] ?? 0) + n }));
       playCoinSound([660, 880]); setNotice(`⚒️ ${LIFE_MATS[id].icon} ${LIFE_MATS[id].name} ${n}개 즉시 완성! (사용: ${describePlan(plan).join(", ")})`);
     },
+    masteryUp: () => {
+      const evo = raid.weapons[raid.equipped.weapon]?.evolution; if (!evo) return;
+      const star = raid.mastery?.[evo] ?? 0, next = SPECIAL_MASTERY[star]; if (!next) return;
+      const open = next.unlock === 0 || (next.unlock <= 30 ? raid.firstClears.includes(next.unlock) : raid.highestFloor >= next.unlock);
+      if (!open) return setNotice(`★${next.star} 숙련은 아직 열리지 않았어요.`);
+      if (money < next.gold || raid.towerSeals < next.seals) return setNotice("숙련에 필요한 골드나 탑의 인장이 모자라요.");
+      setMoney(v => v - next.gold);
+      setRaid(r => ({ ...r, towerSeals: r.towerSeals - next.seals, mastery: { ...(r.mastery ?? {}), [evo]: star + 1 } }));
+      playCoinSound([660, 880, 1100, 1320]); setNotice(`⭐ 특수공격 숙련 ★${next.star}! 특수 피해 +${Math.round(next.dmg * 100)}%${next.star === 3 ? " · 잔향 폭발 해금" : ""}`);
+    },
     enhance: useStabilizer => {
       const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement);
       if (!step || (w.enhancement >= 10 && !w.evolution) || (step.open && !w.unlockedEnhancements.includes(step.to))) return;
@@ -2219,7 +2251,10 @@ export default function Home() {
       const plan = planFor(armor.need, armor.gold); if (!plan) return setNotice("방어구 재료나 돈이 모자라요.");
       spendPlan(plan);
       setRaid(r => ({ ...r, armorOwned: [...r.armorOwned, id], equipped: r.equipped[armor.slot] ? r.equipped : { ...r.equipped, [armor.slot]: id } }));
-      playCoinSound([660, 880, 1100]); setNotice(`${armor.icon} ${armor.name}을(를) 만들었어요!`);
+      // 성장 수치(3.4.2): 지금 그 부위 대신 입었을 때 바뀌는 것만
+      const before = gearOf(raid), after = gearOf({ ...raid, equipped: { ...raid.equipped, [armor.slot]: id } }), cut = (d: number) => (1 - 100 / (100 + d * 8)) * 100;
+      const diff = [after.hp !== before.hp ? `체력 ${100 + before.hp} → ${100 + after.hp}` : "", after.defense !== before.defense ? `받는 피해 감소 ${cut(before.defense).toFixed(1)}% → ${cut(after.defense).toFixed(1)}%` : "", after.startShield !== before.startShield ? `시작 보호막 ${before.startShield} → ${after.startShield}` : "", after.crit !== before.crit ? `치명타 ${Math.round(before.crit * 100)}% → ${Math.round(after.crit * 100)}%` : "", after.speed !== before.speed ? `이동 +${Math.round(before.speed * 100)}% → +${Math.round(after.speed * 100)}%` : "", after.hazardCut !== before.hazardCut ? `바닥 피해 감소 ${Math.round(before.hazardCut * 100)}% → ${Math.round(after.hazardCut * 100)}%` : ""].filter(Boolean);
+      playCoinSound([660, 880, 1100]); setNotice(`${armor.icon} ${armor.name}을(를) 만들었어요!${diff.length ? ` 착용하면: ${diff.join(" · ")}` : ""}`);
     },
     equip: (slot: ArmorSlot, id: string | null) => setRaid(r => ({ ...r, equipped: { ...r.equipped, [slot]: id } })),
     drawPets: count => {

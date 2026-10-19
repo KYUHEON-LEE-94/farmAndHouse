@@ -45,8 +45,8 @@ test('every armor ingredient has a current acquisition source', () => {
   }
 });
 
-test('every enhancement ingredient through +14 has a current source', () => {
-  for (const step of raid.ENHANCE.filter(step => step.to <= 14)) {
+test('every enhancement ingredient through +18 has a current source', () => {
+  for (const step of raid.ENHANCE.filter(step => step.to <= 18)) {
     const ids = [...Object.keys(step.need), ...Object.keys(step.open?.need ?? {})];
     for (const id of ids) assert.ok(id in raid.LIFE_MATS || floorDrops.has(id) || huntAll.has(id) || virtualNeeds.has(id), `+${step.to}: no source for ${id}`);
   }
@@ -56,11 +56,11 @@ test('every configured floor drop is a registered raid item', () => {
   for (const id of floorDrops) assert.ok(id in raid.RAID_ITEMS, `unregistered floor drop: ${id}`);
 });
 
-test('+13 materials drop on floors 11-15, +14 on floors 16-20, and +15 stays reserved for floors 21+', () => {
+test('강화 재료는 해당 구간에서만: +13은 11~15층, +14는 16~20층, +15·+16은 21~25층, +17·+18은 26~30층', () => {
   const needsOf = to => { const step = raid.ENHANCE.find(s => s.to === to); return [...Object.keys(step.need), ...Object.keys(step.open?.need ?? {})]; };
-  const upperNeeds = new Set([13, 14, 15].flatMap(needsOf));
-  assert.deepEqual([...upperNeeds].sort(), Object.keys(raid.UPPER_ITEMS).sort());
-  for (const id of needsOf(13)) { const floors = dropFloors.get(id) ?? []; assert.ok(floors.length && floors.every(f => f >= 11 && f <= 15), `+13 ${id}: ${floors}`); }
-  for (const id of needsOf(14)) { const floors = dropFloors.get(id) ?? []; assert.ok(floors.length && floors.every(f => f >= 16 && f <= 20), `+14 ${id}: ${floors}`); }
-  for (const id of needsOf(15)) assert.equal(floorDrops.has(id), false, `+15 ${id} unexpectedly drops in floors 1-${raid.RAID_MAX_FLOOR}`);
+  const range = { 13: [11, 15], 14: [16, 20], 15: [21, 25], 16: [21, 25], 17: [26, 30], 18: [26, 30] };
+  for (const [to, [lo, hi]] of Object.entries(range)) for (const id of needsOf(Number(to))) {
+    const floors = dropFloors.get(id) ?? [];
+    assert.ok(floors.length && floors.every(f => f >= lo && f <= hi), `+${to} ${id}: ${floors}`);
+  }
 });

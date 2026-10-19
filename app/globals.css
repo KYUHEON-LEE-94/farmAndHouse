@@ -1305,3 +1305,15 @@ button { color:inherit; }
 @keyframes huntShakeL{25%{transform:translate(2px,-1px)}75%{transform:translate(-2px,1px)}}
 @keyframes huntResultUp{0%{opacity:0;transform:translate(-50%,-90%)}20%{opacity:1;transform:translate(-50%,-110%)}100%{opacity:.9;transform:translate(-50%,-150%)}}
 @media (prefers-reduced-motion:reduce){.hunt-arena.shake-s,.hunt-arena.shake-l,.hunt-rustle{animation:none}.hunt-result{animation:none}}
+/* raid-30: 고대 숲·심장부 층 색, 난이도 구간 띠 */
+.raid-storey.ancient{background:linear-gradient(90deg,rgba(70,130,70,.45),rgba(70,130,70,.15))}.raid-storey.core{background:linear-gradient(90deg,rgba(110,80,190,.5),rgba(110,80,190,.15))}
+.raid-floor-card.ancient{background:linear-gradient(120deg,#2f5236,#6f9a5c)}.raid-floor-card.core{background:linear-gradient(120deg,#16122b,#4b3f7a)}
+.raid-tier{display:inline-block;margin-left:6px;padding:0 6px;border-radius:999px;font:700 9.5px "Gowun Dodum";vertical-align:middle}
+.raid-tier.easy{background:#d9f0cf;color:#2f6a24}.raid-tier.normal{background:#ffe0b8;color:#9a4a12}.raid-tier.hard{background:#e6d6ff;color:#5a2f9a}
+.armor-art.ancient{border-color:#6f9a5c;background:radial-gradient(circle at 35% 25%,#fbfff4 0 28%,#d7e8c6 72%,#7fa56b 100%)}.armor-art.core{border-color:#6b58b0;background:radial-gradient(circle at 35% 25%,#fbf8ff 0 28%,#ddd3ff 72%,#7a68c0 100%)}
+.raid-diagnosis{display:grid;gap:4px;margin-top:6px}.raid-diagnosis p{margin:0;display:grid;font-size:12px}.raid-diagnosis p b{font-size:12.5px}.raid-diagnosis p span{color:#6b5a3a}
+.raid-diagnosis-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.raid-diagnosis-actions button,.raid-grown button{border:1px solid rgba(0,0,0,.15);border-radius:10px;padding:6px 10px;background:#fff;font:700 12px "Gowun Dodum";cursor:pointer}
+.raid-diagnosis-actions button.go,.raid-grown button.go{background:#24372b;color:#fff;border-color:#24372b}
+.raid-breakthrough{background:linear-gradient(120deg,#fff6d6,#ffe3a6);border-radius:10px;padding:8px 10px!important}.raid-breakthrough li:first-child{font:800 15px "Gowun Batang";color:#9a5a10}
+.raid-grown{display:grid;gap:4px;padding:10px 12px;border-radius:14px;background:linear-gradient(120deg,#eaf6ff,#d6ecff);border:1px solid #9cc4e6}.raid-grown b{font-size:13.5px}.raid-grown span{font-size:12px;color:#36506a}.raid-grown button{justify-self:start}
+.raid-mastery{display:grid;gap:4px;margin-top:10px;padding:10px 12px;border-radius:14px;background:linear-gradient(120deg,#fff9e8,#fff1c9);border:1px solid #f0d58a}.raid-mastery b{font-size:13.5px}.raid-mastery small{font-size:11.5px;color:#6b5a3a}.raid-stars i{font-style:normal;font-size:18px;color:#d8cba6;margin-right:2px}.raid-stars i.on{color:#f0a91c;text-shadow:0 0 6px #ffd76a}.raid-mastery-lock{color:#8a6a3a!important;font-weight:700}.raid-mastery-note{opacity:.75}
