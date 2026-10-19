@@ -160,7 +160,7 @@ export const derived = (s: RaidState) => ({
     + (pick(s, "pressure-runner") ? Math.min(0.15, 0.05 * s.pressure.stage) : 0) + (pick(s, "shield-keeper") && s.player.shield > 0 ? 0.1 : 0))),
   dashCd: PLAYER.dashCooldown * Math.max(0.3, 1 - 0.18 * pick(s, "quick-dash") - s.gear.dashCd),
   absorb: PLAYER.absorb + s.gear.absorb,
-  armor: 2 * pick(s, "hard-leather") + s.gear.defense + pick(s, "close-instinct"),
+  armor: 3 * pick(s, "hard-leather") + s.gear.defense + pick(s, "close-instinct"),
   crit: PLAYER.critChance + s.gear.crit + buffSum(s, ["crit"]) + 0.08 * pick(s, "critical-eye"),
 });
 
@@ -249,7 +249,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   p.hp -= dmg; p.iframes = PLAYER.iframes; s.damageTaken[source] = (s.damageTaken[source] ?? 0) + dmg;
   if (fromBoss) s.bossHits = (s.bossHits ?? 0) + 1;
   if (dmg > 0) s.pops.push({ x: p.x, y: p.y - 24, text: `-${dmg}`, t: 0.8, kind: "hurt" });
-  if (!p.emergencyUsed && pick(s, "emergency-shield") && p.hp > 0 && p.hp <= p.maxHp * 0.3) { p.emergencyUsed = true; p.shield += 25; p.shieldUntil = s.t + 60; s.pops.push({ x: p.x, y: p.y - 40, text: "비상 보호막!", t: 1.2, kind: "info" }); }
+  if (!p.emergencyUsed && pick(s, "emergency-shield") && p.hp > 0 && p.hp <= p.maxHp * 0.3) { p.emergencyUsed = true; p.shield += Math.round(p.maxHp * 0.2); p.shieldUntil = s.t + 60; s.pops.push({ x: p.x, y: p.y - 40, text: "비상 보호막!", t: 1.2, kind: "info" }); }
   if (s.pet && pick(s, "pet-guard") && !s.ext.petGuard && p.hp > 0 && p.hp <= p.maxHp * 0.35) { s.ext.petGuard = true; p.shield += 18; p.shieldUntil = Math.max(p.shieldUntil, s.t + 30); s.pops.push({ x: p.x, y: p.y - 52, text: "🐾 동료의 수호!", t: 1.2, kind: "info" }); }
   if (p.hp <= 0 && pick(s, "second-wind") && !s.ext.secondWind && !s.floor.training) { s.ext.secondWind = true; p.hp = 1; p.iframes = 2; s.pops.push({ x: p.x, y: p.y - 52, text: "💨 두 번째 숨!", t: 1.4, kind: "info" }); return true; }
   if (p.hp <= 0) { if (s.floor.training) p.hp = 1; else { p.hp = 0; s.over = "dead"; } }
@@ -368,7 +368,7 @@ function killMonster(s: RaidState, m: Monster) {
   // 53절 처치 효과
   if (pick(s, "battle-tempo")) { s.ext.tempo = Math.min(5, (s.t < s.ext.tempoUntil ? s.ext.tempo : 0) + 1); s.ext.tempoUntil = s.t + 5; }
   if (m.elite && !m.boss) {
-    if (pick(s, "elite-remedy")) { const pl = s.player; pl.hp = Math.min(pl.maxHp, pl.hp + 12); s.pops.push({ x: pl.x, y: pl.y - 30, text: "+12", t: 0.8, kind: "heal" }); }
+    if (pick(s, "elite-remedy")) { const pl = s.player, v = Math.round(pl.maxHp * 0.08); pl.hp = Math.min(pl.maxHp, pl.hp + v); s.pops.push({ x: pl.x, y: pl.y - 30, text: `+${v}`, t: 0.8, kind: "heal" }); }
     if (pick(s, "hunter-reset") && s.special.readyAt > s.t) s.special.readyAt = s.t + (s.special.readyAt - s.t) * 0.65;
   }
   if (m === s.boss) { s.bossHpAtEnd = 0; s.over = "clear"; }
@@ -1233,7 +1233,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   { const o = pushOut(p.x, p.y, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; }
   updateWorld(s, dt);
   // 꾸준한 회복: 20초마다 체력 5(중첩마다)
-  if (pick(s, "steady-recovery") && s.t >= s.ext.regenAt) { s.ext.regenAt = s.t + 20; const v = 5 * pick(s, "steady-recovery"); p.hp = Math.min(p.maxHp, p.hp + v); s.pops.push({ x: p.x, y: p.y - 30, text: `+${v}`, t: 0.8, kind: "heal" }); }
+  if (pick(s, "steady-recovery") && s.t >= s.ext.regenAt) { s.ext.regenAt = s.t + 15; const v = Math.round(p.maxHp * 0.03) * pick(s, "steady-recovery"); p.hp = Math.min(p.maxHp, p.hp + v); s.pops.push({ x: p.x, y: p.y - 30, text: `+${v}`, t: 0.8, kind: "heal" }); }
   s.shake = Math.max(0, s.shake - dt * 30); s.xpFlash = Math.max(0, s.xpFlash - dt);
   // 지속 회복 음식(약초 고기찜): 초당 체력 회복
   for (const b of s.buffs) if (b.kind === "regen" && b.until > s.t && s.player.hp > 0) s.player.hp = Math.min(s.player.maxHp, s.player.hp + b.value * dt);
@@ -1299,7 +1299,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, p.x, p.y) < m.r + PLAYER.radius) {
     const took = hurtPlayer(s, m.state === "dash" && m.boss ? m.damage + 8 : m.damage, m.name, Boolean(m.boss));
     // 가시 갑옷: 부딪힌 적에게 20(보스 절반), 0.5초마다
-    if (took && pick(s, "thorn-armor") && s.t - s.ext.thornAt >= 0.5) { s.ext.thornAt = s.t; flatHit(s, m, 20 * pick(s, "thorn-armor") * (m.boss ? 0.5 : 1), "basic"); }
+    if (took && pick(s, "thorn-armor") && s.t - s.ext.thornAt >= 0.5) { s.ext.thornAt = s.t; flatHit(s, m, Math.max(20, s.weapon.damage * 0.6) * pick(s, "thorn-armor") * (m.boss ? 0.5 : 1), "basic"); }
   }
   updateAux(s);
 
