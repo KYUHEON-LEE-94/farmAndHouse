@@ -977,7 +977,7 @@ BOSS_SCRIPTS["forest-guardian"] = {
 BOSS_SCRIPTS["shadow-lord"] = {
   patterns: {
     clones: (s, m) => { summonN(s, m, "tower-shadow", 3, { clone: true, name: "그림자 분신", icon: "👤", hp: 1, maxHp: 1, damage: Math.round(m.damage * 0.6), speed: 150, xp: 0 }); return 0.8; },
-    crossDash: (s, m) => { const a = rnd() * Math.PI; beamCross(s, s.player.x, s.player.y, a + Math.PI / 4, 760, 50, 1.0, 0.15, "교차 돌진"); beamCross(s, s.player.x, s.player.y, a - Math.PI / 4, 760, 50, 1.0, 0.15, "교차 돌진"); return 1.4; },
+    crossDash: s => { const a = rnd() * Math.PI; beamCross(s, s.player.x, s.player.y, a + Math.PI / 4, 760, 50, 1.0, 0.15, "교차 돌진"); beamCross(s, s.player.x, s.player.y, a - Math.PI / 4, 760, 50, 1.0, 0.15, "교차 돌진"); return 1.4; },
     swamp: s => { for (let i = 0; i < 3; i++) zoneAt(s, { kind: "puddle", ...nearPlayer(s, 340), r: 80, t: 6, tele: 0.6, damage: 0, every: 0, slow: 0.35 }); return 0.8; },
     cloneShot: s => { const clones = s.monsters.filter(x => x.hp > 0 && x.clone); for (const c of clones) radial(s, c, 6, rnd() * 6, 170, bossPct(s, 0.07)); return clones.length ? 0.8 : 0.1; },
   },
@@ -1006,7 +1006,7 @@ BOSS_SCRIPTS["core-commander"] = {
   patterns: {
     spin: (s, m) => { addHazard(s, hazard({ kind: "spin", x: m.x, y: m.y, angle: aimP(s, m), len: 420, width: 34, tele: 0.8, life: 6, spin: (rnd() < 0.5 ? 1 : -1) * Math.PI / 3.5, every: 0.4, damage: bossPct(s, 0.1), label: "회전 레이저", owner: m.uid })); return 1.5; },
     turrets: (s, m) => { summonN(s, m, "core-sentry", 3, { name: "포탑", icon: "🔺", speed: 0, hp: 150, maxHp: 150, xp: 0 }); return 0.8; },
-    snipe: (s, m) => { const fast = s.monsters.some(x => x.hp > 0 && x.name === "포탑"); trackAt(s, s.player.x, s.player.y, 34, fast ? 1.3 : 1.6, fast ? 0.9 : 1.2, 600, 0.2, "조준 저격"); return fast ? 1.5 : 1.8; },
+    snipe: s => { const fast = s.monsters.some(x => x.hp > 0 && x.name === "포탑"); trackAt(s, s.player.x, s.player.y, 34, fast ? 1.3 : 1.6, fast ? 0.9 : 1.2, 600, 0.2, "조준 저격"); return fast ? 1.5 : 1.8; },
     spin2: (s, m) => { const a = aimP(s, m); for (const dir of [1, -1]) addHazard(s, hazard({ kind: "spin", x: m.x, y: m.y, angle: a + (dir > 0 ? 0 : Math.PI), len: 420, width: 34, tele: 0.8, life: 6, spin: dir * Math.PI / 3.5, every: 0.4, damage: bossPct(s, 0.1), label: "회전 레이저", owner: m.uid })); return 1.5; },
   },
   phases: [{ at: 1, patterns: ["spin", "turrets", "snipe"], gap: 0.6, combo: 1 }, { at: 0.5, patterns: ["spin2", "turrets", "snipe"], gap: 0.6, combo: 2 }],
