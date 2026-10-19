@@ -6,7 +6,7 @@ import { FURNITURE, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool
 import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, WEATHER_RETRY_SECONDS, fetchWeather, weatherEffect, type WeatherState } from "./weather";
 import { ALL_FISH, BAITS, BARE_HAND, FISH, LEGEND_CHANCE, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
-import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, buffMultiplier, pickEvent, resolveChoice, type Buff, type Effect, type StoryEvent } from "./events";
+import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, PRICE_EVENT_COUNT, RECENT_EVENT_LIMIT, buffMultiplier, consumePriceBuffs, pickEvent, priceBuffFactor, resolveChoice, type Buff, type Effect, type EventContext, type StoryEvent } from "./events";
 import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, laughter, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
 import { BET_PRESETS, BLACKJACK_PAYOUT, BLACKJACK_WIN, CHERRY_PAIR, DICE_FACES, MIN_BET, PARITY_NAME, PAYOUT, PARITY_WIN_CHANCE, SLOT_SYMBOLS, BLACKJACK_ODDS, parityOf, rollParity, slotMultiplier, slotOdds, slotReturnRate, spinReel, type Parity, type Roll } from "./casino";
 import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
@@ -33,7 +33,7 @@ import { COOP_RATE, EMPTY_MARKET, FREE_PER_CYCLE, OVERFLOW_RATE, demandLeft, fre
 import { AFFECTION_MAX, FULL_PER_FEED, FULL_REFUSE, PET_BASE, petBugPenalty, PET_FOODS, PET_MAX_LEVEL, PET_POWER, PLAY_AFFECTION, PLAY_COOLDOWN_MIN, WALK_AFFECTION, WALK_COOLDOWN_MIN, addAffection, friendSaleBonus, whiteTigerBugReduction, fullness, josa, newCare, petAbility, tigerDebuff, type PetCare, type PetFood } from "./pets";
 import { AccountError, CLOUD_SYNC_SECONDS, accountCall, packSave, readSession, saveSummary, unpackSave, writeSession, type Session, readCloudBase, writeCloudBase } from "./account";
 import { AVATAR_STORAGE_KEY, BLACKCAT_AVATAR, DEFAULT_AVATAR, PIXEL_CAT_AVATAR, PRESET_AVATARS, emojiAvatar, readAvatarFile, type StoredAvatar } from "./avatar";
-import { cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
+import { scaleRemaining, cycleCrop, plantingAllowance, reservePlanting, restorePlantingLedger, type PlantingLedger, BUG_CHANCE, BUG_CHECK_SECONDS, BUG_SECONDS, CAN_CAPACITY, CANS, CROPS, HARVEST_TOOLS, PLANT_TOOLS, SPREADERS, STARTER_FERT, QUALITIES, CROP_BOOK_REWARDS, type CropRecord,  STORAGE_MAX, STORAGE_START, STORAGE_STEP, parseProduceKey, produceKey, storagePrice, storedQuality, migrateStorageSlots, SEASON_WARN_SECONDS, seasonOmen, MAX_PLOTS, fieldPrice, fieldColumns, canArea, waterCheckpoints, type HarvestTool, type WateringCan, FERTILIZERS, applyFertilizer, plotStatus, type Crop, type Fertilizer, type Plot } from "./farming";
 
 import { EffectBurst, EffectGacha, EquipmentPanel } from "./EquipmentPanel";
 import { EFFECT_PRICE, rollEffectReward, type EffectReward, emptyEquipment, equipEffect, restoreEquipment, type EffectSlot, type Equipment } from "./equipment";
@@ -418,6 +418,8 @@ export default function Home() {
   const [buffs, setBuffs] = useState<Buff[]>([]);
   const [activeEvent, setActiveEvent] = useState<ActiveEvent | null>(null);
   const [lastEventAt, setLastEventAt] = useState(0);
+  /** 최근 이벤트 id(같은 이벤트 연속 방지, RANDOM_EVENT_AUDIT 10.4) */
+  const [recentEvents, setRecentEvents] = useState<string[]>([]);
   const [avatar, setAvatar] = useState<StoredAvatar>({ src: DEFAULT_AVATAR, pixelated: false });
   const [avatarPos, setAvatarPos] = useState({ x: 0.6, z: 0.6, story: 0 });
   const [stories, setStories] = useState(1);
@@ -467,7 +469,7 @@ export default function Home() {
   const fishTimer = useRef<number | undefined>(undefined);
   const castBait = useRef<Bait | null>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
-  const eventGate = useRef({ ready: false, season: "봄" as Season, lastEventAt: 0, busy: false });
+  const eventGate = useRef({ ready: false, season: "봄" as Season, lastEventAt: 0, busy: false, ctx: { growing: 0, empty: 0, fish: 0 } as EventContext, recent: [] as string[] });
   const bugGate = useRef<{ ready: boolean; plots: Plot[]; dog: number; bugChance: number; rain: boolean }>({ ready: false, plots: [], dog: 0, bugChance: 1, rain: false });
 
   useEffect(() => {
@@ -495,7 +497,7 @@ export default function Home() {
         setWarehouse(hydrate(data.warehouse));
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
         setInventory(migrateInventory(data)); setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), unlockedFloor: Math.min(RAID_MAX_FLOOR, Math.max(data.raid?.unlockedFloor ?? 1, ...(data.raid?.firstClears ?? []).map((n: number) => n + 1))), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [], battlePets: data.raid?.battlePets ?? {}, petPity: data.raid?.petPity ?? 0 });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
-        setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0);
+        setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0); setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents.slice(-RECENT_EVENT_LIMIT) : []);
         setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId || "VRfbFDUybRU"); setCoinHoldings(data.coinHoldings ?? {});
       } catch { /* start fresh */ }
     }
@@ -508,10 +510,10 @@ export default function Home() {
   // 저장은 0.4초 모아서 한 번 쓴다(드래그로 여러 칸을 심을 때 매번 전체 저장을 직렬화하지 않게). 숨김·종료·계정 저장 직전에는 바로 쓴다.
   useEffect(() => {
     if (!loaded || suspendSave.current) return;
-    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed: placed.map(slimItem), warehouse: warehouse.map(slimItem), wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
+    saveJob.current = () => localStorage.setItem("four-seasons-farm", JSON.stringify({ version: 5, money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed: placed.map(slimItem), warehouse: warehouse.map(slimItem), wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, recentEvents, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, market: marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, petsInYard: true, bossTheme, weatherPlace, musicId, coinHoldings }));
     const timer = window.setTimeout(flushSave, 400);
     return () => window.clearTimeout(timer);
-  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
+  }, [money, plots, startHour, endHour, houseLevel, houseShape, ownedPlots, placed, warehouse, wallpaper, floor, ownedThemes, fishLog, fishHarvestMode, baits, selectedBait, ownedRods, rodId, spotId, tickets, buffs, lastEventAt, recentEvents, avatarPos, stories, yardLevel, canWater, ownedCans, canId, ownedHands, handId, ownedPlanters, planterId, ownedSpreaders, spreaderId, fertStock, fertId, inventory, storageCap, produceLocks, fishLocks, workshop, harvestMode, marketState, ordersDone, ownedWeapons, weaponId, huntTicket, raid, cropLog, cropRewards, specialPlantings, casinoStats, notifyOffWork, dayStart, lastBailout, petCare, petFood, ownedEffects, equipment, gachaCollected, bossTheme, weatherPlace, musicId, coinHoldings, loaded]);
 
   const nowMs = now.getTime();
   const currentHour = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -585,10 +587,19 @@ export default function Home() {
   }, [season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 돌발 이벤트: 운영 시간 중 일정 간격으로 확률 검사, 직전 이벤트 이후 쿨다운을 둔다.
-  useEffect(() => { eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || showMissions || tab === "hunt" || tab === "raid" || Boolean(cooking) || Boolean(cookResult) || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game" }; });
+  useEffect(() => {
+    // 돌발 이벤트 등장 조건(RANDOM_EVENT_AUDIT 10.4): 자라는 작물·빈 밭·창고 물고기
+    const now = Date.now(), growing = plots.filter(plot => { if (!plot) return false; const crop = CROPS.find(c => c.id === plot.cropId); return Boolean(crop) && (now - plot.plantedAt) / 1000 < (plot.growSeconds ?? crop!.seconds); }).length;
+    const empty = plots.slice(0, plotCount).filter(plot => !plot).length, fish = Object.values(fishStock).reduce((t, n) => t + n, 0);
+    eventGate.current = { ready: loaded && isWorkTime, season, lastEventAt, busy: Boolean(activeEvent) || Boolean(spotConfirm) || showBailout || showAccount || showStorage || showMissions || tab === "hunt" || tab === "raid" || Boolean(cooking) || Boolean(cookResult) || guideStep !== null || showSettings || showAvatar || Boolean(offWork) || bossMode || Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer" || fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game", ctx: { growing, empty, fish }, recent: recentEvents };
+  });
   useEffect(() => {
     if (!loaded) return;
-    const trigger = () => { setActiveEvent({ event: pickEvent(eventGate.current.season) }); setLastEventAt(Date.now()); };
+    const trigger = () => {
+      const gate = eventGate.current, event = pickEvent(gate.season, gate.ctx, gate.recent);
+      if (!event) return; // 지금 상태에 맞는 이벤트가 없으면 이번 검사는 건너뛴다
+      setActiveEvent({ event }); setLastEventAt(Date.now()); setRecentEvents(list => [...list, event.id].slice(-RECENT_EVENT_LIMIT));
+    };
     if (new URLSearchParams(window.location.search).has("event") && eventGate.current.ready) trigger();
     const timer = setInterval(() => {
       const gate = eventGate.current;
@@ -1140,7 +1151,8 @@ export default function Home() {
       const sold = sales.filter(sale => { if (room <= 0) return true;
         const key = produceKey(sale.crop.id, storedQuality(sale.status.quality.id, sale.status.bugMultiplier), sale.golden);
         room--; stored[key] = (stored[key] ?? 0) + 1; return false; });
-      const soldRun = priceRun(sold), soldTotal = soldRun.priced.reduce((sum, sale) => sum + sale.amount, 0), storedCount = sales.length - sold.length;
+      const soldMul = priceBuffFactor(buffs, sold.length, time), soldRun = priceRun(sold), soldTotal = Math.round(soldRun.priced.reduce((sum, sale) => sum + sale.amount, 0) * soldMul), storedCount = sales.length - sold.length;
+      if (soldMul !== 1) setBuffs(list => consumePriceBuffs(list, sold.length));
       setProduce(stock => { const next = { ...stock }; Object.entries(stored).forEach(([key, count]) => { next[key] = (next[key] ?? 0) + count; }); return next; });
       if (soldTotal) { setMoney(m => m + soldTotal); setMarketState(soldRun.state); }
       const fxs = sales.map(sale => ({ id: time + sale.i, plotIndex: sale.i, icon: sale.golden ? `✨${sale.crop.icon}` : sale.crop.icon, amount: sold.includes(sale) ? soldRun.priced[sold.indexOf(sale)].amount : 0, stars: sold.includes(sale) ? sale.status.quality.stars : "📦 창고로" }));
@@ -1148,7 +1160,8 @@ export default function Home() {
       playPlop();
       return setNotice(`📦 ${currentHand.icon} ${storedCount}개를 창고에 넣었어요! (${sales.filter(sale => !sold.includes(sale)).map(sale => sale.crop.icon).join("")})${sold.length ? ` 창고가 꽉 차서 ${sold.length}개는 ${soldTotal.toLocaleString()}원에 바로 팔았어요.` : ""} 시세 좋을 때 창고에서 파세요.`);
     }
-    const total = sales.reduce((sum, sale) => sum + sale.amount, 0);
+    const eventMul = priceBuffFactor(buffs, sales.length, time), total = Math.round(sales.reduce((sum, sale) => sum + sale.amount, 0) * eventMul);
+    if (eventMul !== 1) setBuffs(list => consumePriceBuffs(list, sales.length));
     setMoney(m => m + total); setMarketState(run.state);
     const fxs = sales.map(sale => ({ id: time + sale.i, plotIndex: sale.i, icon: sale.golden ? `✨${sale.crop.icon}` : sale.crop.icon, amount: sale.amount, stars: `${sale.status.quality.stars}${sale.golden ? " 황금!" : ""}` }));
     const goldens = sales.filter(sale => sale.golden);
@@ -1172,7 +1185,8 @@ export default function Home() {
     const n = Math.min(sellableOf(key), count);
     if (n <= 0) return;
     const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId);
-    const result = sellMany(market, cropId, (crop ? basePrice(crop) : 0) * QUALITIES[quality].multiplier * (golden ? 3 : 1), n), amount = result.total;
+    const eventMul = priceBuffFactor(buffs, n, Date.now()), result = sellMany(market, cropId, (crop ? basePrice(crop) : 0) * QUALITIES[quality].multiplier * (golden ? 3 : 1), n), amount = Math.round(result.total * eventMul);
+    if (eventMul !== 1) setBuffs(list => consumePriceBuffs(list, n));
     setProduce(stock => { const next = { ...stock }; next[key] = (next[key] ?? 0) - n; if (next[key] <= 0) delete next[key]; return next; });
     setMarketState(result.state);
     setMoney(m => m + amount); playCoinSound(n > 1 ? [880, 1100, 1320] : [880, 1320]);
@@ -1187,7 +1201,9 @@ export default function Home() {
     let amount = 0, state = market;
     plan.forEach(({ key, n }) => { const { cropId, quality, golden } = parseProduceKey(key), crop = CROPS.find(c => c.id === cropId); if (!crop) return;
       const result = sellMany(state, cropId, basePrice(crop) * QUALITIES[quality].multiplier * (golden ? 3 : 1), n); amount += result.total; state = result.state; });
-    return { amount, state };
+    // 수량제 판매가 효과(다음 농작물 N개): 묶음 전체 수량 기준으로 남은 만큼만
+    const count = plan.reduce((sum, entry) => sum + entry.n, 0), eventMul = priceBuffFactor(buffs, count, Date.now());
+    return { amount: Math.round(amount * eventMul), state };
   }
   function takeFromProduce(plan: { key: string; n: number }[]) {
     setProduce(stock => { const next = { ...stock }; plan.forEach(({ key, n }) => { next[key] = (next[key] ?? 0) - n; if (next[key] <= 0) delete next[key]; }); return next; });
@@ -1199,6 +1215,7 @@ export default function Home() {
     if (!count) return;
     if (sellConfirm.kind === "market") {
       const { amount, state } = marketSellPlan(plan);
+      if (priceBuffFactor(buffs, count, Date.now()) !== 1) setBuffs(list => consumePriceBuffs(list, count));
       takeFromProduce(plan); setMoney(m => m + amount); setMarketState(state); playCoinSound([880, 1100, 1320, 1760]);
       return setNotice(`짤랑짤랑~ 창고 작물 ${count}개를 ${amount.toLocaleString()}원에 팔았어요! (잠금·주문 예약분은 남겨 뒀어요)`);
     }
@@ -1722,10 +1739,38 @@ export default function Home() {
     if (!activeEvent) return;
     const result = resolveChoice(activeEvent.event.choices[index]);
     if (result.money) setMoney(value => Math.max(0, value + result.money!));
-    const buff = result.buff;
-    if (buff) setBuffs(items => [...items.filter(item => item.expiresAt > Date.now() && item.label !== buff.label), { id: `${buff.kind}-${Date.now()}`, kind: buff.kind, label: buff.label, multiplier: buff.multiplier, expiresAt: Date.now() + buff.minutes * 60000 * (pets.has("tiger") && !BUFF_INFO[buff.kind].good(buff.multiplier) ? tigerDebuff(petLevel("tiger")) : 1) }]);
     setActiveEvent({ ...activeEvent, result });
     setNotice(`${activeEvent.event.icon} ${result.text}`);
+  }
+  /** 호랑이 펫: 나쁜 효과의 크기(성장·판매가)와 지속시간(씨앗·어획)을 줄인다 */
+  const tigerScale = (kind: Buff["kind"], mul: number) => (pets.has("tiger") && !BUFF_INFO[kind].good(mul) ? tigerDebuff(petLevel("tiger")) : 1);
+  /** 결과 창 확인: 이때부터 효과 시작(RANDOM_EVENT_AUDIT 10.4) */
+  function closeEvent() {
+    const buff = activeEvent?.result?.buff;
+    setActiveEvent(null);
+    if (!buff) return;
+    const now = Date.now(), soften = tigerScale(buff.kind, buff.multiplier);
+    if (buff.kind === "growth") {
+      // 성장: 지금 자라는 작물의 남은 시간에 바로(나쁜 효과는 호랑이가 크기를 줄인다)
+      const mul = 1 + (buff.multiplier - 1) * soften; let n = 0;
+      setPlots(current => current.map(plot => { if (!plot) return plot; const crop = CROPS.find(c => c.id === plot.cropId); if (!crop) return plot; const next = scaleRemaining(plot, crop, mul, now); if (next !== plot) n++; return next; }));
+      setNotice(`${buff.label}: 자라는 작물 남은 시간 ${mul < 1 ? "−" : "+"}${Math.round(Math.abs(mul - 1) * 100)}%${soften < 1 ? " (호랑이가 줄여 줬어요)" : ""}`); void n;
+      return;
+    }
+    if (buff.kind === "price") {
+      // 판매가: 다음 농작물 40개(수량제)
+      const mul = 1 + (buff.multiplier - 1) * soften;
+      setBuffs(items => [...items.filter(item => item.expiresAt > now && item.label !== buff.label), { id: `price-${now}`, kind: "price", label: buff.label, multiplier: mul, expiresAt: now + 6 * 3600000, left: PRICE_EVENT_COUNT }]);
+      return;
+    }
+    setBuffs(items => [...items.filter(item => item.expiresAt > now && item.label !== buff.label), { id: `${buff.kind}-${now}`, kind: buff.kind, label: buff.label, multiplier: buff.multiplier, expiresAt: now + buff.minutes * 60000 * soften }]);
+  }
+  /** 결과 창에 보여 줄 효과 설명 */
+  function effectText(buff: NonNullable<Effect["buff"]>) {
+    const pct = Math.round(Math.abs(buff.multiplier - 1) * 100), up = buff.multiplier > 1;
+    if (buff.kind === "growth") { const g = eventGate.current.ctx.growing; return `${buff.label} · 자라는 작물 ${g}개 남은 시간 ${up ? "+" : "−"}${pct}%`; }
+    if (buff.kind === "price") return `${buff.label} · 다음 농작물 ${PRICE_EVENT_COUNT}개 판매가 ${up ? "+" : "−"}${pct}%`;
+    return `${buff.label} · ${BUFF_INFO[buff.kind].name} ${up ? "+" : "−"}${pct}% · ${buff.minutes}분`;
   }
 
   function choiceCost(index: number) {
@@ -2308,7 +2353,7 @@ export default function Home() {
         <span className={`buff-chip weather wx-${weather?.kind ?? "none"}`} title={wx.notes.join(" · ")}><b>{wx.icon} {weather ? `${weatherPlace.name} ${wx.name} ${weather.temp}°` : weatherFailed ? "날씨를 못 불러왔어요" : "날씨 불러오는 중…"}</b>{!weather && weatherFailed && <button onClick={() => setWeatherTry(value => value + 1)} aria-label="날씨 다시 불러오기" title="다시 불러오기">🔄</button>}{wx.notes.slice(0, 2).join(" · ")}{wx.notes.length > 2 ? " …" : ""}<button onClick={useMyLocation} aria-label="내 위치 날씨로 바꾸기" title="내 위치 날씨 쓰기">📍</button></span>
         {[...pets].map(id => { const item = FURNITURE.find(entry => entry.id === id)!; return <span key={id} className="buff-chip pet" title={petAbility(id, petLevel(id), true)}><b>{item.icon} {PET_BUFFS[id].title}{petLevel(id) > 1 ? ` Lv${petLevel(id)}` : ""}</b>{petAbility(id, petLevel(id), true)}</span>; })}
         {activeBuffs.map(buff => { const info = BUFF_INFO[buff.kind], good = info.good(buff.multiplier), percent = Math.round((buff.multiplier - 1) * 100);
-          return <span key={buff.id} className={`buff-chip ${good ? "good" : "bad"}`}><b>{good ? "▲" : "▼"} {buff.label}</b>{info.name} {percent > 0 ? "+" : ""}{percent}%<i>{formatClock(Math.ceil((buff.expiresAt - nowMs) / 1000))}</i></span>; })}
+          return <span key={buff.id} className={`buff-chip ${good ? "good" : "bad"}`}><b>{good ? "▲" : "▼"} {buff.label}</b>{info.name} {percent > 0 ? "+" : ""}{percent}%<i>{buff.left !== undefined ? `남은 ${buff.left}개` : formatClock(Math.ceil((buff.expiresAt - nowMs) / 1000))}</i></span>; })}
       </section>
 
       <nav className="tabs" aria-label="게임 공간">
@@ -2770,10 +2815,10 @@ export default function Home() {
           <p className="story-text">{activeEvent.result.text}</p>
           <div className="story-effects">
             {activeEvent.result.money ? <span className={activeEvent.result.money > 0 ? "good" : "bad"}>💰 {activeEvent.result.money > 0 ? "+" : ""}{activeEvent.result.money.toLocaleString()}원</span> : null}
-            {activeEvent.result.buff && <span className={BUFF_INFO[activeEvent.result.buff.kind].good(activeEvent.result.buff.multiplier) ? "good" : "bad"}>{activeEvent.result.buff.label} · {BUFF_INFO[activeEvent.result.buff.kind].name} {activeEvent.result.buff.multiplier > 1 ? "+" : ""}{Math.round((activeEvent.result.buff.multiplier - 1) * 100)}% · {activeEvent.result.buff.minutes}분</span>}
+            {activeEvent.result.buff && <span className={BUFF_INFO[activeEvent.result.buff.kind].good(activeEvent.result.buff.multiplier) ? "good" : "bad"}>{effectText(activeEvent.result.buff)}</span>}
             {!activeEvent.result.money && !activeEvent.result.buff && <span>별일 없이 지나갔어요.</span>}
           </div>
-          <button className="save-button" onClick={() => setActiveEvent(null)}>다시 하루로</button>
+          <button className="save-button" onClick={closeEvent}>{activeEvent.result.buff ? "확인 · 효과 시작" : "다시 하루로"}</button>
         </> : <>
           <p className="story-text">{activeEvent.event.text}</p>
           <div className="story-choices">{activeEvent.event.choices.map((choice, index) => { const cost = choiceCost(index);
