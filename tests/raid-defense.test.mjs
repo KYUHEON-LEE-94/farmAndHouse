@@ -18,7 +18,7 @@ test('비율식(ratio): 방어 0·4·8·12·15 감소율이 기준표와 같다'
   R.setDefenseMode('ratio');
   const cut = def => 1 - R.mitigate(10000, def) / 10000;
   for (const [def, pct] of [[0, 0], [4, 19.4], [5, 23.1], [8, 32.4], [10, 37.5], [12, 41.9], [14, 45.7], [15, 47.4]]) assert.ok(Math.abs(cut(def) * 100 - pct) < 0.06, `방어 ${def}: ${(cut(def) * 100).toFixed(2)}%`);
-  assert.equal(R.mitigate(20, 5, 3), Math.round(20 * 100 / (100 + 8 * 6)), '방어형 추가 3은 유효 방어에 더한다');
+  assert.equal(R.mitigate(20, 5, 3), Math.round(20 * 1000 / (100 + 8 * 6)) / 10, '방어형 추가 3은 유효 방어에 더한다');
   R.setDefenseMode('flat');
 });
 

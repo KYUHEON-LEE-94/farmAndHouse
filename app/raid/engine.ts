@@ -259,7 +259,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
 function flatHit(s: RaidState, m: Monster, raw: number, src: HitSource, kind: Pop["kind"] = "hit") {
   if (m.hp <= 0) return;
   const dmg = mitigate(raw, effDefense(s, m));
-  m.hp -= dmg; m.flash = 0.1; s.dmgBy[src] += dmg; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.5, kind });
+  m.hp -= dmg; m.flash = 0.1; s.dmgBy[src] += dmg; s.pops.push({ x: m.x, y: m.y - m.r, text: String(Math.round(dmg)), t: 0.5, kind });
   if (m.hp <= 0) killMonster(s, m);
 }
 /** 갑옷 균열을 반영한 방어(0 아래로는 안 내려감). */
@@ -273,7 +273,8 @@ export function setDefenseMode(mode: "flat" | "ratio") { DEFENSE_MODE = mode; }
 export const MONSTER_DEFENSE_K = 6;
 export function mitigate(raw: number, defense: number, extra = 0) {
   const d = Math.max(0, defense) + extra;
-  return DEFENSE_MODE === "ratio" ? Math.max(1, Math.round(raw * 100 / (100 + d * MONSTER_DEFENSE_K))) : Math.max(1, Math.round(raw - d));
+  // 비율식은 소수 첫째 자리까지 남긴다(틱 피해 4 안팎인 분사형에서 +10% 카드가 반올림에 묻히지 않게)
+  return DEFENSE_MODE === "ratio" ? Math.max(1, Math.round(raw * 1000 / (100 + d * MONSTER_DEFENSE_K)) / 10) : Math.max(1, Math.round(raw - d));
 }
 const effDefense = (s: RaidState, m: Monster) => Math.max(0, m.defense - ((m.crackUntil ?? 0) > s.t ? m.crack ?? 0 : 0));
 type HitOpts = { critAdd?: number; ignoreDef?: boolean; noCombo?: boolean; noCrit?: boolean; forceCrit?: boolean; defIgnore?: number; extra?: number };
@@ -338,7 +339,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
       if (pick(s, "special-echo") && rnd() < 0.2) { const ex = m.x, ey = m.y, echoBase = base * 0.5; later(s, 0.4, () => { s.swings.push({ angle: 0, range: 40, arc: 360, t: 0.25, kind: "circle", x: ex, y: ey }); for (const t of s.monsters) if (t.hp > 0 && dist(t.x, t.y, ex, ey) < 40 + t.r) hitMonster(s, t, echoBase, 0, 0, { noCrit: true, noCombo: true }); }); }
     }
   }
-  s.pops.push({ x: m.x + (rnd() - 0.5) * 10, y: m.y - m.r, text: crit ? `${dmg}!` : String(dmg), t: crit ? 0.75 : 0.6, kind: crit ? "crit" : "hit" });
+  s.pops.push({ x: m.x + (rnd() - 0.5) * 10, y: m.y - m.r, text: crit ? `${Math.round(dmg)}!` : String(Math.round(dmg)), t: crit ? 0.75 : 0.6, kind: crit ? "crit" : "hit" });
   // 타격감: 맞은 쪽 불꽃, 치명타는 금빛 불꽃·작은 흔들림·히트스톱, 밀려나기는 순간이동 대신 미끄러지듯
   const hx = m.x - Math.cos(ang) * m.r * 0.6, hy = m.y - Math.sin(ang) * m.r * 0.6;
   burst(s, hx, hy, crit ? 7 : 3, crit ? "#ffd84a" : "#fff4d6", crit ? 260 : 170, ang);
@@ -403,7 +404,7 @@ function explodeFlower(s: RaidState, f: Terrain["flowers"][number]) {
   if (f.exploded) return;
   f.exploded = true;
   zoneAt(s, { kind: "blast", x: f.x, y: f.y, r: 75, t: 0.3, tele: 0, damage: 0, every: 0, slow: 0 });
-  for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, f.x, f.y) < 75 + m.r) { const dmg = mitigate(35 * (1 + 0.3 * pick(s, "opportunity-master")), m.defense); m.hp -= dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.6, kind: "hit" }); if (m.hp <= 0) killMonster(s, m); }
+  for (const m of s.monsters) if (m.hp > 0 && dist(m.x, m.y, f.x, f.y) < 75 + m.r) { const dmg = mitigate(35 * (1 + 0.3 * pick(s, "opportunity-master")), m.defense); m.hp -= dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(Math.round(dmg)), t: 0.6, kind: "hit" }); if (m.hp <= 0) killMonster(s, m); }
   for (const g of s.terrain.flowers) if (!g.exploded && dist(g.x, g.y, f.x, f.y) < 75) explodeFlower(s, g);
 }
 
@@ -1073,7 +1074,7 @@ function intervention(s: RaidState, n: number) {
 function petHit(s: RaidState, m: Monster, raw: number) {
   if (m.hp <= 0) return;
   const dmg = mitigate(raw * (m.markUntil > s.t ? 1.1 : 1), effDefense(s, m));
-  m.hp -= dmg; s.dmgBy.pet += dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(dmg), t: 0.5, kind: "hit" });
+  m.hp -= dmg; s.dmgBy.pet += dmg; m.flash = 0.1; s.pops.push({ x: m.x, y: m.y - m.r, text: String(Math.round(dmg)), t: 0.5, kind: "hit" });
   if (m.hp <= 0) killMonster(s, m);
 }
 function updatePet(s: RaidState, dt: number) {
