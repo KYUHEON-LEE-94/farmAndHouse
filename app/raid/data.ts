@@ -128,8 +128,8 @@ export const FLOORS: FloorDef[] = [
   { floor: 30, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.1, maxAlive: 38, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "core-guardian", name: "탑의 핵 수호자", icon: "💠", hp: 16500, damage: 62, defense: 14, base: "heart-warden" } },
 ];
 /** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부 */
-export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core";
-export const zoneOf = (floor: number): Zone => floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : "core";
+export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
+export const zoneOf = (floor: number): Zone => floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : floor <= 30 ? "core" : floor <= 35 ? "sky" : "void";
 /** 난이도 구간(3.0절): 1~20 쉬움, 21~50 보통, 51~ 어려움 */
 export const tierOf = (floor: number): "easy" | "normal" | "hard" => floor <= 20 ? "easy" : floor <= 50 ? "normal" : "hard";
 export const TIER_NAME = { easy: "쉬움", normal: "보통", hard: "어려움" } as const;
@@ -302,6 +302,9 @@ export const RAID_ITEMS: Record<string, { name: string; icon: string }> = {
   "frost-ore": { name: "서리 광석", icon: "🧊" }, "glacier-crystal": { name: "빙하 결정", icon: "💎" }, "ironbear-core": { name: "철갑곰의 핵", icon: "🐻" },
   "ancient-bark": { name: "고대 수피", icon: "🪵" }, "spirit-crystal": { name: "정령 결정", icon: "🔮" }, "guardian-seed": { name: "수호자의 씨앗", icon: "🌰" },
   "dark-alloy": { name: "암흑 합금", icon: "⬛" }, "core-shard": { name: "탑의 핵 파편", icon: "🔷" }, "heart-ember": { name: "심장 불씨", icon: "🔥" }, "tower-heart": { name: "탑의 심장", icon: "💠" },
+  // 31~40층(RAID_FLOOR_40_EXPANSION_AUDIT 3.2절)
+  "sky-iron": { name: "천공철", icon: "🔩" }, "cloud-crystal": { name: "구름 결정", icon: "☁️" }, "storm-core": { name: "폭풍의 핵", icon: "🌀" },
+  "star-ash": { name: "별의 재", icon: "✨" }, "void-crystal": { name: "공허 결정", icon: "🟣" }, "throne-fragment": { name: "왕좌 파편", icon: "🔱" }, "star-crown": { name: "별의 왕관", icon: "👑" },
 };
 /** [id, 최소, 최대, 확률(없으면 1)] */
 export type Drop = [string, number, number, number?];
@@ -337,13 +340,29 @@ export const FLOOR_REWARDS: Record<number, { firstGold: number; first: Drop[]; r
   29: { firstGold: 3200, first: [["core-shard", 2, 2], ["heart-ember", 1, 1]], repeat: [["dark-alloy", 2, 4], ["core-shard", 1, 1], ["heart-ember", 1, 1, 0.35]], stabilizer: 0.06 },
   30: { firstGold: 10000, first: [["core-shard", 3, 3], ["tower-heart", 1, 1]], repeat: [["core-shard", 1, 2], ["tower-heart", 1, 1, 0.2]], stabilizer: 0.1 },
   20: { firstGold: 4500, first: [["glacier-crystal", 3, 3], ["ironbear-core", 1, 1]], repeat: [["glacier-crystal", 1, 2], ["ironbear-core", 1, 1, 0.3]], stabilizer: 0.06 },
+  // 31~40층 골격(RAID_FLOOR_40_EXPANSION_AUDIT 3.3절): 층 공개 전 경제 검증으로 다시 맞춘다. 정예 추가 지급은 층 구현 때
+  31: { firstGold: 3500, first: [["sky-iron", 3, 3]], repeat: [["sky-iron", 2, 3]], stabilizer: 0.03 },
+  32: { firstGold: 3800, first: [["sky-iron", 4, 4]], repeat: [["sky-iron", 2, 4]], stabilizer: 0.03 },
+  33: { firstGold: 4200, first: [["sky-iron", 3, 3], ["cloud-crystal", 1, 1]], repeat: [["sky-iron", 2, 4], ["cloud-crystal", 1, 2, 0.6]], stabilizer: 0.04 },
+  34: { firstGold: 4600, first: [["cloud-crystal", 2, 2]], repeat: [["sky-iron", 2, 4], ["cloud-crystal", 1, 2, 0.7]], stabilizer: 0.05 },
+  35: { firstGold: 12000, first: [["sky-iron", 5, 5], ["cloud-crystal", 3, 3], ["storm-core", 1, 1]], repeat: [["sky-iron", 3, 5], ["cloud-crystal", 2, 3], ["storm-core", 1, 1, 0.4]], stabilizer: 0.08 },
+  36: { firstGold: 4500, first: [["star-ash", 3, 3]], repeat: [["star-ash", 2, 3]], stabilizer: 0.03 },
+  37: { firstGold: 5000, first: [["star-ash", 3, 3], ["void-crystal", 1, 1]], repeat: [["star-ash", 2, 4], ["void-crystal", 1, 2, 0.6]], stabilizer: 0.04 },
+  38: { firstGold: 5500, first: [["void-crystal", 2, 2]], repeat: [["star-ash", 2, 4], ["void-crystal", 1, 2, 0.7]], stabilizer: 0.05 },
+  39: { firstGold: 6000, first: [["star-ash", 3, 3], ["throne-fragment", 1, 1]], repeat: [["star-ash", 2, 4], ["void-crystal", 1, 2, 0.7], ["throne-fragment", 1, 1, 0.3]], stabilizer: 0.06 },
+  40: { firstGold: 20000, first: [["star-ash", 5, 5], ["void-crystal", 3, 3], ["star-crown", 1, 1]], repeat: [["star-ash", 3, 5], ["void-crystal", 2, 3], ["star-crown", 1, 1, 0.4]], stabilizer: 0.1 },
 };
 /**
  * 보스 재료 불운 방지(RAID_FLOOR_30_EXPANSION_AUDIT 7.3): 반복 클리어에서 이 재료를 misses번 연속 못 받으면 다음 반복 클리어에 확정.
  * 받으면(확률·확정) 0으로. 재료별로 따로 센다. 25층(수호자의 씨앗)은 층 구현 때 추가한다.
  */
-export const BOSS_DROP_PITY: Record<number, { id: string; misses: number }> = { 15: { id: "crimson-antler", misses: 3 }, 20: { id: "ironbear-core", misses: 3 }, 25: { id: "guardian-seed", misses: 3 } };
-export const zoneCommon = (floor: number) => ({ field: "pollen-clump", canal: "canal-moss", maple: "maple-fragment", frost: "frost-ore", ancient: "ancient-bark", core: "dark-alloy" })[zoneOf(floor)];
+export const BOSS_DROP_PITY: Record<number, { id: string; misses: number }> = { 15: { id: "crimson-antler", misses: 3 }, 20: { id: "ironbear-core", misses: 3 }, 25: { id: "guardian-seed", misses: 3 }, 35: { id: "storm-core", misses: 3 }, 39: { id: "throne-fragment", misses: 3 }, 40: { id: "star-crown", misses: 3 } };
+/** 일반 재료 연속 미획득 천장(RAID_FLOOR_40_EXPANSION_AUDIT 3.3절): 확률 재료를 3번 연속 못 받으면 다음 반복 클리어에 확정. 횟수는 재료별로 층을 넘어 이어진다. */
+export const MAT_DROP_PITY: Record<number, { id: string; misses: number }[]> = Object.fromEntries([
+  ...[33, 34].map(f => [f, [{ id: "cloud-crystal", misses: 3 }]]),
+  ...[37, 38, 39].map(f => [f, [{ id: "void-crystal", misses: 3 }]]),
+]);
+export const zoneCommon = (floor: number) => ({ field: "pollen-clump", canal: "canal-moss", maple: "maple-fragment", frost: "frost-ore", ancient: "ancient-bark", core: "dark-alloy", sky: "sky-iron", void: "star-ash" })[zoneOf(floor)];
 
 // ---------- 생활 재료(27절) ----------
 export const LIFE_MATS: Record<string, { name: string; icon: string; recipe: string }> = {
@@ -379,6 +398,11 @@ export const ENHANCE: EnhanceStep[] = [
   { to: 16, chance: 0.15, drop: 0.05, gold: 145000, need: { "ancient-bark": 3, "spirit-crystal": 2 }, open: { gold: 100000, need: { "guardian-seed": 2 } } },
   { to: 17, chance: 0.13, drop: 0.06, gold: 160000, need: { "dark-alloy": 3 }, open: { gold: 130000, need: { "dark-alloy": 5, "core-shard": 2 } } },
   { to: 18, chance: 0.12, drop: 0.06, gold: 180000, need: { "dark-alloy": 4, "core-shard": 1 }, open: { gold: 160000, need: { "heart-ember": 1 } } },
+  // 31~40층(RAID_FLOOR_40_EXPANSION_AUDIT 4절): +18에 한 번 닿으면 +18 아래로 내려가지 않는다(forge.applyEnhance)
+  { to: 19, chance: 0.14, drop: 0.05, gold: 180000, need: { "sky-iron": 3, "cloud-crystal": 1 }, open: { gold: 100000, need: { "sky-iron": 5, "cloud-crystal": 2 } } },
+  { to: 20, chance: 0.12, drop: 0.06, gold: 220000, need: { "sky-iron": 4, "cloud-crystal": 2 }, open: { gold: 130000, need: { "storm-core": 2 } } },
+  { to: 21, chance: 0.1, drop: 0.06, gold: 260000, need: { "star-ash": 3, "void-crystal": 1 }, open: { gold: 170000, need: { "star-ash": 5, "void-crystal": 2 } } },
+  { to: 22, chance: 0.09, drop: 0.07, gold: 320000, need: { "star-ash": 4, "void-crystal": 2 }, open: { gold: 220000, need: { "throne-fragment": 1 } } },
 ];
 /**
  * 강화 실패 누적 보정·천장(IMPLEMENTATION_GAP_AUDIT 10.2): +11~+15만. 무기별·목표 단계별 실패 횟수로
@@ -395,6 +419,10 @@ export const ENHANCE_PITY: Record<number, { start: number; step: number; max: nu
   16: { start: 8, step: 0.018, max: 0.12, ceiling: 15 },
   17: { start: 9, step: 0.016, max: 0.12, ceiling: 17 },
   18: { start: 10, step: 0.015, max: 0.12, ceiling: 19 },
+  19: { start: 7, step: 0.02, max: 0.12, ceiling: 16 },
+  20: { start: 8, step: 0.018, max: 0.12, ceiling: 18 },
+  21: { start: 9, step: 0.016, max: 0.12, ceiling: 20 },
+  22: { start: 10, step: 0.015, max: 0.12, ceiling: 22 },
 };
 /** 11층 이상 재료(11~20층은 탑 상자에서, 21층 이상은 아직 이름만). */
 export const UPPER_ITEMS: Record<string, { name: string; icon: string }> = {

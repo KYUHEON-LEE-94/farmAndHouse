@@ -54,7 +54,9 @@ export function breakthrough(prev: FloorProgress | undefined, rec: FloorRecord) 
 /** 층별 권장 강화(3절 표·쉬움 구간은 기존 권장) */
 export function recommendedEnh(floor: number) {
   if (floor <= 5) return 3; if (floor <= 10) return 10; if (floor <= 15) return 12; if (floor <= 20) return 13;
-  if (floor <= 22) return 14; if (floor <= 25) return 15; if (floor <= 27) return 16; if (floor <= 29) return 17; return 18;
+  if (floor <= 22) return 14; if (floor <= 25) return 15; if (floor <= 27) return 16; if (floor <= 29) return 17;
+  // 31~40층(RAID_FLOOR_40_EXPANSION_AUDIT 7절)
+  if (floor <= 32) return 18; if (floor <= 34) return 19; if (floor <= 36) return 20; if (floor <= 38) return 21; return 22;
 }
 
 const TERRAIN = ["꽃가루 장판", "감전", "전도성 웅덩이", "낙엽 회오리", "빙판", "핵 방전", "균열 흔적", "포자 구름", "봄 덩굴"];

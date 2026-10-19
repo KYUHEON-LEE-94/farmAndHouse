@@ -12,7 +12,7 @@ export type ShareCardData = {
   weapon: string; armor: string[]; pet: string | null; version: number; at: number;
 };
 
-const ZONE_BG: Record<string, [string, string]> = { field: ["#5d8c3e", "#a7cf73"], canal: ["#2f5f6e", "#6aa0a8"], maple: ["#8a3a1c", "#dc8a43"], frost: ["#3f6a86", "#a6c9dc"], ancient: ["#3d5a2a", "#8fae5c"], core: ["#2a1f3d", "#7a4a8c"] };
+const ZONE_BG: Record<string, [string, string]> = { field: ["#5d8c3e", "#a7cf73"], canal: ["#2f5f6e", "#6aa0a8"], maple: ["#8a3a1c", "#dc8a43"], frost: ["#3f6a86", "#a6c9dc"], ancient: ["#3d5a2a", "#8fae5c"], core: ["#2a1f3d", "#7a4a8c"], sky: ["#3c6e9c", "#bcd8ef"], void: ["#1a1430", "#4b3b7a"] };
 const EMOJI = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const FONT = '"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
 

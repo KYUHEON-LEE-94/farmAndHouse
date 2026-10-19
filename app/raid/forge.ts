@@ -1,4 +1,4 @@
-import { BOSS_DROP_PITY, ENHANCE, ENHANCE_PITY, type Drop, type EnhanceStep, type Evolution, type RaidSave } from "./data";
+import { BOSS_DROP_PITY, ENHANCE, MAT_DROP_PITY, ENHANCE_PITY, type Drop, type EnhanceStep, type Evolution, type RaidSave } from "./data";
 
 /** 지금 무기의 다음 강화 단계(없으면 null). */
 export const nextStep = (enhancement: number): EnhanceStep | null => ENHANCE.find(step => step.to === enhancement + 1) ?? null;
@@ -22,29 +22,30 @@ export function pityChance(step: EnhanceStep, fails = 0) {
  * 강화 판정(11·14절). 성공이면 +1, 실패 후 하락 판정이 나면 −1(안정화석을 쓰기로 했으면 1개 소모하고 유지).
  * +10에 한 번 도달한 무기는 이후 강화에 실패해도 +10 아래로 내려가지 않는다(IMPLEMENTATION_GAP_AUDIT 10.1).
  * +10→+11 실패는 하락 판정 자체가 없고, +11 이상에서 하락해도 최저 +10이다. 그래서 안정화석은 +11 이상에서만 쓰인다.
+ * +18도 같은 안전선(RAID_FLOOR_40_EXPANSION_AUDIT 4절): +18→+19 실패는 하락 없음, +19 이상에서 하락해도 최저 +18.
  */
 export function rollEnhance(enhancement: number, step: EnhanceStep, useStabilizer: boolean, stabilizers: number, random = Math.random, fails = 0): EnhanceRoll {
   if (random() < pityChance(step, fails).chance) return { success: true, dropped: false, saved: false };
-  if (random() >= step.drop || enhancement <= 0 || enhancement === 10) return { success: false, dropped: false, saved: false };
+  if (random() >= step.drop || enhancement <= 0 || enhancement === 10 || enhancement === 18) return { success: false, dropped: false, saved: false };
   if (useStabilizer && stabilizers > 0) return { success: false, dropped: false, saved: true };
   return { success: false, dropped: true, saved: false };
 }
 
-/** 상자 굴리기: 드롭 목록 → 획득량. 반복 클리어면 보스 재료 연속 미획득 천장을 적용하고 새 횟수를 돌려준다. */
+/** 상자 굴리기: 드롭 목록 → 획득량. 반복 클리어면 보스·일반 재료 연속 미획득 천장을 적용하고 새 횟수를 돌려준다. */
 export function rollDrops(drops: Drop[], floor: number, repeat: boolean, bossMiss: Record<string, number> = {}, random = Math.random) {
-  const gain: Record<string, number> = {}, pity = repeat ? BOSS_DROP_PITY[floor] : undefined, miss = { ...bossMiss };
+  const pities = repeat ? [BOSS_DROP_PITY[floor], ...(MAT_DROP_PITY[floor] ?? [])].filter(Boolean) : [], miss = { ...bossMiss }, gain: Record<string, number> = {};
+  const due = (id: string) => pities.some(p => p.id === id && (bossMiss[id] ?? 0) >= p.misses);
   for (const [id, min, max, chance] of drops) {
-    const forced = pity?.id === id && (miss[id] ?? 0) >= pity.misses;
-    if (forced || random() < (chance ?? 1)) gain[id] = (gain[id] ?? 0) + min + Math.floor(random() * (max - min + 1));
+    if (due(id) || random() < (chance ?? 1)) gain[id] = (gain[id] ?? 0) + min + Math.floor(random() * (max - min + 1));
   }
-  if (pity) miss[pity.id] = gain[pity.id] ? 0 : (miss[pity.id] ?? 0) + 1;
-  return { gain, bossMiss: miss, forced: Boolean(pity && (bossMiss[pity.id] ?? 0) >= pity.misses) };
+  for (const p of pities) miss[p.id] = gain[p.id] ? 0 : (miss[p.id] ?? 0) + 1;
+  return { gain, bossMiss: miss, forced: pities.some(p => due(p.id)) };
 }
 
 /** 판정 결과를 저장에 반영한다. */
 export function applyEnhance(raid: RaidSave, weaponId: string, roll: EnhanceRoll): RaidSave {
   const w = raid.weapons[weaponId];
-  const enhancement = roll.success ? w.enhancement + 1 : roll.dropped ? Math.max(w.enhancement >= 10 ? 10 : 0, w.enhancement - 1) : w.enhancement;
+  const enhancement = roll.success ? w.enhancement + 1 : roll.dropped ? Math.max(w.enhancement >= 18 ? 18 : w.enhancement >= 10 ? 10 : 0, w.enhancement - 1) : w.enhancement;
   // 천장: 시도한 목표 단계의 실패 횟수(성공하면 0, 하락해도 유지)
   const to = w.enhancement + 1, fails = { ...(w.fails ?? {}) };
   if (ENHANCE_PITY[to]) { if (roll.success) delete fails[to]; else fails[to] = (fails[to] ?? 0) + 1; }

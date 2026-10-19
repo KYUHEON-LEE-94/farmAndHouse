@@ -69,12 +69,14 @@ export function weaponArtUrl(id: string) {
   if (!url) { url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(weaponSvg(id))}`; urls.set(id, url); }
   return url;
 }
-/** 무기 아이콘. id는 무기 id 또는 진화 id. */
-export function WeaponIcon({ id, size = 36, className = "" }: { id: string; size?: number; className?: string }) {
-  const route = GLOW[id];
+/** +22 공통 최종 광휘(RAID_FLOOR_40_EXPANSION_AUDIT 5절): 무기별 외형은 그대로, 테두리 빛만 더한다. */
+export const RADIANT_ENHANCEMENT = 22;
+/** 무기 아이콘. id는 무기 id 또는 진화 id. enhancement를 주면 +22 이상에서 최종 광휘. */
+export function WeaponIcon({ id, size = 36, className = "", enhancement = 0 }: { id: string; size?: number; className?: string; enhancement?: number }) {
+  const route = GLOW[id], radiant = Boolean(route) && enhancement >= RADIANT_ENHANCEMENT;
   return <span
-    className={`weapon-icon ${route ? `evolved route-${route}` : "life-tool"} ${className}`}
-    data-rank={route ? "+10" : undefined}
+    className={`weapon-icon ${route ? `evolved route-${route}` : "life-tool"} ${radiant ? "radiant" : ""} ${className}`}
+    data-rank={route ? (radiant ? `+${RADIANT_ENHANCEMENT}` : "+10") : undefined}
     style={{ width: size, height: size }}
     aria-hidden="true"
     dangerouslySetInnerHTML={{ __html: weaponSvg(id) }}
