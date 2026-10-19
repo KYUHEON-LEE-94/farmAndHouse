@@ -379,7 +379,7 @@ type Job = {
 
 ## 16. 구현 기록 (2026-10-16, 비공개 플래그)
 
-`WORKSHOP_V2_RELEASED = false`(app/workshop.ts). 로컬 테스트 모드에서만 새 화면이 보이고, 운영은 예전 화면·예전 미션 보상 그대로다. 공개할 때 이 값 하나만 `true`로 바꾼다.
+**2026-10-19 운영 공개**(사용자 요청): `WORKSHOP_V2_RELEASED = true`(app/workshop.ts). 자유·혼합·특선 가공 화면과 기준가 기반 미션 보상(`ORDER_REFERENCE_SCALE 0.85`)이 함께 켜졌다. 16.1절의 실제 생산량 기준 60분 수익 시뮬레이션은 공개 후 이용 기록으로 확인한다.
 
 - **기준가**: `cropReferencePrice`·`CROP_REFERENCE_PRICE`(app/farming.ts). 4,096표본 기댓값 쉬움 189 · 보통 181 · 어려움 184와 상수 190/180/185의 차이 1% 이내. 테스트가 ±3%를 넘으면 실패한다.
 - **분류**: `CROP_TAGS`(3절 표 그대로, 송이버섯·아스파라거스·계절 한정 = 특산물).
