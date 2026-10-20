@@ -267,6 +267,8 @@ function settleExploration(inventory: Inventory, exploration: ExplorationState, 
   return { inventory: next, exploration: { ...exploration, totalRuns: exploration.totalRuns + 1, rareMissesByRegion: { ...exploration.rareMissesByRegion, [result.regionId]: nextRareMisses(misses, rareFound) }, discoveredFinds: finds, checkpoint: undefined } };
 }
 
+/** 예전 버전이 기본으로 틀던 BGM. 저장에 이 값만 남아 있으면 꺼진 상태로 불러온다(이용자가 고른 음악은 유지). */
+const LEGACY_DEFAULT_BGM = "VRfbFDUybRU";
 const UNSELLABLE_NOTICE = "🎖️ 기념품이라 판매할 수 없어요. 창고에 보관하거나 집에 꾸며 주세요.";
 function hydrateItem(raw: LegacyItem, version: number, room: Room): PlacedItem | null {
   const base = FURNITURE.find(item => item.id === raw.id);
@@ -471,7 +473,8 @@ export default function Home() {
   const [showAvatar, setShowAvatar] = useState(false);
   const [notice, setNotice] = useState("오늘도 월급은 들어오고, 흙은 정직해요. 씨앗을 심어볼까요?");
   const [musicUrl, setMusicUrl] = useState("");
-  const [musicId, setMusicId] = useState("VRfbFDUybRU");
+  // 농장 라디오: 기본으로 틀어 주는 음악은 없다. 이용자가 링크를 넣었을 때만 재생한다.
+  const [musicId, setMusicId] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showTopMenu, setShowTopMenu] = useState(false);
   const [bossMode, setBossMode] = useState(false);
@@ -552,7 +555,7 @@ export default function Home() {
         setLunchBuff(restoreLunchBuff(data.lunchBuff)); setVillage(restoreVillage(data.village)); setCookingBatch(restoreCookingBatch(data.cookingBatch, LUNCHES.map(dish => dish.id)));
         setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), unlockedFloor: Math.min(RAID_MAX_FLOOR, Math.max(data.raid?.unlockedFloor ?? 1, ...(data.raid?.firstClears ?? []).map((n: number) => n + 1))), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [], battlePets: data.raid?.battlePets ?? {}, petPity: data.raid?.petPity ?? 0 });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0); setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents.slice(-RECENT_EVENT_LIMIT) : []);
-        setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId || "VRfbFDUybRU"); setCoinHoldings(data.coinHoldings ?? {});
+        setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId && data.musicId !== LEGACY_DEFAULT_BGM ? data.musicId : ""); setCoinHoldings(data.coinHoldings ?? {});
       } catch { /* start fresh */ }
     }
     try { const stored = localStorage.getItem(AVATAR_STORAGE_KEY); if (stored) setAvatar(JSON.parse(stored)); } catch { /* keep default */ }
@@ -2797,9 +2800,22 @@ export default function Home() {
 
       {tab === "casino" && <div className="game-grid">
         <section className="panel casino-panel">
-          <div className="panel-heading"><div><span className="eyebrow">BACK ALLEY</span><h3>뒷골목 도박장</h3></div><div className="shop-tabs casino-tabs" role="tablist">{([["parity", "🎲 홀짝"], ["slot", "🎰 슬롯"], ["blackjack", "🃏 블랙잭"], ...(COIN_ENABLED ? [["coin", "🪙 코인"]] as const : [])] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => setCasinoGame(id)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>{label}</button>)}</div></div>
+          <div className="panel-heading"><div><span className="eyebrow">BACK ALLEY</span><h3>뒷골목 도박장</h3></div></div>
+          {/* 게임 고르기: 전체 폭 카드(아이콘·이름·배당 요약). 판이 진행 중이면 바꿀 수 없다. */}
+          <div className="casino-games" role="tablist" aria-label="게임 고르기">{([
+            ["parity", "🎲", "홀짝", `적중 ×${PAYOUT}`],
+            ["slot", "🎰", "슬롯", `최대 ×${Math.max(...SLOT_SYMBOLS.map(symbol => symbol.triple))}`],
+            ["blackjack", "🃏", "블랙잭", `승리 ×${BLACKJACK_WIN} · BJ ×${BLACKJACK_PAYOUT}`],
+            ...(COIN_ENABLED ? [["coin", "🪙", "코인", "시세 사고팔기"]] as const : []),
+          ] as const).map(([id, icon, name, note]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => setCasinoGame(id)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>
+            <span className="casino-game-icon" aria-hidden="true">{icon}</span><b>{name}</b><small>{note}</small></button>)}</div>
           <div className={`dealer ${casinoFx?.kind ?? "idle"}`} key={`dealer-${casinoFx?.id ?? 0}`}>
-            <span className="dealer-face">🦝{casinoFx && <em className="dealer-mood">{{ win: "😤", jackpot: "😭", lose: "🤣", near: "😝" }[casinoFx.kind]}</em>}</span>
+            {/* 딜러 부스: 너구리·모자·이름표·지금 기분 */}
+            <div className="dealer-card">
+              <span className="dealer-face"><i className="dealer-hat" aria-hidden="true">🎩</i>🦝{casinoFx && <em className="dealer-mood">{{ win: "😤", jackpot: "😭", lose: "🤣", near: "😝" }[casinoFx.kind]}</em>}</span>
+              <b className="dealer-name">딜러 너굴</b>
+              <small className="dealer-state">{casinoFx ? { win: "삐짐", jackpot: "멘붕", lose: "신남", near: "약 올리는 중" }[casinoFx.kind] : casinoStats.streak <= -3 ? "기세등등" : casinoStats.streak >= 3 ? "초조함" : "손님 기다리는 중"}</small>
+            </div>
             <div className="bubble-wrap"><p className="bubble">{casinoFx?.line ?? dealerIdle}</p>{casinoFx && (casinoFx.kind === "lose" || casinoFx.kind === "near") && <p className="laugh-line">{laughter(Math.max(1, -casinoStats.streak)).split("").map((char, i) => <span key={i} style={{ animationDelay: `${i * 0.05}s` }}>{char}</span>)}</p>}</div>
           </div>
           {casinoFx && <div className={`casino-fx ${casinoFx.kind}`} key={casinoFx.id} aria-hidden="true">
@@ -2840,11 +2856,13 @@ export default function Home() {
           </div>
           </>}
           </div>
-          {casinoGame !== "coin" && <div className="bet-row">
-            <span>판돈</span>
-            {BET_PRESETS.map(amount => <button key={amount} className={bet === amount ? "on" : ""} onClick={() => setBet(amount)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>{amount.toLocaleString()}</button>)}
-            <button className={bet === Math.max(MIN_BET, money) ? "on" : ""} onClick={() => setBet(Math.max(MIN_BET, money))} disabled={Boolean(rolling)} title="가진 돈 전부">올인</button>
-            <input type="number" min={MIN_BET} step={10} value={bet} onChange={event => setBet(Math.max(MIN_BET, Math.floor(Number(event.target.value)) || MIN_BET))} aria-label="판돈(자유 입력)" disabled={Boolean(rolling)} />
+          {casinoGame !== "coin" && <div className="bet-tray">
+            <div className="bet-now"><small>판돈</small><b>{bet.toLocaleString()}원</b><em>{money > 0 ? `가진 돈의 ${Math.min(100, Math.round((bet / money) * 100))}%` : "가진 돈 없음"}</em></div>
+            <div className="bet-chips" role="group" aria-label="판돈 고르기">
+              {BET_PRESETS.map((amount, i) => <button key={amount} className={`chip chip-${i} ${bet === amount ? "on" : ""}`} onClick={() => setBet(amount)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"} aria-pressed={bet === amount}>{amount >= 1000 ? `${amount / 1000}천` : amount}</button>)}
+              <button className={`chip chip-allin ${bet === Math.max(MIN_BET, money) ? "on" : ""}`} onClick={() => setBet(Math.max(MIN_BET, money))} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"} title="가진 돈 전부" aria-pressed={bet === Math.max(MIN_BET, money)}>올인</button>
+            </div>
+            <label className="bet-input"><span>직접</span><input type="number" min={MIN_BET} step={10} value={bet} onChange={event => setBet(Math.max(MIN_BET, Math.floor(Number(event.target.value)) || MIN_BET))} aria-label="판돈(자유 입력)" disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"} /></label>
           </div>}
           {casinoGame === "parity" && lastRoll && !lastRoll.payout && !rolling && <div className="revenge-row">
             <button onClick={() => placeBet(lastRoll.pick)} disabled={money < bet}>🔥 복수전! 다시 {PARITY_NAME[lastRoll.pick]}에 {bet.toLocaleString()}원</button>
@@ -2855,14 +2873,21 @@ export default function Home() {
             <button onClick={() => runDealer(bj.player, bj.dealer, bj.bet)}>✋ 스탠드</button>
             <button className="double" onClick={doubleBlackjack} disabled={bj.player.length !== 2 || money < bj.bet}>💥 더블다운</button>
           </div> : <button className={`lever-button ${bj.outcome === "lose" || bj.outcome === "bust" ? "revenge" : ""}`} onClick={dealBlackjack} disabled={bj.phase === "dealer" || money < bet}>{bj.outcome === "lose" || bj.outcome === "bust" ? "🔥 복수의 딜" : "🃏 카드 받기"} · {bet.toLocaleString()}원</button>)}
-          {casinoGame === "blackjack" && <p className="bj-rules">21을 넘지 않고 딜러보다 높으면 ×{BLACKJACK_WIN} · 처음 두 장이 21이면 블랙잭 ×{BLACKJACK_PAYOUT} · 비기면 반환 · 딜러는 17 이상에서 멈춰요 · 더블다운: 판돈 2배로 딱 한 장 더</p>}
           {casinoGame === "slot" && <>
             <button className={`lever-button ${lastSlot && lastSlot.payout < lastSlot.bet ? "revenge" : ""}`} onClick={pullLever} disabled={slotSpinning > 0 || money < bet}>{lastSlot && lastSlot.payout < lastSlot.bet ? "🔥 복수의 레버" : "🎰 레버 당기기"} · {bet.toLocaleString()}원</button>
-            <div className="slot-paytable">{SLOT_SYMBOLS.map(symbol => <span key={symbol.icon}>{symbol.icon}{symbol.icon}{symbol.icon}<b>×{symbol.triple}</b></span>)}<span>🍒🍒 + 아무거나<b>×{CHERRY_PAIR}</b></span></div>
+            <div className="slot-paytable">{SLOT_SYMBOLS.map(symbol => <span key={symbol.icon}>{symbol.icon}{symbol.icon}{symbol.icon}<b>×{symbol.triple}</b></span>)}<span title="체리 2개 + 아무 그림">🍒🍒❔<b>×{CHERRY_PAIR}</b></span></div>
           </>}
           {casinoGame !== "coin" && (() => { const [win, lose] = casinoGame === "parity" ? [PARITY_WIN_CHANCE, 1 - PARITY_WIN_CHANCE] : casinoGame === "slot" ? [slotOdds().anyWin, 1 - slotOdds().anyWin] : [BLACKJACK_ODDS.win, BLACKJACK_ODDS.lose];
-            return <p className="odds-line" aria-label="확률">🎲 이길 확률 <b className="win">{Math.round(win * 100)}%</b> · 질 확률 <b className="lose">{Math.round(lose * 100)}%</b>{casinoGame === "blackjack" && <> · 무승부 {Math.round(BLACKJACK_ODDS.push * 100)}%</>}</p>; })()}
-          {casinoGame !== "coin" && <p className="hint">⚠ 게임 속 돈으로만 하는 놀이예요. {casinoGame === "blackjack" ? "블랙잭은 딜러가 마지막에 카드를 받아 조금 유리해서" : casinoGame === "slot" ? `슬롯의 기대 환수율은 약 ${Math.round(slotReturnRate() * 100)}%라` : `홀짝은 이길 확률 ${Math.round(PARITY_WIN_CHANCE * 100)}% · 질 확률 ${100 - Math.round(PARITY_WIN_CHANCE * 100)}%에 배당 ×${PAYOUT}라`} 오래 하면 조금씩 잃게 돼요. 판돈은 {MIN_BET.toLocaleString()}원부터 가진 돈 전부까지 자유롭게 걸 수 있어요(올인 주의!).</p>}
+            const push = casinoGame === "blackjack" ? BLACKJACK_ODDS.push : 0;
+            return <div className="odds-bar" aria-label={`이길 확률 ${Math.round(win * 100)}%, 질 확률 ${Math.round(lose * 100)}%`}>
+              <span className="win" style={{ flexGrow: win }}>이길 {Math.round(win * 100)}%</span>
+              {push > 0 && <span className="push" style={{ flexGrow: push }}>무승부 {Math.round(push * 100)}%</span>}
+              <span className="lose" style={{ flexGrow: lose }}>질 {Math.round(lose * 100)}%</span>
+            </div>; })()}
+          {casinoGame !== "coin" && <details className="casino-rules"><summary>⚠ 게임 속 돈으로만 하는 놀이예요 · 오래 하면 조금씩 잃어요 <em>규칙 자세히</em></summary>
+            {casinoGame === "blackjack" && <p>21을 넘지 않고 딜러보다 높으면 ×{BLACKJACK_WIN} · 처음 두 장이 21이면 블랙잭 ×{BLACKJACK_PAYOUT} · 비기면 반환 · 딜러는 17 이상에서 멈춰요 · 더블다운: 판돈 2배로 딱 한 장 더</p>}
+            <p>{casinoGame === "blackjack" ? "블랙잭은 딜러가 마지막에 카드를 받아 조금 유리해서" : casinoGame === "slot" ? `슬롯의 기대 환수율은 약 ${Math.round(slotReturnRate() * 100)}%라` : `홀짝은 이길 확률 ${Math.round(PARITY_WIN_CHANCE * 100)}% · 질 확률 ${100 - Math.round(PARITY_WIN_CHANCE * 100)}%에 배당 ×${PAYOUT}라`} 오래 하면 조금씩 잃게 돼요. 판돈은 {MIN_BET.toLocaleString()}원부터 가진 돈 전부까지 자유롭게 걸 수 있어요(올인 주의!).</p>
+          </details>}
         </section>
         <aside className="panel casino-side">
           <div className="panel-heading"><div><span className="eyebrow">RECORD</span><h3>전적</h3></div></div>
@@ -2871,8 +2896,9 @@ export default function Home() {
             <span className={casinoStats.net >= 0 ? "plus" : "minus"}><small>누적 손익</small><b>{casinoStats.net >= 0 ? "+" : ""}{casinoStats.net.toLocaleString()}원</b></span>
             <span><small>현재</small><b>{casinoStats.streak > 0 ? `${casinoStats.streak}연승` : casinoStats.streak < 0 ? `${-casinoStats.streak}연패` : "-"}</b></span>
             <span><small>최고 연승</small><b>{casinoStats.best}</b></span>
+            <span className="rate"><small>승률</small><b>{casinoStats.wins + casinoStats.losses ? `${Math.round((casinoStats.wins / (casinoStats.wins + casinoStats.losses)) * 100)}%` : "-"}</b><i style={{ width: `${casinoStats.wins + casinoStats.losses ? (casinoStats.wins / (casinoStats.wins + casinoStats.losses)) * 100 : 0}%` }} /></span>
           </div>
-          <b className="history-title">최근 결과</b>
+          <b className="history-title">최근 홀짝 결과</b>
           <div className="roll-history">{rollHistory.length === 0 ? <p>아직 기록이 없어요.</p> : rollHistory.map(roll => <span key={roll.at} className={`${roll.result} ${roll.payout ? "hit" : ""}`} title={`${roll.dice[0]}+${roll.dice[1]} · ${roll.payout ? "적중" : "꽝"}`}>{PARITY_NAME[roll.result]}</span>)}</div>
         </aside>
       </div>}
@@ -2985,7 +3011,7 @@ export default function Home() {
 
       <section className="bottom-dock">
         <div className="message"><span>✦ 농장 소식</span><p>{notice}</p></div>
-        <div className="music"><div className="record">♪</div><div><span>FARM RADIO</span><strong>{musicId ? "YouTube BGM 재생 중" : "농장에 음악을 틀어주세요"}</strong></div><input value={musicUrl} onChange={e => setMusicUrl(e.target.value)} placeholder="YouTube 링크 붙여넣기" aria-label="YouTube 링크"/><button onClick={() => { const id = getYoutubeId(musicUrl); if (id) { setMusicId(id); setNotice("🎵 농장 라디오를 켰어요."); } else setNotice("올바른 YouTube 영상 링크를 넣어주세요."); }}>재생</button></div>
+        <div className="music"><div className="record">♪</div><div><span>FARM RADIO</span><strong>{musicId ? "YouTube BGM 재생 중" : "농장에 음악을 틀어주세요"}</strong></div><input value={musicUrl} onChange={e => setMusicUrl(e.target.value)} placeholder="YouTube 링크 붙여넣기" aria-label="YouTube 링크"/><button onClick={() => { const id = getYoutubeId(musicUrl); if (id) { setMusicId(id); setNotice("🎵 농장 라디오를 켰어요."); } else setNotice("올바른 YouTube 영상 링크를 넣어주세요."); }}>재생</button>{musicId && <button className="music-stop" onClick={() => { setMusicId(""); setNotice("🔇 농장 라디오를 껐어요."); }}>끄기</button>}</div>
       </section>
       {musicId && !bossMode && <iframe className="youtube-player" src={`https://www.youtube.com/embed/${musicId}?autoplay=1&loop=1&playlist=${musicId}`} title="농장 BGM" allow="autoplay; encrypted-media" />}
 
