@@ -1324,11 +1324,6 @@ button { color:inherit; }
 .item-lock{border:0;background:transparent;font-size:14px;cursor:pointer;padding:0}
 .forage-rare{font-style:normal;font-size:10px;color:#a0702a}
 /* 상단 메뉴 3그룹(LIFE_CONTENT_EXPANSION_SPEC 2.2): PC는 그룹별 한 줄, 모바일은 그룹 버튼 + 하단 시트 */
-.tabs.grouped{align-items:stretch;gap:6px 10px}
-.tab-group{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:3px 4px 3px 10px;border-radius:14px;background:rgba(255,255,255,.45)}
-.tab-group.current{background:rgba(255,255,255,.8)}
-.tab-group-label{font:800 11px "Gowun Dodum";color:#9a8f78;margin-right:4px;white-space:nowrap}
-.tabs.grouped button{padding:8px 14px}
 .tabs-mobile{display:none}
 .menu-sheet-layer{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
 .menu-sheet-backdrop{position:absolute;inset:0;border:0;padding:0;background:rgba(20,24,18,.38);cursor:pointer}
@@ -1341,7 +1336,6 @@ button { color:inherit; }
 .menu-sheet-close{width:100%;margin-top:10px;border:0;border-radius:12px;padding:11px;background:#efe7d6;font:700 13px "Gowun Dodum";cursor:pointer}
 @keyframes sheet-up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
 @media(max-width:760px){
-  .tabs.grouped{display:none}
   .tabs-mobile{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:1440px;margin:0 auto 10px}
   .tabs-mobile button{position:relative;display:grid;gap:1px;border:0;border-radius:12px;padding:8px 6px;background:rgba(255,255,255,.6);color:#5f6b61;cursor:pointer;text-align:center}
   .tabs-mobile button b{font-size:13px}
@@ -1460,3 +1454,31 @@ button { color:inherit; }
 .village-confirm-actions{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:760px){.village-layout{grid-template-columns:1fr}.village-map{gap:6px;padding:10px}.village-look{font-size:24px}.village-needs li{grid-template-columns:1fr auto auto}.village-need-bar{grid-column:1/-1;grid-row:2}}
 .village-actions .save-button:disabled,.village-actions .ghost-button:disabled{opacity:.45;cursor:not-allowed}
+/* 2단 메뉴(PC): 그룹 3개 + 현재 그룹의 탭 한 줄 */
+.tabs.two-level{display:grid;gap:8px;justify-items:start}
+.tab-groups{display:flex;flex-wrap:wrap;gap:8px}
+.tab-groups button{position:relative;display:grid;gap:1px;min-width:150px;padding:9px 16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,253,245,.75);color:#4c5a4f;text-align:left;cursor:pointer}
+.tab-groups button b{font:800 14px "Gowun Dodum"}
+.tab-groups button small{font-size:11px;color:#8a8f86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.tab-groups button.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.tab-groups button.active small{color:#c9d8cb}
+.tab-groups .tab-dot{position:absolute;top:8px;right:10px;width:7px;height:7px;border-radius:50%;background:#e8a530}
+.tab-row{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:14px;background:rgba(255,255,255,.55)}
+.tab-row[hidden]{display:none}
+.tabs.two-level .tab-row button{padding:8px 16px}
+@media(max-width:760px){.tabs.two-level{display:none}}
+/* 텃밭이 아닌 탭: 계절 배너를 한 줄로 */
+.season-strip.compact{margin:8px auto 10px;padding:8px 18px;border-radius:16px;grid-template-columns:auto 1fr;gap:20px;box-shadow:none}
+.season-strip.compact .eyebrow{display:none}
+.season-strip.compact .season-copy{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.season-strip.compact .season-copy h2{font-size:17px;margin:0}
+.season-strip.compact .season-copy p{font-size:12px}
+.season-strip.compact .season-track{padding:2px 0}
+.season-strip.compact .season-step span{width:24px;height:24px;font-size:12px}
+.season-strip.compact .season-step b{display:none}
+.season-strip.compact .season-track:before,.season-strip.compact .season-fill{top:14px}
+.main-menu{max-width:1440px;margin:12px auto 0}
+@media(max-width:760px){.season-strip.compact{grid-template-columns:1fr;gap:6px;padding:8px 12px}.season-strip.compact .season-track{display:none}}
+/* 상단바: 좁은 PC 폭에서 로고가 줄바꿈되지 않게 */
+.brand h1{white-space:nowrap}
+@media(max-width:1100px){.brand p{display:none}.brand h1{font-size:21px}}

@@ -1,8 +1,9 @@
 /**
  * 상단 메뉴(LIFE_CONTENT_EXPANSION_SPEC 2.2): 탭을 생활 / 전투 / 집·마을 3개 그룹으로 묶는다.
- * PC는 그룹 이름 아래에 탭을 한 줄로 늘어놓고, 모바일은 그룹 버튼 3개만 보여 주고 누르면 하단 시트로 탭을 고른다.
+ * PC는 2단 메뉴: 위에는 그룹 3개만, 아래 줄에는 지금 그룹의 탭만 보인다. 그룹을 누르면 그 그룹에서 마지막으로 보던 탭으로 간다.
+ * 모바일은 그룹 버튼 3개만 보여 주고 누르면 하단 시트로 탭을 고른다.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type MenuGroup = "life" | "battle" | "home";
 export type MenuEntry<T extends string> = { id: T; label: string; group: MenuGroup; badge?: string };
@@ -24,12 +25,24 @@ export function MainMenu<T extends string>({ entries, active, onSelect }: { entr
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [sheet]);
+  // 그룹별로 마지막에 본 탭(그룹 버튼을 누르면 여기로 간다)
+  const lastInGroup = useRef<Partial<Record<MenuGroup, T>>>({});
+  useEffect(() => { if (current) lastInGroup.current[current.group] = current.id; }, [current]);
   const pick = (id: T) => { setSheet(null); onSelect(id); };
+  const goGroup = (group: MenuGroup) => {
+    const members = entries.filter(entry => entry.group === group), last = lastInGroup.current[group];
+    const target = members.find(entry => entry.id === last) ?? members[0];
+    if (target) pick(target.id);
+  };
   const label = (entry: MenuEntry<T>) => <>{entry.label}{entry.badge ? ` ${entry.badge}` : ""}</>;
   return <div className="main-menu">
-    <nav className="tabs grouped" aria-label="게임 공간">
-      {groups.map(group => <div key={group.id} className={`tab-group ${current?.group === group.id ? "current" : ""}`} role="group" aria-label={group.label}>
-        <span className="tab-group-label">{group.icon} {group.label}</span>
+    <nav className="tabs two-level" aria-label="게임 공간">
+      <div className="tab-groups">{groups.map(group => { const members = entries.filter(entry => entry.group === group.id), here = current?.group === group.id, badge = members.some(entry => entry.badge);
+        return <button key={group.id} className={here ? "active" : ""} aria-current={here ? "true" : undefined} onClick={() => goGroup(group.id)}>
+          <b>{group.icon} {group.label}{badge && <i className="tab-dot" aria-label="새 소식" />}</b>
+          <small>{members.map(entry => entry.label.replace(/^\S+\s/, "")).join(" · ")}</small>
+        </button>; })}</div>
+      {groups.map(group => <div key={group.id} className="tab-row" role="group" aria-label={`${group.label} 메뉴`} hidden={current?.group !== group.id}>
         {entries.filter(entry => entry.group === group.id).map(entry => <button key={entry.id} className={active === entry.id ? "active" : ""} aria-current={active === entry.id ? "page" : undefined} onClick={() => pick(entry.id)}>{label(entry)}</button>)}
       </div>)}
     </nav>
