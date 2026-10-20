@@ -1,3 +1,4 @@
+import { lunchPower, type LunchBuff } from "../cooking/lunch";
 /**
  * 채집·탐험 한 판의 순수 로직(LIFE_CONTENT_EXPANSION_SPEC 3·3.1.1·3.7절). 화면 없이 테스트할 수 있게 그리기와 입력은 ExploreGame.tsx가 맡는다.
  * 상태는 프레임마다 직접 바꾼다(토벌 엔진과 같은 방식). 저장할 것은 checkpointOf()·resultOf()로만 꺼낸다.
@@ -140,6 +141,7 @@ export const NO_INPUT: ExploreInput = { mx: 0, my: 0, gather: false, dodge: fals
 
 export type RunState = {
   runId: string; seed: number; regionId: string; startedAt: number;
+  lunch: LunchBuff | null;
   map: ExploreMap; nodes: ForageNode[]; hazards: Hazard[];
   phase: Phase; readyLeft: number; t: number; timeLeft: number;
   player: { x: number; y: number; stunUntil: number; dodgeUntil: number; dodgeCd: number; dx: number; dy: number; faceX: number; faceY: number };
@@ -156,12 +158,13 @@ export type RunState = {
   toast: { text: string; until: number } | null;
 };
 
-export function createRun(opts: MapOptions & { seed: number; runId: string; startedAt: number; bagBonus?: number; resume?: { bag: Record<string, number>; gathered: string[] } }): RunState {
+export function createRun(opts: MapOptions & { seed: number; runId: string; startedAt: number; bagBonus?: number; lunch?: LunchBuff | null; resume?: { bag: Record<string, number>; gathered: string[] } }): RunState {
   const map = generateMap(opts.seed, opts);
   const nodes = map.nodes.map(node => ({ ...node }));
   if (opts.resume) for (const node of nodes) if (opts.resume.gathered.includes(node.id)) node.left = 0;
   return {
     runId: opts.runId, seed: opts.seed, regionId: opts.regionId, startedAt: opts.startedAt,
+    lunch: opts.lunch ?? null,
     map, nodes, hazards: map.hazards.map(h => ({ ...h })),
     phase: "ready", readyLeft: READY_SECONDS, t: 0, timeLeft: RUN_SECONDS,
     player: { x: START.x, y: START.y, stunUntil: 0, dodgeUntil: 0, dodgeCd: 0, dx: 0, dy: 0, faceX: 1, faceY: 0 },
@@ -222,7 +225,7 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
     const node = nearestNode(s, input.gatherTarget);
     if (node) {
       if (bagCount(s) >= s.bagCap) toast(s, "🎒 가방이 가득 찼어요! R을 1초 눌러 귀환하세요.", 2.2);
-      else s.gather = { nodeId: node.id, progress: 0, need: node.size === "small" ? GATHER_SMALL : GATHER_BIG };
+      else s.gather = { nodeId: node.id, progress: 0, need: (node.size === "small" ? GATHER_SMALL : GATHER_BIG) * (1 - lunchPower(s.lunch, "explore")) };
     }
   }
   if (s.gather) {

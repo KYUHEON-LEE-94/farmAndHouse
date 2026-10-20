@@ -15,7 +15,7 @@
     "test:equipment": "node --test tests/equipment.test.mjs",
     "test:raid-cards": "node --test tests/raid-cards.test.mjs",
     "test:workshop": "node --test tests/workshop.test.mjs",
-    "test:life": "node --test tests/life-foundation.test.mjs tests/explore-engine.test.mjs",
+    "test:life": "node --test tests/life-foundation.test.mjs tests/explore-engine.test.mjs tests/lunch.test.mjs",
     "test:enhance": "node --test tests/enhance.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",

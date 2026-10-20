@@ -1402,3 +1402,19 @@ button { color:inherit; }
   .explore-game.touch .explore-controls .explore-stick-zone{background:transparent;border:0;color:transparent}
   .explore-game.touch .explore-controls .explore-touch-buttons{align-self:end;justify-self:end;padding:0 12px 12px 0}
 }
+
+/* 생활 도시락 */
+.lunch-controls, .lunch-stock { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:16px 0; }
+.lunch-controls label { display:flex; align-items:center; gap:8px; }
+.lunch-controls select { padding:8px; border:1px solid #d7dece; border-radius:8px; background:#fffdf5; color:#354c36; }
+.lunch-panel .recipe small { display:block; margin-top:6px; }
+.lunch-panel .recipe button, .lunch-stock button, .lunch-preview button, .lunch-controls button { padding:10px 16px; border:1px solid #c9d5bc; border-radius:12px; background:#edf2e4; color:#304730; cursor:pointer; }
+.lunch-panel button:disabled { opacity:.5; cursor:not-allowed; }
+.lunch-preview { margin:20px 0; padding:20px; border:2px solid #89a477; border-radius:16px; background:#fffbee; }
+.lunch-preview button + button { margin-left:12px; }
+.lunch-stock span { flex:1 1 180px; }
+.lunch-bag { margin:20px 0; padding:16px; border:1px solid #d7dece; border-radius:16px; }
+.lunch-chip { font-size:12px; padding:8px 12px; background:#eef4df; border-radius:12px; max-width:100%; }
+.lunch-chip.relevant { animation:lunch-emphasis .6s ease-out; }
+@keyframes lunch-emphasis { from { background:#ffe29e; } to { background:#eef4df; } }
+@media (prefers-reduced-motion: reduce) { .lunch-chip.relevant { animation:none; } }

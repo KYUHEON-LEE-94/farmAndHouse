@@ -176,3 +176,16 @@ test('1,000판 시뮬레이션: 가방 상한·희귀 최대 2개를 지키고, 
   line('봇(지도 전체를 앎 = 안내소 1단계 상한)', omni); line('봇(화면 시야만, 기본)', sight);
   assert.ok(omni.worstStreak <= 5 && sight.worstStreak <= 5);
 });
+
+test('일품 도시락: 동일 시드 1,000판에서 채집물 기준 수익 증가 12% 이내', () => {
+  let plain = 0, buffed = 0;
+  const value = bag => Object.entries(bag).reduce((sum, [id, n]) => sum + n * (E.FORAGE.find(f => f.id === id)?.price ?? 0), 0);
+  for (let seed = 1; seed <= 1000; seed++) {
+    const options = { reaction: 0.6, vision: true };
+    plain += value(playBot(run(seed * 7919), options).bag);
+    buffed += value(playBot(run(seed * 7919, { lunch: { dishId: 'forest-potato-wrap', grade: 2, expiresAt: Date.now() + 3600000, actionsLeft: 9 } }), options).bag);
+  }
+  const increase = buffed / plain - 1;
+  console.log(`  일품 도시락 채집물 가치 증가 ${(increase * 100).toFixed(2)}% (같은 시드·조작, 제작 비용 제외)`);
+  assert.ok(increase >= 0 && increase <= .12);
+});

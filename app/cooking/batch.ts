@@ -1,6 +1,7 @@
+import { rollGrade } from "../kitchen";
 /**
  * 요리 제작 이력과 진행 중 일괄 조리(LIFE_CONTENT_EXPANSION_SPEC 4.7·6.2절).
- * 이번 1단계는 저장 형식·구버전 호환·검증만 만든다. 일괄 조리 흐름은 3단계에서 연결한다.
+ * 저장 복원·단계별 수량 제한·확정 시드에 따른 도시락 완성을 관리한다.
  */
 import { parseItemKey, type Inventory } from "../items";
 
@@ -44,4 +45,18 @@ export function restoreCookingBatch(raw: unknown, validDishIds: string[]): Cooki
   if (typeof b.seed !== "number" || !Number.isFinite(b.seed)) return null;
   const consumed = b.consumed && typeof b.consumed === "object" ? Object.fromEntries(Object.entries(b.consumed).filter(([, n]) => typeof n === "number" && n > 0)) : {};
   return { batchId: b.batchId, dishId: b.dishId, quantity, consumed, seed: b.seed, results: b.results as Array<0 | 1 | 2>, facilityLevelAtStart: level };
+}
+
+/** 저장된 시드로 완성품마다 독립 추첨. 완료 상태가 아닌 배치는 지급하지 않는다. */
+export function completeLunchBatch(inventory: Inventory, batch: CookingBatch | null, expectedId: string) {
+  if (!batch || batch.batchId !== expectedId || batch.results.length !== BATCH_MAX_STEPS) return null;
+  let seed = batch.seed >>> 0;
+  const random = () => { seed = (seed + 0x6d2b79f5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const next = { ...inventory }, counts = [0, 0, 0];
+  const score = batch.results.reduce<number>((n, p) => n + p, 0);
+  for (let i = 0; i < batch.quantity; i++) {
+    const grade = rollGrade(score, random), key = `dish:${batch.dishId}:${grade}:0`;
+    next[key] = (next[key] ?? 0) + 1; counts[grade]++;
+  }
+  return { inventory: next, counts };
 }

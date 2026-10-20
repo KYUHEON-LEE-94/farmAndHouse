@@ -1,3 +1,4 @@
+import { lunchRecipe } from "./recipes";
 /**
  * 도시락 버프 저장 상태(LIFE_CONTENT_EXPANSION_SPEC 4.2·4.4·6.2절).
  * 도시락은 하나만 활성화하고, 현실 시간과 행동 횟수 중 먼저 끝나는 쪽에서 종료한다.
@@ -30,3 +31,17 @@ export function restoreLunchBuff(raw: unknown, now = Date.now()): LunchBuff | nu
 export const LUNCH_UNLOCK_KINDS = 3;
 export const lunchUnlocked = (cookedDishIds: string[], battleDishIds: string[]) =>
   new Set(cookedDishIds.filter(id => battleDishIds.includes(id))).size >= LUNCH_UNLOCK_KINDS;
+
+/** 판 수는 입장 시 한 번 소비한다. 마지막 판에도 효과를 적용하도록 소비 전 버프를 반환한다. */
+export function enterLunchRun(buff: LunchBuff | null, now = Date.now()) {
+  const active = restoreLunchBuff(buff, now);
+  if (!active || lunchRecipe(active.dishId)?.target !== "explore") return { applied: null, next: active };
+  return { applied: active, next: active.actionsLeft > 1 ? { ...active, actionsLeft: active.actionsLeft - 1 } : null };
+}
+export function lunchPower(buff: LunchBuff | null, target: "farm" | "fish" | "explore", now = Date.now()) {
+  const active = restoreLunchBuff(buff, now), recipe = active && lunchRecipe(active.dishId);
+  return recipe && recipe.target === target ? recipe.values[active!.grade] : 0;
+}
+export function activateLunch(dishId: string, grade: 0 | 1 | 2, now = Date.now()): LunchBuff {
+  return { dishId, grade, expiresAt: now + LUNCH_DURATION[grade].minutes * 60_000, actionsLeft: LUNCH_DURATION[grade].runs };
+}

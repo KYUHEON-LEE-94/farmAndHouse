@@ -4,6 +4,7 @@
  * 지급·저장은 page가 onFinish에서 한 번만 처리한다.
  */
 import { lazy, Suspense, useState } from "react";
+import type { LunchBuff } from "../cooking/lunch";
 import type { Season } from "../fishing";
 import { FORAGE, inSeasonBonus, openRegions, REGIONS, type ExploreRegion } from "./data";
 import { createRun, RARE_PITY_MISSES, RUN_SECONDS, type RunResult, type RunState } from "./engine";
@@ -18,12 +19,13 @@ type Props = {
   season: Season | "휴식";
   /** 안내소 단계(마을 복구 전에는 0) */
   guideLevel: number;
+  onStart?: () => LunchBuff | null;
   onCheckpoint: (checkpoint: ExplorationCheckpoint) => void;
   onFinish: (result: RunResult) => void;
   onOpenStorage: () => void;
 };
 
-export default function ExplorePanel({ exploration, season, guideLevel, onCheckpoint, onFinish, onOpenStorage }: Props) {
+export default function ExplorePanel({ exploration, season, guideLevel, onStart, onCheckpoint, onFinish, onOpenStorage }: Props) {
   const regions = openRegions(season);
   const [regionId, setRegionId] = useState(regions[0]?.id ?? REGIONS[0].id);
   const [run, setRun] = useState<RunState | null>(null);
@@ -33,7 +35,7 @@ export default function ExplorePanel({ exploration, season, guideLevel, onCheckp
   const start = () => {
     const seed = Math.floor(Math.random() * 2 ** 31), now = Date.now();
     setResult(null);
-    setRun(createRun({ seed, runId: `${now.toString(36)}-${seed.toString(36)}`, startedAt: now, regionId: region.id, inSeason: inSeasonBonus(region, season), guideLevel, rareMisses: exploration.rareMissesByRegion[region.id] ?? 0 }));
+    setRun(createRun({ seed, runId: `${now.toString(36)}-${seed.toString(36)}`, startedAt: now, lunch: onStart?.() ?? null, regionId: region.id, inSeason: inSeasonBonus(region, season), guideLevel, rareMisses: exploration.rareMissesByRegion[region.id] ?? 0 }));
   };
   const finish = (next: RunResult) => { onFinish(next); setResult(next); setRun(null); };
 
