@@ -28,8 +28,10 @@ import { TEST_MODE, ownsItem } from "./testMode";
 import { KitchenPanel } from "./KitchenPanel";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rollGrade, type Dish } from "./kitchen";
 import { categoryLocks, replaceCategoryLocks, restoreItemLocks, type ItemLocks } from "./stock";
-import { FORAGE, forageKey } from "./explore/data";
-import { EMPTY_EXPLORATION, explorationUnlockMet, restoreExploration, villageUnlockMet, type ExplorationState } from "./explore/types";
+import { EXPLORE_ENABLED, FORAGE, forageKey } from "./explore/data";
+import ExplorePanel from "./explore/ExplorePanel";
+import { nextRareMisses, type RunResult } from "./explore/engine";
+import { EMPTY_EXPLORATION, explorationUnlockMet, restoreExploration, villageUnlockMet, type ExplorationCheckpoint, type ExplorationState } from "./explore/types";
 import { restoreLunchBuff, type LunchBuff } from "./cooking/lunch";
 import { addCookedDish, restoreCookedDishIds, restoreCookingBatch, type CookingBatch } from "./cooking/batch";
 import { EMPTY_VILLAGE, restoreVillage, type VillageState } from "./village/types";
@@ -246,6 +248,19 @@ const PET_LIMIT = 100;
 /** 작물이 이만큼 이상 심겨 있으면 밭 연출을 가볍게(흔들림·반짝임 끔). */
 const LITE_FIELD_PLANTS = 16;
 
+/**
+ * 탐험 결과 확정(한 번만): 채집물을 통합 창고에, 판 수·희귀 천장·발견 기록을 갱신하고 체크포인트를 지운다.
+ * 체크포인트 runId와 결과 runId가 다르면(이미 정산한 판) 창고는 건드리지 않는다.
+ */
+function settleExploration(inventory: Inventory, exploration: ExplorationState, result: RunResult) {
+  if (exploration.checkpoint && exploration.checkpoint.runId !== result.runId) return { inventory, exploration };
+  const next = { ...inventory }, finds = { ...exploration.discoveredFinds };
+  for (const [id, n] of Object.entries(result.bag)) { if (n <= 0 || !FORAGE.some(item => item.id === id)) continue; next[forageKey(id)] = (next[forageKey(id)] ?? 0) + n; finds[id] = (finds[id] ?? 0) + n; }
+  const rareFound = result.rareFound || Object.keys(result.bag).some(id => FORAGE.find(item => item.id === id)?.rare);
+  const misses = exploration.rareMissesByRegion[result.regionId] ?? 0;
+  return { inventory: next, exploration: { ...exploration, totalRuns: exploration.totalRuns + 1, rareMissesByRegion: { ...exploration.rareMissesByRegion, [result.regionId]: nextRareMisses(misses, rareFound) }, discoveredFinds: finds, checkpoint: undefined } };
+}
+
 const UNSELLABLE_NOTICE = "🎖️ 기념품이라 판매할 수 없어요. 창고에 보관하거나 집에 꾸며 주세요.";
 function hydrateItem(raw: LegacyItem, version: number, room: Room): PlacedItem | null {
   const base = FURNITURE.find(item => item.id === raw.id);
@@ -284,7 +299,7 @@ const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(M
 
 export default function Home() {
   const [now, setNow] = useState(new Date());
-  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid" | "workshop">("farm");
+  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid" | "workshop" | "explore">("farm");
   const [bookSeason, setBookSeason] = useState<Season | "special" | null>(null);
   const [bet, setBet] = useState(100);
   const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
@@ -519,7 +534,14 @@ export default function Home() {
         setWallpaper(data.wallpaper ?? "stripe"); setFloor(data.floor ?? "oak"); setOwnedThemes(data.ownedThemes ?? ["wall:stripe", "floor:oak"]);
         const restoredInventory = migrateInventory(data);
         setInventory(restoredInventory); setCookedDishIds(restoreCookedDishIds(data.cookedDishIds, restoredInventory, DISHES.map(dish => dish.id)));
-        setExploration(restoreExploration(data.exploration)); setLunchBuff(restoreLunchBuff(data.lunchBuff)); setVillage(restoreVillage(data.village)); setCookingBatch(restoreCookingBatch(data.cookingBatch, DISHES.map(dish => dish.id)));
+        const restoredExploration = restoreExploration(data.exploration);
+        // 탐험 중 창을 닫았으면 마지막 10초 체크포인트의 채집물을 지금 지급하고 그 판을 끝낸다(중복 지급 없음, 3.1·9절).
+        if (restoredExploration.checkpoint) {
+          const settled = settleExploration(restoredInventory, restoredExploration, { runId: restoredExploration.checkpoint.runId, regionId: restoredExploration.checkpoint.regionId, bag: restoredExploration.checkpoint.bag, bait: 0, rareFound: false, reason: "resume", stuns: 0, seconds: 0 });
+          setInventory(settled.inventory); setExploration(settled.exploration);
+          if (Object.keys(restoredExploration.checkpoint.bag).length) setNotice("🧭 지난 탐험에서 저장된 채집물을 통합 창고에 넣었어요.");
+        } else setExploration(restoredExploration);
+        setLunchBuff(restoreLunchBuff(data.lunchBuff)); setVillage(restoreVillage(data.village)); setCookingBatch(restoreCookingBatch(data.cookingBatch, DISHES.map(dish => dish.id)));
         setFishLog(data.fishLog ?? {}); setOwnedWeapons(data.ownedWeapons ?? ["hand"]); setWeaponId(data.weaponId ?? "hand"); setHuntTicket(data.huntTicket ?? 0); setRaid({ ...EMPTY_RAID, ...(data.raid ?? {}), unlockedFloor: Math.min(RAID_MAX_FLOOR, Math.max(data.raid?.unlockedFloor ?? 1, ...(data.raid?.firstClears ?? []).map((n: number) => n + 1))), weapons: { ...EMPTY_RAID.weapons, ...(data.raid?.weapons ?? {}) }, equipped: { ...EMPTY_RAID.equipped, ...(data.raid?.equipped ?? {}) }, armorOwned: data.raid?.armorOwned ?? [], battlePets: data.raid?.battlePets ?? {}, petPity: data.raid?.petPity ?? 0 });  setFishHarvestMode(data.fishHarvestMode ?? "sell"); setBaits(data.baits ?? STARTER_BAIT); setSelectedBait(data.selectedBait ?? "worm"); setOwnedRods(data.ownedRods ?? ["bamboo"]); setRodId(data.rodId ?? "bamboo"); setSpotId(data.spotId ?? "river"); setTickets(data.tickets ?? {});
         setBuffs((data.buffs ?? []).filter((buff: Buff) => buff.expiresAt > Date.now())); setLastEventAt(data.lastEventAt ?? 0); setRecentEvents(Array.isArray(data.recentEvents) ? data.recentEvents.slice(-RECENT_EVENT_LIMIT) : []);
         setAvatarPos({ x: 0.6, z: 0.6, story: 0, ...data.avatarPos }); setMusicId(data.musicId || "VRfbFDUybRU"); setCoinHoldings(data.coinHoldings ?? {});
@@ -1427,6 +1449,26 @@ export default function Home() {
 
   /** 아이템 키 하나의 잠금을 바꾼다(채집물처럼 분류별 화면이 따로 없는 품목). */
   function toggleItemLock(key: string) { setItemLocks(locks => { const next = { ...locks }; if (next[key]) delete next[key]; else next[key] = true; return next; }); }
+  // ---------- 채집·탐험 ----------
+  /** 이미 정산한 판(같은 접속 안에서 중복 호출 방지) */
+  const settledRuns = useRef(new Set<string>());
+  /** 10초 체크포인트: 확정 채집 품목만 저장(창고에는 아직 넣지 않음). 이미 끝난 판이면 무시. */
+  function saveExploreCheckpoint(checkpoint: ExplorationCheckpoint) {
+    if (settledRuns.current.has(checkpoint.runId)) return;
+    setExploration(state => ({ ...state, checkpoint }));
+  }
+  /** 귀환·시간 종료: 창고 지급·판 수·희귀 천장·체크포인트 삭제를 한 번에(같은 판은 한 번만). */
+  function finishExploration(result: RunResult) {
+    if (settledRuns.current.has(result.runId)) return;
+    settledRuns.current.add(result.runId);
+    // 최신 상태 위에서 계산한다(그 사이 공방 완료 등 다른 변경을 덮어쓰지 않게)
+    setInventory(stock => settleExploration(stock, EMPTY_EXPLORATION, result).inventory);
+    setExploration(state => settleExploration({}, { ...state, checkpoint: undefined }, result).exploration);
+    if (result.bait > 0) setBaits(stock => ({ ...stock, worm: (stock.worm ?? 0) + result.bait }));
+    const total = Object.values(result.bag).reduce((sum, n) => sum + n, 0);
+    setNotice(total > 0 ? `🧭 탐험에서 채집물 ${total}개를 가져와 통합 창고에 넣었어요.` : "🧭 빈손으로 돌아왔어요. 다음엔 반짝이는 곳을 노려 봐요!");
+    playCoinSound([660, 880]);
+  }
   /** 채집물 판매: 고정 저가, 잠금은 팔지 않는다(7.1절). */
   function sellForage(id: string, count: number) {
     const item = FORAGE.find(entry => entry.id === id);
@@ -2441,6 +2483,7 @@ export default function Home() {
         { id: "farm", label: "🌱 텃밭", group: "life" },
         { id: "workshop", label: "🏭 공방", group: "life", badge: doneJobs > 0 ? `✨${doneJobs}` : undefined },
         { id: "fish", label: "🎣 낚시터", group: "life" },
+        ...(EXPLORE_ENABLED && explorationOpen ? [{ id: "explore", label: "🧭 탐험", group: "life" } as const] : []),
         { id: "book", label: "📖 도감", group: "life" },
         ...(HUNT_ENABLED ? [{ id: "hunt", label: "🏹 사냥터", group: "battle" } as const] : []),
         ...(RAID_ENABLED ? [{ id: "raid", label: "🗼 토벌탑 (베타)", group: "battle" } as const] : []),
@@ -2780,6 +2823,8 @@ export default function Home() {
         </aside>
       </div>}
 
+      {tab === "explore" && EXPLORE_ENABLED && <ExplorePanel exploration={exploration} season={season} guideLevel={village.facilityLevels["guide-office"] ?? 0}
+        onCheckpoint={saveExploreCheckpoint} onFinish={finishExploration} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }} />}
       {tab === "book" && <div className="book-kind" role="tablist" aria-label="도감 종류">{([["fish", "🐟 물고기 도감"], ["crop", "🌱 작물 도감"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={bookKind === id} className={bookKind === id ? "on" : ""} onClick={() => setBookKind(id)}>{label}</button>)}</div>}
       {tab === "book" && bookKind === "crop" && (() => {
         const shown: Season = bookSeason && bookSeason !== "special" ? bookSeason : season, list = CROPS.filter(crop => crop.seasons.includes(shown));

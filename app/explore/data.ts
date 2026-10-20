@@ -3,9 +3,11 @@
  * 채집물은 통합 인벤토리의 `forage:id` 키로 저장한다(품질·황금 없음).
  */
 import type { Season } from "../fishing";
+import { TEST_MODE } from "../testMode";
 
-/** 탐험 기능 공개 여부. 2단계(봄 숲길 MVP) 구현 뒤 true로 바꾼다. 로컬 테스트 모드에서는 따로 보인다. */
+/** 탐험 기능 공개 여부. 운영 공개 승인 뒤 true로 바꾼다(10절 출시 기준). 로컬 테스트 모드에서는 항상 보인다. */
 export const EXPLORE_RELEASED = false;
+export const EXPLORE_ENABLED = EXPLORE_RELEASED || TEST_MODE;
 
 export type ForageItem = {
   id: string;

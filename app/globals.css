@@ -1350,3 +1350,55 @@ button { color:inherit; }
   .tab-dot{position:absolute;top:6px;right:8px;width:7px;height:7px;border-radius:50%;background:#e8a530}
 }
 .forage-store .hunt-store-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+/* 채집·탐험(LIFE_CONTENT_EXPANSION_SPEC 3절) */
+.explore-panel{max-width:1440px;margin:0 auto 16px}
+.explore-panel.playing{padding:10px}
+.explore-loading{padding:40px;text-align:center;color:#6e786f}
+.explore-regions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.explore-region{display:grid;justify-items:center;gap:2px;padding:12px 8px;border:1px solid var(--line);border-radius:14px;background:#fffdf8;cursor:pointer;font-family:"Gowun Dodum"}
+.explore-region.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset}
+.explore-region:disabled{opacity:.45;cursor:not-allowed}
+.explore-region-icon{font-size:28px}
+.explore-region b{font-size:13px}.explore-region small{font-size:11px;color:#6e786f}
+.explore-brief{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#fbf6ea;margin-bottom:10px}
+.explore-brief div{display:grid;grid-template-columns:86px 1fr;gap:2px 8px;align-items:baseline}
+.explore-brief span{font:700 11px "Gowun Dodum";color:#8a7a5a}.explore-brief b{font-size:13px}.explore-brief small{grid-column:2;font-size:11px;color:#a0702a}
+.explore-start{width:100%;padding:13px}
+.explore-result{border:1px solid #e3d3a8;background:#fff8e6;border-radius:14px;padding:12px 14px;margin:8px 0 4px;display:grid;gap:6px}
+.explore-result ul{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.explore-result li{display:flex;align-items:center;gap:4px;padding:5px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:13px}
+.explore-result li.rare{border-color:#e0b450;background:#fff3cf}.explore-result li em{font-style:normal;font-weight:800}
+.explore-result p{margin:0;font-size:13px}.explore-result small{color:#6e786f}
+.explore-result-actions{display:flex;gap:8px;flex-wrap:wrap}
+.explore-game{position:relative;width:100%;max-width:1100px;margin:0 auto;user-select:none;-webkit-user-select:none}
+.explore-stage{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#8fbf72;touch-action:none}
+.explore-canvas{display:block;width:100%;height:100%;cursor:pointer}
+.explore-hud{position:absolute;left:10px;top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;pointer-events:none;max-width:60%}
+.explore-hud>span{padding:5px 10px;border-radius:999px;background:rgba(255,253,245,.92);font:800 13px "Gowun Dodum";color:var(--ink)}
+.explore-time.low{background:#ffe1d6;color:#a3361c}.explore-bag.full{background:#ffe9b8}
+.explore-bag-items{display:flex;gap:4px;font-size:12px}.explore-bag-items i{font-style:normal}
+.explore-mini{position:absolute;right:10px;top:10px;border-radius:8px;border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.explore-toast{position:absolute;left:50%;top:56px;transform:translateX(-50%);padding:7px 14px;border-radius:999px;background:rgba(36,55,43,.88);color:#fff;font:700 13px "Gowun Dodum";white-space:nowrap;pointer-events:none}
+.explore-ready{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;background:rgba(20,30,20,.35);color:#fff;pointer-events:none}
+.explore-ready b{font:800 72px "Gowun Batang";text-shadow:0 3px 12px rgba(0,0,0,.35)}.explore-ready small{font:700 13px "Gowun Dodum";padding:0 16px;text-align:center}
+.explore-event{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(380px,86%);display:grid;gap:8px;padding:16px;border-radius:16px;background:#fffdf8;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.explore-event b{font-size:16px}.explore-event p{margin:0;font-size:13px;color:#4c5a4f}.explore-event div{display:flex;gap:8px;flex-wrap:wrap}.explore-event small{color:#a3361c}
+.explore-return{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);overflow:hidden;border:0;border-radius:999px;padding:8px 16px;background:rgba(255,253,245,.92);font:800 13px "Gowun Dodum";color:var(--ink);cursor:pointer;touch-action:none}
+.explore-return i{position:absolute;left:0;top:0;bottom:0;background:rgba(255,200,80,.6);z-index:-1}
+.explore-stick-zone{position:absolute;left:0;top:0;bottom:0;width:50%;touch-action:none}
+.explore-touch-buttons{position:absolute;right:12px;bottom:12px;display:flex;gap:10px;align-items:flex-end}
+.explore-btn{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;border:0;background:rgba(255,253,245,.9);font-size:24px;box-shadow:0 3px 10px rgba(0,0,0,.2);touch-action:none}
+.explore-btn small{font:800 10px "Gowun Dodum";margin-top:-6px}
+.explore-btn.gather{width:76px;height:76px}.explore-btn.gather.ready{background:#ffe08a;box-shadow:0 0 0 4px rgba(255,224,138,.5)}
+@media(max-width:760px){.explore-regions{grid-template-columns:repeat(2,1fr)}.explore-brief div{grid-template-columns:1fr}.explore-brief small{grid-column:1}.explore-hud{max-width:58%}.explore-hud>span{font-size:11px;padding:4px 8px}.explore-bag-items{display:none}}
+/* 탐험 터치 조작: 세로 화면은 16:9 화면 아래 별도 조작 영역(시야를 가리지 않음), 가로 화면은 화면 위에 겹침(3.1.1절) */
+.explore-controls{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;min-height:150px}
+.explore-controls .explore-stick-zone{position:relative;width:auto;display:grid;place-items:center;border-radius:16px;background:rgba(36,55,43,.08);border:1px dashed rgba(36,55,43,.25);color:#7a857c;font:700 12px "Gowun Dodum"}
+.explore-controls .explore-touch-buttons{position:static;display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:10px;align-items:end;justify-items:center}
+.explore-controls .explore-return{position:relative;left:auto;bottom:auto;top:auto;transform:none;grid-column:1/-1;width:100%}
+@media (orientation:landscape){
+  .explore-game.touch .explore-controls{position:absolute;inset:auto 0 0 0;margin:0;min-height:0;height:100%;pointer-events:none;grid-template-columns:45% 1fr}
+  .explore-game.touch .explore-controls>*{pointer-events:auto}
+  .explore-game.touch .explore-controls .explore-stick-zone{background:transparent;border:0;color:transparent}
+  .explore-game.touch .explore-controls .explore-touch-buttons{align-self:end;justify-self:end;padding:0 12px 12px 0}
+}
