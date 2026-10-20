@@ -30,12 +30,14 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
   const [regionId, setRegionId] = useState(regions[0]?.id ?? REGIONS[0].id);
   const [run, setRun] = useState<RunState | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
+  /** 안내소 2단계 집중 탐색 재료(5.2.1절). 선택하지 않으면 기본 분포 */
+  const [focusItem, setFocusItem] = useState<string | null>(null);
   const region = REGIONS.find(entry => entry.id === regionId) ?? REGIONS[0];
 
   const start = () => {
     const seed = Math.floor(Math.random() * 2 ** 31), now = Date.now();
     setResult(null);
-    setRun(createRun({ seed, runId: `${now.toString(36)}-${seed.toString(36)}`, startedAt: now, lunch: onStart?.() ?? null, regionId: region.id, inSeason: inSeasonBonus(region, season), guideLevel, rareMisses: exploration.rareMissesByRegion[region.id] ?? 0 }));
+    setRun(createRun({ seed, runId: `${now.toString(36)}-${seed.toString(36)}`, startedAt: now, lunch: onStart?.() ?? null, regionId: region.id, inSeason: inSeasonBonus(region, season), guideLevel, focusItem: guideLevel >= 2 && itemsOf(region).some(item => item.id === focusItem && !item.rare) ? focusItem : null, rareMisses: exploration.rareMissesByRegion[region.id] ?? 0 }));
   };
   const finish = (next: RunResult) => { onFinish(next); setResult(next); setRun(null); };
 
@@ -64,7 +66,14 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
       <div><span>희귀 발견물</span><b>{itemsOf(region).filter(item => item.rare).map(item => `${item.icon} ${item.name}`).join("")}</b><small>{misses >= RARE_PITY_MISSES ? "이번 판 확정 등장!" : `${RARE_PITY_MISSES - misses}판 더 못 찾으면 다음 판 확정`}</small></div>
       <div><span>위험</span><b>{HAZARD_INFO[region.id] ?? "-"}</b></div>
       <div><span>규칙</span><b>가방 16칸 · 사망 없음 · 중도 귀환해도 불이익 없음</b></div>
+      {guideLevel >= 1 && <div><span>🧭 안내소</span><b>{["", "미니맵에 자원 위치 표시", "미니맵 표시 · 집중 탐색", "미니맵 표시 · 집중 탐색 · 큰 자원 1곳 추가"][Math.min(3, guideLevel)]}</b>{guideLevel >= 2 && <small>비계절 지역 선택은 4계절 지역이 모두 열리면 추가돼요.</small>}</div>}
     </div>
+    {guideLevel >= 2 && <div className="explore-focus" role="group" aria-label="집중 탐색 재료">
+      <span>🎯 집중 탐색</span>
+      <button className={focusItem === null ? "on" : ""} aria-pressed={focusItem === null} onClick={() => setFocusItem(null)}>선택 안 함</button>
+      {itemsOf(region).filter(item => !item.rare).map(item => <button key={item.id} className={focusItem === item.id ? "on" : ""} aria-pressed={focusItem === item.id} onClick={() => setFocusItem(item.id)}>{item.icon} {item.name}</button>)}
+      <small>고른 재료로 일반 자원의 30%를 바꿔요. 자원 수·희귀 확률·가방은 그대로예요.</small>
+    </div>}
     <button className="save-button explore-start" onClick={start}>🧭 {region.name} 탐험 시작</button>
     <p className="hint">입장권·에너지는 없어요. 반짝이는 채집물에 다가가 F(또는 클릭)로 캐고, 시간이 끝나거나 귀환하면 통합 창고로 들어가요. 탐험 중 브라우저를 닫아도 10초마다 저장한 채집물은 다음 접속 때 받아요.</p>
   </section>;

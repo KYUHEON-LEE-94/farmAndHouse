@@ -1418,3 +1418,45 @@ button { color:inherit; }
 .lunch-chip.relevant { animation:lunch-emphasis .6s ease-out; }
 @keyframes lunch-emphasis { from { background:#ffe29e; } to { background:#eef4df; } }
 @media (prefers-reduced-motion: reduce) { .lunch-chip.relevant { animation:none; } }
+/* 탐험 안내소 2단계 집중 탐색 · 공방 거리 1단계 즐겨찾기 */
+.explore-focus{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;padding:8px 10px;border-radius:12px;background:#eef5e6}
+.explore-focus span{font:800 12px "Gowun Dodum";color:#41603f}
+.explore-focus button{border:1px solid var(--line);border-radius:999px;padding:5px 10px;background:#fff;font:700 12px "Gowun Dodum";cursor:pointer}
+.explore-focus button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.explore-focus small{flex-basis:100%;font-size:11px;color:#6e786f}
+.lunch-fav{border:0;background:transparent;font-size:18px;color:#c9a53a;cursor:pointer;padding:0 4px}
+.lunch-go-explore{margin-left:8px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
+/* 마을 복구(5.6절) */
+.village-panel{max-width:1440px;margin:0 auto 16px}
+.village-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-top:10px}
+.village-map{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px;border-radius:18px;background:linear-gradient(160deg,#cfe3b4,#b8d39a);align-content:start}
+.village-map.decorated{background:linear-gradient(160deg,#f3d9e4,#cfe3b4 40%,#b8d39a)}
+.village-tile{position:relative;display:grid;justify-items:center;gap:2px;padding:12px 6px;border:2px solid transparent;border-radius:14px;background:rgba(255,253,245,.85);cursor:pointer;font-family:"Gowun Dodum"}
+.village-tile.on{border-color:var(--ink)}
+.village-tile.level-0 .village-look{filter:grayscale(.85) brightness(.9)}
+.village-tile.soon{opacity:.55}
+.village-tile b{font-size:12px}.village-tile small{font-size:11px;color:#a0702a;letter-spacing:.05em}
+.village-look{font-size:30px;line-height:1.1;white-space:nowrap}.village-look.big{font-size:40px}
+.village-hammer{position:absolute;right:6px;top:4px;font-style:normal;font-size:16px}
+.village-reco{position:absolute;left:6px;top:6px;font:800 10px "Gowun Dodum";font-style:normal;color:#fff;background:#6c9a4f;border-radius:999px;padding:1px 6px}
+.village-detail{display:grid;gap:10px;align-content:start}
+.village-detail-head{display:flex;gap:10px;align-items:center}.village-detail-head div{display:grid}.village-detail-head small{color:#6e786f}
+.village-effects{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.village-effects li{display:grid;grid-template-columns:70px 1fr;gap:6px;font-size:12px;color:#8a8f86}
+.village-effects li.done{color:#41603f}.village-effects li.next{color:var(--ink);font-weight:700}
+.village-needs{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.village-needs li{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(50px,1fr) auto auto;gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:#fffdf8;border:1px solid var(--line);font-size:12px}
+.village-needs li.full{background:#eef5e6}
+.village-need-name{display:grid}.village-need-name small{color:#8a8f86;font-size:10px}
+.village-need-bar{height:6px;border-radius:6px;background:#ece4d2;overflow:hidden}.village-need-bar i{display:block;height:100%;background:#6c9a4f}
+.village-need-count{font-weight:800;white-space:nowrap}.village-need-count small{font-weight:400;color:#8a8f86}
+.village-needs button{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
+.village-needs button:disabled{opacity:.4;cursor:not-allowed}
+.village-actions{display:grid;gap:6px}
+.village-actions .danger{color:#a3361c}
+.village-max{font-weight:800;color:#41603f}
+.village-confirm{max-width:420px}.village-confirm ul{margin:8px 0;padding:0;list-style:none;display:grid;gap:4px;max-height:40vh;overflow:auto}
+.village-confirm li{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:5px 8px;border-radius:8px;background:#fbf6ea}
+.village-confirm-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:760px){.village-layout{grid-template-columns:1fr}.village-map{gap:6px;padding:10px}.village-look{font-size:24px}.village-needs li{grid-template-columns:1fr auto auto}.village-need-bar{grid-column:1/-1;grid-row:2}}
+.village-actions .save-button:disabled,.village-actions .ghost-button:disabled{opacity:.45;cursor:not-allowed}

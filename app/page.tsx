@@ -38,6 +38,9 @@ import { EMPTY_EXPLORATION, explorationUnlockMet, restoreExploration, villageUnl
 import { lunchPower, lunchUnlocked, restoreLunchBuff, type LunchBuff } from "./cooking/lunch";
 import { addCookedDish, restoreCookedDishIds, restoreCookingBatch, type CookingBatch } from "./cooking/batch";
 import { EMPTY_VILLAGE, restoreVillage, type VillageState } from "./village/types";
+import { VILLAGE_ENABLED, FACILITIES } from "./village/data";
+import { applyDelivery, cancelDelivery, completable, completeStage, takeCount } from "./village/logic";
+import VillagePanel from "./village/VillagePanel";
 import { migrateInventory, pickCategory, replaceCategory, type Inventory, type ItemCategory } from "./items";
 import { dailyOrders, type Order } from "./orders";
 import { EMPTY_WORKSHOP, RECIPES, WORKSHOP_MAX_SLOTS, WORKSHOP_V2_ENABLED, goodsInfo, goodsPrice, jobInfo, processResult, rawValue, workshopSlotPrice, type Recipe, type Stock, type Workshop } from "./workshop";
@@ -302,7 +305,7 @@ const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(M
 
 export default function Home() {
   const [now, setNow] = useState(new Date());
-  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid" | "workshop" | "explore">("farm");
+  const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid" | "workshop" | "explore" | "village">("farm");
   const [bookSeason, setBookSeason] = useState<Season | "special" | null>(null);
   const [bet, setBet] = useState(100);
   const [rolling, setRolling] = useState<{ pick: Parity; bet: number } | null>(null);
@@ -1454,6 +1457,33 @@ export default function Home() {
 
   /** 아이템 키 하나의 잠금을 바꾼다(채집물처럼 분류별 화면이 따로 없는 품목). */
   function toggleItemLock(key: string) { setItemLocks(locks => { const next = { ...locks }; if (next[key]) delete next[key]; else next[key] = true; return next; }); }
+  // ---------- 마을 복구(LIFE_CONTENT_EXPANSION_SPEC 5절) ----------
+  const facilityName = (id: string) => FACILITIES.find(entry => entry.id === id)?.name ?? id;
+  /** 납품: 창고에서 빼고 시설에 보관(확인창을 거친 뒤 호출). 창고 차감과 납품 기록을 같은 저장에 반영한다. */
+  function deliverVillage(facility: string, take: Record<string, number>) {
+    const result = applyDelivery(inventory, village, facility, take);
+    const moved = takeCount(result.village.contributions[facility] ?? {}) - takeCount(village.contributions[facility] ?? {});
+    if (moved <= 0) return setNotice("🏘️ 납품할 수 있는 재료가 없어요.");
+    setInventory(result.inventory); setVillage(result.village);
+    setNotice(`🏘️ ${facilityName(facility)}에 재료 ${moved}개를 납품했어요.`); playPlop();
+  }
+  /** 복구 취소: 이번 단계 납품분 전부 반환(창고 용량을 넘어도 잃지 않음). */
+  function cancelVillage(facility: string) {
+    const result = cancelDelivery(inventory, village, facility);
+    setInventory(result.inventory); setVillage(result.village);
+    setNotice(`🏘️ ${facilityName(facility)} 복구를 취소하고 재료 ${result.refunded}개를 돌려받았어요.`);
+  }
+  /** 완공: 골드 지불 → 즉시 완공. 광장 보상은 단계당 한 번만 지급한다. */
+  function completeVillage(facility: string) {
+    const result = completeStage(inventory, village, facility, money);
+    if (!result) return setNotice("🏘️ 아직 재료나 골드가 모자라요.");
+    setMoney(value => value - result.gold); setInventory(result.inventory); setVillage(result.village);
+    const gift = result.reward?.furniture ? FURNITURE.find(entry => entry.id === result.reward!.furniture) : undefined;
+    if (gift) setWarehouse(items => [...items, { ...gift, instanceId: `${gift.id}-${Date.now()}`, x: 0, z: 0, rot: 0 }]);
+    playCoinSound([523, 659, 784, 1047, 1319]);
+    setNotice(`🔨 ${facilityName(facility)} ${result.level}단계 복구 완료!${gift ? ` ${gift.icon} ${josa(gift.name, "을를")} 받았어요(🏡 나의 집 › 창고).` : ""}${result.reward?.title ? ` 칭호 「${result.reward.title}」` : ""}`);
+  }
+
   // ---------- 채집·탐험 ----------
   /** 이미 정산한 판(같은 접속 안에서 중복 호출 방지) */
   const settledRuns = useRef(new Set<string>());
@@ -2500,6 +2530,7 @@ export default function Home() {
         ...(RAID_ENABLED ? [{ id: "raid", label: "🗼 토벌탑 (베타)", group: "battle" } as const] : []),
         { id: "equipment", label: "🎒 장비", group: "battle" },
         { id: "home", label: "🏡 나의 집", group: "home" },
+        ...(VILLAGE_ENABLED && villageOpen ? [{ id: "village", label: "🏘️ 마을", group: "home", badge: completable(village, money).length ? "🔨" : undefined } as const] : []),
         { id: "pets", label: "🐾 펫", group: "home" },
         { id: "gacha", label: "🛍️ 상점", group: "home" },
         { id: "casino", label: "🎲 도박장", group: "home" },
@@ -2836,6 +2867,8 @@ export default function Home() {
 
       {tab === "explore" && EXPLORE_ENABLED && <ExplorePanel exploration={exploration} season={season} guideLevel={village.facilityLevels["guide-office"] ?? 0}
         onStart={lunchCooking.enterRun} onCheckpoint={saveExploreCheckpoint} onFinish={finishExploration} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }} />}
+      {tab === "village" && VILLAGE_ENABLED && <VillagePanel village={village} inventory={inventory} money={money} options={lunchOptions}
+        onDeliver={deliverVillage} onCancel={cancelVillage} onComplete={completeVillage} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }} />}
       {tab === "book" && <div className="book-kind" role="tablist" aria-label="도감 종류">{([["fish", "🐟 물고기 도감"], ["crop", "🌱 작물 도감"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={bookKind === id} className={bookKind === id ? "on" : ""} onClick={() => setBookKind(id)}>{label}</button>)}</div>}
       {tab === "book" && bookKind === "crop" && (() => {
         const shown: Season = bookSeason && bookSeason !== "special" ? bookSeason : season, list = CROPS.filter(crop => crop.seasons.includes(shown));
