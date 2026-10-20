@@ -1,4 +1,5 @@
 "use client";
+import "./neogul.css";
 import { hasArmorPrerequisite } from "./raid/armorRequirements";
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -12,6 +13,7 @@ import { BET_PRESETS, BLACKJACK_PAYOUT, BLACKJACK_WIN, CHERRY_PAIR, DICE_FACES, 
 import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { MainMenu } from "./MainMenu";
+import { NeogulMascot } from "./NeogulMascot";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
@@ -2810,9 +2812,9 @@ export default function Home() {
           ] as const).map(([id, icon, name, note]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => setCasinoGame(id)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>
             <span className="casino-game-icon" aria-hidden="true">{icon}</span><b>{name}</b><small>{note}</small></button>)}</div>
           <div className={`dealer ${casinoFx?.kind ?? "idle"}`} key={`dealer-${casinoFx?.id ?? 0}`}>
-            {/* 딜러 부스: 너구리·모자·이름표·지금 기분 */}
+            {/* 플레이어의 결과에 반응하는 너굴 */}
             <div className="dealer-card">
-              <span className="dealer-face"><i className="dealer-hat" aria-hidden="true">🎩</i>🦝{casinoFx && <em className="dealer-mood">{{ win: "😤", jackpot: "😭", lose: "🤣", near: "😝" }[casinoFx.kind]}</em>}</span>
+              <span className="dealer-face neogul-dealer"><NeogulMascot mood={casinoFx ? ({ win: "sulk", jackpot: "sulk", lose: "laugh", near: "tease" } as const)[casinoFx.kind] : "idle"} /></span>
               <b className="dealer-name">딜러 너굴</b>
               <small className="dealer-state">{casinoFx ? { win: "삐짐", jackpot: "멘붕", lose: "신남", near: "약 올리는 중" }[casinoFx.kind] : casinoStats.streak <= -3 ? "기세등등" : casinoStats.streak >= 3 ? "초조함" : "손님 기다리는 중"}</small>
             </div>
@@ -2824,7 +2826,7 @@ export default function Home() {
               return <div className="taunt-overlay" style={{ "--taunt-scale": size } as CSSProperties}>
                 <span className="taunt-vignette" />
                 {Array.from({ length: Math.min(28, 10 + streak * 3) }).map((_, i) => <b key={i} className="taunt-k" style={{ left: `${(i * 37) % 96}%`, animationDelay: `${(i % 7) * 0.09}s`, fontSize: `${22 + ((i * 13) % 26)}px` }}>{i % 5 === 0 ? "ㅋㅋㅋ" : i % 3 === 0 ? "ㅋㅋ" : "ㅋ"}</b>)}
-                <div className="taunt-raccoon"><span className="taunt-body">🦝</span><span className="taunt-laugh">🤣</span><span className="taunt-point">👉</span></div>
+                <div className="taunt-raccoon"><span className="taunt-body neogul-taunt"><NeogulMascot mood={casinoFx.kind === "near" ? "tease" : "laugh"} decorative /></span></div>
                 <p className="taunt-bubble">{casinoFx.line}</p>
                 {casinoFx.kind === "lose" && <strong className="taunt-stamp">꽝!</strong>}
               </div>; })()}
@@ -3137,7 +3139,7 @@ export default function Home() {
       </section></div>}
 
       {showBailout && <div className="modal-backdrop"><section className="modal bailout-modal" role="dialog" aria-labelledby="bailout-title">
-        <div className="bailout-raccoon" aria-hidden="true">🦝<span>💸</span></div>
+        <div className="neogul-bailout"><NeogulMascot mood="help" /></div>
         <h3 id="bailout-title">월루 지원금</h3>
         <p className="bailout-line">“ㅋㅋㅋ 진짜 다 잃었어? 거지 농부 탄생~<br />옛다, 300원. 불쌍해서 주는 거야. 오늘만이다?”</p>
         <p className="bailout-taunt">“이걸로도 모자라면 🎣 낚시터 가서 <b>맨손으로</b> 물고기나 잡아 와~<br />미끼 살 돈도 없잖아? ㅋㅋㅋㅋ”</p>
