@@ -473,6 +473,7 @@ export default function Home() {
   const [musicUrl, setMusicUrl] = useState("");
   const [musicId, setMusicId] = useState("VRfbFDUybRU");
   const [showSettings, setShowSettings] = useState(false);
+  const [showTopMenu, setShowTopMenu] = useState(false);
   const [bossMode, setBossMode] = useState(false);
   const [bossTheme, setBossTheme] = useState<BossMode>("office");
   const [showPicker, setShowPicker] = useState(false);
@@ -2493,15 +2494,23 @@ export default function Home() {
         {TEST_MODE && <span className="test-badge" title="로컬 개발 서버 전용: 숨긴 기능 공개 · 상점 아이템 모두 사용 · 계정 자동 저장 꺼짐">🧪 테스트 모드</span>}
         <div className="brand"><button className="avatar-button" onClick={() => setShowAvatar(true)} aria-label="내 아바타 바꾸기">{avatarImg}</button><div><h1>월루농가</h1><p>월급은 루팡, 농사는 진심</p></div></div>
         <div className="status-cluster">
-          {activeLunch && activeLunchRecipe && <span key={`${activeLunch.dishId}-${tab}`} className={`lunch-chip ${activeLunchRecipe.target === tab ? "relevant" : ""}`}>{activeLunchRecipe.icon} {activeLunchRecipe.name} · {Math.ceil((activeLunch.expiresAt - nowMs) / 60000)}분{activeLunchRecipe.target === "explore" ? ` · ${activeLunch.actionsLeft}판` : ""}</span>}
           <div key={tab === "casino" && casinoFx ? casinoFx.id : "money"} className={`status-card money ${tab === "casino" && casinoFx ? (casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "money-gain" : "money-loss") : ""}`}><span>💰 보유 자금</span><strong>{money.toLocaleString()}원</strong>{tab === "casino" && casinoFx && <em className="money-fly">{casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "+" : "-"}{casinoFx.amount.toLocaleString()}원</em>}</div>
-          <div className="status-card clock"><span>🕰 {timeLabel}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
-          <div className="status-card market-status"><span>📈 다음 시세</span><strong>{formatClock(marketSecondsLeft)}</strong></div>
-          <button className={`status-card top-action ${showMissions ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => { setShowStorage(false); setShowMissions(open => !open); }} aria-label={`미션 ${doneToday.length}/${orders.length} (M)`} title="공용 미션 (M)"><span>📜<em className="ta-label"> 미션</em> <kbd>M</kbd></span><strong>{doneToday.length}/{orders.length}</strong>{readyOrders > 0 && <i className="tab-dot" aria-label={`완료 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
-          <button className={`status-card top-action ${showStorage ? "on" : ""}`} onClick={() => { setShowMissions(false); setShowStorage(open => !open); }} aria-label={`통합 창고 ${storageUsed}/${storageCap} (E)`} title="통합 창고 (E)"><span>📦<em className="ta-label"> 창고</em> <kbd>E</kbd></span><strong>{storageUsed}/{storageCap}</strong></button>
+          <div className="status-card clock" title="5분마다 작물 시세가 바뀌어요"><span>🕰 {timeLabel} · 📈 시세 {formatClock(marketSecondsLeft)}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
+          <button className={`status-card top-action compact mission-action ${showMissions ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => { setShowStorage(false); setShowMissions(open => !open); }} aria-label={`미션 ${doneToday.length}/${orders.length} (M)`} title="공용 미션 (M)"><span>📜<em className="ta-label"> 미션</em> <kbd>M</kbd></span><strong>{doneToday.length}/{orders.length}</strong>{readyOrders > 0 && <i className="tab-dot" aria-label={`완료 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
+          <button className={`status-card top-action compact storage-action ${showStorage ? "on" : ""}`} onClick={() => { setShowMissions(false); setShowStorage(open => !open); }} aria-label={`통합 창고 ${storageUsed}/${storageCap} (E)`} title="통합 창고 (E)"><span>📦<em className="ta-label"> 창고</em> <kbd>E</kbd></span><strong>{storageUsed}/{storageCap}</strong></button>
           <button className="icon-button boss-button" onClick={() => setBossMode(true)} aria-label="보스 키: 업무 화면으로 위장 (ESC)" title="보스 키 (ESC)">🙈<small>ESC</small></button>
-          <button className={`icon-button account-button ${session ? "on" : ""}`} onClick={() => { setAccountError(""); setShowAccount(true); }} aria-label={session ? `계정: ${session.id}` : "계정 로그인"} title={session ? `${session.id} · 계정 저장 중` : "로그인 · 계정 만들기"}>👤<span>{session ? session.id : "로그인"}</span>{session && <small>☁️</small>}</button>
-          <button className="icon-button" onClick={() => setShowSettings(true)} aria-label="시간 설정">⚙</button>
+          {/* 계정·설정·아바타를 메뉴 하나로(상단 아이콘 버튼 줄이기) */}
+          <div className="top-menu">
+            <button className={`icon-button account-button ${session ? "on" : ""}`} onClick={() => setShowTopMenu(open => !open)} aria-haspopup="menu" aria-expanded={showTopMenu} aria-label={session ? `계정·설정 메뉴: ${session.id}` : "로그인·설정 메뉴"} title={session ? `${session.id} · 계정 저장 중` : "로그인 · 설정"}>👤<span>{session ? session.id : "로그인"}</span>{session && <small>☁️</small>}<i className="top-menu-caret" aria-hidden="true">▾</i></button>
+            {showTopMenu && <>
+              <button className="top-menu-backdrop" aria-label="메뉴 닫기" onClick={() => setShowTopMenu(false)} />
+              <div className="top-menu-list" role="menu">
+                <button role="menuitem" onClick={() => { setShowTopMenu(false); setAccountError(""); setShowAccount(true); }}>👤 {session ? `계정 · ${session.id}` : "로그인 · 계정 만들기"}</button>
+                <button role="menuitem" onClick={() => { setShowTopMenu(false); setShowSettings(true); }}>⚙ 설정 <small>운영 시간 · 위장 화면 · 알림</small></button>
+                <button role="menuitem" onClick={() => { setShowTopMenu(false); setShowAvatar(true); }}>🐱 아바타 바꾸기</button>
+              </div>
+            </>}
+          </div>
         </div>
       </header>
 
@@ -2528,14 +2537,15 @@ export default function Home() {
           {SEASONS.map((s, i) => <div key={s} className={`season-step ${i === seasonIndex ? "active" : ""}`}><span>{SEASON_ICON[s]}</span><b>{s}</b></div>)}
           <div className="season-fill" style={{ width: `${seasonIndex < 0 ? 0 : (seasonIndex * 25) + seasonProgress / 4}%` }} />
         </div>
-      </section>
-
-      <section className="buff-bar" aria-label="적용 중인 효과">
+        <div className="buff-bar" aria-label="날씨와 적용 중인 효과">
+          {activeLunch && activeLunchRecipe && <span key={`${activeLunch.dishId}-${tab}`} className={`buff-chip lunch-chip ${activeLunchRecipe.target === tab ? "relevant" : ""}`}>{activeLunchRecipe.icon} {activeLunchRecipe.name} · {Math.ceil((activeLunch.expiresAt - nowMs) / 60000)}분{activeLunchRecipe.target === "explore" ? ` · ${activeLunch.actionsLeft}판` : ""}</span>}
         <span className={`buff-chip weather wx-${weather?.kind ?? "none"}`} title={wx.notes.join(" · ")}><b>{wx.icon} {weather ? `${weatherPlace.name} ${wx.name} ${weather.temp}°` : weatherFailed ? "날씨를 못 불러왔어요" : "날씨 불러오는 중…"}</b>{!weather && weatherFailed && <button onClick={() => setWeatherTry(value => value + 1)} aria-label="날씨 다시 불러오기" title="다시 불러오기">🔄</button>}{wx.notes.slice(0, 2).join(" · ")}{wx.notes.length > 2 ? " …" : ""}<button onClick={useMyLocation} aria-label="내 위치 날씨로 바꾸기" title="내 위치 날씨 쓰기">📍</button></span>
         {[...pets].map(id => { const item = FURNITURE.find(entry => entry.id === id)!; return <span key={id} className="buff-chip pet" title={petAbility(id, petLevel(id), true)}><b>{item.icon} {PET_BUFFS[id].title}{petLevel(id) > 1 ? ` Lv${petLevel(id)}` : ""}</b>{petAbility(id, petLevel(id), true)}</span>; })}
         {activeBuffs.map(buff => { const info = BUFF_INFO[buff.kind], good = info.good(buff.multiplier), percent = Math.round((buff.multiplier - 1) * 100);
           return <span key={buff.id} className={`buff-chip ${good ? "good" : "bad"}`}><b>{good ? "▲" : "▼"} {buff.label}</b>{info.name} {percent > 0 ? "+" : ""}{percent}%<i>{buff.left !== undefined ? `남은 ${buff.left}개` : formatClock(Math.ceil((buff.expiresAt - nowMs) / 1000))}</i></span>; })}
+        </div>
       </section>
+
 
 
       {tab === "farm" && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~5)">

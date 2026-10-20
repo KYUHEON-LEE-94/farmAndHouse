@@ -1482,3 +1482,43 @@ button { color:inherit; }
 /* 상단바: 좁은 PC 폭에서 로고가 줄바꿈되지 않게 */
 .brand h1{white-space:nowrap}
 @media(max-width:1100px){.brand p{display:none}.brand h1{font-size:21px}}
+/* 상단바 정리: 시계+시세 한 카드, 미션·창고 작은 버튼, 계정·설정 메뉴 하나 */
+.status-card.clock{min-width:150px}
+.top-action.compact{min-width:0;display:flex;align-items:center;gap:6px;padding:8px 12px}
+.top-action.compact span{font-size:15px;color:inherit;letter-spacing:0}
+.top-action.compact .ta-label{display:none}
+.top-action.compact strong{font-size:14px}
+.top-menu{position:relative}
+.top-menu-caret{font-style:normal;font-size:10px;opacity:.7;margin-left:2px}
+.top-menu-backdrop{position:fixed;inset:0;z-index:20;border:0;padding:0;background:transparent;cursor:default}
+.top-menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:21;display:grid;min-width:220px;padding:6px;border:1px solid var(--line);border-radius:14px;background:#fffdf8;box-shadow:0 12px 30px rgba(30,40,30,.18)}
+.top-menu-list button{display:grid;gap:1px;border:0;border-radius:10px;padding:10px 12px;background:transparent;text-align:left;font:700 13px "Gowun Dodum";color:var(--ink);cursor:pointer}
+.top-menu-list button:hover{background:#f1ead9}
+.top-menu-list small{font-weight:400;font-size:11px;color:#7a847c}
+/* 날씨·효과 줄을 계절 배너 안으로 */
+.season-strip .buff-bar{grid-column:1/-1;margin:0;max-width:none}
+.season-strip.compact{grid-template-columns:auto minmax(0,1fr) minmax(160px,280px)}
+.season-strip.compact .buff-bar{grid-column:auto;order:2;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.season-strip.compact .buff-bar::-webkit-scrollbar{display:none}
+.season-strip.compact .season-track{order:3}
+.season-strip.compact .buff-chip{flex:none}
+@media(max-width:760px){
+  .season-strip.compact{grid-template-columns:1fr}
+  .top-action.compact{padding:6px 8px}.top-action.compact span{font-size:13px}.top-action.compact strong{font-size:12px}
+  .status-card.clock{min-width:0}
+  .status-card.clock span{white-space:nowrap}
+}
+/* 모바일 상단바: 아바타 + 2줄 격자(1줄 자금·위장·메뉴 / 2줄 시계·미션·창고) */
+@media(max-width:760px){
+  .topbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px}
+  .brand h1{display:none}
+  .status-cluster{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto;gap:4px}
+  .status-cluster>.status-card.money{grid-column:1/3;grid-row:1}
+  .status-cluster>.status-card.clock{grid-column:1/3;grid-row:2}
+  .status-cluster>.mission-action{grid-column:3;grid-row:2}
+  .status-cluster>.storage-action{grid-column:4;grid-row:2}
+  .status-cluster>.boss-button{grid-column:3;grid-row:1;width:auto}
+  .status-cluster>.top-menu{grid-column:4;grid-row:1}
+  .status-cluster>.top-menu .account-button{width:100%;height:100%}
+  .account-button span{display:none}
+}
