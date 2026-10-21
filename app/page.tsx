@@ -8,12 +8,14 @@ import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, WEATHER_RETRY_SECONDS, fetchWea
 import { ALL_FISH, BAITS, BARE_HAND, FISH, LEGEND_CHANCE, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, PRICE_EVENT_COUNT, RECENT_EVENT_LIMIT, buffMultiplier, consumePriceBuffs, pickEvent, priceBuffFactor, resolveChoice, type Buff, type Effect, type EventContext, type StoryEvent } from "./events";
-import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, laughter, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
+import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
 import { BET_PRESETS, BLACKJACK_PAYOUT, BLACKJACK_WIN, CHERRY_PAIR, DICE_FACES, MIN_BET, PARITY_NAME, PAYOUT, PARITY_WIN_CHANCE, SLOT_SYMBOLS, BLACKJACK_ODDS, parityOf, rollParity, slotMultiplier, slotOdds, slotReturnRate, spinReel, type Parity, type Roll } from "./casino";
 import { GUIDE_DONE_KEY, GUIDE_STEPS } from "./guide";
 import { QtyBuy } from "./qtyBuy";
 import { MainMenu } from "./MainMenu";
 import { NeogulMascot } from "./NeogulMascot";
+import { CasinoDealer } from "./CasinoDealer";
+import type { CasinoReaction, CasinoReactionKind } from "./casinoPresentation";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
@@ -174,20 +176,20 @@ function playPlop() {
   window.setTimeout(() => context.close(), 400);
 }
 
-/** 너구리 웃음소리: "하하하하하" — 짧은 음절을 높낮이 바꿔 가며 반복한다. */
-function playLaugh() {
+/** 짧은 킥킥 / 메롱 효과음. 말풍선과 맞춰 시작하고 1초 안에 끝낸다. */
+function playLaugh(tease = false) {
   if (quietMode) return;
   const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   if (!AudioCtx) return;
-  const context = new AudioCtx(), t = context.currentTime;
-  for (let i = 0; i < 7; i++) {
+  const context = new AudioCtx(), t = context.currentTime + 0.15;
+  for (let i = 0; i < (tease ? 3 : 4); i++) {
     const start = t + i * 0.14, voice = context.createOscillator(), gain = context.createGain(), filter = context.createBiquadFilter();
-    voice.type = "square"; voice.frequency.setValueAtTime(520 - i * 18 + (i % 2) * 60, start); voice.frequency.exponentialRampToValueAtTime(300 - i * 10, start + 0.1);
+    voice.type = "triangle"; voice.frequency.setValueAtTime(tease ? 600 - i * 100 : 460 - i * 18 + (i % 2) * 60, start); voice.frequency.exponentialRampToValueAtTime(tease ? 240 : 300 - i * 10, start + 0.1);
     filter.type = "bandpass"; filter.frequency.value = 1100; filter.Q.value = 1.4;
-    gain.gain.setValueAtTime(0.0001, start); gain.gain.exponentialRampToValueAtTime(0.09, start + 0.015); gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.11);
+    gain.gain.setValueAtTime(0.0001, start); gain.gain.exponentialRampToValueAtTime(0.045, start + 0.015); gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.11);
     voice.connect(filter); filter.connect(gain); gain.connect(context.destination); voice.start(start); voice.stop(start + 0.12);
   }
-  window.setTimeout(() => context.close(), 1400);
+  window.setTimeout(() => context.close(), 1000);
 }
 
 /** 지면 나오는 "빠밤빠~" 실망 효과음. */
@@ -322,8 +324,9 @@ export default function Home() {
   const [slotReels, setSlotReels] = useState(["🍒", "⭐", "7️⃣"]);
   const [slotSpinning, setSlotSpinning] = useState(0);
   const [lastSlot, setLastSlot] = useState<{ bet: number; payout: number; multiplier: number } | null>(null);
-  const [casinoFx, setCasinoFx] = useState<{ id: number; kind: "win" | "lose" | "near" | "jackpot"; amount: number; line: string } | null>(null);
-  const [dealerIdle] = useState(() => DEALER_IDLE[Math.floor(Math.random() * DEALER_IDLE.length)]);
+  const [casinoFx, setCasinoFx] = useState<CasinoReaction | null>(null);
+  const [dealerIdle] = useState(DEALER_IDLE[0]);
+  const previousDealerLine = useRef("");
   const [slotTension, setSlotTension] = useState(false);
   const [casinoStats, setCasinoStats] = useState({ wins: 0, losses: 0, net: 0, streak: 0, best: 0 });
   const [money, setMoney] = useState(1500);
@@ -1740,8 +1743,8 @@ export default function Home() {
       if (win) setMoney(value => value + payout);
       setLastRoll(roll); setRollHistory(items => [roll, ...items].slice(0, 12)); setRolling(null);
       recordCasino(amount, payout);
-      if (win) { playCoinSound([880, 1100, 1320]); casinoReact("win", payout, dealerLine(WIN_GRUMBLES)); }
-      else casinoReact("lose", amount, loseLine(Math.random() < 0.5 ? dealerLine(PARITY_TAUNTS, { result: PARITY_NAME[result], pick: PARITY_NAME[pick] }) : undefined));
+      if (win) { playCoinSound([880, 1100, 1320]); casinoReact("win", payout, pickDealerLine(WIN_GRUMBLES)); }
+      else casinoReact("lose", amount, loseLine(Math.random() < 0.5 ? pickDealerLine(PARITY_TAUNTS, { result: PARITY_NAME[result], pick: PARITY_NAME[pick] }) : undefined));
       setNotice(`🎲 ${DICE_FACES[dice[0] - 1]} ${DICE_FACES[dice[1] - 1]} 합 ${dice[0] + dice[1]} → ${PARITY_NAME[result]}! ${win ? `적중! ${payout.toLocaleString()}원을 받았어요.` : `${amount.toLocaleString()}원을 잃었어요.`}`);
     }, 1200);
   }
@@ -1787,15 +1790,20 @@ export default function Home() {
   }
 
   /** 딜러 반응과 화면 효과. 지면 약 올리고, 연패가 쌓이면 더 놀린다. */
-  function casinoReact(kind: "win" | "lose" | "near" | "jackpot", amount: number, line: string) {
+  function casinoReact(kind: CasinoReactionKind, amount: number, line: string) {
+    previousDealerLine.current = line;
     setCasinoFx({ id: Date.now(), kind, amount, line });
-    if (kind === "lose" || kind === "near") { playSadTrombone(); window.setTimeout(playLaugh, 250); }
+    if (kind === "lose" || kind === "near") playLaugh(kind === "near");
+  }
+
+  function pickDealerLine(lines: readonly string[], vars: Record<string, string | number> = {}) {
+    return dealerLine(lines, vars, previousDealerLine.current);
   }
 
   function loseLine(extra?: string) {
     const streak = casinoStats.streak < 0 ? -casinoStats.streak + 1 : 1;
-    if (streak >= 3) return dealerLine(STREAK_TAUNTS, { n: streak });
-    return extra ?? dealerLine(LOSE_TAUNTS);
+    if (streak >= 3 && streak % 3 === 0) return pickDealerLine(STREAK_TAUNTS, { n: streak });
+    return extra ?? pickDealerLine(LOSE_TAUNTS);
   }
 
   /** 슬롯머신: 결과를 먼저 정하고, 릴이 왼쪽부터 차례로 멈추는 연출을 보여준다. */
@@ -1817,10 +1825,10 @@ export default function Home() {
       if (payout) { setMoney(value => value + payout); playCoinSound(multiplier >= 30 ? [660, 880, 1100, 1320, 1760] : [880, 1100, 1320]); }
       setLastSlot({ bet: amount, payout, multiplier }); recordCasino(amount, payout);
       const pairSymbol = SLOT_SYMBOLS.find(symbol => symbol.icon === final[0]);
-      if (multiplier >= 30) casinoReact("jackpot", payout, dealerLine(JACKPOT_GRUMBLES));
-      else if (payout > amount) casinoReact("win", payout, dealerLine(WIN_GRUMBLES));
+      if (multiplier >= 30) casinoReact("jackpot", payout, pickDealerLine(JACKPOT_GRUMBLES));
+      else if (payout > amount) casinoReact("win", payout, pickDealerLine(WIN_GRUMBLES));
       else if (payout) casinoReact("lose", amount - payout, "체리 두 개? 본전도 겨우네~ ㅋㅋ");
-      else if (tease && pairSymbol) casinoReact("near", amount, dealerLine(NEAR_MISS_TAUNTS, { x: pairSymbol.triple, icon: pairSymbol.icon }));
+      else if (tease && pairSymbol) casinoReact("near", amount, pickDealerLine(NEAR_MISS_TAUNTS, { x: pairSymbol.triple, icon: pairSymbol.icon }));
       else casinoReact("lose", amount, loseLine());
       setNotice(`🎰 ${final.join(" ")} — ${payout ? `${multiplier}배! ${payout.toLocaleString()}원을 받았어요.` : `꽝! ${amount.toLocaleString()}원을 잃었어요.`}`);
     }, delay));
@@ -1871,12 +1879,12 @@ export default function Home() {
     const { outcome, payout } = settleBlackjack(player, dealer, amount);
     setBj({ phase: "done", player, dealer, bet: amount, outcome, payout });
     if (payout) setMoney(value => value + payout);
-    recordCasino(amount, payout);
+    if (outcome !== "push") recordCasino(amount, payout);
     const p = handValue(player).total, d = handValue(dealer).total;
-    if (outcome === "blackjack") { playCoinSound([660, 880, 1100, 1320, 1760]); casinoReact("jackpot", payout, dealerLine(JACKPOT_GRUMBLES)); }
-    else if (outcome === "win") { playCoinSound([880, 1100, 1320]); casinoReact("win", payout, dealerLine(WIN_GRUMBLES)); }
-    else if (outcome === "push") casinoReact("win", payout, dealerLine(BLACKJACK_TAUNTS.push));
-    else casinoReact("lose", amount, loseLine(outcome === "bust" ? dealerLine(BLACKJACK_TAUNTS.bust, { n: p }) : isBlackjack(dealer) ? dealerLine(BLACKJACK_TAUNTS.dealerBlackjack) : dealerLine(BLACKJACK_TAUNTS.lose, { n: p })));
+    if (outcome === "blackjack") { playCoinSound([660, 880, 1100, 1320, 1760]); casinoReact("jackpot", payout, pickDealerLine(JACKPOT_GRUMBLES)); }
+    else if (outcome === "win") { playCoinSound([880, 1100, 1320]); casinoReact("win", payout, pickDealerLine(WIN_GRUMBLES)); }
+    else if (outcome === "push") casinoReact("push", payout, pickDealerLine(BLACKJACK_TAUNTS.push));
+    else casinoReact("lose", amount, loseLine(outcome === "bust" ? pickDealerLine(BLACKJACK_TAUNTS.bust, { n: p }) : isBlackjack(dealer) ? pickDealerLine(BLACKJACK_TAUNTS.dealerBlackjack) : pickDealerLine(BLACKJACK_TAUNTS.lose, { n: p })));
     setNotice(`🃏 나 ${p} : 딜러 ${d} — ${{ blackjack: `블랙잭! ${payout.toLocaleString()}원`, win: `승리! ${payout.toLocaleString()}원`, push: "무승부, 판돈을 돌려받았어요", lose: `패배… ${amount.toLocaleString()}원을 잃었어요`, bust: `버스트! ${amount.toLocaleString()}원을 잃었어요` }[outcome]}`);
   }
 
@@ -2499,7 +2507,7 @@ export default function Home() {
         {TEST_MODE && <span className="test-badge" title="로컬 개발 서버 전용: 숨긴 기능 공개 · 상점 아이템 모두 사용 · 계정 자동 저장 꺼짐">🧪 테스트 모드</span>}
         <div className="brand"><button className="avatar-button" onClick={() => setShowAvatar(true)} aria-label="내 아바타 바꾸기">{avatarImg}</button><div><h1>월루농가</h1><p>월급은 루팡, 농사는 진심</p></div></div>
         <div className="status-cluster">
-          <div key={tab === "casino" && casinoFx ? casinoFx.id : "money"} className={`status-card money ${tab === "casino" && casinoFx ? (casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "money-gain" : "money-loss") : ""}`}><span>💰 보유 자금</span><strong>{money.toLocaleString()}원</strong>{tab === "casino" && casinoFx && <em className="money-fly">{casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "+" : "-"}{casinoFx.amount.toLocaleString()}원</em>}</div>
+          <div key={tab === "casino" && casinoFx ? casinoFx.id : "money"} className={`status-card money ${tab === "casino" && casinoFx ? (casinoFx.kind === "push" ? "" : casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "money-gain" : "money-loss") : ""}`}><span>💰 보유 자금</span><strong>{money.toLocaleString()}원</strong>{tab === "casino" && casinoFx && casinoFx.kind !== "push" && <em className="money-fly">{casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "+" : "-"}{casinoFx.amount.toLocaleString()}원</em>}</div>
           <div className="status-card clock" title="5분마다 작물 시세가 바뀌어요"><span>🕰 {timeLabel} · 📈 시세 {formatClock(marketSecondsLeft)}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
           <button className={`status-card top-action compact mission-action ${showMissions ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => { setShowStorage(false); setShowMissions(open => !open); }} aria-label={`미션 ${doneToday.length}/${orders.length} (M)`} title="공용 미션 (M)"><span>📜<em className="ta-label"> 미션</em> <kbd>M</kbd></span><strong>{doneToday.length}/{orders.length}</strong>{readyOrders > 0 && <i className="tab-dot" aria-label={`완료 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
           <button className={`status-card top-action compact storage-action ${showStorage ? "on" : ""}`} onClick={() => { setShowMissions(false); setShowStorage(open => !open); }} aria-label={`통합 창고 ${storageUsed}/${storageCap} (E)`} title="통합 창고 (E)"><span>📦<em className="ta-label"> 창고</em> <kbd>E</kbd></span><strong>{storageUsed}/{storageCap}</strong></button>
@@ -2809,31 +2817,12 @@ export default function Home() {
             ["slot", "🎰", "슬롯", `최대 ×${Math.max(...SLOT_SYMBOLS.map(symbol => symbol.triple))}`],
             ["blackjack", "🃏", "블랙잭", `승리 ×${BLACKJACK_WIN} · BJ ×${BLACKJACK_PAYOUT}`],
             ...(COIN_ENABLED ? [["coin", "🪙", "코인", "시세 사고팔기"]] as const : []),
-          ] as const).map(([id, icon, name, note]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => setCasinoGame(id)} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>
+          ] as const).map(([id, icon, name, note]) => <button key={id} role="tab" aria-selected={casinoGame === id} className={casinoGame === id ? "active" : ""} onClick={() => { setCasinoGame(id); setCasinoFx(null); }} disabled={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}>
             <span className="casino-game-icon" aria-hidden="true">{icon}</span><b>{name}</b><small>{note}</small></button>)}</div>
-          <div className={`dealer ${casinoFx?.kind ?? "idle"}`} key={`dealer-${casinoFx?.id ?? 0}`}>
-            {/* 플레이어의 결과에 반응하는 너굴 */}
-            <div className="dealer-card">
-              <span className="dealer-face neogul-dealer"><NeogulMascot mood={casinoFx ? ({ win: "sulk", jackpot: "sulk", lose: "laugh", near: "tease" } as const)[casinoFx.kind] : "idle"} /></span>
-              <b className="dealer-name">딜러 너굴</b>
-              <small className="dealer-state">{casinoFx ? { win: "삐짐", jackpot: "멘붕", lose: "신남", near: "약 올리는 중" }[casinoFx.kind] : casinoStats.streak <= -3 ? "기세등등" : casinoStats.streak >= 3 ? "초조함" : "손님 기다리는 중"}</small>
-            </div>
-            <div className="bubble-wrap"><p className="bubble">{casinoFx?.line ?? dealerIdle}</p>{casinoFx && (casinoFx.kind === "lose" || casinoFx.kind === "near") && <p className="laugh-line">{laughter(Math.max(1, -casinoStats.streak)).split("").map((char, i) => <span key={i} style={{ animationDelay: `${i * 0.05}s` }}>{char}</span>)}</p>}</div>
-          </div>
-          {casinoFx && <div className={`casino-fx ${casinoFx.kind}`} key={casinoFx.id} aria-hidden="true">
-            {(casinoFx.kind === "lose" || casinoFx.kind === "near" ? ["ㅋㅋ", "ㅋㅋㅋ", "💸", "😏", "ㅋ", "🤭", "ㅋㅋㅋㅋ", "💸", "ㅋㅋㅋㅋㅋ", "🤣", "ㅋ", "ㅋㅋㅋ", "😝", "ㅋㅋ"] : ["🎉", "💰", "✨", "🪙", "🎊", "💰", "✨", "🪙", "🎉", "🪙"]).map((text, i) => <i key={i} style={{ left: `${8 + ((i * 37) % 84)}%`, animationDelay: `${(i % 4) * 0.08}s` }}>{text}</i>)}
-            {(casinoFx.kind === "lose" || casinoFx.kind === "near") && (() => { const streak = Math.max(1, -casinoStats.streak), size = Math.min(1.6, 1 + streak * 0.08);
-              return <div className="taunt-overlay" style={{ "--taunt-scale": size } as CSSProperties}>
-                <span className="taunt-vignette" />
-                {Array.from({ length: Math.min(28, 10 + streak * 3) }).map((_, i) => <b key={i} className="taunt-k" style={{ left: `${(i * 37) % 96}%`, animationDelay: `${(i % 7) * 0.09}s`, fontSize: `${22 + ((i * 13) % 26)}px` }}>{i % 5 === 0 ? "ㅋㅋㅋ" : i % 3 === 0 ? "ㅋㅋ" : "ㅋ"}</b>)}
-                <div className="taunt-raccoon"><span className="taunt-body neogul-taunt"><NeogulMascot mood={casinoFx.kind === "near" ? "tease" : "laugh"} decorative /></span></div>
-                <p className="taunt-bubble">{casinoFx.line}</p>
-                {casinoFx.kind === "lose" && <strong className="taunt-stamp">꽝!</strong>}
-              </div>; })()}
-            {casinoFx.kind === "near" && <strong className="near-miss">아깝다!!!</strong>}
-            {casinoFx.kind === "jackpot" && <strong className="jackpot">JACKPOT!!</strong>}
-          </div>}
-          <div className={casinoFx && (casinoFx.kind === "lose" || casinoFx.kind === "near") ? "fx-shake" : ""} key={`table-${casinoFx?.id ?? 0}`}>
+          <CasinoDealer reaction={casinoFx} idleLine={dealerIdle} streak={casinoStats.streak}
+            busy={Boolean(rolling) || slotSpinning > 0 || bj.phase === "player" || bj.phase === "dealer"}
+            tension={casinoGame === "slot" && slotTension} />
+          <div>
           {casinoGame === "coin" ? <CoinGame nowMs={nowMs} money={money} holdings={coinHoldings} onBuy={buyCoin} onSell={sellCoin} /> : casinoGame === "blackjack" ? <div className={`bj-table ${bj.outcome ?? ""}`}>
             {(() => { const hide = bj.phase === "player"; const cards = (list: Card[], hideSecond: boolean) => list.map((card, i) => hideSecond && i === 1 ? <span key={i} className="card back" /> : <span key={`${i}-${card.rank}${card.suit}`} className={`card ${card.suit === "♥" || card.suit === "♦" ? "red" : ""}`} style={{ animationDelay: `${i * 0.08}s` }}><b>{cardLabel(card)}</b><i>{card.suit}</i></span>);
               return <>
