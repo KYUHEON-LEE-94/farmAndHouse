@@ -1,7 +1,8 @@
 import type { Season } from "./fishing";
 
 export type BuffKind = "growth" | "price" | "seed" | "fish";
-export type Buff = { id: string; kind: BuffKind; label: string; multiplier: number; expiresAt: number };
+/** left: 횟수제 판매가 효과의 남은 농작물 수(있으면 시간 대신 수량으로 끝난다) */
+export type Buff = { id: string; kind: BuffKind; label: string; multiplier: number; expiresAt: number; left?: number };
 export type Effect = { text: string; money?: number; buff?: { kind: BuffKind; label: string; multiplier: number; minutes: number } };
 export type Choice = { label: string; outcome: Effect | { chance: number; success: Effect; fail: Effect } };
 export type StoryEvent = { id: string; title: string; icon: string; seasons?: Season[]; text: string; choices: Choice[] };
@@ -17,10 +18,21 @@ export const BUFF_INFO: Record<BuffKind, { name: string; good: (multiplier: numb
 export const EVENT_CHECK_SECONDS = 45;
 export const EVENT_COOLDOWN_MINUTES = 3;
 export const EVENT_CHANCE = 0.35;
+/**
+ * 2026-10-19 돌발 이벤트 1차 개선(RANDOM_EVENT_AUDIT 10절):
+ * - 성장 효과는 확인을 누르는 순간 자라는 작물의 남은 시간에 바로 적용(시간제 성장 배수 폐지)
+ * - 판매가 효과는 "다음 농작물 40개"(수량제, 대량 판매 폭주 방지). 씨앗·희귀 어획은 시간제 유지
+ * - 효과 시작은 결과 창의 확인 버튼부터(돈은 선택 즉시)
+ * - 지금 상태에서 효과가 없는 이벤트와 최근 3개 이벤트는 후보에서 뺀다
+ */
+export const PRICE_EVENT_COUNT = 40;
+export const RECENT_EVENT_LIMIT = 3;
+export const EVENT_MIN_GROWING = 4;
+export const EVENT_MIN_EMPTY = 4;
 
 export const STORY_EVENTS: StoryEvent[] = [
-  { id: "merchant", title: "떠돌이 상인", icon: "🧳", text: "낡은 수레를 끄는 상인이 멈춰 섰어요. \"이 반짝이는 비료 한 봉지면 작물이 쑥쑥 자란다오. 300원이면 되지.\"", choices: [
-    { label: "300원에 산다", outcome: { text: "비료를 뿌리자 흙에서 달큰한 냄새가 나요.", money: -300, buff: { kind: "growth", label: "반짝 비료", multiplier: 0.75, minutes: 5 } } },
+  { id: "merchant", title: "떠돌이 상인", icon: "🧳", text: "낡은 수레를 끄는 상인이 멈춰 섰어요. \"이 특제 영양제 한 병을 밭에 뿌리면 자라던 작물이 쑥쑥 큰다오. 300원이면 되지.\"", choices: [
+    { label: "300원에 산다", outcome: { text: "특제 영양제를 밭에 뿌리자 자라던 작물들이 기운을 차려요.", money: -300, buff: { kind: "growth", label: "반짝 비료", multiplier: 0.75, minutes: 5 } } },
     { label: "반값에 흥정한다", outcome: { chance: 0.5, success: { text: "상인이 껄껄 웃으며 150원에 넘겨줬어요!", money: -150, buff: { kind: "growth", label: "반짝 비료", multiplier: 0.75, minutes: 5 } }, fail: { text: "상인이 기분이 상해 수레를 끌고 떠나버렸어요.", money: 0 } } },
     { label: "정중히 거절한다", outcome: { text: "상인은 아쉬운 듯 다음 마을로 향했어요." } },
   ] },
@@ -97,7 +109,7 @@ export const STORY_EVENTS: StoryEvent[] = [
     { label: "천천히 음미한다", outcome: { text: "여유가 생기니 물고기도 여유롭게 물어요.", buff: { kind: "fish", label: "여유로운 오후", multiplier: 1.15, minutes: 4 } } },
   ] },
   { id: "rainbow", title: "쌍무지개", icon: "🌈", seasons: ["봄", "여름"], text: "비가 그친 하늘에 쌍무지개가 떴어요! 소원을 빌면 이루어진대요.", choices: [
-    { label: "\"전설 물고기를 낚게 해주세요\"", outcome: { text: "강물이 반짝이기 시작했어요. 희귀 물고기가 잘 물어요!", buff: { kind: "fish", label: "무지개 소원", multiplier: 1.3, minutes: 5 } } },
+    { label: "\"희귀한 물고기를 낚게 해주세요\"", outcome: { text: "강물이 반짝이기 시작했어요. 희귀 물고기가 잘 물어요!", buff: { kind: "fish", label: "무지개 소원", multiplier: 1.3, minutes: 5 } } },
     { label: "\"부자 되게 해주세요\"", outcome: { text: "무지개 끝에서 동전 몇 닢을 주웠어요.", money: 400 } },
   ] },
   { id: "typhoon", title: "태풍 경보", icon: "🌀", seasons: ["여름"], text: "태풍이 북상 중이래요! 밭이 걱정돼요.", choices: [
@@ -113,7 +125,7 @@ export const STORY_EVENTS: StoryEvent[] = [
     { label: "얼음낚시를 간다", outcome: { text: "꽁꽁 언 강에서 물고기가 몰려 있는 구멍을 찾았어요!", buff: { kind: "fish", label: "얼음 구멍 명당", multiplier: 1.25, minutes: 4 } } },
   ] },
   { id: "fishing-contest", title: "마을 낚시대회", icon: "🏆", text: "이장님이 낚시대회를 연대요. 참가비 200원, 우승 상금 800원!", choices: [
-    { label: "참가한다 (-200원)", outcome: { chance: 0.45, success: { text: "월척을 낚아 우승했어요!! 상금 800원!", money: 600 }, fail: { text: "아쉽게 2등… 참가상으로 낚시 요령을 배웠어요.", money: -200, buff: { kind: "fish", label: "대회 경험", multiplier: 1.1, minutes: 4 } } } },
+    { label: "참가한다 (참가비 -200원)", outcome: { chance: 0.45, success: { text: "월척을 낚아 우승했어요!! 상금 800원(참가비를 빼면 +600원)!", money: 600 }, fail: { text: "아쉽게 2등… 참가상으로 낚시 요령을 배웠어요.", money: -200, buff: { kind: "fish", label: "대회 경험", multiplier: 1.1, minutes: 4 } } } },
     { label: "응원만 한다", outcome: { text: "응원하다 보니 목이 쉬었어요. 그래도 재밌었어요!" } },
   ] },
   { id: "blackout", title: "갑작스런 정전", icon: "🔌", text: "사무실 전기가 나갔어요! 모니터가 꺼지고 모두 웅성거려요.", choices: [
@@ -126,9 +138,29 @@ export const STORY_EVENTS: StoryEvent[] = [
   ] },
 ];
 
-export function pickEvent(season: Season, random = Math.random) {
-  const pool = STORY_EVENTS.filter(event => !event.seasons || event.seasons.includes(season));
-  return pool[Math.floor(random() * pool.length)];
+/** 이벤트가 효과를 내려면 필요한 상태(선택지 결과에서 자동으로 계산) */
+export type EventContext = { growing: number; empty: number; fish: number };
+const effectsOf = (event: StoryEvent) => event.choices.flatMap(c => ("chance" in c.outcome ? [c.outcome.success, c.outcome.fail] : [c.outcome]));
+export function eventFits(event: StoryEvent, ctx: EventContext) {
+  const kinds = new Set(effectsOf(event).map(e => e.buff?.kind).filter(Boolean));
+  if (kinds.has("growth") && ctx.growing < EVENT_MIN_GROWING) return false; // 자라는 작물이 없으면 까마귀·두더지·태풍 등 제외
+  if (kinds.has("seed") && ctx.empty < EVENT_MIN_EMPTY) return false;        // 빈 밭이 없으면 씨앗 할인 제외
+  if (event.id === "thief-cat" && ctx.fish < 1) return false;                 // 창고 물고기가 없으면 생선 도둑 제외
+  return true;
+}
+/** 계절·현재 상태·최근 3개 제외로 고른다. 후보가 없으면 null(이번 검사는 건너뜀) */
+export function pickEvent(season: Season, ctx: EventContext = { growing: 99, empty: 99, fish: 99 }, recent: string[] = [], random = Math.random): StoryEvent | null {
+  const pool = STORY_EVENTS.filter(event => (!event.seasons || event.seasons.includes(season)) && !recent.slice(-RECENT_EVENT_LIMIT).includes(event.id) && eventFits(event, ctx));
+  return pool.length ? pool[Math.floor(random() * pool.length)] : null;
+}
+/** 횟수제 판매가 효과: n개 판매 묶음에 적용할 배율(남은 수량만큼만 보너스) */
+export function priceBuffFactor(buffs: Buff[], n: number, now: number) {
+  if (n <= 0) return 1;
+  return buffs.filter(b => b.kind === "price" && b.left !== undefined && b.left > 0 && b.expiresAt > now).reduce((t, b) => t * (1 + (b.multiplier - 1) * Math.min(b.left!, n) / n), 1);
+}
+/** n개 판매 뒤 남은 수량을 줄이고 다 쓴 효과는 지운다 */
+export function consumePriceBuffs(buffs: Buff[], n: number) {
+  return buffs.map(b => (b.kind === "price" && b.left !== undefined ? { ...b, left: b.left - n } : b)).filter(b => b.left === undefined || b.left > 0);
 }
 
 export function resolveChoice(choice: Choice, random = Math.random): Effect {
@@ -136,5 +168,5 @@ export function resolveChoice(choice: Choice, random = Math.random): Effect {
 }
 
 export function buffMultiplier(buffs: Buff[], kind: BuffKind, now: number) {
-  return buffs.filter(buff => buff.kind === kind && buff.expiresAt > now).reduce((total, buff) => total * buff.multiplier, 1);
+  return buffs.filter(buff => buff.kind === kind && buff.expiresAt > now && buff.left === undefined).reduce((total, buff) => total * buff.multiplier, 1);
 }

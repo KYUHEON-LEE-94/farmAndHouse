@@ -1,0 +1,34 @@
+/* One shared transparent atlas keeps all four poses cached between reactions. */
+.neogul-mascot {
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  vertical-align: middle;
+  pointer-events: none;
+}
+.dealer .dealer-face.neogul-dealer {
+  width: 108px;
+  height: 108px;
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 50% 80%, #f6dfab 0%, #fff6df 65%);
+}
+.neogul-taunt {
+  width: min(70vw, calc(210px * var(--taunt-scale, 1)));
+  aspect-ratio: 1;
+}
+.neogul-bailout {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 6px 5px #62452c20);
+}
+@media (max-width: 760px) {
+  .dealer .dealer-face.neogul-dealer { width: 82px; height: 82px; }
+  .neogul-bailout { width: 138px; height: 138px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dealer .dealer-face.neogul-dealer,
+  .taunt-body.neogul-taunt { animation: none; }
+  .taunt-raccoon:has(.neogul-taunt) { animation: none; }
+}

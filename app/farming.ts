@@ -161,6 +161,16 @@ export function plotStatus(plot: NonNullable<Plot>, crop: Crop, now: number, bug
 }
 
 /** 자라는 중인 작물에 거름을 주면 남은 성장 시간만 줄어든다. */
+/**
+ * 남은 성장 시간에 배율을 곱한다(돌발 이벤트 즉시 성장 효과, RANDOM_EVENT_AUDIT 10.1). 0.75면 남은 시간 −25%, 1.3이면 +30%.
+ * 비료처럼 이미 준 물의 진행률 위치를 함께 옮긴다. 다 자란 작물은 그대로 둔다.
+ */
+export function scaleRemaining(plot: NonNullable<Plot>, crop: Crop, mul: number, now: number): NonNullable<Plot> {
+  const grow = plot.growSeconds ?? crop.seconds, elapsed = (now - plot.plantedAt) / 1000;
+  if (elapsed >= grow) return plot;
+  const nextGrow = Math.max(elapsed + 1, elapsed + (grow - elapsed) * mul), ratio = grow > 0 ? nextGrow / grow : 1;
+  return { ...plot, water: (plot.water ?? []).map(time => plot.plantedAt + (time - plot.plantedAt) * ratio), growSeconds: Math.round(nextGrow) };
+}
 export function applyFertilizer(plot: NonNullable<Plot>, crop: Crop, fertilizer: Fertilizer, now: number): NonNullable<Plot> {
   const grow = plot.growSeconds ?? crop.seconds, elapsed = (now - plot.plantedAt) / 1000;
   const nextGrow = Math.max(elapsed, elapsed + Math.max(0, grow - elapsed) * (1 - fertilizer.speed));

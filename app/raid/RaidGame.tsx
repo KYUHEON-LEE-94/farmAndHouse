@@ -383,7 +383,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.save(); ctx.translate(-Math.round(cam.x) + (sh ? (Math.random() - 0.5) * sh * 2 : 0), -Math.round(cam.y) + (sh ? (Math.random() - 0.5) * sh * 2 : 0));
   ctx.drawImage(art.bg, 0, 0);
   // 수문(닫힘·곧 바뀜 예고)
-  const gateSoon = T.gates.some(g => g.moving) && 45 - (s.t % 45) < 2;
+  const gp = T.gatePeriod ?? 45, gateSoon = T.gates.some(g => g.moving) && gp - (s.t % gp) < 2;
   for (const g of T.gates) {
     if (g.closed) { ctx.fillStyle = "#6b4a2a"; ctx.fillRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); ctx.strokeStyle = "#3a2614"; ctx.lineWidth = 3; ctx.strokeRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); }
     if (gateSoon) { ctx.strokeStyle = `rgba(255,200,60,${0.5 + 0.5 * Math.sin(clock * 12)})`; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.strokeRect(g.rect.x - 4, g.rect.y - 4, g.rect.w + 8, g.rect.h + 8); ctx.setLineDash([]); }
@@ -479,7 +479,13 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.fillStyle = "#000"; ctx.font = `${Math.round(m.r * 1.9)}px ${EMOJI_FONT}`; ctx.fillText(m.icon, 0, 1);
     ctx.restore();
     if (m.markUntil > s.t) { ctx.save(); ctx.strokeStyle = "#ff9a3a"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 8, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); ctx.fillStyle = "#000"; ctx.font = `12px ${EMOJI_FONT}`; ctx.fillText("🔥", m.x + m.r, m.y - m.r); }
-    if (m.state === "stun") { ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.fillText("💫", m.x, m.y - m.r - 12); }
+    if (m.state === "stun") { ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.fillText(m.def.id === "rift-stalker" && !m.boss ? "💨" : "💫", m.x, m.y - m.r - 12); }
+    // 21~30층 방어형: 암흑 갑주 정면 방패(±60°), 공격 준비·돌진 중에는 방어가 내려간 표시
+    if (!m.boss && m.hp > 0 && (m.def.id === "dark-armor" || m.def.id === "guardian-tree")) {
+      const open = m.state === "tele" || m.state === "dash";
+      if (m.def.id === "dark-armor" && !open) { const a = Math.atan2(m.dir.y, m.dir.x); ctx.save(); ctx.strokeStyle = "rgba(170,190,215,.9)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 7, a - 1.05, a + 1.05); ctx.stroke(); ctx.restore(); }
+      if (open) { ctx.save(); ctx.fillStyle = "#ffd84a"; ctx.font = "800 11px sans-serif"; ctx.textAlign = "center"; ctx.fillText("방어↓", m.x, m.y - m.r - 10); ctx.restore(); }
+    }
     if (!m.boss && (m.elite || m.hp < m.maxHp)) bar(ctx, m.x - m.r, m.y - m.r - 10, m.r * 2, 4, m.hp / m.maxHp, m.elite ? "#f0a030" : "#ef5a43");
   }
   // 투사체
@@ -509,7 +515,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   // 전투펫
   if (s.pet && petIcon) { const pt = s.pet; shadow(ctx, pt.x, pt.y, 10); ctx.save(); ctx.translate(pt.x, pt.y + Math.sin(clock * 6) * 2); if (pt.flash > 0) ctx.scale(1.2, 1.2); ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(petIcon, 0, 0); ctx.restore(); }
   // 플레이어(내 아바타)
-  const size = 44, flip = Math.cos(p.aim) < 0;
+  // 조준(마우스 커서) 쪽을 바라본다. 방향이 바뀌면 약 0.1초 동안 납작해졌다 펴지며 돌아선다
+  const size = 44, flip = turnToward(s, Math.cos(p.aim) < 0 ? -1 : 1, clock);
   ctx.save();
   shadow(ctx, p.x, p.y + 4, 16);
   ctx.globalAlpha = p.iframes > 0 && Math.floor(clock * 20) % 2 ? 0.45 : 1;
@@ -696,8 +703,18 @@ function drawEnd(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, k: numbe
   ctx.restore();
 }
 
-function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, flip: boolean) {
-  ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
+/** 판마다 아바타 좌우 값(-1~1)을 부드럽게 따라가게 기억한다. */
+const facing = new WeakMap<object, { f: number; at: number }>();
+function turnToward(s: RaidState, want: -1 | 1, clock: number) {
+  const prev = facing.get(s) ?? { f: want, at: clock }, dt = Math.min(0.1, Math.max(0, clock - prev.at));
+  const f = prev.f + (want - prev.f) * Math.min(1, dt * 18);
+  facing.set(s, { f, at: clock });
+  return f >= 0 ? Math.max(0.15, f) : Math.min(-0.15, f);
+}
+
+/** face: true면 왼쪽을 본다(좌우 반전), 숫자면 좌우 배율(-1~1, 돌아서는 중간 모습). */
+function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, face: boolean | number) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(typeof face === "number" ? face : face ? -1 : 1, 1);
   if (art.avatar) { ctx.imageSmoothingEnabled = !art.pixelated; ctx.drawImage(art.avatar, -size / 2, -size / 2, size, size); }
   else { ctx.beginPath(); ctx.arc(0, 0, PLAYER.radius, 0, Math.PI * 2); ctx.fillStyle = "#fff3d6"; ctx.fill(); ctx.fillStyle = "#000"; ctx.font = `20px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🧑‍🌾", 0, 1); }
   ctx.restore();

@@ -316,7 +316,7 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
         <span>간격<b>{stats.interval}초</b>{next && !needEvolution && step!.to <= 10 && <i>→ {next.interval}초</i>}</span>
       </div>
       {needEvolution ? <div className="raid-evolve-banner"><span className="raid-evolve-burst">✨</span><div><b>+10 강화 달성!</b><small>{wDef.icon} {wDef.name}을(를) 전투 무기로 진화시킬 수 있어요 (첫 선택 무료)</small></div><button onClick={() => setPicking(true)}>⚔️ 전투 무기로 진화</button></div>
-        : !step ? <p className="raid-max">최대 강화(+15)에 도달했어요!</p>
+        : !step ? <p className="raid-max">최대 강화(+{ENHANCE[ENHANCE.length - 1].to})에 도달했어요!</p>
         : <>
           <div className="raid-odds">
             <span>목표<b>+{step.to}</b></span><span>성공<b className="ok">{pct(pity.chance)}</b>{pity.bonus > 0 && <i className="raid-pity-bonus">기본 {pct(pity.base)} + 보정 {pct(pity.bonus)}</i>}</span>

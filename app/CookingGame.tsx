@@ -10,9 +10,11 @@ import { COOK_MAX_SCORE, COOK_STEPS, gradeChances } from "./kitchen";
  */
 const PERFECT = 0.06, GOOD = 0.16;
 
-export function CookingGame({ title, icon, onFinish }: { title: string; icon: string; onFinish: (score: number) => void }) {
-  const [step, setStep] = useState(0);
-  const [results, setResults] = useState<number[]>([]);
+export function CookingGame({ title, icon, onFinish, initialResults = [], onStepComplete }: { title: string; icon: string; onFinish: (score: number) => void; initialResults?: Array<0 | 1 | 2>; onStepComplete?: (results: Array<0 | 1 | 2>) => void }) {
+  const [results, setResults] = useState<Array<0 | 1 | 2>>(() => [...initialResults]);
+  const step = results.length;
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   const [flash, setFlash] = useState<string | null>(null);
   const pos = useRef(0.5), dir = useRef(1), marker = useRef<HTMLSpanElement>(null), waiting = useRef(false);
   const done = results.length >= COOK_STEPS.length;
@@ -41,20 +43,21 @@ export function CookingGame({ title, icon, onFinish }: { title: string; icon: st
     const off = Math.abs(pos.current - 0.5), points = off <= PERFECT ? 2 : off <= GOOD ? 1 : 0;
     waiting.current = true;
     setFlash(points === 2 ? "정확해요! ✨" : points === 1 ? "좋아요!" : "아쉬워요…");
-    window.setTimeout(() => {
+    const next: Array<0 | 1 | 2> = [...results, points];
+    setResults(next); onStepComplete?.(next);
+    timer.current = window.setTimeout(() => {
       waiting.current = false; setFlash(null);
-      setResults(list => [...list, points]); setStep(value => value + 1);
       pos.current = Math.random() < 0.5 ? 0.05 : 0.95; dir.current = pos.current < 0.5 ? 1 : -1;
     }, 650);
   }
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); hit(); } };
+    const onKey = (event: KeyboardEvent) => { if (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return; if (event.key === " " || event.key === "Enter") { event.preventDefault(); hit(); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const score = results.reduce((sum, value) => sum + value, 0), [normal, good, best] = gradeChances(score);
+  const score = results.reduce<number>((sum, value) => sum + value, 0), [normal, good, best] = gradeChances(score);
   return <div className="cook-game">
     <div className="cook-title"><span className="cook-pot">{icon}</span><b>{title}</b></div>
     <ol className="cook-steps">{COOK_STEPS.map((name, i) => <li key={name} className={i === step && !done ? "now" : i < results.length ? (results[i] === 2 ? "perfect" : results[i] === 1 ? "good" : "miss") : ""}>{name}{i < results.length && <em>{results[i] === 2 ? " ✨" : results[i] === 1 ? " ○" : " ✕"}</em>}</li>)}</ol>

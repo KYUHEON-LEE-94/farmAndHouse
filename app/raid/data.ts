@@ -16,7 +16,7 @@ export function floorBand(floor: number) {
   if (floor >= 4) return { fodder: 1.05, elite: 1.08, eliteTime: 0.95 };
   return { fodder: 1, elite: 1, eliteTime: 1 };
 }
-export const RAID_MAX_FLOOR = 30; // raid-30 브랜치: 21~30층(보통 구간 1차). 운영 공개 전(승인 필요)
+export const RAID_MAX_FLOOR = 30; // 21~30층(보통 구간 1차) 운영 공개(2026-10-19)
 
 export const ARENA_W = 960, ARENA_H = 540;
 /** 2분 고밀도 웨이브 + 제한 없는 보스전(59절). FLOOR_SECONDS는 훈련장 외에는 쓰지 않는다(보스전 시간 초과 없음). */

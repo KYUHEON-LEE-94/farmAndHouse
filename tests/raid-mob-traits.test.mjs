@@ -1,0 +1,146 @@
+// 21~30층 일반 몬스터 고유 행동(RAID_FLOOR_30_EXPANSION_AUDIT 4.1·4.2): 1~20층과 같은 움직임을 쓰지 않는다
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildSync } from 'esbuild';
+
+const out = buildSync({
+  stdin: { contents: `export * from "./app/raid/engine"; export { FLOORS, weaponStats, MONSTERS } from "./app/raid/data";`, resolveDir: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), loader: 'ts' },
+  bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent',
+});
+const R = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+function seeded(seed) { let x = seed >>> 0; return () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// 이 파일의 모든 전투는 고정 난수로(치명타·생성 위치 등에 따라 결과가 흔들리지 않게)
+Math.random = seeded(20261021);
+const input = (s, o = {}) => ({ up: false, down: false, left: false, right: false, aimX: s.player.x - s.cam.x + 50, aimY: s.player.y - s.cam.y, attack: false, special: false, dash: false, food: [false, false, false], ...o });
+
+/** 웨이브 생성 없이 지정 몬스터 하나만 둔 전투(플레이어는 공격하지 않게 아주 약한 무기) */
+function arena(floorNo, id, dx, dy, opts = {}) {
+  const keep = Math.random; Math.random = seeded(floorNo * 31 + dx);
+  const s = R.createRaid(R.FLOORS[floorNo - 1], { ...R.weaponStats(0, null, 'raid-scythe'), damage: 0.0001, range: 1 }, null, [], undefined, null, floorNo);
+  Math.random = keep;
+  s.spawnAcc = -1e9; s.nextElite = 1e9; s.monsters = []; s.zones = []; s.projectiles = []; s.hazards = [];
+  // 지형에 막히지 않게 열린 자리로
+  s.player.x = 900; s.player.y = 700; s.terrain.walls = []; s.terrain.deep = []; s.terrain.bridges = [];
+  const m = R.spawn(s, id, opts, { x: s.player.x + dx, y: s.player.y + dy });
+  return { s, m };
+}
+function run(s, seconds, each = () => {}, o = {}) {
+  for (let i = 0; i < seconds * 60 && !s.over; i++) { s.player.hp = s.player.maxHp; s.choices = null; R.stepRaid(s, 1 / 60, input(s, o)); each(i); }
+}
+
+test('수호목·암흑 갑주: 평소 방어형 +3, 공격 준비·돌진 중에는 수호목 10→7, 암흑 갑주 12→4(다른 방어형은 그대로)', () => {
+  const mk = (id, state) => ({ def: R.MONSTERS[id], boss: null, defense: R.MONSTERS[id].defense, state });
+  assert.equal(R.MONSTERS['guardian-tree'].defense + R.guardBonus(mk('guardian-tree', 'move')), 10);
+  assert.equal(R.MONSTERS['guardian-tree'].defense + R.guardBonus(mk('guardian-tree', 'tele')), 7);
+  assert.equal(R.MONSTERS['dark-armor'].defense + R.guardBonus(mk('dark-armor', 'move')), 12);
+  assert.equal(R.MONSTERS['dark-armor'].defense + R.guardBonus(mk('dark-armor', 'tele')), 4);
+  assert.equal(R.MONSTERS['dark-armor'].defense + R.guardBonus(mk('dark-armor', 'dash')), 4);
+  assert.equal(R.guardBonus(mk('shell-crab', 'move')), 3); assert.equal(R.guardBonus(mk('shell-crab', 'tele')), 3); assert.equal(R.guardBonus(mk('shell-crab', 'dash')), 0);
+});
+
+test('암흑 갑주 정면 방패: 정면(±60°)에서만, 공격 준비 중에는 내려간다', () => {
+  const { s, m } = arena(29, 'dark-armor', 150, 0);
+  m.dir = { x: -1, y: 0 }; m.state = 'move';
+  assert.equal(R.frontGuardUp(s, m), true);
+  m.dir = { x: 1, y: 0 }; assert.equal(R.frontGuardUp(s, m), false, '등 뒤');
+  m.dir = { x: -1, y: 0 }; m.state = 'tele'; assert.equal(R.frontGuardUp(s, m), false, '공격 준비');
+  assert.ok(R.DARK_ARMOR_FRONT < 1);
+});
+
+test('고대 묘목: 쓰러진 자리에 1초 뿌리 장판(감속·소량 피해), 피해 없는 회복 묘목 소환물은 남기지 않는다', () => {
+  const a = arena(22, 'ancient-sapling', 300, 0);
+  a.m.hp = 1; a.m.x = a.s.player.x + 30; a.m.y = a.s.player.y; a.m.speed = 0;
+  a.s.weapon.damage = 999; a.s.weapon.range = 120;
+  let root = null;
+  run(a.s, 2, () => { root ??= a.s.zones.find(z => z.label === '뿌리 장판'); });
+  assert.ok(a.m.hp <= 0, '처치'); assert.ok(root && root.mob && root.slow > 0 && root.t <= 1 && root.damage > 0);
+  const b = arena(22, 'ancient-sapling', 30, 0, { damage: 0, speed: 0, name: '회복 묘목' });
+  b.m.hp = 1; b.s.weapon.damage = 999; b.s.weapon.range = 120;
+  let any = false;
+  run(b.s, 2, () => { any ||= b.s.zones.some(z => z.label === '뿌리 장판'); });
+  assert.ok(b.m.hp <= 0); assert.equal(any, false);
+});
+
+test('뿌리 사냥개: 2초마다 0.35초 예고 후 짧은 도약(160px)', () => {
+  const { s, m } = arena(21, 'root-hound', 260, 0);
+  let tele = null;
+  run(s, 3, () => { if (!tele && m.state === 'tele') tele = { len: m.tele.len, left: m.stateT }; });
+  assert.ok(tele, '도약 예고'); assert.equal(tele.len, 160); assert.ok(tele.left <= 0.35 + 1e-9 && tele.left > 0.3);
+});
+
+test('포자 주술사: 플레이어 자리에 0.9초 착탄 예고 원 → 포자탄(보스 피격 집계 제외)', () => {
+  const { s } = arena(23, 'spore-shaman', 200, 0);
+  let bomb = null;
+  run(s, 6, () => { bomb ??= s.zones.find(z => z.label === '포자탄'); });
+  assert.ok(bomb && bomb.kind === 'pbomb' && bomb.mob);
+  assert.ok(Math.abs(bomb.x - s.player.x) < 5 && Math.abs(bomb.y - s.player.y) < 5);
+  run(s, 2);
+  assert.ok((s.damageTaken['포자탄'] ?? 0) > 0, '그 자리에 서 있으면 맞는다'); assert.equal(s.bossHits ?? 0, 0);
+});
+
+test('숲의 집행자: 도약(돌진)이 끝나면 포자 3방향', () => {
+  // 결정적으로: 난수를 고정하고, 돌진 예고가 시작되면 플레이어를 멀리 옮겨 포자가 같은 프레임에 플레이어에 맞아 사라지지 않게 한다
+  const keep = Math.random; Math.random = seeded(2525);
+  try {
+    const { s, m } = arena(25, 'forest-executor', 220, 0);
+    let fired = 0, wasDash = false, moved = false;
+    run(s, 8, () => {
+      if (!moved && m.state === 'tele') { moved = true; s.player.x = m.x - 420; s.player.y = m.y + 260; }
+      if (wasDash && m.state === 'move' && !fired) fired = s.projectiles.filter(p => !p.mine).length;
+      wasDash = m.state === 'dash';
+    });
+    assert.ok(moved, '돌진 예고'); assert.equal(fired, 3);
+  } finally { Math.random = keep; }
+});
+
+test('탑의 그림자: 플레이어가 움직이는 방향을 앞질러 추적, 분신은 곧장 추적', () => {
+  const { s, m } = arena(26, 'tower-shadow', 0, 260);
+  run(s, 0.6, () => {}, { right: true });
+  assert.ok(m.dir.x > 0.25, `예측 추적 dir.x=${m.dir.x.toFixed(2)}`);
+  const c = arena(26, 'tower-shadow', 0, 260, { clone: true });
+  run(c.s, 0.6, () => {}, { right: true });
+  assert.ok(c.m.dir.x < m.dir.x, '분신은 예측하지 않음');
+});
+
+test('균열 추적자: 두 번 연속 돌진한 뒤 1초 휴식', () => {
+  const { s, m } = arena(27, 'rift-stalker', 220, 0);
+  const seq = []; let prev = m.state;
+  run(s, 6, () => { if (m.state !== prev) { seq.push(m.state); prev = m.state; } });
+  const i = seq.indexOf('dash');
+  assert.ok(i >= 0, '돌진');
+  assert.deepEqual(seq.slice(i, i + 5), ['dash', 'tele', 'dash', 'stun', 'move']);
+});
+
+test('핵 파수꾼: 0.8초 예고 직선 광선(일반 몬스터 광선은 보스 피격으로 세지 않음), 쓰러지면 예고 중 광선도 사라진다', () => {
+  const { s, m } = arena(28, 'core-sentry', 240, 0);
+  let beam = null;
+  run(s, 5, () => { beam ??= s.hazards.find(h => h.mob && h.kind === 'beam'); });
+  assert.ok(beam, '광선'); assert.equal(beam.tele, 0.8); assert.equal(beam.owner, m.uid);
+  run(s, 1.2);
+  assert.ok((s.damageTaken[`${m.name} 광선`] ?? 0) > 0, '광선 정면에 서 있으면 맞는다'); assert.equal(s.bossHits ?? 0, 0);
+  // 다음 광선 예고 중에 처치 → 광선 취소
+  let next = null; run(s, 5, () => { next ??= s.hazards.find(h => h.mob && h.age < h.tele); });
+  assert.ok(next); m.hp = 0; const before = s.damageTaken[`${m.name} 광선`];
+  run(s, 1.5);
+  assert.equal(s.hazards.filter(h => h.owner === m.uid).length, 0); assert.equal(s.damageTaken[`${m.name} 광선`], before);
+});
+
+test('심장부 감시자: 2연속 돌진과 광선(예고 0.8초 이상)을 번갈아', () => {
+  const { s, m } = arena(30, 'heart-warden', 260, 0);
+  const events = []; let prev = m.state, beams = 0;
+  run(s, 16, () => {
+    if (m.state !== prev) { if (m.state === 'dash') events.push('dash'); prev = m.state; }
+    const n = s.hazards.filter(h => h.owner === m.uid && h.mob).length; if (n > beams) { events.push('beam'); const h = s.hazards.find(x => x.owner === m.uid); assert.ok(h.tele >= 0.8); } beams = n;
+  });
+  const joined = events.join(' ');
+  assert.match(joined, /dash dash beam/); assert.match(joined, /beam dash dash/);
+});
+
+test('1~20층 몬스터는 기존 행동 그대로(고유 행동은 21~30층 10종만)', () => {
+  const ids = ['ancient-sapling', 'root-hound', 'spore-shaman', 'guardian-tree', 'forest-executor', 'tower-shadow', 'rift-stalker', 'core-sentry', 'dark-armor', 'heart-warden'];
+  for (const id of ids) assert.ok(R.MONSTERS[id], id);
+  const { s, m } = arena(16, 'ice-bat', 200, 0);
+  const seq = []; let prev = m.state;
+  run(s, 6, () => { if (m.state !== prev) { seq.push(m.state); prev = m.state; } });
+  assert.ok(!seq.includes('stun'), '얼음 박쥐는 연속 돌진·휴식 없음');
+});

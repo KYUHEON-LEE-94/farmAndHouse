@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 export type FurnitureKind = "floor" | "rug" | "wall";
 export type ShopGroup = "furniture" | "decor" | "structure" | "yard" | "pet" | "gacha";
 /** size는 [가로, 높이, 깊이] 미터. 벽 부착 가구는 mount 높이(바닥에서 중심까지)에 걸린다. */
-export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; reward?: boolean; rare?: boolean; legend?: boolean; tier?: "junk" | "common" | "rare" | "legend" };
+export type Furniture = { id: string; name: string; icon: string; price: number; color: string; kind: FurnitureKind; group: ShopGroup; size: [number, number, number]; mount?: number; fixedMount?: boolean; yard?: boolean; pet?: boolean; reward?: boolean; /** false면 어떤 경로로도 판매할 수 없는 기념품(생략 시 판매 가능). 판단은 항상 최신 카탈로그 기준. */ sellable?: boolean; rare?: boolean; legend?: boolean; tier?: "junk" | "common" | "rare" | "legend" };
 /** 바닥 가구는 x·z(방 중심 기준 미터)와 rot(도), 벽 가구는 wall(벽 번호)·u(벽 위치 0~1)·h(높이 m). story는 층(0=1층, 1=2층), 마당 소품은 층이 없다. */
 /** host·side: 가벽(partition/arch)에 붙은 벽 장식이면 그 가벽 id와 붙은 면(1 앞, -1 뒤). */
 export type PlacedItem = Furniture & { instanceId: string; x: number; z: number; rot: number; tint?: string; wall?: number; u?: number; h?: number; story?: number; host?: string; side?: number; locked?: boolean; nickname?: string; sx?: number; sz?: number };
@@ -56,6 +56,8 @@ export const FURNITURE: Furniture[] = [
   { id: "melonparasol", name: "수박 파라솔", icon: "🍉", price: 3000, color: "#4f9a46", kind: "floor", group: "yard", size: [1.6, 2.1, 1.6], yard: true, reward: true },
   { id: "goldenstraw", name: "황금 볏짚 장식", icon: "🌾", price: 3000, color: "#e8c35a", kind: "floor", group: "yard", size: [1, 0.9, 0.8], yard: true, reward: true },
   { id: "tangerinestove", name: "귤 난로", icon: "🍊", price: 3000, color: "#c4573b", kind: "floor", group: "yard", size: [0.7, 1.2, 0.7], yard: true, reward: true },
+  // 마을 광장 복구 기념품(LIFE_CONTENT_EXPANSION_SPEC 5.2.1·6.5): 상점·가챠에 나오지 않고 판매 불가
+  { id: "restore-flowerbox", name: "복구 기념 꽃상자", icon: "💐", price: 3000, color: "#e7a0b0", kind: "floor", group: "yard", size: [1.2, 0.6, 0.6], yard: true, reward: true, sellable: false },
   { id: "fence", name: "나무 울타리", icon: "🪵", price: 300, color: "#d9b98a", kind: "floor", group: "yard", size: [2, 0.9, 0.12], yard: true },
   { id: "flowerbed", name: "꽃밭", icon: "🌷", price: 450, color: "#e7899a", kind: "floor", group: "yard", size: [1.6, 0.5, 0.8], yard: true },
   { id: "stonepath", name: "징검돌 길", icon: "🪨", price: 250, color: "#b8b3a8", kind: "rug", group: "yard", size: [0.9, 0.05, 2.4], yard: true },
@@ -123,6 +125,8 @@ export function rollPet(random = Math.random) {
  * 가구 뽑기: 가챠샵 전용 가구. 꽝(빈 상자)도 나오고, 한 번 뽑은 상품은 다시 나오지 않는다.
  * 남은 상품이 있는 등급만 가중치로 고르고, 꽝은 항상 후보다. 모두 모으면 더 뽑을 수 없다.
  */
+/** 판매 가능 여부(6.5절): 저장된 인스턴스가 아니라 최신 카탈로그 정의로 판단한다. 사용자 잠금과는 별개. */
+export const isSellable = (item: { id: string }) => FURNITURE.find(entry => entry.id === item.id)?.sellable !== false;
 export const FURNITURE_GACHA_PRICE = 2000;
 export const FURNITURE_GACHA_WEIGHTS = { miss: 30, junk: 25, common: 25, rare: 15, legend: 5 } as const;
 export const TIER_NAME = { junk: "쓸데없는 상품", common: "일반", rare: "희귀", legend: "전설" } as const;

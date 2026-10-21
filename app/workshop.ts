@@ -15,7 +15,7 @@ import { CROPS, CROP_PRICE_SCALE, QUALITIES, cropReferencePrice, type Crop } fro
 import { TEST_MODE } from "./testMode";
 
 /** 생활 가공 개편 공개 여부. 공개 전에는 로컬 테스트 모드에서만 새 화면이 보인다. */
-export const WORKSHOP_V2_RELEASED = false;
+export const WORKSHOP_V2_RELEASED = true; // 2026-10-19 운영 공개(사용자 요청)
 export const WORKSHOP_V2_ENABLED = WORKSHOP_V2_RELEASED || TEST_MODE;
 
 export type Recipe = { id: string; name: string; icon: string; minutes: number; mult: number; inputs: { cropId: string; count: number }[] };

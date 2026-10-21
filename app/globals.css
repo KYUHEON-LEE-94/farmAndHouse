@@ -1318,3 +1318,270 @@ button { color:inherit; }
 .raid-breakthrough{background:linear-gradient(120deg,#fff6d6,#ffe3a6);border-radius:10px;padding:8px 10px!important}.raid-breakthrough li:first-child{font:800 15px "Gowun Batang";color:#9a5a10}
 .raid-grown{display:grid;gap:4px;padding:10px 12px;border-radius:14px;background:linear-gradient(120deg,#eaf6ff,#d6ecff);border:1px solid #9cc4e6}.raid-grown b{font-size:13.5px}.raid-grown span{font-size:12px;color:#36506a}.raid-grown button{justify-self:start}
 .raid-mastery{display:grid;gap:4px;margin-top:10px;padding:10px 12px;border-radius:14px;background:linear-gradient(120deg,#fff9e8,#fff1c9);border:1px solid #f0d58a}.raid-mastery b{font-size:13.5px}.raid-mastery small{font-size:11.5px;color:#6b5a3a}.raid-stars i{font-style:normal;font-size:18px;color:#d8cba6;margin-right:2px}.raid-stars i.on{color:#f0a91c;text-shadow:0 0 6px #ffd76a}.raid-mastery-lock{color:#8a6a3a!important;font-weight:700}.raid-mastery-note{opacity:.75}
+/* 통합 창고: 이름 검색과 채집물(LIFE_CONTENT_EXPANSION_SPEC 6.1) */
+.storage-search{width:100%;margin:2px 0 8px;border:1px solid var(--line);border-radius:10px;padding:7px 10px;font:700 12px "Gowun Dodum";background:#fffdf8}
+.forage-chip{grid-template-columns:20px 28px 1fr auto}
+.forage-chip.locked{background:#f6efe0}
+.item-lock{border:0;background:transparent;font-size:14px;cursor:pointer;padding:0}
+.forage-rare{font-style:normal;font-size:10px;color:#a0702a}
+/* 상단 메뉴 3그룹(LIFE_CONTENT_EXPANSION_SPEC 2.2): PC는 그룹별 한 줄, 모바일은 그룹 버튼 + 하단 시트 */
+.tabs-mobile{display:none}
+.menu-sheet-layer{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.menu-sheet-backdrop{position:absolute;inset:0;border:0;padding:0;background:rgba(20,24,18,.38);cursor:pointer}
+.menu-sheet{position:relative;width:100%;max-width:520px;background:#fffdf8;border-radius:20px 20px 0 0;padding:10px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.18);animation:sheet-up .18s ease-out}
+.menu-sheet-handle{width:40px;height:4px;border-radius:4px;background:#d9cfbb;margin:0 auto 10px}
+.menu-sheet-title{display:block;font-size:15px;margin-bottom:10px}
+.menu-sheet-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.menu-sheet-grid button{border:1px solid var(--line);border-radius:14px;padding:14px 10px;background:#fff;font:700 14px "Gowun Dodum";color:var(--ink);cursor:pointer;text-align:left}
+.menu-sheet-grid button.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.menu-sheet-close{width:100%;margin-top:10px;border:0;border-radius:12px;padding:11px;background:#efe7d6;font:700 13px "Gowun Dodum";cursor:pointer}
+@keyframes sheet-up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@media(max-width:760px){
+  .tabs-mobile{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:1440px;margin:0 auto 10px}
+  .tabs-mobile button{position:relative;display:grid;gap:1px;border:0;border-radius:12px;padding:8px 6px;background:rgba(255,255,255,.6);color:#5f6b61;cursor:pointer;text-align:center}
+  .tabs-mobile button b{font-size:13px}
+  .tabs-mobile button small{font-size:10px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tabs-mobile button.active{background:var(--ink);color:#fff}
+  .tab-dot{position:absolute;top:6px;right:8px;width:7px;height:7px;border-radius:50%;background:#e8a530}
+}
+.forage-store .hunt-store-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+/* 채집·탐험(LIFE_CONTENT_EXPANSION_SPEC 3절) */
+.explore-panel{max-width:1440px;margin:0 auto 16px}
+.explore-panel.playing{padding:10px}
+.explore-loading{padding:40px;text-align:center;color:#6e786f}
+.explore-regions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.explore-region{display:grid;justify-items:center;gap:2px;padding:12px 8px;border:1px solid var(--line);border-radius:14px;background:#fffdf8;cursor:pointer;font-family:"Gowun Dodum"}
+.explore-region.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset}
+.explore-region:disabled{opacity:.45;cursor:not-allowed}
+.explore-region-icon{font-size:28px}
+.explore-region b{font-size:13px}.explore-region small{font-size:11px;color:#6e786f}
+.explore-brief{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#fbf6ea;margin-bottom:10px}
+.explore-brief div{display:grid;grid-template-columns:86px 1fr;gap:2px 8px;align-items:baseline}
+.explore-brief span{font:700 11px "Gowun Dodum";color:#8a7a5a}.explore-brief b{font-size:13px}.explore-brief small{grid-column:2;font-size:11px;color:#a0702a}
+.explore-start{width:100%;padding:13px}
+.explore-result{border:1px solid #e3d3a8;background:#fff8e6;border-radius:14px;padding:12px 14px;margin:8px 0 4px;display:grid;gap:6px}
+.explore-result ul{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.explore-result li{display:flex;align-items:center;gap:4px;padding:5px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:13px}
+.explore-result li.rare{border-color:#e0b450;background:#fff3cf}.explore-result li em{font-style:normal;font-weight:800}
+.explore-result p{margin:0;font-size:13px}.explore-result small{color:#6e786f}
+.explore-result-actions{display:flex;gap:8px;flex-wrap:wrap}
+.explore-game{position:relative;width:100%;max-width:1100px;margin:0 auto;user-select:none;-webkit-user-select:none}
+.explore-stage{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#8fbf72;touch-action:none}
+.explore-canvas{display:block;width:100%;height:100%;cursor:pointer}
+.explore-hud{position:absolute;left:10px;top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;pointer-events:none;max-width:60%}
+.explore-hud>span{padding:5px 10px;border-radius:999px;background:rgba(255,253,245,.92);font:800 13px "Gowun Dodum";color:var(--ink)}
+.explore-time.low{background:#ffe1d6;color:#a3361c}.explore-bag.full{background:#ffe9b8}
+.explore-bag-items{display:flex;gap:4px;font-size:12px}.explore-bag-items i{font-style:normal}
+.explore-mini{position:absolute;right:10px;top:10px;border-radius:8px;border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.explore-toast{position:absolute;left:50%;top:56px;transform:translateX(-50%);padding:7px 14px;border-radius:999px;background:rgba(36,55,43,.88);color:#fff;font:700 13px "Gowun Dodum";white-space:nowrap;pointer-events:none}
+.explore-ready{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;background:rgba(20,30,20,.35);color:#fff;pointer-events:none}
+.explore-ready b{font:800 72px "Gowun Batang";text-shadow:0 3px 12px rgba(0,0,0,.35)}.explore-ready small{font:700 13px "Gowun Dodum";padding:0 16px;text-align:center}
+.explore-event{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(380px,86%);display:grid;gap:8px;padding:16px;border-radius:16px;background:#fffdf8;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.explore-event b{font-size:16px}.explore-event p{margin:0;font-size:13px;color:#4c5a4f}.explore-event div{display:flex;gap:8px;flex-wrap:wrap}.explore-event small{color:#a3361c}
+.explore-return{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);overflow:hidden;border:0;border-radius:999px;padding:8px 16px;background:rgba(255,253,245,.92);font:800 13px "Gowun Dodum";color:var(--ink);cursor:pointer;touch-action:none}
+.explore-return i{position:absolute;left:0;top:0;bottom:0;background:rgba(255,200,80,.6);z-index:-1}
+.explore-stick-zone{position:absolute;left:0;top:0;bottom:0;width:50%;touch-action:none}
+.explore-touch-buttons{position:absolute;right:12px;bottom:12px;display:flex;gap:10px;align-items:flex-end}
+.explore-btn{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;border:0;background:rgba(255,253,245,.9);font-size:24px;box-shadow:0 3px 10px rgba(0,0,0,.2);touch-action:none}
+.explore-btn small{font:800 10px "Gowun Dodum";margin-top:-6px}
+.explore-btn.gather{width:76px;height:76px}.explore-btn.gather.ready{background:#ffe08a;box-shadow:0 0 0 4px rgba(255,224,138,.5)}
+@media(max-width:760px){.explore-regions{grid-template-columns:repeat(2,1fr)}.explore-brief div{grid-template-columns:1fr}.explore-brief small{grid-column:1}.explore-hud{max-width:58%}.explore-hud>span{font-size:11px;padding:4px 8px}.explore-bag-items{display:none}}
+/* 탐험 터치 조작: 세로 화면은 16:9 화면 아래 별도 조작 영역(시야를 가리지 않음), 가로 화면은 화면 위에 겹침(3.1.1절) */
+.explore-controls{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;min-height:150px}
+.explore-controls .explore-stick-zone{position:relative;width:auto;display:grid;place-items:center;border-radius:16px;background:rgba(36,55,43,.08);border:1px dashed rgba(36,55,43,.25);color:#7a857c;font:700 12px "Gowun Dodum"}
+.explore-controls .explore-touch-buttons{position:static;display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:10px;align-items:end;justify-items:center}
+.explore-controls .explore-return{position:relative;left:auto;bottom:auto;top:auto;transform:none;grid-column:1/-1;width:100%}
+@media (orientation:landscape){
+  .explore-game.touch .explore-controls{position:absolute;inset:auto 0 0 0;margin:0;min-height:0;height:100%;pointer-events:none;grid-template-columns:45% 1fr}
+  .explore-game.touch .explore-controls>*{pointer-events:auto}
+  .explore-game.touch .explore-controls .explore-stick-zone{background:transparent;border:0;color:transparent}
+  .explore-game.touch .explore-controls .explore-touch-buttons{align-self:end;justify-self:end;padding:0 12px 12px 0}
+}
+
+/* 생활 도시락 */
+.lunch-controls, .lunch-stock { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:16px 0; }
+.lunch-controls label { display:flex; align-items:center; gap:8px; }
+.lunch-controls select { padding:8px; border:1px solid #d7dece; border-radius:8px; background:#fffdf5; color:#354c36; }
+.lunch-panel .recipe small { display:block; margin-top:6px; }
+.lunch-panel .recipe button, .lunch-stock button, .lunch-preview button, .lunch-controls button { padding:10px 16px; border:1px solid #c9d5bc; border-radius:12px; background:#edf2e4; color:#304730; cursor:pointer; }
+.lunch-panel button:disabled { opacity:.5; cursor:not-allowed; }
+.lunch-preview { margin:20px 0; padding:20px; border:2px solid #89a477; border-radius:16px; background:#fffbee; }
+.lunch-preview button + button { margin-left:12px; }
+.lunch-stock span { flex:1 1 180px; }
+.lunch-bag { margin:20px 0; padding:16px; border:1px solid #d7dece; border-radius:16px; }
+.lunch-chip { font-size:12px; padding:8px 12px; background:#eef4df; border-radius:12px; max-width:100%; }
+.lunch-chip.relevant { animation:lunch-emphasis .6s ease-out; }
+@keyframes lunch-emphasis { from { background:#ffe29e; } to { background:#eef4df; } }
+@media (prefers-reduced-motion: reduce) { .lunch-chip.relevant { animation:none; } }
+/* 탐험 안내소 2단계 집중 탐색 · 공방 거리 1단계 즐겨찾기 */
+.explore-focus{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;padding:8px 10px;border-radius:12px;background:#eef5e6}
+.explore-focus span{font:800 12px "Gowun Dodum";color:#41603f}
+.explore-focus button{border:1px solid var(--line);border-radius:999px;padding:5px 10px;background:#fff;font:700 12px "Gowun Dodum";cursor:pointer}
+.explore-focus button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.explore-focus small{flex-basis:100%;font-size:11px;color:#6e786f}
+.lunch-fav{border:0;background:transparent;font-size:18px;color:#c9a53a;cursor:pointer;padding:0 4px}
+.lunch-go-explore{margin-left:8px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
+/* 마을 복구(5.6절) */
+.village-panel{max-width:1440px;margin:0 auto 16px}
+.village-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-top:10px}
+.village-map{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px;border-radius:18px;background:linear-gradient(160deg,#cfe3b4,#b8d39a);align-content:start}
+.village-map.decorated{background:linear-gradient(160deg,#f3d9e4,#cfe3b4 40%,#b8d39a)}
+.village-tile{position:relative;display:grid;justify-items:center;gap:2px;padding:12px 6px;border:2px solid transparent;border-radius:14px;background:rgba(255,253,245,.85);cursor:pointer;font-family:"Gowun Dodum"}
+.village-tile.on{border-color:var(--ink)}
+.village-tile.level-0 .village-look{filter:grayscale(.85) brightness(.9)}
+.village-tile.soon{opacity:.55}
+.village-tile b{font-size:12px}.village-tile small{font-size:11px;color:#a0702a;letter-spacing:.05em}
+.village-look{font-size:30px;line-height:1.1;white-space:nowrap}.village-look.big{font-size:40px}
+.village-hammer{position:absolute;right:6px;top:4px;font-style:normal;font-size:16px}
+.village-reco{position:absolute;left:6px;top:6px;font:800 10px "Gowun Dodum";font-style:normal;color:#fff;background:#6c9a4f;border-radius:999px;padding:1px 6px}
+.village-detail{display:grid;gap:10px;align-content:start}
+.village-detail-head{display:flex;gap:10px;align-items:center}.village-detail-head div{display:grid}.village-detail-head small{color:#6e786f}
+.village-effects{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.village-effects li{display:grid;grid-template-columns:70px 1fr;gap:6px;font-size:12px;color:#8a8f86}
+.village-effects li.done{color:#41603f}.village-effects li.next{color:var(--ink);font-weight:700}
+.village-needs{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.village-needs li{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(50px,1fr) auto auto;gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:#fffdf8;border:1px solid var(--line);font-size:12px}
+.village-needs li.full{background:#eef5e6}
+.village-need-name{display:grid}.village-need-name small{color:#8a8f86;font-size:10px}
+.village-need-bar{height:6px;border-radius:6px;background:#ece4d2;overflow:hidden}.village-need-bar i{display:block;height:100%;background:#6c9a4f}
+.village-need-count{font-weight:800;white-space:nowrap}.village-need-count small{font-weight:400;color:#8a8f86}
+.village-needs button{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
+.village-needs button:disabled{opacity:.4;cursor:not-allowed}
+.village-actions{display:grid;gap:6px}
+.village-actions .danger{color:#a3361c}
+.village-max{font-weight:800;color:#41603f}
+.village-confirm{max-width:420px}.village-confirm ul{margin:8px 0;padding:0;list-style:none;display:grid;gap:4px;max-height:40vh;overflow:auto}
+.village-confirm li{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:5px 8px;border-radius:8px;background:#fbf6ea}
+.village-confirm-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:760px){.village-layout{grid-template-columns:1fr}.village-map{gap:6px;padding:10px}.village-look{font-size:24px}.village-needs li{grid-template-columns:1fr auto auto}.village-need-bar{grid-column:1/-1;grid-row:2}}
+.village-actions .save-button:disabled,.village-actions .ghost-button:disabled{opacity:.45;cursor:not-allowed}
+/* 2단 메뉴(PC): 그룹 3개 + 현재 그룹의 탭 한 줄 */
+.tabs.two-level{display:grid;gap:8px;justify-items:start}
+.tab-groups{display:flex;flex-wrap:wrap;gap:8px}
+.tab-groups button{position:relative;display:grid;gap:1px;min-width:150px;padding:9px 16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,253,245,.75);color:#4c5a4f;text-align:left;cursor:pointer}
+.tab-groups button b{font:800 14px "Gowun Dodum"}
+.tab-groups button small{font-size:11px;color:#8a8f86;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.tab-groups button.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.tab-groups button.active small{color:#c9d8cb}
+.tab-groups .tab-dot{position:absolute;top:8px;right:10px;width:7px;height:7px;border-radius:50%;background:#e8a530}
+.tab-row{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:14px;background:rgba(255,255,255,.55)}
+.tab-row[hidden]{display:none}
+.tabs.two-level .tab-row button{padding:8px 16px}
+@media(max-width:760px){.tabs.two-level{display:none}}
+/* 텃밭이 아닌 탭: 계절 배너를 한 줄로 */
+.season-strip.compact{margin:8px auto 10px;padding:8px 18px;border-radius:16px;grid-template-columns:auto 1fr;gap:20px;box-shadow:none}
+.season-strip.compact .eyebrow{display:none}
+.season-strip.compact .season-copy{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.season-strip.compact .season-copy h2{font-size:17px;margin:0}
+.season-strip.compact .season-copy p{font-size:12px}
+.season-strip.compact .season-track{padding:2px 0}
+.season-strip.compact .season-step span{width:24px;height:24px;font-size:12px}
+.season-strip.compact .season-step b{display:none}
+.season-strip.compact .season-track:before,.season-strip.compact .season-fill{top:14px}
+.main-menu{max-width:1440px;margin:12px auto 0}
+@media(max-width:760px){.season-strip.compact{grid-template-columns:1fr;gap:6px;padding:8px 12px}.season-strip.compact .season-track{display:none}}
+/* 상단바: 좁은 PC 폭에서 로고가 줄바꿈되지 않게 */
+.brand h1{white-space:nowrap}
+@media(max-width:1100px){.brand p{display:none}.brand h1{font-size:21px}}
+/* 상단바 정리: 시계+시세 한 카드, 미션·창고 작은 버튼, 계정·설정 메뉴 하나 */
+.status-card.clock{min-width:150px}
+.top-action.compact{min-width:0;display:flex;align-items:center;gap:6px;padding:8px 12px}
+.top-action.compact span{font-size:15px;color:inherit;letter-spacing:0}
+.top-action.compact .ta-label{display:none}
+.top-action.compact strong{font-size:14px}
+.top-menu{position:relative}
+.top-menu-caret{font-style:normal;font-size:10px;opacity:.7;margin-left:2px}
+.top-menu-backdrop{position:fixed;inset:0;z-index:20;border:0;padding:0;background:transparent;cursor:default}
+.top-menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:21;display:grid;min-width:220px;padding:6px;border:1px solid var(--line);border-radius:14px;background:#fffdf8;box-shadow:0 12px 30px rgba(30,40,30,.18)}
+.top-menu-list button{display:grid;gap:1px;border:0;border-radius:10px;padding:10px 12px;background:transparent;text-align:left;font:700 13px "Gowun Dodum";color:var(--ink);cursor:pointer}
+.top-menu-list button:hover{background:#f1ead9}
+.top-menu-list small{font-weight:400;font-size:11px;color:#7a847c}
+/* 날씨·효과 줄을 계절 배너 안으로 */
+.season-strip .buff-bar{grid-column:1/-1;margin:0;max-width:none}
+.season-strip.compact{grid-template-columns:auto minmax(0,1fr) minmax(160px,280px)}
+.season-strip.compact .buff-bar{grid-column:auto;order:2;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.season-strip.compact .buff-bar::-webkit-scrollbar{display:none}
+.season-strip.compact .season-track{order:3}
+.season-strip.compact .buff-chip{flex:none}
+@media(max-width:760px){
+  .season-strip.compact{grid-template-columns:1fr}
+  .top-action.compact{padding:6px 8px}.top-action.compact span{font-size:13px}.top-action.compact strong{font-size:12px}
+  .status-card.clock{min-width:0}
+  .status-card.clock span{white-space:nowrap}
+}
+/* 모바일 상단바: 아바타 + 2줄 격자(1줄 자금·위장·메뉴 / 2줄 시계·미션·창고) */
+@media(max-width:760px){
+  .topbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px}
+  .brand h1{display:none}
+  .status-cluster{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto;gap:4px}
+  .status-cluster>.status-card.money{grid-column:1/3;grid-row:1}
+  .status-cluster>.status-card.clock{grid-column:1/3;grid-row:2}
+  .status-cluster>.mission-action{grid-column:3;grid-row:2}
+  .status-cluster>.storage-action{grid-column:4;grid-row:2}
+  .status-cluster>.boss-button{grid-column:3;grid-row:1;width:auto}
+  .status-cluster>.top-menu{grid-column:4;grid-row:1}
+  .status-cluster>.top-menu .account-button{width:100%;height:100%}
+  .account-button span{display:none}
+}
+/* 도박장 UI: 게임 카드·칩 트레이·확률 막대·접는 규칙 */
+.casino-games{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:2px 0 14px}
+.casino-games button{display:grid;justify-items:start;gap:1px;padding:10px 12px;border:1px solid rgba(42,29,20,.18);border-radius:14px;background:#fbf6ea;color:#2a1d14;text-align:left;cursor:pointer;font-family:"Gowun Dodum";transition:transform .12s,box-shadow .12s}
+.casino-games button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 0 rgba(42,29,20,.12)}
+.casino-games button.active{background:#2a1d14;border-color:#2a1d14;color:#ffe19a;box-shadow:0 4px 0 #8f6a2a}
+.casino-games button:disabled:not(.active){opacity:.45;cursor:not-allowed}
+.casino-game-icon{font-size:22px;line-height:1}
+.casino-games b{font-size:14px}
+.casino-games small{font-size:11px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bet-tray{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;margin:14px 0 10px;padding:10px 12px;border-radius:16px;background:#2f4a36;color:#fff;box-shadow:inset 0 2px 0 rgba(255,255,255,.08)}
+.bet-now{display:grid;gap:0;min-width:110px}
+.bet-now small{font-size:10px;letter-spacing:.08em;color:#c9d8cb}
+.bet-now b{font:700 18px "Gowun Batang";color:#ffe19a;white-space:nowrap}
+.bet-now em{font-style:normal;font-size:10px;color:#c9d8cb}
+.bet-chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;border:3px dashed rgba(255,255,255,.75);font:800 12px "Gowun Dodum";color:#fff;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.35);transition:transform .12s}
+.chip:hover:not(:disabled){transform:translateY(-2px)}
+.chip.on{outline:3px solid #ffe19a;outline-offset:2px;transform:translateY(-2px)}
+.chip:disabled{opacity:.5;cursor:not-allowed}
+.chip-0{background:#6b8f5e}.chip-1{background:#2f6f90}.chip-2{background:#7a4e9a}.chip-3{background:#2a1d14}
+.chip-allin{background:#c4573b;width:auto;min-width:46px;padding:0 10px;border-radius:999px}
+.bet-input{display:flex;align-items:center;gap:6px;font-size:11px;color:#c9d8cb}
+.bet-input input{width:96px;border:0;border-radius:10px;padding:8px 9px;font:700 13px "Gowun Dodum";background:#fffdf8;color:var(--ink)}
+.odds-bar{display:flex;gap:2px;margin:10px 0 0;border-radius:999px;overflow:hidden;font:700 11.5px "Gowun Dodum";color:#fff}
+.odds-bar span{flex-basis:0;min-width:max-content;padding:6px 10px;text-align:center;white-space:nowrap}
+.odds-bar .win{background:#5a8a3c}.odds-bar .lose{background:#b0473a}.odds-bar .push{background:#9a8f78}
+.casino-rules{margin-top:8px;font-size:12px;color:#6b776d}
+.casino-rules summary{cursor:pointer;list-style:none}
+.casino-rules summary::-webkit-details-marker{display:none}
+.casino-rules summary em{font-style:normal;margin-left:6px;color:#a5762a;text-decoration:underline}
+.casino-rules p{margin:6px 0 0;line-height:1.55}
+.slot-paytable{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.slot-paytable span{white-space:nowrap;gap:6px}
+.casino-stats .rate{grid-column:1/3;position:relative;overflow:hidden}
+.casino-stats .rate i{position:absolute;left:0;bottom:0;height:4px;background:#5a8a3c;border-radius:0 4px 4px 0}
+@media(max-width:760px){
+  .casino-games{grid-template-columns:repeat(2,1fr)}
+  .bet-tray{grid-template-columns:1fr auto;gap:8px}
+  .bet-chips{grid-column:1/-1;grid-row:2;justify-content:space-between}
+  .chip{width:42px;height:42px}
+}
+.casino-games button{grid-template-columns:auto minmax(0,1fr);column-gap:8px;align-items:center}
+.casino-games .casino-game-icon{grid-row:1/3}
+/* 농장 라디오 끄기 */
+.music .music-stop{background:#f1ead9}
+/* 너구리 딜러 부스 */
+.dealer{gap:14px;margin:0 0 12px;padding:10px 14px;border-radius:18px;background:linear-gradient(180deg,#4a3324,#2a1d14);box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+.dealer-card{display:grid;justify-items:center;gap:2px;flex:none;min-width:78px}
+.dealer .dealer-face{width:64px;height:64px;font-size:40px;background:radial-gradient(circle at 50% 35%,#5b4330,#1f150e);border:2px solid #c9a24a;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.dealer-hat{position:absolute;top:-16px;left:50%;transform:translateX(-50%) rotate(-8deg);font-style:normal;font-size:24px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.3))}
+.dealer-name{margin-top:4px;padding:1px 8px;border-radius:6px;background:#c9a24a;color:#2a1d14;font:800 11px "Gowun Dodum";white-space:nowrap}
+.dealer-state{font:700 10px "Gowun Dodum";color:#f3d9a4;white-space:nowrap}
+.dealer .bubble-wrap{flex:1}
+.dealer .bubble{font-size:15px;padding:12px 16px;line-height:1.45}
+.dealer.lose .dealer-face,.dealer.near .dealer-face{border-color:#e2557f}
+.dealer.win .dealer-face,.dealer.jackpot .dealer-face{border-color:#7fb3d5}
+.dealer .laugh-line{color:#ffe19a}
+@media(max-width:760px){.dealer{padding:8px 10px;gap:10px}.dealer-card{min-width:64px}.dealer .dealer-face{width:54px;height:54px;font-size:34px}.dealer .bubble{font-size:13px;padding:9px 12px}}
+.dealer .dealer-face{background:radial-gradient(circle at 50% 40%,#fff6df,#e8c98a)}
+/* 탐험 체력·잃은 채집물 */
+.explore-hp{letter-spacing:1px}.explore-hp.low{background:#ffe1d6}
+.explore-lost{color:#a3361c}

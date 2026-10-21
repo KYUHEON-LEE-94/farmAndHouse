@@ -96,14 +96,14 @@ const capsule = (r: number, length: number) => new THREE.CapsuleGeometry(r, Math
 /** 반짝이는 큰 눈 한 쌍 + 볼터치. */
 function face(g: THREE.Object3D, x: number, y: number, z: number, r: number, spread: number, cheeks = true) {
   [-1, 1].forEach(s => {
-    part(g, sphere(r), "#1d1410", x + s * spread, y, z, [1, 1.15, 0.7], false).userData.eye = true;
+    const eye = part(g, sphere(r), "#241d26", x + s * spread, y, z, [1, 1.15, 0.7], false); eye.userData.eye = true;
     const glint = new THREE.Mesh(sphere(r * 0.38), new THREE.MeshBasicMaterial({ color: "#ffffff" }));
-    glint.position.set(x + s * spread + r * 0.3, y + r * 0.4, z + r * 0.55); g.add(glint);
+    glint.position.set(r * 0.27, r * 0.32, r * 0.88); glint.scale.set(1, 0.87, 1.43); eye.add(glint);
     if (cheeks) { const blush = new THREE.Mesh(sphere(r * 0.75), new THREE.MeshBasicMaterial({ color: "#f59aa8", transparent: true, opacity: 0.75 })); blush.position.set(x + s * spread * 1.55, y - r * 1.3, z - r * 0.15); blush.scale.set(1, 0.6, 0.4); g.add(blush); }
   });
 }
 
-type CritterShape = { len: number; w: number; h: number; leg: number; head: number; ears: "flop" | "point" | "round" | "long" | "none"; tail: number; tailUp?: boolean; fluffyTail?: boolean; snout?: boolean; stripes?: boolean; belly?: string; nose?: string; spot?: string };
+type CritterShape = { len: number; w: number; h: number; leg: number; head: number; ears: "flop" | "point" | "round" | "long" | "none"; tail: number; tailUp?: boolean; fluffyTail?: boolean; snout?: boolean; stripes?: boolean; belly?: string; nose?: string; spot?: string; tabby?: boolean };
 
 /** 네 발 동물 공통 모델(머리가 큰 귀여운 비율). 앞이 +z. */
 function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
@@ -120,11 +120,26 @@ function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
   });
   // 머리(크게)와 얼굴
   const hy = bodyY + r * 0.75 + o.head * 0.35, hz = o.len / 2 - r * 0.2 + o.head * 0.35;
-  part(g, sphere(o.head), c.main, 0, hy, hz);
+  part(g, sphere(o.head), c.main, 0, hy, hz, [1.08, 0.96, 1]);
   if (o.snout) part(g, sphere(o.head * 0.45), o.belly ?? c.light, 0, hy - o.head * 0.3, hz + o.head * 0.75, [1.15, 0.85, 1], false);
   else if (o.belly) part(g, sphere(o.head * 0.55), o.belly, 0, hy - o.head * 0.35, hz + o.head * 0.55, [1.3, 0.8, 0.8], false);
   part(g, sphere(o.head * 0.13), o.nose ?? "#2a1d14", 0, hy - o.head * (o.snout ? 0.22 : 0.18), hz + o.head * (o.snout ? 1.15 : 0.98), [1.3, 1, 1], false);
-  face(g, 0, hy + o.head * 0.12, hz + o.head * 0.82, o.head * 0.16, o.head * 0.42);
+  face(g, 0, hy + o.head * 0.12, hz + o.head * 0.82, o.head * 0.18, o.head * 0.46);
+  // Rounded muzzle pads and a small stitched smile stay legible from the house camera.
+  const muzzleZ = hz + o.head * (o.snout ? 1.07 : 0.91);
+  [-1, 1].forEach(side => {
+    part(g, sphere(o.head * 0.21), o.belly ?? c.light, side * o.head * 0.17, hy - o.head * 0.31, muzzleZ, [1.1, 0.8, 0.5], false);
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(0, hy - o.head * 0.27, muzzleZ + o.head * 0.11),
+      new THREE.Vector3(side * o.head * 0.08, hy - o.head * 0.48, muzzleZ + o.head * 0.11),
+      new THREE.Vector3(side * o.head * 0.22, hy - o.head * 0.36, muzzleZ + o.head * 0.1),
+    );
+    part(g, new THREE.TubeGeometry(curve, 6, o.head * 0.018, 4, false), "#79564e", 0, 0, 0, [1, 1, 1], false);
+  });
+  if (o.tabby) [-1, 0, 1].forEach(i => {
+    const mark = part(g, sphere(o.head * 0.09), c.dark, i * o.head * 0.27, hy + o.head * 0.58, hz + o.head * 0.78, [0.65, 1.7, 0.2], false);
+    mark.rotation.z = -i * 0.25;
+  });
   if (o.stripes) [-1, 1].forEach(s => { const mark = new THREE.Mesh(new THREE.BoxGeometry(o.head * 0.08, o.head * 0.45, 0.01), new THREE.MeshBasicMaterial({ color: "#2a1d14" })); mark.position.set(s * o.head * 0.25, hy + o.head * 0.6, hz + o.head * 0.78); mark.rotation.set(-0.5, 0, s * 0.35); g.add(mark); });
   // 귀
   [-1, 1].forEach(s => {
@@ -135,9 +150,39 @@ function critter(g: THREE.Group, c: ReturnType<typeof shade>, o: CritterShape) {
     if (o.ears === "long") { part(g, capsule(o.head * 0.2, o.head * 1.1), c.main, s * o.head * 0.35, hy + o.head * 1.35, hz - o.head * 0.15, [1, 1, 0.55]).rotation.z = -s * 0.12; part(g, capsule(o.head * 0.1, o.head * 0.9), "#f6b0b8", s * o.head * 0.35, hy + o.head * 1.35, hz - o.head * 0.03, [1, 1, 0.3], false).rotation.z = -s * 0.12; }
   });
   // 꼬리
-  if (o.fluffyTail) { const tail = part(g, capsule(o.h * 0.42, o.h * 1.2), c.dark, 0, bodyY + o.h * 0.9, -o.len / 2 - o.h * 0.2); tail.rotation.x = -0.35; tail.userData.wag = true; }
-  else if (o.tail > 0.06) { const tail = part(g, capsule(0.015 + o.w * 0.06, o.tail), c.main, 0, bodyY + (o.tailUp ? o.tail * 0.4 : 0), -o.len / 2 - o.tail * 0.3); tail.rotation.x = o.tailUp ? -0.4 : -1.1; tail.userData.wag = true; }
-  else part(g, sphere(Math.max(o.tail, 0.04) * 1.3), "#ffffff", 0, bodyY + r * 0.2, -o.len / 2);
+  if (o.tail > 0.06 || o.fluffyTail) {
+    // Rooted curved tail: sway the whole curve from its base rather than a straight rod.
+    const tail = new THREE.Group(); tail.position.set(0, bodyY + r * 0.1, -o.len / 2 + r * 0.15); tail.userData.wag = true; g.add(tail);
+    const length = o.fluffyTail ? o.h * 2 : o.tail;
+    const curve = new THREE.CatmullRomCurve3(o.fluffyTail ? [
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, length * 0.25, -length * 0.42),
+      new THREE.Vector3(0, length * 0.85, -length * 0.55),
+      new THREE.Vector3(0, length * 1.1, -length * 0.2),
+      new THREE.Vector3(0, length * 0.82, length * 0.02),
+    ] : [
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, length * 0.15, -length * 0.35),
+      new THREE.Vector3(length * 0.12, length * (o.tailUp || o.fluffyTail ? 0.7 : 0.3), -length * 0.55),
+      new THREE.Vector3(length * 0.3, length * (o.tailUp || o.fluffyTail ? 0.9 : 0.2), -length * 0.32),
+    ]);
+    const radius = o.fluffyTail ? o.h * 0.38 : 0.012 + o.w * 0.075;
+    const geometry = new THREE.TubeGeometry(curve, 20, radius, 8, false);
+    if (o.fluffyTail) {
+      const positions = geometry.attributes.position;
+      for (let ring = 0; ring <= 20; ring++) {
+        const t = ring / 20, center = curve.getPointAt(t), width = 0.55 + Math.sin(Math.PI * t) * 0.65;
+        for (let side = 0; side <= 8; side++) {
+          const index = ring * 9 + side;
+          positions.setXYZ(index, center.x + (positions.getX(index) - center.x) * width, center.y + (positions.getY(index) - center.y) * width, center.z + (positions.getZ(index) - center.z) * width);
+        }
+      }
+      geometry.computeVertexNormals();
+    }
+    part(tail, geometry, o.fluffyTail ? c.dark : c.main, 0, 0, 0);
+    const tip = curve.getPoint(1);
+    part(tail, sphere(radius * (o.fluffyTail ? 0.55 : 1)), o.fluffyTail ? c.light : c.main, tip.x, tip.y, tip.z, [1, 1, 1], false);
+  } else part(g, sphere(Math.max(o.tail, 0.04) * 1.5), o.ears === "long" ? "#fffaf1" : c.light, 0, bodyY + r * 0.2, -o.len / 2, [1.1, 1, 1]);
 }
 
 const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => void> = {
@@ -198,7 +243,7 @@ const MODELS: Record<string, (g: THREE.Group, c: ReturnType<typeof shade>) => vo
   mirror: (g, c) => { box(g, 0.6, 1, 0.04, c.main, 0, -0.5, -0.01); box(g, 0.5, 0.9, 0.01, "#dfeef3", 0, -0.45, 0.012, { metalness: 0.9, roughness: 0.05 }); },
   walltv: (g, c) => { box(g, 1.3, 0.75, 0.05, c.main, 0, -0.375, -0.01); const screen = box(g, 1.22, 0.67, 0.01, "#5a8fb5", 0, -0.335, 0.016, { emissive: "#5a8fb5", emissiveIntensity: 0.5 }); screen.castShadow = false; },
   dog: (g, c) => critter(g, c, { len: 0.5, w: 0.3, h: 0.28, leg: 0.16, head: 0.2, ears: "flop", tail: 0.2, tailUp: true, snout: true, belly: "#f3e3c4", spot: c.dark.getStyle() }),
-  cat: (g, c) => critter(g, c, { len: 0.44, w: 0.24, h: 0.22, leg: 0.13, head: 0.17, ears: "point", tail: 0.36, tailUp: true, belly: "#fff3e0", nose: "#f2899a" }),
+  cat: (g, c) => critter(g, c, { len: 0.44, w: 0.24, h: 0.22, leg: 0.13, head: 0.17, ears: "point", tail: 0.36, tailUp: true, tabby: true, belly: "#fff3e0", nose: "#f2899a" }),
   rabbit: (g, c) => critter(g, c, { len: 0.3, w: 0.26, h: 0.26, leg: 0.05, head: 0.15, ears: "long", tail: 0.04, belly: "#ffffff", nose: "#f2899a" }),
   mole: (g, c) => critter(g, c, { len: 0.34, w: 0.28, h: 0.22, leg: 0.03, head: 0.12, ears: "none", tail: 0.05, nose: "#f2899a", belly: "#f2b5c4" }),
   weasel: (g, c) => critter(g, c, { len: 0.58, w: 0.15, h: 0.15, leg: 0.08, head: 0.11, ears: "round", tail: 0.28, belly: "#f3e3c4" }),
@@ -310,6 +355,16 @@ function buildItem(item: PlacedItem) {
   MODELS[item.id]?.(group, shade(item.tint ?? item.color));
   if (!item.pet && item.kind !== "rug") toonify(group);
   if (item.pet) {
+    group.traverse(child => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const material = child.material;
+      if (material instanceof THREE.MeshToonMaterial) {
+        child.material = new THREE.MeshStandardMaterial({ color: material.color, roughness: 0.88, metalness: 0, emissive: material.color, emissiveIntensity: 0.035 });
+        material.dispose();
+      } else if (material instanceof THREE.MeshBasicMaterial && material.side === THREE.BackSide) {
+        material.color.set("#725b50"); child.scale.setScalar(1.025);
+      }
+    });
     const blob = new THREE.Mesh(new THREE.CircleGeometry(Math.max(item.size[0], item.size[2]) * 0.45, 20), new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.16, depthWrite: false }));
     blob.rotation.x = -Math.PI / 2; blob.position.y = 0.006; group.add(blob);
     const tails: THREE.Object3D[] = [], eyes: THREE.Object3D[] = [];
@@ -637,7 +692,7 @@ export default function House3D(props: Props) {
         if (!st) { st = { tx: node.position.x, tz: node.position.z, wait: Math.random() * 2, jump: 0 }; state.set(pet.instanceId, st); }
         if (cheerNow?.id === pet.instanceId && time - cheerNow.at < 50 && st.jump <= 0) st.jump = 0.8;
         const base = (pet.story ?? 0) * STORY_HEIGHT;
-        (node.userData.tails as THREE.Object3D[] | undefined)?.forEach(tail => { tail.rotation.z = Math.sin(time / 140 + pet.x) * 0.45; });
+        (node.userData.tails as THREE.Object3D[] | undefined)?.forEach(tail => { tail.rotation.z = Math.sin(time / 320 + pet.x) * 0.23; });
         const blinking = (time + (node.userData.blinkOffset ?? 0)) % 3600 < 130;
         (node.userData.eyes as THREE.Object3D[] | undefined)?.forEach(eye => { eye.scale.y = blinking ? 0.12 : 1.15; });
         if (st.jump > 0) { st.jump -= dt; node.position.y = base + Math.abs(Math.sin((0.8 - st.jump) * Math.PI * 2.5)) * 0.25; return; }

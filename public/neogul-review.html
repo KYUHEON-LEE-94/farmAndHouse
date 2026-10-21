@@ -1,0 +1,95 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>너굴의 도박장 반응</title><style>*{box-sizing:border-box}body{margin:0;padding:24px;background:#f6f0e4;font-family:sans-serif}h1{font-size:24px}h2{font-size:13px;color:#73573e}main{display:grid;gap:18px;grid-template-columns:repeat(2,minmax(0,1fr))}@media(max-width:700px){body{padding:12px}main{grid-template-columns:1fr}}/* One shared transparent atlas keeps all four poses cached between reactions. */
+.neogul-mascot {
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  vertical-align: middle;
+  pointer-events: none;
+}
+.dealer .dealer-face.neogul-dealer {
+  width: 108px;
+  height: 108px;
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 50% 80%, #f6dfab 0%, #fff6df 65%);
+}
+.neogul-taunt {
+  width: min(70vw, calc(210px * var(--taunt-scale, 1)));
+  aspect-ratio: 1;
+}
+.neogul-bailout {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 6px 5px #62452c20);
+}
+@media (max-width: 760px) {
+  .dealer .dealer-face.neogul-dealer { width: 82px; height: 82px; }
+  .neogul-bailout { width: 138px; height: 138px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dealer .dealer-face.neogul-dealer,
+  .taunt-body.neogul-taunt { animation: none; }
+  .taunt-raccoon:has(.neogul-taunt) { animation: none; }
+}
+.neogul-booth {
+  --neogul-accent: #f4cd76;
+  position: relative;
+  margin: 0 0 16px;
+  overflow: hidden;
+  border: 1px solid #796044;
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 10% 80%, #6e5034, transparent 65%), #30261f;
+  color: #fff5df;
+}
+.neogul-booth.is-near { --neogul-accent: #f4b49e; }
+.neogul-booth.is-win { --neogul-accent: #b9dcb7; }
+.neogul-booth.is-push { --neogul-accent: #c5d4e2; }
+.neogul-booth.is-jackpot { --neogul-accent: #ffe48a; border-color: #f6d16c; }
+.neogul-booth-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #ffffff18; font-size: 11px; color: #d9c7ae; }
+.neogul-booth-top b { color: #fff1ce; font-size: 14px; margin-left: 5px; }
+.neogul-booth-tag { color: var(--neogul-accent); font-weight: 800; }
+.neogul-booth-scene { display: grid; grid-template-columns: 176px minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px 18px 16px 8px; }
+.neogul-stage { position: relative; height: 188px; isolation: isolate; }
+.neogul-stage-halo { position: absolute; inset: 10px 0 0; z-index: -1; border-radius: 50%; background: radial-gradient(ellipse, #ffe5ad28, transparent 70%); }
+.neogul-stage-shadow { position: absolute; bottom: 19px; left: 24%; width: 52%; height: 14px; border-radius: 50%; background: #160f0c65; }
+.neogul-actor { position: absolute; width: 176px; height: 176px; left: 0; bottom: 10px; transform-origin: 50% 85%; }
+.neogul-stamp { position: absolute; left: 50%; bottom: 0; width: max-content; max-width: 95%; padding: 4px 10px; border: 2px solid currentColor; border-radius: 7px; color: var(--neogul-accent); background: #33251ef0; font: 900 19px/1.15 "Gowun Batang", serif; transform: translateX(-50%) rotate(-7deg); animation: neogulStamp .38s .28s both; }
+.neogul-dialogue { min-width: 0; position: relative; padding-bottom: 20px; }
+.neogul-aside { display: block; margin-bottom: 8px; color: var(--neogul-accent); font-size: 11px; font-weight: 700; }
+.neogul-line { position: relative; margin: 0; padding: 15px 17px; border-radius: 4px 17px 17px 17px; background: #fff9ed; box-shadow: 0 4px 0 #0003; color: #493425; font: 700 18px/1.6 "Gowun Batang", serif; word-break: keep-all; overflow-wrap: anywhere; animation: neogulSpeak .28s .15s both; }
+.neogul-receipt { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; margin-top: 13px; padding-top: 8px; border-top: 1px dashed #ffffff30; font-size: 11px; color: #d9c7ae; }
+.neogul-receipt strong { color: var(--neogul-accent); font-size: 18px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.neogul-giggle { position: absolute; right: 0; bottom: -6px; color: var(--neogul-accent); font: 800 13px "Gowun Dodum", sans-serif; animation: neogulGiggle .35s .65s both; }
+.neogul-particles { position: absolute; inset: 0; pointer-events: none; }
+.neogul-particles i { position: absolute; top: 60%; opacity: 0; font-style: normal; color: var(--neogul-accent); font-weight: 900; font-size: 18px; animation: neogulSpark 1.15s ease-out both; }
+.is-lose .neogul-actor { animation: neogulChuckle .22s .1s 6 alternate; }
+.is-near .neogul-actor { animation: neogulTease .8s .1s 2; }
+.is-win .neogul-actor, .is-jackpot .neogul-actor { animation: neogulDeflate .65s .1s both; }
+.is-push .neogul-actor { animation: neogulNod .6s .1s; }
+.is-jackpot .neogul-stage-halo { animation: neogulGold 1s 2 alternate; }
+@keyframes neogulChuckle { from { transform: rotate(-4deg) translateY(0); } to { transform: rotate(4deg) translateY(-5px); } }
+@keyframes neogulTease { 30% { transform: translateX(-6px) rotate(-7deg); } 65% { transform: translateX(4px) rotate(5deg); } }
+@keyframes neogulDeflate { 35% { transform: translateY(-6px) scale(1.04); } 100% { transform: translateY(4px) rotate(-5deg) scale(.95); } }
+@keyframes neogulNod { 50% { transform: translateY(7px) rotate(4deg); } }
+@keyframes neogulStamp { from { opacity: 0; transform: translateX(-50%) rotate(-14deg) scale(1.8); } to { opacity: 1; transform: translateX(-50%) rotate(-7deg) scale(1); } }
+@keyframes neogulSpeak { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@keyframes neogulGiggle { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes neogulSpark { 0% { opacity: 0; transform: translateY(0) scale(.5); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-95px) rotate(18deg) scale(1.1); } }
+@keyframes neogulGold { to { background-color: #ffdd7525; } }
+@media (max-width: 520px) {
+  .neogul-booth-top { padding: 9px 12px; font-size: 10px; }
+  .neogul-booth-scene { grid-template-columns: 100px minmax(0, 1fr); padding: 10px 12px 14px 4px; gap: 6px; }
+  .neogul-stage { height: 142px; }
+  .neogul-actor { width: 112px; height: 112px; left: -6px; bottom: 20px; }
+  .neogul-stamp { padding: 4px 5px; font-size: 14px; bottom: 8px; }
+  .neogul-line { padding: 11px 12px; font-size: 14px; line-height: 1.65; }
+  .neogul-aside { font-size: 10px; }
+  .neogul-receipt strong { font-size: 15px; }
+  .neogul-giggle { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .neogul-booth *, .neogul-booth *::before, .neogul-booth *::after { animation: none !important; }
+  .neogul-particles { display: none; }
+}
+</style><h1>너굴의 도박장 · 여섯 가지 반응</h1><main><article><h2>대기</h2><section class="neogul-booth is-idle" aria-label="딜러 너굴"><div class="neogul-booth-top"><span>뒷골목 터줏대감 <b>너굴</b></span><span class="neogul-booth-tag">오늘도 능청 영업</span></div><div class="neogul-booth-scene"><div class="neogul-stage" aria-hidden="true"><span class="neogul-stage-halo"></span><span class="neogul-stage-shadow"></span><span class="neogul-actor"><span class="neogul-mascot" aria-hidden="true" style="background-image:url(&quot;images/mascot/neogul-poses.png&quot;);background-position:0% 0%;background-size:200% 200%"></span></span></div><div class="neogul-dialogue" role="status" aria-live="polite" aria-atomic="true"><span class="neogul-aside">입꼬리부터 수상한 딜러</span><p class="neogul-line">어서 와~ 카드는 내가 섞고, 표정은 네가 관리해. ㅋㅋ</p><div class="neogul-receipt"><span>“정산은 정확하게. 약 올리기는 덤으로.”</span></div></div></div></section></article><article><h2>패배</h2><section class="neogul-booth is-lose" aria-label="딜러 너굴"><div class="neogul-booth-top"><span>뒷골목 터줏대감 <b>너굴</b></span><span class="neogul-booth-tag">너굴 승</span></div><div class="neogul-booth-scene"><div class="neogul-stage" aria-hidden="true"><span class="neogul-stage-halo"></span><span class="neogul-stage-shadow"></span><span class="neogul-actor"><span class="neogul-mascot" aria-hidden="true" style="background-image:url(&quot;images/mascot/neogul-poses.png&quot;);background-position:100% 0%;background-size:200% 200%"></span></span><span class="neogul-particles"><i style="left:8%;animation-delay:0.18s">ㅋ</i><i style="left:23%;animation-delay:0.25s">🌰</i><i style="left:38%;animation-delay:0.32s">ㅋ</i><i style="left:53%;animation-delay:0.39s">✦</i><i style="left:68%;animation-delay:0.46s">ㅋㅋ</i><i style="left:83%;animation-delay:0.53s">🌰</i></span><strong class="neogul-stamp">도토리 적립</strong></div><div class="neogul-dialogue" role="status" aria-live="polite" aria-atomic="true"><span class="neogul-aside">3연패 목격 중 · 꼬리까지 신난 너굴</span><p class="neogul-line">도토리 적립 완료~ 아, 네 이름 말고 내 이름으로. ㅋㅋ</p><div class="neogul-receipt"><span>잃은 금액</span><strong>−500원</strong></div><span class="neogul-giggle" aria-hidden="true">푸하하! ㅋㅋㅋ</span></div></div></section></article><article><h2>아슬아슬</h2><section class="neogul-booth is-near" aria-label="딜러 너굴"><div class="neogul-booth-top"><span>뒷골목 터줏대감 <b>너굴</b></span><span class="neogul-booth-tag">아슬아슬… 꽝</span></div><div class="neogul-booth-scene"><div class="neogul-stage" aria-hidden="true"><span class="neogul-stage-halo"></span><span class="neogul-stage-shadow"></span><span class="neogul-actor"><span class="neogul-mascot" aria-hidden="true" style="background-image:url(&quot;images/mascot/neogul-tease.png&quot;);background-position:center;background-size:100% 100%"></span></span><span class="neogul-particles"><i style="left:8%;animation-delay:0.18s">?</i><i style="left:23%;animation-delay:0.25s">✦</i><i style="left:38%;animation-delay:0.32s">ㅋ</i><i style="left:53%;animation-delay:0.39s">!</i><i style="left:68%;animation-delay:0.46s">✧</i><i style="left:83%;animation-delay:0.53s">ㅋ</i></span><strong class="neogul-stamp">메~롱</strong></div><div class="neogul-dialogue" role="status" aria-live="polite" aria-atomic="true"><span class="neogul-aside">마지막 한 칸의 배신</span><p class="neogul-line">🍋🍋까지는 좋았지? 마지막 친구가 눈치가 없네~ 메롱.</p><div class="neogul-receipt"><span>잃은 금액</span><strong>−500원</strong></div><span class="neogul-giggle" aria-hidden="true">메롱은 서비스~</span></div></div></section></article><article><h2>승리</h2><section class="neogul-booth is-win" aria-label="딜러 너굴"><div class="neogul-booth-top"><span>뒷골목 터줏대감 <b>너굴</b></span><span class="neogul-booth-tag">플레이어 승</span></div><div class="neogul-booth-scene"><div class="neogul-stage" aria-hidden="true"><span class="neogul-stage-halo"></span><span class="neogul-stage-shadow"></span><span class="neogul-actor"><span class="neogul-mascot" aria-hidden="true" style="background-image:url(&quot;images/mascot/neogul-poses.png&quot;);background-position:0% 100%;background-size:200% 200%"></span></span><span class="neogul-particles"><i style="left:8%;animation-delay:0.18s">✦</i><i style="left:23%;animation-delay:0.25s">🪙</i><i style="left:38%;animation-delay:0.32s">✧</i><i style="left:53%;animation-delay:0.39s">✦</i><i style="left:68%;animation-delay:0.46s">🪙</i><i style="left:83%;animation-delay:0.53s">✧</i></span><strong class="neogul-stamp">흥! 가져가</strong></div><div class="neogul-dialogue" role="status" aria-live="polite" aria-atomic="true"><span class="neogul-aside">축하는 아주 작게</span><p class="neogul-line">…축하해. 방금 말 작았다고? 두 번은 안 해. 흥.</p><div class="neogul-receipt"><span>받은 금액 · 판돈 포함</span><strong>+950원</strong></div></div></div></section></article><article><h2>잭팟</h2><section class="neogul-booth is-jackpot" aria-label="딜러 너굴"><div class="neogul-booth-top"><span>뒷골목 터줏대감 <b>너굴</b></span><span class="neogul-booth-tag">JACKPOT</span></div><div class="neogul-booth-scene"><div class="neogul-stage" aria-hidden="true"><span class="neogul-stage-halo"></span><span class="neogul-stage-shadow"></span><span class="neogul-actor"><span class="neogul-mascot" aria-hidden="true" style="background-image:url(&quot;images/mascot/neogul-poses.png&quot;);background-position:0% 100%;background-size:200% 200%"></span></span><span class="neogul-particles"><i style="left:8%;animation-delay:0.18s">★</i><i style="left:23%;animation-delay:0.25s">🪙</i><i style="left:38%;animation-delay:0.32s">✦</i><i style="left:53%;animation-delay:0.39s">★</i><i style="left:68%;animation-delay:0.46s">🪙</i><i style="left:83%;animation-delay:0.53s">✦</i></span><strong class="neogul-stamp">금고 비상!</strong></div><div class="neogul-dialogue" role="status" aria-live="polite" aria-atomic="true"><span class="neogul-aside">너굴 간식 예산 긴급 회의</span><p class="neogul-line">잠깐. 내 도토리 금고도 마음의 준비가 필요하거든?!</p><div class="neogul-receipt"><span>받은 금액 · 판돈 포함</span><strong>+150,000,000원</strong></div></div></div></section></article><article><h2>무승부</h2><section class="neogul-booth is-push" aria-label="딜러 너굴"><div class="neogul-booth-top"><span>뒷골목 터줏대감 <b>너굴</b></span><span class="neogul-booth-tag">무승부</span></div><div class="neogul-booth-scene"><div class="neogul-stage" aria-hidden="true"><span class="neogul-stage-halo"></span><span class="neogul-stage-shadow"></span><span class="neogul-actor"><span class="neogul-mascot" aria-hidden="true" style="background-image:url(&quot;images/mascot/neogul-poses.png&quot;);background-position:0% 0%;background-size:200% 200%"></span></span><span class="neogul-particles"><i style="left:8%;animation-delay:0.18s">=</i><i style="left:23%;animation-delay:0.25s">✧</i><i style="left:38%;animation-delay:0.32s">=</i><i style="left:53%;animation-delay:0.39s">✧</i></span><strong class="neogul-stamp">쌤쌤!</strong></div><div class="neogul-dialogue" role="status" aria-live="polite" aria-atomic="true"><span class="neogul-aside">자존심은 각자 챙기기</span><p class="neogul-line">동점? 흥, 악수는 생략하고 판돈만 돌려줄게.</p><div class="neogul-receipt"><span>돌려받은 판돈</span><strong>500원</strong></div></div></div></section></article></main></html>
