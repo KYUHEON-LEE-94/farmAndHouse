@@ -6,7 +6,7 @@ import type { Season } from "../fishing";
 import { TEST_MODE } from "../testMode";
 
 /** 탐험 기능 공개 여부. 운영 공개 승인 뒤 true로 바꾼다(10절 출시 기준). 로컬 테스트 모드에서는 항상 보인다. */
-export const EXPLORE_RELEASED = false;
+export const EXPLORE_RELEASED = true; // 2026-10-21 운영 공개(사용자 요청)
 export const EXPLORE_ENABLED = EXPLORE_RELEASED || TEST_MODE;
 
 export type ForageItem = {

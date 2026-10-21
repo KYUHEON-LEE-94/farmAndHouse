@@ -2,7 +2,7 @@
 import { TEST_MODE } from "../testMode";
 
 /** 마을 기능 공개 여부. 운영 공개 승인 뒤 true로 바꾼다. 로컬 테스트 모드에서는 항상 보인다. */
-export const VILLAGE_RELEASED = false;
+export const VILLAGE_RELEASED = true; // 2026-10-21 운영 공개(사용자 요청)
 export const VILLAGE_ENABLED = VILLAGE_RELEASED || TEST_MODE;
 export const MAX_FACILITY_LEVEL = 3;
 
