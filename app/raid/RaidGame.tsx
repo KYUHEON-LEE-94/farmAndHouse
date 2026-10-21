@@ -280,14 +280,17 @@ function paintWorld(T: Terrain) {
   const c = document.createElement("canvas"); c.width = WORLD_W; c.height = WORLD_H;
   const g = c.getContext("2d")!, canal = T.zone === "canal", maple = T.zone === "maple", frost = T.zone === "frost", ancient = T.zone === "ancient", core = T.zone === "core";
   // 구역별 색: 풀(단풍 덤불)·진흙(낙엽 더미/빙판)·얕은 물(눈 더미)·벽(울타리/얼음 기둥)
-  const P = ancient ? { grass: "rgba(40,90,50,.5)", grassLine: "rgba(20,60,30,.55)", mud: "rgba(80,70,40,.5)", mudDot: "rgba(60,50,30,.5)", shallow: "rgba(150,110,170,.42)", wall: "#5a3f28", wallHi: "#7a5a38", wallLine: "#2f2014" }
+  const sky = T.zone === "sky", voidZ = T.zone === "void";
+  const P = sky ? { grass: "rgba(200,225,250,.45)", grassLine: "rgba(150,185,220,.5)", mud: "rgba(170,180,200,.5)", mudDot: "rgba(230,240,255,.6)", shallow: "rgba(255,255,255,.4)", wall: "#9aa3b5", wallHi: "#c3cad8", wallLine: "#6f7890" }
+    : voidZ ? { grass: "rgba(80,60,140,.4)", grassLine: "rgba(50,35,100,.5)", mud: "rgba(60,45,100,.5)", mudDot: "rgba(180,150,255,.5)", shallow: "rgba(120,90,200,.35)", wall: "#2e2550", wallHi: "#4a3d78", wallLine: "#1a1430" }
+    : ancient ? { grass: "rgba(40,90,50,.5)", grassLine: "rgba(20,60,30,.55)", mud: "rgba(80,70,40,.5)", mudDot: "rgba(60,50,30,.5)", shallow: "rgba(150,110,170,.42)", wall: "#5a3f28", wallHi: "#7a5a38", wallLine: "#2f2014" }
     : core ? { grass: "rgba(90,60,140,.4)", grassLine: "rgba(60,40,110,.5)", mud: "rgba(70,50,110,.5)", mudDot: "rgba(150,110,220,.5)", shallow: "rgba(120,90,200,.35)", wall: "#3b2f5c", wallHi: "#5a4a86", wallLine: "#1c1530" }
     : maple ? { grass: "rgba(196,84,40,.42)", grassLine: "rgba(140,40,20,.5)", mud: "rgba(150,95,40,.55)", mudDot: "rgba(205,120,40,.6)", shallow: "rgba(255,255,255,.55)", wall: "#6b3f2a", wallHi: "#8d5a3b", wallLine: "#3f2416" }
     : frost ? { grass: "rgba(200,220,235,.5)", grassLine: "rgba(120,150,175,.5)", mud: "rgba(170,215,240,.6)", mudDot: "rgba(235,250,255,.8)", shallow: "rgba(250,252,255,.7)", wall: "#8fb6cc", wallHi: "#c4e2f0", wallLine: "#4e7890" }
     : { grass: "rgba(70,130,50,.45)", grassLine: "rgba(40,90,30,.55)", mud: "rgba(120,85,50,.55)", mudDot: "rgba(90,60,35,.5)", shallow: "rgba(110,170,210,.35)", wall: "#8a8578", wallHi: "#a8a294", wallLine: "#5e594e" };
   let seed = (T.seed % 9973) + 3; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   const base = g.createRadialGradient(WORLD_W / 2, WORLD_H / 2, 100, WORLD_W / 2, WORLD_H / 2, 1000);
-  if (ancient) { base.addColorStop(0, "#6f9a5c"); base.addColorStop(1, "#2f5236"); } else if (core) { base.addColorStop(0, "#3a3360"); base.addColorStop(1, "#16122b"); } else if (canal) { base.addColorStop(0, "#94b9ad"); base.addColorStop(1, "#5b7f78"); } else if (maple) { base.addColorStop(0, "#e3b878"); base.addColorStop(1, "#b07a43"); } else if (frost) { base.addColorStop(0, "#eef6fb"); base.addColorStop(1, "#a9c3d3"); } else { base.addColorStop(0, "#b8dc8f"); base.addColorStop(1, "#86b562"); }
+  if (sky) { base.addColorStop(0, "#d9ecfb"); base.addColorStop(1, "#8fb3d6"); } else if (voidZ) { base.addColorStop(0, "#2a2050"); base.addColorStop(1, "#0c0a1c"); } else if (ancient) { base.addColorStop(0, "#6f9a5c"); base.addColorStop(1, "#2f5236"); } else if (core) { base.addColorStop(0, "#3a3360"); base.addColorStop(1, "#16122b"); } else if (canal) { base.addColorStop(0, "#94b9ad"); base.addColorStop(1, "#5b7f78"); } else if (maple) { base.addColorStop(0, "#e3b878"); base.addColorStop(1, "#b07a43"); } else if (frost) { base.addColorStop(0, "#eef6fb"); base.addColorStop(1, "#a9c3d3"); } else { base.addColorStop(0, "#b8dc8f"); base.addColorStop(1, "#86b562"); }
   g.fillStyle = base; g.fillRect(0, 0, WORLD_W, WORLD_H);
   if (ancient) {
     for (let i = 0; i < 360; i++) { g.fillStyle = `rgba(${20 + r() * 40},${70 + r() * 60},${30 + r() * 30},${0.25 + r() * 0.3})`; g.beginPath(); g.ellipse(r() * WORLD_W, r() * WORLD_H, 5 + r() * 12, 3 + r() * 6, r() * 3, 0, Math.PI * 2); g.fill(); }
@@ -319,7 +322,7 @@ function paintWorld(T: Terrain) {
   // 얕은 물
   for (const a of T.shallow) { g.fillStyle = P.shallow; roundRect(g, a.x, a.y, a.w, a.h, 34); g.fill(); g.strokeStyle = "rgba(220,240,255,.4)"; g.lineWidth = 1.5; for (let i = 0; i < 6; i++) { const x = a.x + 20 + r() * (a.w - 40), y = a.y + 15 + r() * (a.h - 30); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 10, y - 4, x + 20, y); g.stroke(); } }
   // 깊은 물(진입 불가)과 돌다리
-  for (const a of T.deep) { const w = g.createLinearGradient(0, a.y, 0, a.y + a.h); w.addColorStop(0, "#3d7aa6"); w.addColorStop(0.5, "#2b5f88"); w.addColorStop(1, "#3d7aa6"); g.fillStyle = w; g.fillRect(a.x, a.y, a.w, a.h); g.strokeStyle = "rgba(255,255,255,.22)"; g.lineWidth = 2; for (let i = 0; i < a.w / 40; i++) { const x = a.x + r() * a.w, y = a.y + 10 + r() * (a.h - 20); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 14, y - 5, x + 28, y); g.stroke(); } }
+  for (const a of T.deep) { const w = g.createLinearGradient(0, a.y, 0, a.y + a.h); if (sky) { w.addColorStop(0, "#5f86b8"); w.addColorStop(0.5, "#eaf4ff"); w.addColorStop(1, "#5f86b8"); } else { w.addColorStop(0, "#3d7aa6"); w.addColorStop(0.5, "#2b5f88"); w.addColorStop(1, "#3d7aa6"); } g.fillStyle = w; g.fillRect(a.x, a.y, a.w, a.h); g.strokeStyle = "rgba(255,255,255,.22)"; g.lineWidth = 2; for (let i = 0; i < a.w / 40; i++) { const x = a.x + r() * a.w, y = a.y + 10 + r() * (a.h - 20); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 14, y - 5, x + 28, y); g.stroke(); } }
   for (const b of T.bridges) { g.fillStyle = "#a89a84"; g.fillRect(b.x, b.y, b.w, b.h); g.strokeStyle = "#7d705c"; g.lineWidth = 2; for (let y = b.y + 8; y < b.y + b.h; y += 16) { g.beginPath(); g.moveTo(b.x, y); g.lineTo(b.x + b.w, y); g.stroke(); } g.strokeStyle = "#5c5140"; g.lineWidth = 4; g.strokeRect(b.x, b.y, b.w, b.h); }
   // 전도성 웅덩이
   for (const u of T.puddles) { g.fillStyle = "rgba(90,150,210,.45)"; g.beginPath(); g.arc(u.x, u.y, u.r, 0, Math.PI * 2); g.fill(); g.strokeStyle = "rgba(255,240,120,.7)"; g.setLineDash([6, 5]); g.lineWidth = 2; g.stroke(); g.setLineDash([]); g.font = "18px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#ffe36a"; g.fillText("⚡", u.x, u.y); }
@@ -394,7 +397,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   if (T.chance && !T.chance.used) {
     const ch = T.chance, glow = 0.5 + 0.5 * Math.sin(clock * 4);
     ctx.beginPath(); ctx.arc(ch.x, ch.y, ch.r + 6 + glow * 4, 0, Math.PI * 2); ctx.fillStyle = fieldLike(T) ? `rgba(255,216,74,${0.18 + glow * 0.15})` : T.zone === "frost" ? `rgba(255,170,90,${0.2 + glow * 0.12})` : `rgba(150,230,255,${0.2 + glow * 0.12})`; ctx.fill();
-    ctx.fillStyle = "#000"; ctx.font = `${fieldLike(T) ? 30 : 34}px ${EMOJI_FONT}`; ctx.fillText({ field: "🌻", maple: "🍁", canal: "⛲", frost: "🔥", ancient: "🌺", core: "💎" }[T.zone], ch.x, ch.y);
+    ctx.fillStyle = "#000"; ctx.font = `${fieldLike(T) ? 30 : 34}px ${EMOJI_FONT}`; ctx.fillText({ field: "🌻", maple: "🍁", canal: "⛲", frost: "🔥", ancient: "🌺", core: "💎", sky: "☁️", void: "🌟" }[T.zone], ch.x, ch.y);
   }
   // 정예 예고(바닥 표시)
   for (const w of s.warns) { const left = w.at - s.t; ctx.beginPath(); ctx.arc(w.x, w.y, 30, 0, Math.PI * 2); ctx.strokeStyle = `rgba(240,150,40,${0.5 + 0.5 * Math.sin(clock * 10)})`; ctx.lineWidth = 3; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#f0a030"; ctx.font = "800 16px sans-serif"; ctx.fillText(`! ${Math.ceil(left)}`, w.x, w.y); }
@@ -620,7 +623,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   { const mw = 168, mh = 96, mx0 = W - mw - 12, my0 = 16, k = mw / WORLD_W;
     panel(ctx, mx0 - 4, my0 - 4, mw + 8, mh + 8);
     ctx.save(); roundRect(ctx, mx0, my0, mw, mh, 6); ctx.clip();
-    ctx.fillStyle = { canal: "rgba(140,180,170,.35)", field: "rgba(150,200,120,.3)", maple: "rgba(220,150,80,.35)", frost: "rgba(210,230,245,.4)", ancient: "rgba(70,120,70,.4)", core: "rgba(90,70,150,.45)" }[T.zone]; ctx.fillRect(mx0, my0, mw, mh);
+    ctx.fillStyle = { canal: "rgba(140,180,170,.35)", field: "rgba(150,200,120,.3)", maple: "rgba(220,150,80,.35)", frost: "rgba(210,230,245,.4)", ancient: "rgba(70,120,70,.4)", core: "rgba(90,70,150,.45)", sky: "rgba(170,200,235,.45)", void: "rgba(40,30,70,.5)" }[T.zone]; ctx.fillRect(mx0, my0, mw, mh);
     ctx.fillStyle = "rgba(50,110,170,.9)"; for (const a of T.deep) ctx.fillRect(mx0 + a.x * k, my0 + a.y * k, a.w * k, a.h * k);
     ctx.fillStyle = "#ccc"; for (const a of T.walls) ctx.fillRect(mx0 + a.x * k, my0 + a.y * k, Math.max(2, a.w * k), Math.max(2, a.h * k));
     ctx.fillStyle = "#6b4a2a"; for (const gt of T.gates) if (gt.closed) ctx.fillRect(mx0 + gt.rect.x * k, my0 + gt.rect.y * k, gt.rect.w * k, Math.max(2, gt.rect.h * k));

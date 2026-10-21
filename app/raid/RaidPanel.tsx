@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY, MONSTERS, SPECIAL_MASTERY } from "./data";
+import { zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, RAID_DATA_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY, MONSTERS, SPECIAL_MASTERY } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance, pityChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -63,8 +63,10 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
   const [view, setView] = useState<"tower" | "forge">("tower");
   const [gearOpen, setGearOpen] = useState(false);
   /** 테스트 모드(로컬 개발 서버)에서는 모든 층을 열어 바로 체험한다. 운영 빌드에서는 TEST_MODE가 꺼진다. */
-  const unlockedFloor = TEST_MODE ? RAID_MAX_FLOOR : raid.unlockedFloor;
-  const [floorNo, setFloorNo] = useState(Math.min(unlockedFloor, RAID_MAX_FLOOR));
+  // 로컬 테스트 모드는 데이터가 있는 층(31층 이상 숨김 층 포함)까지 연다. 운영은 RAID_MAX_FLOOR까지.
+  const maxFloor = TEST_MODE ? RAID_DATA_FLOOR : RAID_MAX_FLOOR;
+  const unlockedFloor = TEST_MODE ? maxFloor : raid.unlockedFloor;
+  const [floorNo, setFloorNo] = useState(Math.min(unlockedFloor, maxFloor));
   const [slots, setSlots] = useState<(string | null)[]>([null, null, null]);
   const [running, setRunning] = useState<{ foods: FoodSlot[]; id: number; training?: Evolution } | null>(null);
   const [outcome, setOutcome] = useState<RaidOutcome | null>(null);
@@ -108,7 +110,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
     if (running?.training) { const name = EVOLUTIONS[running.training].name; setRunning(null); setView("forge"); setOutcome({ result: { ...result, floor: 0 }, lines: [`🎯 ${name} 체험 끝 · 처치 ${result.kills}`] }); return; }
     const lines = onResult(result, running?.foods ?? []);
     setOutcome({ result, lines }); setRunning(null); setSlots([null, null, null]);
-    if (result.cleared) setFloorNo(n => Math.min(RAID_MAX_FLOOR, n + 1));
+    if (result.cleared) setFloorNo(n => Math.min(maxFloor, n + 1));
   };
 
   if (running?.training) return <div className="raid-run">
@@ -127,7 +129,7 @@ export default function RaidPanel({ raid, dishStock, raidItems, hold, avatar, fo
       {/* 탑: 아래가 1층, 위로 올라간다 */}
       <div className="raid-tower" role="radiogroup" aria-label="층 선택">
         <div className="raid-tower-top">🏯 월루탑</div>
-        {[...FLOORS].reverse().map(f => { const locked = f.floor > unlockedFloor, boss = f.floor % 5 === 0, cleared = raid.firstClears.includes(f.floor);
+        {FLOORS.filter(f => f.floor <= maxFloor).reverse().map(f => { const locked = f.floor > unlockedFloor, boss = f.floor % 5 === 0, cleared = raid.firstClears.includes(f.floor);
           return <button key={f.floor} role="radio" aria-checked={floor.floor === f.floor} disabled={locked} onClick={() => setFloorNo(f.floor)}
             className={`raid-storey ${floor.floor === f.floor ? "on" : ""} ${boss ? "boss" : ""} ${cleared ? "cleared" : ""} ${zoneOf(f.floor)}`}>
             <b>{f.floor}F</b><span>{locked ? "🔒 잠김" : boss ? `${f.boss.icon} ${f.boss.name}` : f.zone}{(f.floor === 1 || f.floor === 21 || f.floor === 51) && <em className={`raid-tier ${tierOf(f.floor)}`}>{TIER_NAME[tierOf(f.floor)]}</em>}</span><i>{cleared ? "✔" : locked ? "" : "▶"}</i>

@@ -16,7 +16,18 @@ export function floorBand(floor: number) {
   if (floor >= 4) return { fodder: 1.05, elite: 1.08, eliteTime: 0.95 };
   return { fodder: 1, elite: 1, eliteTime: 1 };
 }
-export const RAID_MAX_FLOOR = 30; // 21~30층(보통 구간 1차) 운영 공개(2026-10-19)
+export const RAID_MAX_FLOOR = 30; // 21~30층(보통 구간 1차) 운영 공개(2026-10-19). 31~40층은 데이터만 있고 숨김(로컬 테스트 모드에서만 개방)
+/** 데이터가 있는 마지막 층(로컬 테스트 모드의 전 층 개방 상한) */
+export const RAID_DATA_FLOOR = 35;
+/**
+ * 31층 이상 일반·정예 몬스터 층별 상승(RAID_FLOOR_40_EXPANSION_AUDIT 7.2): 몬스터 표는 구간 첫 층 기준.
+ * 31~35층 HP +3%·피해 +2%(정예 HP +4%)/층, 36~40층 HP +4%·피해 +2.5%(정예 HP +5%)/층. 보스는 층 표 수치 그대로.
+ */
+export function mobLift(floor: number, elite: boolean) {
+  if (floor <= 31) return { hp: 1, damage: 1 };
+  if (floor <= 35) { const n = floor - 31; return { hp: Math.pow(elite ? 1.04 : 1.03, n), damage: Math.pow(1.02, n) }; }
+  const n = floor - 36; return { hp: Math.pow(elite ? 1.05 : 1.04, n), damage: Math.pow(1.025, n) };
+}
 
 export const ARENA_W = 960, ARENA_H = 540;
 /** 2분 고밀도 웨이브 + 제한 없는 보스전(59절). FLOOR_SECONDS는 훈련장 외에는 쓰지 않는다(보스전 시간 초과 없음). */
@@ -77,6 +88,12 @@ export const MONSTERS: Record<string, MonsterDef> = {
   "core-sentry": { id: "core-sentry", name: "핵 파수꾼", icon: "🔆", kind: "frog", hp: 145, damage: 30, defense: 2, speed: 60, radius: 13, xp: 1 },
   "dark-armor": { id: "dark-armor", name: "암흑 갑주", icon: "🛡️", kind: "crab", hp: 320, damage: 37, defense: 9, speed: 36, radius: 20, xp: 2 },
   "heart-warden": { id: "heart-warden", name: "심장부 감시자", icon: "👁️", kind: "canal-elite", hp: 1000, damage: 48, defense: 11, speed: 50, radius: 27, xp: 12 },
+  // 31~35층 천공 유적(RAID_FLOOR_40_EXPANSION_AUDIT 7.2, 2026-10-21 방어 결정: 일반 3~4·방어형 10·정예 11)
+  "sky-remnant": { id: "sky-remnant", name: "천공 잔영", icon: "👻", kind: "chase", hp: 195, damage: 31, defense: 4, speed: 62, radius: 14, xp: 1 },
+  "wind-raptor": { id: "wind-raptor", name: "질풍 맹금", icon: "🦅", kind: "hop", hp: 155, damage: 32, defense: 3, speed: 105, radius: 13, xp: 1 },
+  "cloud-mage": { id: "cloud-mage", name: "구름 술사", icon: "🌩️", kind: "ranged", hp: 165, damage: 31, defense: 4, speed: 58, radius: 13, xp: 1 },
+  "ruin-guardian": { id: "ruin-guardian", name: "유적 수호병", icon: "🗿", kind: "crab", hp: 365, damage: 34, defense: 10, speed: 36, radius: 20, xp: 2 },
+  "storm-enforcer": { id: "storm-enforcer", name: "폭풍 집행관", icon: "⚡", kind: "elite", hp: 1150, damage: 42, defense: 11, speed: 50, radius: 26, xp: 12 },
   "mine-warden": { id: "mine-warden", name: "광산 감시자", icon: "🗿", kind: "canal-elite", hp: 620, damage: 36, defense: 7, speed: 50, radius: 26, xp: 12 },
 };
 
@@ -92,7 +109,7 @@ export type FloorDef = {
   /** 진화 훈련장: 보스·간접 개입 없음, 체력이 1 아래로 내려가지 않는다. */
   training?: boolean;
 };
-const z1 = "꽃가루 들판", z2 = "침수된 수로", z3 = "단풍 미궁", z4 = "서리 광산", z5 = "고대 숲", z6 = "탑의 심장부";
+const z1 = "꽃가루 들판", z2 = "침수된 수로", z3 = "단풍 미궁", z4 = "서리 광산", z5 = "고대 숲", z6 = "탑의 심장부", z7 = "천공 유적";
 export const FLOORS: FloorDef[] = [
   { floor: 1, zone: z1, monsters: ["pollen-mite"], spawnRate: 0.8, maxAlive: 16, elite: null, boss: { id: "mini", name: "강화 진드기", icon: "🐞", hp: 300, damage: 10, defense: 0, base: "pollen-mite" } },
   { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 520, damage: 12, defense: 0, base: "thorn-rabbit" } },
@@ -126,8 +143,15 @@ export const FLOORS: FloorDef[] = [
   { floor: 28, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.05, maxAlive: 37, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "core-commander", name: "핵 파수꾼 지휘체", icon: "🔆", hp: 12750, damage: 56, defense: 4, base: "core-sentry" } },
   { floor: 29, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.2, maxAlive: 37, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "dark-colossus", name: "암흑 갑주 거신", icon: "🗿", hp: 14250, damage: 58, defense: 13, base: "dark-armor" } },
   { floor: 30, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.1, maxAlive: 38, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "core-guardian", name: "탑의 핵 수호자", icon: "💠", hp: 16500, damage: 62, defense: 14, base: "heart-warden" } },
+  // 31~35층 천공 유적(7절 생성량, 2026-10-21 보스 HP 결정: 30층 실측 HP 16,500·방어 14·+18 약 68초에서 권장 강화 화력으로 역산, 목표 60~72초)
+  // 보스는 전용 대본을 붙이기 전까지 기본 보스 행동(mini)으로 둔다.
+  { floor: 31, zone: z7, monsters: ["sky-remnant", "wind-raptor"], spawnRate: 1.9, maxAlive: 38, elite: { id: "storm-enforcer", hp: 1150, count: 2 }, boss: { id: "mini", name: "천공 골렘", icon: "🗿", hp: 14500, damage: 54, defense: 14, base: "ruin-guardian" } },
+  { floor: 32, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage"], spawnRate: 2.0, maxAlive: 38, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "질풍의 대붕", icon: "🦅", hp: 15000, damage: 56, defense: 14, base: "wind-raptor" } },
+  { floor: 33, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.1, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "구름 대현자", icon: "🌩️", hp: 15600, damage: 58, defense: 15, base: "cloud-mage" } },
+  { floor: 34, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.2, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "유적 거신", icon: "🗿", hp: 16100, damage: 61, defense: 15, base: "ruin-guardian" } },
+  { floor: 35, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.3, maxAlive: 40, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "폭풍의 집행자", icon: "⛈️", hp: 18800, damage: 66, defense: 16, base: "storm-enforcer" } },
 ];
-/** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부 */
+/** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부, 31~35 천공 유적, 36~40 공허 왕좌 */
 export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
 export const zoneOf = (floor: number): Zone => floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : floor <= 30 ? "core" : floor <= 35 ? "sky" : "void";
 /** 난이도 구간(3.0절): 1~20 쉬움, 21~50 보통, 51~ 어려움 */

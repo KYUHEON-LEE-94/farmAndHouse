@@ -10,7 +10,7 @@ export type Rect = { x: number; y: number; w: number; h: number };
 export type Flower = { x: number; y: number; hits: number; dmg: number; exploded: boolean; golden?: boolean };
 export type Gate = { rect: Rect; closed: boolean; next: number; moving: boolean };
 export type Terrain = {
-  seed: number; zone: "field" | "canal" | "maple" | "frost" | "ancient" | "core";
+  seed: number; zone: "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
   /** 고대 숲 이끼 길(플레이어 이동 +8%), 심장부 가속 지대(모두 +12%), 수문·균열벽 전환 주기(초) */
   moss?: Rect[]; boost?: Rect[]; gatePeriod?: number;
   walls: Rect[]; grass: Rect[]; mud: Rect[]; wind: (Rect & { dx: number; dy: number })[];
@@ -25,7 +25,7 @@ const inside = (r: Rect, x: number, y: number, pad = 0) => x > r.x - pad && x < 
 const nearStart = (r: Rect) => { const cx = Math.max(r.x, Math.min(START.x, r.x + r.w)), cy = Math.max(r.y, Math.min(START.y, r.y + r.h)); return Math.hypot(cx - START.x, cy - START.y) < SAFE_RADIUS; };
 
 export function makeTerrain(floor: number, seed: number): Terrain {
-  const r = rng(seed * 7919 + floor * 104729), canal = floor > 5 && floor <= 10, zone = floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : "core";
+  const r = rng(seed * 7919 + floor * 104729), canal = floor > 5 && floor <= 10, zone: Terrain["zone"] = floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : floor <= 30 ? "core" : floor <= 35 ? "sky" : "void";
   const t: Terrain = { seed, zone, walls: [], grass: [], mud: [], wind: [], flowers: [], deep: [], bridges: [], shallow: [], puddles: [], gates: [], chance: null };
   const template = Math.floor(r() * 3);
   const place = (list: Rect[], make: () => Rect, n: number, avoid: Rect[][] = []) => {
@@ -49,6 +49,16 @@ export function makeTerrain(floor: number, seed: number): Terrain {
     const rift: Rect[] = []; place(rift, () => { const horiz = r() < 0.5, len = 180 + r() * 80; return horiz ? { x: r() * WORLD_W, y: r() * WORLD_H, w: len, h: 20 } : { x: r() * WORLD_W, y: r() * WORLD_H, w: 20, h: len }; }, 3, [t.walls]);
     t.gates = rift.map((rect, i) => ({ rect, closed: i === 0, next: 20, moving: true })); t.gatePeriod = 20;
     place(t.boost, () => ({ x: r() * WORLD_W, y: r() * WORLD_H, w: 220 + r() * 80, h: 110 }), 2, [t.walls, rift]);
+  } else if (zone === "sky") {
+    // 천공 유적(31~35층, 7.4절): 끊어진 다리(건널 수 없는 틈 + 다리 3개, 항상 두 경로 이상) + 강풍 지대(바닥 화살) + 무너진 기둥
+    const top = template !== 1, ry = top ? 130 + r() * 40 : WORLD_H - 290 - r() * 40, rh = 110;
+    const slots = [[200, 420], [740, 960], [1280, 1500]];
+    for (const [a, b] of slots) { const w = 110 + r() * 40, x = a + r() * (b - a - w); t.bridges.push({ x, y: ry - 6, w, h: rh + 12 }); }
+    const pieces: Rect[] = []; let from = 0;
+    for (const br of [...t.bridges].sort((p, q) => p.x - q.x)) { pieces.push({ x: from, y: ry, w: br.x - from, h: rh }); from = br.x + br.w; }
+    pieces.push({ x: from, y: ry, w: WORLD_W - from, h: rh }); t.deep = pieces;
+    place(t.walls, () => { const w = 50 + r() * 40, h = 50 + r() * 40; return { x: r() * WORLD_W, y: r() * WORLD_H, w, h }; }, 4 + Math.min(2, floor - 31), [t.deep]);
+    place(t.wind as Rect[], () => { const a = [0, Math.PI / 2, Math.PI, -Math.PI / 2][Math.floor(r() * 4)]; return Object.assign({ x: r() * WORLD_W, y: r() * WORLD_H, w: 280, h: 140 }, { dx: Math.cos(a), dy: Math.sin(a) }); }, 2 + (floor >= 33 ? 1 : 0), [t.walls, t.deep]);
   } else if (zone === "maple") {
     // 단풍 미궁(11~15층): 덤불 울타리 미로 + 낙엽 더미(적 감속) + 단풍 덤불(모두 감속). 층이 오를수록 울타리가 늘어난다.
     place(t.walls, () => { const horiz = r() < 0.5, len = 150 + r() * 120; return horiz ? { x: r() * WORLD_W, y: r() * WORLD_H, w: len, h: 24 } : { x: r() * WORLD_W, y: r() * WORLD_H, w: 24, h: len }; }, 5 + (floor - 11), [t.walls]);

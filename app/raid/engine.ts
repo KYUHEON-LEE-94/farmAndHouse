@@ -9,7 +9,7 @@ import {
 import { SPECIALS } from "./weapons";
 import { hazard, hazardDone, stepHazard, type Hazard } from "./bossKit";
 import { AUX_WEAPONS, rollChoices, type AuxId } from "./awakenings";
-import { AUX_POWER, FODDER_HP, MOB_SHOT_DAMAGE, MOB_SHOT_INTERVAL, floorBand, type RaidRunLog } from "./data";
+import { AUX_POWER, FODDER_HP, MOB_SHOT_DAMAGE, MOB_SHOT_INTERVAL, floorBand, mobLift, type RaidRunLog } from "./data";
 import { FLOW_CELL, START, WORLD_H, WORLD_W, blockedAt, blockers, buildFlow, clearLine, flowNext, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, type Flow, type Terrain, fieldLike } from "./terrain";
 
 export type Input = { up: boolean; down: boolean; left: boolean; right: boolean; aimX: number; aimY: number; attack: boolean; dash: boolean; food: [boolean, boolean, boolean];
@@ -182,8 +182,9 @@ function spawnPoint(s: RaidState) {
   return { x: p.x < WORLD_W / 2 ? WORLD_W - 30 : 30, y: p.y };
 }
 function makeMonster(s: RaidState, def: MonsterDef, at = spawnPoint(s), opts: Partial<Monster> = {}): Monster {
-  const band = floorBand(s.floor.floor), fodder = def.kind === "elite" || def.kind === "canal-elite" ? 1 : FODDER_HP * band.fodder, hp0 = Math.max(1, Math.round(def.hp * fodder));
-  return { uid: s.uid++, def, name: def.name, icon: def.icon, x: at.x, y: at.y, r: def.radius, hp: hp0, maxHp: hp0, damage: def.damage, defense: def.defense, speed: def.speed * (def.kind === "hop" || def.kind === "eel" ? 1 : NORMAL_SPEED_MUL),
+  const band = floorBand(s.floor.floor), eliteKind = def.kind === "elite" || def.kind === "canal-elite", lift = mobLift(s.floor.floor, eliteKind);
+  const fodder = eliteKind ? 1 : FODDER_HP * band.fodder, hp0 = Math.max(1, Math.round(def.hp * fodder * lift.hp));
+  return { uid: s.uid++, def, name: def.name, icon: def.icon, x: at.x, y: at.y, r: def.radius, hp: hp0, maxHp: hp0, damage: Math.round(def.damage * lift.damage), defense: def.defense, speed: def.speed * (def.kind === "hop" || def.kind === "eel" ? 1 : NORMAL_SPEED_MUL),
     elite: def.kind === "elite" || def.kind === "canal-elite", boss: null, xp: def.xp, timer: 1 + rnd() * 1.5, state: "move", stateT: 0, dir: { x: 1, y: 0 }, tele: null,
     rate: 1, split: false, summoned: false, flash: 0, shots: 0, kvx: 0, kvy: 0, t2: 4, t3: 6, t4: 8, markUntil: 0, slowUntil: 0, slowMul: 1, expose: 0, frozenUntil: 0, takenUntil: 0, takenBonus: 0, combo: 0, inNet: false, ...opts };
 }
@@ -297,7 +298,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   // 정면 방패(29층 암흑 갑주 거신): 플레이어가 방패 쪽(±60°)에 있으면 피해 −70%
   if (m.shieldFacing !== undefined && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), m.shieldFacing) < 1.05) base *= 0.3;
   // 암흑 갑주(26~30층 일반): 정면(±60°) 피해 −50%. 공격 준비·돌진 중에는 방패가 내려간다
-  else if (frontGuardUp(s, m)) base *= DARK_ARMOR_FRONT;
+  else if (frontGuardUp(s, m)) base *= m.def.id === "ruin-guardian" ? RUIN_GUARD_FRONT : DARK_ARMOR_FRONT;
   if ((m.invulnUntil ?? 0) > s.t) { if (s.t - (m.flash > 0 ? 0 : -1) > 0) s.pops.push({ x: m.x, y: m.y - m.r - 10, text: "무적", t: 0.3, kind: "info" }); return; }
   const src = hitSource;
   // 보조무기: 주무기 강화·치명타 없이 고정 피해(62.1)
@@ -713,6 +714,10 @@ function zoneAt(s: RaidState, z: Omit<Zone, "tick">) { s.zones.push({ src: hitSo
 // ---------- 21~30층 일반 몬스터 고유 행동(RAID_FLOOR_30_EXPANSION_AUDIT 4.1·4.2) ----------
 /** 암흑 갑주 정면 피해 배율(−50%), 정면 판정 ±60° */
 export const DARK_ARMOR_FRONT = 0.5;
+/** 유적 수호병 정면 피해 배율(−35%, RAID_FLOOR_40_EXPANSION_AUDIT 7.2) */
+export const RUIN_GUARD_FRONT = 0.65;
+/** 천공 유적 강풍이 플레이어를 미는 속도(px/s) */
+export const SKY_WIND = 70;
 const FRONT_ARC = 1.05;
 const MOB_BEAM_LEN = 440, MOB_BEAM_WIDTH = 22;
 const preparing = (m: Monster) => m.state === "tele" || m.state === "dash";
@@ -720,12 +725,12 @@ const preparing = (m: Monster) => m.state === "tele" || m.state === "dash";
 export function guardBonus(m: Monster) {
   if (m.def.kind !== "crab" || m.boss) return 0;
   if (m.def.id === "dark-armor") return preparing(m) ? -Math.min(5, Math.max(0, m.defense)) : 3;
-  if (m.def.id === "guardian-tree") return preparing(m) || m.state === "stun" ? 0 : 3;
+  if (m.def.id === "guardian-tree" || m.def.id === "ruin-guardian") return preparing(m) || m.state === "stun" ? 0 : 3;
   return m.state !== "dash" ? 3 : 0;
 }
 /** 암흑 갑주 정면 방패가 지금 플레이어 쪽을 막고 있는가 */
 export function frontGuardUp(s: RaidState, m: Monster) {
-  return m.def.id === "dark-armor" && !m.boss && !preparing(m) && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), Math.atan2(m.dir.y, m.dir.x)) < FRONT_ARC;
+  return (m.def.id === "dark-armor" || (m.def.id === "ruin-guardian" && m.state !== "stun")) && !m.boss && !preparing(m) && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), Math.atan2(m.dir.y, m.dir.x)) < FRONT_ARC;
 }
 /** 플레이어 속도 추정(프레임 간 위치 차, 부드럽게) */
 function trackPlayerVelocity(s: RaidState, dt: number) {
@@ -743,6 +748,10 @@ function afterDash(s: RaidState, m: Monster) {
   if (m.boss) return;
   const p = s.player;
   if (m.def.id === "forest-executor") shoot(s, m, [-0.4, 0, 0.4], 150);
+  if (m.def.id === "storm-enforcer") { // 돌진이 끝난 자리에서 양옆으로 번개선(0.6초 예고)
+    const a = Math.atan2(m.dir.y, m.dir.x);
+    for (const side of [1, -1]) addHazard(s, hazard({ kind: "beam", x: m.x, y: m.y, angle: a + side * Math.PI / 2, len: 280, width: 26, tele: 0.6, life: 0.15, damage: Math.round(m.damage * 0.7), label: "번개선", owner: m.uid, mob: true }));
+  }
   if (m.def.id === "rift-stalker") {
     if (m.t4 === 1) { m.t4 = 2; startCharge(m, p.x, p.y, 0.35, 200); }
     else if (m.t4 === 2) { m.t4 = 0; m.state = "stun"; m.stateT = 1; zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 48, t: 2.2, tele: 0, damage: Math.max(1, Math.round(m.damage * 0.25)), every: 0.5, slow: 0.2, label: "균열", mob: true }); }
@@ -753,6 +762,31 @@ function afterDash(s: RaidState, m: Monster) {
 function updateTrait(s: RaidState, m: Monster, dt: number, far: number, slow: number): boolean {
   const p = s.player;
   switch (m.def.id) {
+    // ---------- 31~35층 천공 유적 ----------
+    case "sky-remnant": { // 추적(강풍 안에서 +15%) + 3.5초마다 0.5초 예고 잔상 돌진
+      moveToward(m, p.x, p.y, m.speed * (windAt(s.terrain, m.x, m.y) ? 1.15 : 1), dt, slow);
+      if (m.timer <= 0 && far < 260) { m.timer = 3.5; startCharge(m, p.x, p.y, 0.5, 220); }
+      return true;
+    }
+    case "wind-raptor": { // 플레이어 둘레(반지름 180)를 맴돌다 2.2초마다 0.6초 예고 급강하
+      const ang = Math.atan2(m.y - p.y, m.x - p.x) + (m.uid % 2 ? 0.9 : -0.9);
+      moveToward(m, clamp(p.x + Math.cos(ang) * 180, 20, WORLD_W - 20), clamp(p.y + Math.sin(ang) * 180, 20, WORLD_H - 20), m.speed * 0.9, dt, slow);
+      if (m.timer <= 0 && far < 320) { m.timer = 2.2; startCharge(m, p.x, p.y, 0.6, 300); }
+      return true;
+    }
+    case "cloud-mage": { // 거리를 두고 2.6초마다 느린 구름탄 3발(부채꼴)
+      if (far > 240) moveToward(m, p.x, p.y, m.speed, dt, slow);
+      else if (far < 150) { aimAt(m, p.x, p.y); m.x = clamp(m.x - m.dir.x * m.speed * 0.7 * dt, 20, WORLD_W - 20); m.y = clamp(m.y - m.dir.y * m.speed * 0.7 * dt, 20, WORLD_H - 20); }
+      else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; }
+      if (m.timer <= 0.5 && m.timer > 0) m.flash = Math.max(m.flash, 0.05);
+      if (m.timer <= 0) { m.timer = 2.6 * MOB_SHOT_INTERVAL; if (far < 380 && !segmentHits(s.terrain.walls, m.x, m.y, p.x, p.y)) shoot(s, m, [-0.3, 0, 0.3], 105); }
+      return true;
+    }
+    case "ruin-guardian": { // 정면 방패(−35%)로 다가오다 4초마다 멈춰 1초 예고 지면 강타(반지름 95). 멈춘 동안 방패·방어 해제
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0 && far < 200) { m.timer = 4; m.state = "stun"; m.stateT = 1; zoneAt(s, { kind: "bolt", x: m.x, y: m.y, r: 95, t: 0.15, tele: 1, damage: Math.round(m.damage * 0.9), every: 0, slow: 0, label: "지면 강타", mob: true }); }
+      return true;
+    }
     case "ancient-sapling": { // 추적 + 3.2초마다 플레이어 발밑에 뿌리 가시(0.9초 예고, 맞으면 0.6초 속박)
       if (m.damage <= 0) return true; // 회복 묘목(보스 소환물)은 움직이지 않는다
       moveToward(m, p.x, p.y, m.speed, dt, slow);
@@ -1360,6 +1394,8 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   if ((s.ext.pullUntil ?? 0) > s.t && p.dashT <= 0) { const dx = (s.ext.pullX ?? p.x) - p.x, dy = (s.ext.pullY ?? p.y) - p.y, dd = Math.hypot(dx, dy) || 1; if (dd > 40) { p.x += (dx / dd) * 110 * dt; p.y += (dy / dd) * 110 * dt; } }
   if (s.ext.wasDashing && p.dashT <= 0 && pick(s, "long-dash")) s.ext.dashBoostUntil = s.t + 1;
   s.ext.wasDashing = p.dashT > 0;
+  // 천공 유적 강풍 지대(7.4절): 화살 방향으로 초당 70px 밀림, 대시 중에는 영향 없음
+  if (s.terrain.zone === "sky" && p.dashT <= 0) { const w = windAt(s.terrain, p.x, p.y); if (w) { p.x = clamp(p.x + w.dx * SKY_WIND * dt, PLAYER.radius, WORLD_W - PLAYER.radius); p.y = clamp(p.y + w.dy * SKY_WIND * dt, PLAYER.radius, WORLD_H - PLAYER.radius); } }
   { const o = pushOut(p.x, p.y, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; }
   updateWorld(s, dt);
   // 꾸준한 회복: 20초마다 체력 5(중첩마다)

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { buildSync } from 'esbuild';
 
 const out = buildSync({
-  stdin: { contents: `export * from "./app/raid/engine"; export { FLOORS, weaponStats, MONSTERS } from "./app/raid/data";`, resolveDir: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), loader: 'ts' },
+  stdin: { contents: `export * from "./app/raid/engine"; export { FLOORS, weaponStats, MONSTERS, mobLift } from "./app/raid/data";`, resolveDir: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent',
 });
 const R = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
@@ -189,4 +189,50 @@ test('암흑 갑주: 0.8초 예고 뒤 긴 방패 돌진', () => {
   const { s, m } = arena(29, 'dark-armor', 200, 0);
   let tele = null; run(s, 5, () => { if (!tele && m.state === 'tele') tele = { len: m.tele.len, left: m.stateT }; });
   assert.ok(tele && tele.len === 160 && tele.left > 0.75);
+});
+
+// ---------- 31~35층 천공 유적(RAID_FLOOR_40_EXPANSION_AUDIT 7.2·7.4, 숨김 데이터) ----------
+test('31~35층 데이터: 몬스터 5종·층 5개, 32~35층은 층마다 HP +3%·피해 +2%(정예 HP +4%)', () => {
+  for (let f = 31; f <= 35; f++) assert.equal(R.FLOORS[f - 1].floor, f);
+  const lift = (f, e) => R.mobLift(f, e);
+  assert.deepEqual(lift(31, false), { hp: 1, damage: 1 });
+  assert.ok(Math.abs(lift(35, false).hp - Math.pow(1.03, 4)) < 1e-9 && Math.abs(lift(35, true).hp - Math.pow(1.04, 4)) < 1e-9 && Math.abs(lift(35, false).damage - Math.pow(1.02, 4)) < 1e-9);
+  assert.deepEqual(lift(30, false), { hp: 1, damage: 1 }, '30층 이하는 그대로');
+  const { m } = arena(35, 'sky-remnant', 200, 0);
+  assert.equal(m.maxHp, Math.round(195 * 0.5 * Math.pow(1.03, 4)));
+});
+test('천공 잔영: 3.5초마다 0.5초 예고 잔상 돌진(220px)', () => {
+  const { s, m } = arena(31, 'sky-remnant', 200, 0);
+  let tele = null; run(s, 4, () => { if (!tele && m.state === 'tele') tele = { len: m.tele.len, left: m.stateT }; });
+  assert.ok(tele && tele.len === 220 && tele.left > 0.45);
+});
+test('질풍 맹금: 맴돌다 0.6초 예고 급강하(300px)', () => {
+  const { s, m } = arena(31, 'wind-raptor', 250, 0);
+  let tele = null; run(s, 4, () => { if (!tele && m.state === 'tele') tele = { len: m.tele.len, left: m.stateT }; });
+  assert.ok(tele && tele.len === 300 && tele.left > 0.55);
+});
+test('구름 술사: 느린 구름탄 3발', () => {
+  const { s } = arena(32, 'cloud-mage', 200, 0);
+  let n = 0; run(s, 5, () => { n = Math.max(n, s.projectiles.filter(p => !p.mine).length); });
+  assert.ok(n >= 3);
+});
+test('유적 수호병: 정면 −35%(공격 준비 중 해제), 1초 예고 지면 강타', () => {
+  const { s, m } = arena(33, 'ruin-guardian', 150, 0);
+  run(s, 0.1); assert.equal(R.frontGuardUp(s, m), true); assert.equal(R.RUIN_GUARD_FRONT, 0.65);
+  let slam = null, guardDown = null; run(s, 6, () => { if (!slam) { slam = s.zones.find(z => z.label === '지면 강타') ?? null; if (slam) guardDown = { up: R.frontGuardUp(s, m), bonus: R.guardBonus(m) }; } });
+  assert.ok(slam && slam.mob && slam.r === 95); assert.deepEqual(guardDown, { up: false, bonus: 0 });
+});
+test('폭풍 집행관: 돌진이 끝나면 양옆으로 번개선 2줄(0.6초 예고)', () => {
+  const { s } = arena(31, 'storm-enforcer', 200, 0);
+  let lines = []; run(s, 8, () => { const now = s.hazards.filter(h => h.label === '번개선'); if (now.length > lines.length) lines = now.map(h => ({ ...h })); });
+  assert.equal(lines.length, 2); assert.ok(lines.every(h => h.tele >= 0.55 && h.mob));
+});
+test('천공 유적 지형: 끊어진 다리(틈 + 다리 3개)와 강풍(플레이어를 밀고 대시 중에는 무시)', () => {
+  const s = R.createRaid(R.FLOORS[32], { ...R.weaponStats(0, null, 'raid-scythe'), damage: 0.0001, range: 1 }, null, [], undefined, null, 33);
+  assert.equal(s.terrain.zone, 'sky'); assert.equal(s.terrain.bridges.length, 3); assert.ok(s.terrain.deep.length >= 3); assert.ok(s.terrain.wind.length >= 2);
+  s.spawnAcc = -1e9; s.nextElite = 1e9; s.monsters = []; s.terrain.walls = [];
+  const w = s.terrain.wind[0]; s.player.x = w.x + w.w / 2; s.player.y = w.y + w.h / 2; const x0 = s.player.x, y0 = s.player.y;
+  R.stepRaid(s, 0.5, input(s, { aimX: s.player.x - s.cam.x, aimY: s.player.y - s.cam.y }));
+  const pushed = (s.player.x - x0) * w.dx + (s.player.y - y0) * w.dy;
+  assert.ok(pushed > 20, `밀린 거리 ${pushed}`);
 });
