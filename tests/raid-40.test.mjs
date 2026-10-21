@@ -12,7 +12,7 @@ const step = to => F.ENHANCE.find(s => s.to === to);
 const raidAt = enhancement => ({ ...F.EMPTY_RAID, stabilizers: 0, weapons: { 'raid-scythe': { enhancement, evolution: 'great-scythe' } } });
 
 test('+19~+22 표: 성공률·하락률·골드·보정 천장이 문서 4절과 같다', () => {
-  const want = { 19: [0.14, 0.05, 180000, 100000, 7, 0.02, 16], 20: [0.12, 0.06, 220000, 130000, 8, 0.018, 18], 21: [0.1, 0.06, 260000, 170000, 9, 0.016, 20], 22: [0.09, 0.07, 320000, 220000, 10, 0.015, 22] };
+  const want = { 19: [0.1, 0.06, 340000, 190000, 10, 0.015, 22], 20: [0.09, 0.07, 390000, 230000, 11, 0.014, 24], 21: [0.08, 0.06, 450000, 280000, 12, 0.013, 25], 22: [0.07, 0.07, 520000, 340000, 13, 0.012, 27] };
   for (const [to, [chance, drop, gold, open, start, inc, ceiling]] of Object.entries(want)) {
     const s = step(Number(to)), p = F.ENHANCE_PITY[to];
     assert.deepEqual([s.chance, s.drop, s.gold, s.open.gold], [chance, drop, gold, open], `+${to}`);
@@ -53,7 +53,7 @@ test('재료 7종 등록, 31~40층 보상 골격, 일반·보스 재료 3회 연
   }
 });
 
-test('강화 비용 20만 회(+18→+22, 개방비 포함, 하락·재승급·보정 유지): 평균 1,000~1,300만, 하위 10% 2,000만 이하', () => {
+test('강화 비용 20만 회(+18→+22, 개방비 포함, 하락·재승급·보정 유지): 평균 2,700~3,300만, 하위 10% 5,500만 이하', () => {
   let seed = 12345; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
   const N = 200000, costs = new Float64Array(N);
   for (let i = 0; i < N; i++) {
@@ -68,6 +68,7 @@ test('강화 비용 20만 회(+18→+22, 개방비 포함, 하락·재승급·�
   }
   costs.sort(); const mean = costs.reduce((a, b) => a + b, 0) / N, p90 = costs[Math.floor(N * 0.9)];
   console.log(`+18→+22 평균 ${Math.round(mean / 1e4)}만 · 하위 10% ${Math.round(p90 / 1e4)}만 · 하위 1% ${Math.round(costs[Math.floor(N * 0.99)] / 1e4)}만`);
-  assert.ok(mean >= 1e7 && mean <= 1.3e7, `평균 ${mean}`);
-  assert.ok(p90 <= 2e7, `하위 10% ${p90}`);
+  // 2026-10-21 결정: 평균 2,700만~3,300만, 운 나쁜 상위 10%도 5,500만 이하
+  assert.ok(mean >= 2.7e7 && mean <= 3.3e7, `평균 ${mean}`);
+  assert.ok(p90 <= 5.5e7, `하위 10% ${p90}`);
 });

@@ -398,11 +398,11 @@ export const ENHANCE: EnhanceStep[] = [
   { to: 16, chance: 0.15, drop: 0.05, gold: 145000, need: { "ancient-bark": 3, "spirit-crystal": 2 }, open: { gold: 100000, need: { "guardian-seed": 2 } } },
   { to: 17, chance: 0.13, drop: 0.06, gold: 160000, need: { "dark-alloy": 3 }, open: { gold: 130000, need: { "dark-alloy": 5, "core-shard": 2 } } },
   { to: 18, chance: 0.12, drop: 0.06, gold: 180000, need: { "dark-alloy": 4, "core-shard": 1 }, open: { gold: 160000, need: { "heart-ember": 1 } } },
-  // 31~40층(RAID_FLOOR_40_EXPANSION_AUDIT 4절): +18에 한 번 닿으면 +18 아래로 내려가지 않는다(forge.applyEnhance)
-  { to: 19, chance: 0.14, drop: 0.05, gold: 180000, need: { "sky-iron": 3, "cloud-crystal": 1 }, open: { gold: 100000, need: { "sky-iron": 5, "cloud-crystal": 2 } } },
-  { to: 20, chance: 0.12, drop: 0.06, gold: 220000, need: { "sky-iron": 4, "cloud-crystal": 2 }, open: { gold: 130000, need: { "storm-core": 2 } } },
-  { to: 21, chance: 0.1, drop: 0.06, gold: 260000, need: { "star-ash": 3, "void-crystal": 1 }, open: { gold: 170000, need: { "star-ash": 5, "void-crystal": 2 } } },
-  { to: 22, chance: 0.09, drop: 0.07, gold: 320000, need: { "star-ash": 4, "void-crystal": 2 }, open: { gold: 220000, need: { "throne-fragment": 1 } } },
+  // 31~40층(RAID_FLOOR_40_EXPANSION_AUDIT 4절, 2026-10-19 개정표): +18에 한 번 닿으면 +18 아래로 내려가지 않는다(forge.applyEnhance)
+  { to: 19, chance: 0.1, drop: 0.06, gold: 340000, need: { "sky-iron": 3, "cloud-crystal": 1 }, open: { gold: 190000, need: { "sky-iron": 5, "cloud-crystal": 2 } } },
+  { to: 20, chance: 0.09, drop: 0.07, gold: 390000, need: { "sky-iron": 4, "cloud-crystal": 2 }, open: { gold: 230000, need: { "storm-core": 2 } } },
+  { to: 21, chance: 0.08, drop: 0.06, gold: 450000, need: { "star-ash": 3, "void-crystal": 1 }, open: { gold: 280000, need: { "star-ash": 5, "void-crystal": 2 } } },
+  { to: 22, chance: 0.07, drop: 0.07, gold: 520000, need: { "star-ash": 4, "void-crystal": 2 }, open: { gold: 340000, need: { "throne-fragment": 1 } } },
 ];
 /**
  * 강화 실패 누적 보정·천장(IMPLEMENTATION_GAP_AUDIT 10.2): +11~+15만. 무기별·목표 단계별 실패 횟수로
@@ -419,10 +419,10 @@ export const ENHANCE_PITY: Record<number, { start: number; step: number; max: nu
   16: { start: 8, step: 0.018, max: 0.12, ceiling: 15 },
   17: { start: 9, step: 0.016, max: 0.12, ceiling: 17 },
   18: { start: 10, step: 0.015, max: 0.12, ceiling: 19 },
-  19: { start: 7, step: 0.02, max: 0.12, ceiling: 16 },
-  20: { start: 8, step: 0.018, max: 0.12, ceiling: 18 },
-  21: { start: 9, step: 0.016, max: 0.12, ceiling: 20 },
-  22: { start: 10, step: 0.015, max: 0.12, ceiling: 22 },
+  19: { start: 10, step: 0.015, max: 0.12, ceiling: 22 },
+  20: { start: 11, step: 0.014, max: 0.12, ceiling: 24 },
+  21: { start: 12, step: 0.013, max: 0.12, ceiling: 25 },
+  22: { start: 13, step: 0.012, max: 0.12, ceiling: 27 },
 };
 /** 11층 이상 재료(11~20층은 탑 상자에서, 21층 이상은 아직 이름만). */
 export const UPPER_ITEMS: Record<string, { name: string; icon: string }> = {
