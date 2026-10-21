@@ -19,6 +19,8 @@ export type Hazard = {
   spin?: number; followFor?: number; followSpeed?: number;
   damage: number; every?: number; tick?: number; hit?: boolean;
   label: string; owner?: number;
+  /** 일반 몬스터가 만든 위험(보스 피격 집계에서 뺀다) */
+  mob?: boolean;
   /** 맞으면 이 시간(초)만큼 거의 못 움직임(뿌리 감옥). 대시는 가능 */
   root?: number;
 };

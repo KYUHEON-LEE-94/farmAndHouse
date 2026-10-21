@@ -479,7 +479,13 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.fillStyle = "#000"; ctx.font = `${Math.round(m.r * 1.9)}px ${EMOJI_FONT}`; ctx.fillText(m.icon, 0, 1);
     ctx.restore();
     if (m.markUntil > s.t) { ctx.save(); ctx.strokeStyle = "#ff9a3a"; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 8, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); ctx.fillStyle = "#000"; ctx.font = `12px ${EMOJI_FONT}`; ctx.fillText("🔥", m.x + m.r, m.y - m.r); }
-    if (m.state === "stun") { ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.fillText("💫", m.x, m.y - m.r - 12); }
+    if (m.state === "stun") { ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.fillText(m.def.id === "rift-stalker" && !m.boss ? "💨" : "💫", m.x, m.y - m.r - 12); }
+    // 21~30층 방어형: 암흑 갑주 정면 방패(±60°), 공격 준비·돌진 중에는 방어가 내려간 표시
+    if (!m.boss && m.hp > 0 && (m.def.id === "dark-armor" || m.def.id === "guardian-tree")) {
+      const open = m.state === "tele" || m.state === "dash";
+      if (m.def.id === "dark-armor" && !open) { const a = Math.atan2(m.dir.y, m.dir.x); ctx.save(); ctx.strokeStyle = "rgba(170,190,215,.9)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 7, a - 1.05, a + 1.05); ctx.stroke(); ctx.restore(); }
+      if (open) { ctx.save(); ctx.fillStyle = "#ffd84a"; ctx.font = "800 11px sans-serif"; ctx.textAlign = "center"; ctx.fillText("방어↓", m.x, m.y - m.r - 10); ctx.restore(); }
+    }
     if (!m.boss && (m.elite || m.hp < m.maxHp)) bar(ctx, m.x - m.r, m.y - m.r - 10, m.r * 2, 4, m.hp / m.maxHp, m.elite ? "#f0a030" : "#ef5a43");
   }
   // 투사체

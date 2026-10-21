@@ -55,6 +55,8 @@ export type Projectile = { x: number; y: number; vx: number; vy: number; r: numb
 export type Zone = { kind: "pollen" | "puddle" | "bolt" | "shock" | "line" | "tshock" | "blast" | "pbomb" | "poison" | "net" | "rain" | "frost" | "spray" | "leaf" | "ice";
   /** 맞았을 때 피해 원인 이름(없으면 종류별 기본값) */
   label?: string;
+  /** 일반 몬스터가 만든 장판(보스 피격 집계에서 뺀다) */
+  mob?: boolean;
   /** 피해 원천(보조무기 씨앗탄·싹 장판은 "aux") */
   src?: HitSource;
   /** 내 공격 장판: 폭발 배율·독·그물 반지름 등 */
@@ -113,7 +115,7 @@ export type RaidState = {
   /** 판 기록: 보스 등장 순간 체력 비율, 회피 횟수, 입력 방식 */
   waveEndHp: number | null; dodges: number; input: "pc" | "mobile";
   /** 53절 카드 진행 상태 */
-  ext: { /** 같은 층 직전 최고 실패 기록(3.4.3 비교 표식) */ prevBest?: { waveTime: number; bossHpRatio: number }; prevBeat?: boolean; dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
+  ext: { /** 플레이어 이동 속도 추정(탑의 그림자 예측 추적) */ pvx?: number; pvy?: number; plx?: number; ply?: number; /** 같은 층 직전 최고 실패 기록(3.4.3 비교 표식) */ prevBest?: { waveTime: number; bossHpRatio: number }; prevBeat?: boolean; dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
     specialHitAt: number; castId: number; firstHitCast: number; perfectUntil: number; dashBoostUntil: number; cut: number[]; wasDashing: boolean };
   kills: number; damageTaken: Record<string, number>; uid: number; prevDash: boolean; prevFood: [boolean, boolean, boolean]; bossHpAtEnd: number;
 };
@@ -183,7 +185,8 @@ function makeMonster(s: RaidState, def: MonsterDef, at = spawnPoint(s), opts: Pa
     elite: def.kind === "elite" || def.kind === "canal-elite", boss: null, xp: def.xp, timer: 1 + rnd() * 1.5, state: "move", stateT: 0, dir: { x: 1, y: 0 }, tele: null,
     rate: 1, split: false, summoned: false, flash: 0, shots: 0, kvx: 0, kvy: 0, t2: 4, t3: 6, t4: 8, markUntil: 0, slowUntil: 0, slowMul: 1, expose: 0, frozenUntil: 0, takenUntil: 0, takenBonus: 0, combo: 0, inNet: false, ...opts };
 }
-function spawn(s: RaidState, id: string, opts: Partial<Monster> = {}, at?: { x: number; y: number }) {
+/** 몬스터 하나를 만든다(테스트에서도 특정 몬스터 행동을 확인할 때 쓴다). */
+export function spawn(s: RaidState, id: string, opts: Partial<Monster> = {}, at?: { x: number; y: number }) {
   const m = makeMonster(s, MONSTERS[id], at, opts);
   s.monsters.push(m);
   return m;
@@ -291,6 +294,8 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   if (m.hp <= 0) return;
   // 정면 방패(29층 암흑 갑주 거신): 플레이어가 방패 쪽(±60°)에 있으면 피해 −70%
   if (m.shieldFacing !== undefined && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), m.shieldFacing) < 1.05) base *= 0.3;
+  // 암흑 갑주(26~30층 일반): 정면(±60°) 피해 −50%. 공격 준비·돌진 중에는 방패가 내려간다
+  else if (frontGuardUp(s, m)) base *= DARK_ARMOR_FRONT;
   if ((m.invulnUntil ?? 0) > s.t) { if (s.t - (m.flash > 0 ? 0 : -1) > 0) s.pops.push({ x: m.x, y: m.y - m.r - 10, text: "무적", t: 0.3, kind: "info" }); return; }
   const src = hitSource;
   // 보조무기: 주무기 강화·치명타 없이 고정 피해(62.1)
@@ -326,7 +331,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   mul = Math.min(DAMAGE_MUL_CAP, mul);
   let dmg = base * mul * (crit ? Math.max(s.picks["vital-stab"] ? 2 : 0, PLAYER.critMul + 0.25 * pick(s, "critical-force")) : 1) * (m.state === "stun" ? 1.3 : 1);
   const ignore = m.boss && (o.ignoreDef || (crit && s.picks["vital-pierce"]));
-  dmg = mitigate(dmg, ignore ? 0 : effDefense(s, m) * (1 - (o.defIgnore ?? 0)), m.def.kind === "crab" && m.state !== "dash" ? 3 : 0);
+  dmg = mitigate(dmg, ignore ? 0 : effDefense(s, m) * (1 - (o.defIgnore ?? 0)), ignore ? 0 : guardBonus(m));
   if (s.picks.executioner && !m.boss && !m.elite && m.hp - dmg <= m.maxHp * 0.2) dmg = m.hp;
   m.hp -= dmg; m.flash = 0.12; s.dmgBy[src] += dmg;
   if (src === "basic" && pick(s, "armor-crack") && rnd() < 0.1) { m.crack = Math.min(3, ((m.crackUntil ?? 0) > s.t ? m.crack ?? 0 : 0) + 1); m.crackUntil = s.t + 5; }
@@ -351,6 +356,8 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
 }
 function killMonster(s: RaidState, m: Monster) {
   m.hp = 0; s.kills++;
+  // 고대 묘목(21~25층 일반): 쓰러진 자리에 1초 뿌리 장판(피해 없는 회복 묘목 소환물은 제외)
+  if (m.def.id === "ancient-sapling" && !m.boss && m.damage > 0) zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 40, t: 1, tele: 0, damage: Math.max(1, Math.round(m.damage * 0.25)), every: 0.5, slow: 0.35, label: "뿌리 장판", mob: true });
   if (m.boss) s.hazards = [];
   s.shake = Math.max(s.shake, m.boss ? 5 : m.elite ? 3 : 1.5);
   s.killTimes = [...s.killTimes.filter(t => t > s.t - 1), s.t];
@@ -701,6 +708,88 @@ function startCharge(m: Monster, x: number, y: number, tele: number, len = 260) 
 }
 function zoneAt(s: RaidState, z: Omit<Zone, "tick">) { s.zones.push({ src: hitSource, ...z, tick: 0 }); }
 
+// ---------- 21~30층 일반 몬스터 고유 행동(RAID_FLOOR_30_EXPANSION_AUDIT 4.1·4.2) ----------
+/** 암흑 갑주 정면 피해 배율(−50%), 정면 판정 ±60° */
+export const DARK_ARMOR_FRONT = 0.5;
+const FRONT_ARC = 1.05;
+const MOB_BEAM_LEN = 440, MOB_BEAM_WIDTH = 22;
+const preparing = (m: Monster) => m.state === "tele" || m.state === "dash";
+/** 방어형 추가 방어: 기본 +3(돌진 중 0). 수호목은 공격 준비·돌진 중 0(10→7), 암흑 갑주는 공격 준비·돌진 중 −5(12→4). */
+export function guardBonus(m: Monster) {
+  if (m.def.kind !== "crab" || m.boss) return 0;
+  if (m.def.id === "dark-armor") return preparing(m) ? -Math.min(5, Math.max(0, m.defense)) : 3;
+  if (m.def.id === "guardian-tree") return preparing(m) ? 0 : 3;
+  return m.state !== "dash" ? 3 : 0;
+}
+/** 암흑 갑주 정면 방패가 지금 플레이어 쪽을 막고 있는가 */
+export function frontGuardUp(s: RaidState, m: Monster) {
+  return m.def.id === "dark-armor" && !m.boss && !preparing(m) && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), Math.atan2(m.dir.y, m.dir.x)) < FRONT_ARC;
+}
+/** 플레이어 속도 추정(프레임 간 위치 차, 부드럽게) */
+function trackPlayerVelocity(s: RaidState, dt: number) {
+  const p = s.player, e = s.ext;
+  if (e.plx !== undefined && e.ply !== undefined && dt > 0) { const k = Math.min(1, dt * 8); e.pvx = (e.pvx ?? 0) + ((p.x - e.plx) / dt - (e.pvx ?? 0)) * k; e.pvy = (e.pvy ?? 0) + ((p.y - e.ply) / dt - (e.pvy ?? 0)) * k; }
+  e.plx = p.x; e.ply = p.y;
+}
+/** 일반 몬스터 직선 광선(예고 tele초). 주인이 죽으면 예고 중인 광선도 사라진다. */
+function mobBeam(s: RaidState, m: Monster, tele: number, damage: number, len = MOB_BEAM_LEN, width = MOB_BEAM_WIDTH) {
+  addHazard(s, hazard({ kind: "beam", x: m.x, y: m.y, angle: Math.atan2(s.player.y - m.y, s.player.x - m.x), len, width, tele, life: 0.15, damage, label: `${m.name} 광선`, owner: m.uid, mob: true }));
+  m.flash = Math.max(m.flash, tele);
+}
+/** 돌진이 끝난 직후: 연속 돌진·휴식 */
+function afterDash(s: RaidState, m: Monster) {
+  if (m.boss) return;
+  const p = s.player;
+  if (m.def.id === "forest-executor") shoot(s, m, [-0.4, 0, 0.4], 150);
+  if (m.def.id === "rift-stalker") {
+    if (m.t4 === 1) { m.t4 = 2; startCharge(m, p.x, p.y, 0.35, 200); }
+    else if (m.t4 === 2) { m.t4 = 0; m.state = "stun"; m.stateT = 1; }
+  }
+  if (m.def.id === "heart-warden" && m.shots === 1) { m.shots = 0; startCharge(m, p.x, p.y, 0.45, 240); }
+}
+/** 고유 행동이 있는 몬스터면 처리하고 true. 소환물 예외: 분신은 그대로 추적, 회복 묘목(피해 0)은 움직이지 않는다. */
+function updateTrait(s: RaidState, m: Monster, dt: number, far: number, slow: number): boolean {
+  const p = s.player;
+  switch (m.def.id) {
+    case "root-hound": // 2초마다 0.35초 예고 후 짧은 도약
+      moveToward(m, p.x, p.y, m.speed * 0.6, dt, slow);
+      if (m.timer <= 0) { m.timer = 2; startCharge(m, p.x, p.y, 0.35, 160); }
+      return true;
+    case "spore-shaman": { // 원거리: 플레이어 자리에 착탄 예고 원 → 0.9초 뒤 포자 폭발
+      if (far > 220) moveToward(m, p.x, p.y, m.speed, dt, slow); else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; }
+      if (m.timer <= 0) {
+        m.timer = 2.2 * MOB_SHOT_INTERVAL;
+        if (far < 380 && !segmentHits(s.terrain.walls, m.x, m.y, p.x, p.y)) zoneAt(s, { kind: "pbomb", x: p.x, y: p.y, r: 46, t: 0.2, tele: 0.9, damage: Math.max(1, Math.round(m.damage * MOB_SHOT_DAMAGE)), every: 0, slow: 0, label: "포자탄", mob: true });
+      }
+      return true;
+    }
+    case "tower-shadow": { // 플레이어 이동을 0.4초 앞서 예측해 추적(분신은 곧장)
+      if (m.clone) return false;
+      const ax = clamp(p.x + (s.ext.pvx ?? 0) * 0.4, 20, WORLD_W - 20), ay = clamp(p.y + (s.ext.pvy ?? 0) * 0.4, 20, WORLD_H - 20);
+      moveToward(m, far < 60 ? p.x : ax, far < 60 ? p.y : ay, m.speed, dt, slow);
+      return true;
+    }
+    case "rift-stalker": // 두 번 연속 돌진 → 1초 휴식
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0 && far < 320) { m.timer = 3.4; m.t4 = 1; startCharge(m, p.x, p.y, 0.5, 200); }
+      return true;
+    case "core-sentry": { // 2.0초 간격 직선 광선, 0.8초 예고(포탑 소환물도 같은 행동)
+      if (m.speed > 0) { if (far > 260) moveToward(m, p.x, p.y, m.speed, dt, slow); else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; } }
+      if (m.timer <= 0) { m.timer = 2 * MOB_SHOT_INTERVAL; if (far < MOB_BEAM_LEN && !segmentHits(s.terrain.walls, m.x, m.y, p.x, p.y)) mobBeam(s, m, 0.8, Math.max(1, Math.round(m.damage * MOB_SHOT_DAMAGE))); }
+      return true;
+    }
+    case "heart-warden": // 연속 돌진(2회)과 광선을 번갈아
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0) {
+        m.timer = 3; m.t4 = (m.t4 || 0) + 1;
+        if (m.t4 % 2) { m.shots = 1; startCharge(m, p.x, p.y, 0.7, 240); }
+        else mobBeam(s, m, 0.9, Math.round(m.damage * 0.8), 520, 30);
+      }
+      return true;
+  }
+  return false;
+}
+
 function updateMonster(s: RaidState, m: Monster, dt: number) {
   const p = s.player, rate = m.rate;
   m.flash = Math.max(0, m.flash - dt);
@@ -716,7 +805,7 @@ function updateMonster(s: RaidState, m: Monster, dt: number) {
     if (wall && m.boss === "pollen-boar") { m.state = "stun"; m.stateT = 1; s.pops.push({ x: m.x, y: m.y - 50, text: "기절!", t: 1, kind: "info" }); }
     else if (wall && m.boss === "iron-bear") { m.state = "move"; exposeBear(s, m); }
     else if (wall && m.script === "dark-colossus") { m.state = "move"; exposeBear(s, m); }
-    else if (m.stateT <= 0 || wall) { m.state = "move"; if (m.def.kind === "elite" && !m.boss) zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 50, t: 3, tele: 0, damage: 6, every: 0.5, slow: 0.25 }); }
+    else if (m.stateT <= 0 || wall) { m.state = "move"; if (m.def.kind === "elite" && !m.boss) zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 50, t: 3, tele: 0, damage: 6, every: 0.5, slow: 0.25 }); afterDash(s, m); }
     { const o = pushOut(m.x, m.y, m.r, blockers(s.terrain)); m.x = o.x; m.y = o.y; }
     return;
   }
@@ -730,6 +819,7 @@ function updateMonster(s: RaidState, m: Monster, dt: number) {
   if (m.script) return updateScriptedBoss(s, m, dt);
   m.timer -= dt * rate;
   const far = dist(m.x, m.y, p.x, p.y);
+  if (!m.boss && updateTrait(s, m, dt, far, slow)) { const o = pushOut(m.x, m.y, m.r, blockers(s.terrain)); m.x = o.x; m.y = o.y; return; }
   switch (m.def.kind) {
     case "chase": case "slime": moveToward(m, p.x, p.y, m.speed, dt, slow); break;
     case "hop": moveToward(m, p.x, p.y, m.speed * 0.6, dt, slow); if (m.timer <= 0) { m.timer = 1.8; aimAt(m, p.x, p.y); m.state = "dash"; m.stateT = 0.3; } break;
@@ -1284,6 +1374,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   const cell = Math.floor(p.x / FLOW_CELL) + Math.floor(p.y / FLOW_CELL) * 1000;
   if (!s.flow || (s.t >= s.flowAt && cell !== s.flowCell) || s.t >= s.flowAt + 1) { s.flow = buildFlow(s.terrain, p.x, p.y); s.flowAt = s.t + 0.25; s.flowCell = cell; }
   routeFlow = { flow: s.flow, terrain: s.terrain, px: p.x, py: p.y };
+  trackPlayerVelocity(s, dt);
   for (const m of s.monsters) if (m.hp > 0) updateMonster(s, m, dt);
   routeTerrain = null; routeFlow = null;
   updatePet(s, dt);
@@ -1342,7 +1433,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
       const owner = h.owner !== undefined ? s.monsters.find(m => m.uid === h.owner && m.hp > 0) : undefined;
       if (h.owner !== undefined && !owner) { h.age = h.tele + h.life + 1; continue; }
       const dmg = stepHazard(h, dt, p.x, p.y, PLAYER.radius, h.kind === "spin" ? owner : undefined);
-      if (dmg > 0 && hurtPlayer(s, dmg, h.label, true) && h.root) { s.ext.rootUntil = s.t + h.root; s.pops.push({ x: p.x, y: p.y - 40, text: "🌿 속박!", t: 0.8, kind: "info" }); }
+      if (dmg > 0 && hurtPlayer(s, dmg, h.label, !h.mob) && h.root) { s.ext.rootUntil = s.t + h.root; s.pops.push({ x: p.x, y: p.y - 40, text: "🌿 속박!", t: 0.8, kind: "info" }); }
     }
     s.hazards = s.hazards.filter(h => !hazardDone(h));
   }
@@ -1352,7 +1443,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
     hitSource = z.src ?? "basic";
     if (z.tele > 0) { z.tele -= dt; if (z.tele <= 0 && (z.kind === "bolt" || z.kind === "line" || z.kind === "tshock" || z.kind === "pbomb" || z.kind === "rain")) {
       const inside = z.kind === "line" ? Math.abs(p.y - z.y) < z.r && p.x > z.x && p.x < z.x + (z.len ?? ARENA_W) : dist(z.x, z.y, p.x, p.y) < z.r;
-      if (inside && !z.mine && z.kind !== "tshock") hurtPlayer(s, z.damage, z.label ?? (z.kind === "line" ? "돌진 예고" : "번개"), Boolean(z.label));
+      if (inside && !z.mine && z.kind !== "tshock") hurtPlayer(s, z.damage, z.label ?? (z.kind === "line" ? "돌진 예고" : "번개"), Boolean(z.label) && !z.mob);
       if (z.kind === "bolt") for (const w of s.terrain.puddles) if (dist(w.x, w.y, z.x, z.y) < w.r + z.r) zoneAt(s, { kind: "tshock", x: w.x, y: w.y, r: w.r, t: 0.3, tele: 0.5, damage: z.damage, every: 0, slow: 0 });
       if (z.kind === "pbomb" && z.mine && z.src === "aux") {
         // 톡톡 씨앗탄: 최대 5명, 잔재주면 2초 싹 장판(초당 2)
