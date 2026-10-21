@@ -61,11 +61,11 @@ test('고대 묘목: 쓰러진 자리에 1초 뿌리 장판(감속·소량 피�
   assert.ok(b.m.hp <= 0); assert.equal(any, false);
 });
 
-test('뿌리 사냥개: 2초마다 0.35초 예고 후 짧은 도약(160px)', () => {
+test('뿌리 사냥개: 1.6초마다 0.35초 예고 후 긴 도약(220px)', () => {
   const { s, m } = arena(21, 'root-hound', 260, 0);
   let tele = null;
   run(s, 3, () => { if (!tele && m.state === 'tele') tele = { len: m.tele.len, left: m.stateT }; });
-  assert.ok(tele, '도약 예고'); assert.equal(tele.len, 160); assert.ok(tele.left <= 0.35 + 1e-9 && tele.left > 0.3);
+  assert.ok(tele, '도약 예고'); assert.equal(tele.len, 220); assert.ok(tele.left <= 0.35 + 1e-9 && tele.left > 0.3);
 });
 
 test('포자 주술사: 플레이어 자리에 0.9초 착탄 예고 원 → 포자탄(보스 피격 집계 제외)', () => {
@@ -143,4 +143,50 @@ test('1~20층 몬스터는 기존 행동 그대로(고유 행동은 21~30층 10�
   const seq = []; let prev = m.state;
   run(s, 6, () => { if (m.state !== prev) { seq.push(m.state); prev = m.state; } });
   assert.ok(!seq.includes('stun'), '얼음 박쥐는 연속 돌진·휴식 없음');
+});
+
+// ---------- 2026-10-21 보통 구간 패턴 강화: 몬스터마다 예고가 보이는 공격 ----------
+test('고대 묘목: 가까우면 플레이어 발밑에 뿌리 가시(0.9초 예고·속박, 보스 피격 제외)', () => {
+  const { s } = arena(21, 'ancient-sapling', 180, 0);
+  let spike = null;
+  run(s, 4, () => { spike ??= s.hazards.find(h => h.label === '뿌리 가시'); });
+  assert.ok(spike && spike.kind === 'track' && spike.mob && spike.root > 0 && spike.tele >= 0.9);
+});
+test('뿌리 사냥개: 멀리서는 옆으로 돌아 들어온다(정면 직진이 아님)', () => {
+  const { s, m } = arena(21, 'root-hound', 300, 0);
+  const y0 = m.y; run(s, 0.5);
+  assert.ok(Math.abs(m.y - y0) > 10, `옆으로 이동 ${m.y - y0}`);
+});
+test('포자 주술사: 플레이어 자리와 양옆 두 곳, 세 곳에 동시에 착탄', () => {
+  const { s } = arena(23, 'spore-shaman', 200, 0);
+  let n = 0; run(s, 6, () => { n = Math.max(n, s.zones.filter(z => z.label === '포자탄').length); });
+  assert.equal(n, 3);
+});
+test('수호목: 멈춰 서서 1초 예고 덩굴 채찍(속박), 준비 중 방어 감소', () => {
+  const { s, m } = arena(24, 'guardian-tree', 200, 0);
+  let vine = null, still = null;
+  run(s, 6, () => { if (!vine) { vine = s.hazards.find(h => h.label === '덩굴 채찍'); if (vine) still = { state: m.state, bonus: R.guardBonus(m) }; } });
+  assert.ok(vine && vine.kind === 'beam' && vine.tele >= 1 && vine.root > 0 && vine.mob);
+  assert.equal(still.state, 'stun'); assert.equal(still.bonus, 0);
+});
+test('탑의 그림자: 착지 지점을 0.7초 예고한 뒤 플레이어 근처로 순간이동', () => {
+  const { s, m } = arena(26, 'tower-shadow', 300, 0);
+  let mark = null, tele0 = 0, jumped = false;
+  run(s, 8, () => { if (!mark) { mark = s.zones.find(z => z.label === '그림자 착지') ?? null; if (mark) tele0 = mark.tele; } if (mark && Math.hypot(m.x - mark.x, m.y - mark.y) < 1) jumped = true; });
+  assert.ok(mark && tele0 >= 0.65 && mark.mob, `예고 ${tele0}`); assert.ok(jumped, '예고 자리로 이동');
+});
+test('균열 추적자: 2연속 돌진이 끝난 자리에 균열 장판', () => {
+  const { s } = arena(27, 'rift-stalker', 200, 0);
+  let crack = null; run(s, 8, () => { crack ??= s.zones.find(z => z.label === '균열'); });
+  assert.ok(crack && crack.mob && crack.damage > 0);
+});
+test('핵 파수꾼: 가까이 붙으면 뒤로 물러나 거리를 벌린다', () => {
+  const { s, m } = arena(27, 'core-sentry', 100, 0);
+  const d0 = Math.hypot(m.x - s.player.x, m.y - s.player.y); run(s, 0.6);
+  assert.ok(Math.hypot(m.x - s.player.x, m.y - s.player.y) > d0 + 20);
+});
+test('암흑 갑주: 0.8초 예고 뒤 긴 방패 돌진', () => {
+  const { s, m } = arena(29, 'dark-armor', 200, 0);
+  let tele = null; run(s, 5, () => { if (!tele && m.state === 'tele') tele = { len: m.tele.len, left: m.stateT }; });
+  assert.ok(tele && tele.len === 160 && tele.left > 0.75);
 });
