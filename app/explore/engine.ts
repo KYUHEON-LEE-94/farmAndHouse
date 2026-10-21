@@ -43,9 +43,20 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 // ---------- 타입 ----------
 export type NodeSize = "small" | "big" | "rare";
 export type ForageNode = { id: string; item: string; x: number; y: number; size: NodeSize; left: number };
+/**
+ * 위험 요소(2026-10-21 견제 강화): 벌떼는 가까이 오면 쫓아오고, 멧돼지는 돌아다니다 예고 후 돌진한다. 진흙은 감속만.
+ * 캠프(시작 지점 반경 START_SAFE_R)는 안전지대라 그 안으로 들어가면 추적을 멈춘다. 위치·상태를 저장해 이어 하기 때 그대로 되살린다.
+ */
 export type Hazard =
-  | { id: string; kind: "bees"; cx: number; cy: number; orbit: number; r: number; speed: number; phase: number; x: number; y: number }
+  | { id: string; kind: "bees"; cx: number; cy: number; orbit: number; r: number; speed: number; phase: number; x: number; y: number; mode: "patrol" | "chase" | "return"; ang: number; lostFor: number }
+  | { id: string; kind: "boar"; x: number; y: number; r: number; hx: number; hy: number; mode: "roam" | "aim" | "charge" | "rest"; until: number; dx: number; dy: number; wx: number; wy: number; n: number }
   | { id: string; kind: "mud"; x: number; y: number; r: number };
+
+/** 벌떼: 감지 200px, 추적 초당 140px(플레이어 240보다 느림), 둥지에서 340px 넘거나 1.2초 놓치면 복귀(봇 1,000판 조정, 문서 16절) */
+export const BEE_AGGRO = 200, BEE_CHASE_SPEED = 140, BEE_LEASH = 340, BEE_LOSE_SECONDS = 1.2, BEE_RETURN_SPEED = 220;
+/** 멧돼지: 배회 초당 70px, 감지 260px, 0.9초 예고 → 0.5초 돌진(초당 460px), 3.5초 휴식 */
+export const BOAR_ROAM_SPEED = 70, BOAR_AGGRO = 260, BOAR_AIM = 0.9, BOAR_CHARGE_SPEED = 460, BOAR_CHARGE_TIME = 0.5, BOAR_REST = 3.5;
+export const inCamp = (x: number, y: number) => dist(x, y, START.x, START.y) < START_SAFE_R;
 export type EventKind = "merchant" | "sidepath" | "injured" | "weather";
 export const EVENT_INFO: Record<EventKind, { icon: string; name: string; text: string; accept: string; decline: string | null }> = {
   merchant: { icon: "🧳", name: "길 잃은 상인", text: "길을 잃은 상인이 채집 재료 2개를 나눠 달래요. 고마움의 표시로 미끼를 준대요.", accept: "재료 2개 전달 → 기본 미끼 2개", decline: "지나가기" },
@@ -131,7 +142,8 @@ export function generateMap(seed: number, opts: MapOptions): ExploreMap {
   const hazardFree = (x: number, y: number, reach: number) =>
     dist(x, y, START.x, START.y) > START_SAFE_R + reach + 40 && nodes.every(node => dist(node.x, node.y, x, y) > reach + 60) && hazards.every(h => dist(h.kind === "bees" ? h.cx : h.x, h.kind === "bees" ? h.cy : h.y, x, y) > reach + 120);
   const spot = (reach: number) => { for (let i = 0; i < 300; i++) { const x = 120 + rnd() * (WORLD_W - 240), y = 120 + rnd() * (WORLD_H - 240); if (hazardFree(x, y, reach)) return { x, y }; } return null; };
-  for (let i = 0; i < 3; i++) { const orbit = 60 + rnd() * 30, at = spot(orbit + 22); if (at) hazards.push({ id: `b${i}`, kind: "bees", cx: at.x, cy: at.y, orbit, r: 22, speed: 1.3 + rnd() * 0.6, phase: rnd() * Math.PI * 2, x: at.x + orbit, y: at.y }); }
+  for (let i = 0; i < 3; i++) { const orbit = 60 + rnd() * 30, at = spot(orbit + 22); if (at) { const phase = rnd() * Math.PI * 2; hazards.push({ id: `b${i}`, kind: "bees", cx: at.x, cy: at.y, orbit, r: 22, speed: 1.3 + rnd() * 0.6, phase, x: at.x + Math.cos(phase) * orbit, y: at.y + Math.sin(phase * 1.3) * orbit * 0.7, mode: "patrol", ang: phase, lostFor: 0 }); } }
+  for (let i = 0; i < 2; i++) { const at = spot(90); if (at) hazards.push({ id: `w${i}`, kind: "boar", x: at.x, y: at.y, r: 24, hx: at.x, hy: at.y, mode: "roam", until: 0, dx: 1, dy: 0, wx: at.x, wy: at.y, n: 0 }); }
   for (let i = 0; i < 4; i++) { const r = 55 + rnd() * 35, at = spot(r); if (at) hazards.push({ id: `m${i}`, kind: "mud", x: at.x, y: at.y, r }); }
   const kind = rollEvent(rnd(), opts.sidepathBonus);
   return { nodes, hazards, event: kind ? { kind, at: 7 + rnd() * 12 } : null, rareGuaranteed, baseNodes: baseCount };
@@ -178,7 +190,7 @@ export function createRun(opts: MapOptions & { seed: number; runId: string; star
   const s: RunState = {
     runId: opts.runId, seed: opts.seed, regionId: opts.regionId, startedAt: opts.startedAt, mapOpts,
     lunch: snap ? snap.lunch : opts.lunch ?? null,
-    map, nodes, hazards: map.hazards.map(h => ({ ...h })),
+    map, nodes, hazards: restoreHazards(map.hazards, snap?.hazards),
     phase: "ready", readyLeft: READY_SECONDS, t: snap?.t ?? 0, timeLeft: snap?.timeLeft ?? RUN_SECONDS,
     player: { x: snap?.x ?? START.x, y: snap?.y ?? START.y, stunUntil: snap?.stunUntil ?? 0, dodgeUntil: 0, dodgeCd: 0, dx: 0, dy: 0, faceX: 1, faceY: 0 },
     bag: { ...(opts.bag ?? {}) }, bagCap: BAG_BASE + (opts.bagBonus ?? 0),
@@ -190,6 +202,14 @@ export function createRun(opts: MapOptions & { seed: number; runId: string; star
   };
   if (snap) toast(s, "🔄 지난 탐험을 이어서 해요", 2.4);
   return s;
+}
+
+/** 이어 하기: 저장된 몬스터 위치·상태를 같은 id에 덮어쓴다(진흙 등 고정 요소는 지도 그대로). */
+function restoreHazards(base: Hazard[], saved?: unknown[]): Hazard[] {
+  return base.map(h => {
+    const found = Array.isArray(saved) ? saved.find(entry => entry && typeof entry === "object" && (entry as Hazard).id === h.id && (entry as Hazard).kind === h.kind) as Hazard | undefined : undefined;
+    return found && h.kind !== "mud" && Number.isFinite(found.x) && Number.isFinite(found.y) ? { ...h, ...found } as Hazard : { ...h };
+  });
 }
 
 export const bagCount = (s: Pick<RunState, "bag">) => Object.values(s.bag).reduce((sum, n) => sum + n, 0);
@@ -204,12 +224,47 @@ export function nearestNode(s: RunState, targetId?: string | null) {
   return live.sort((a, b) => dist(a.x, a.y, p.x, p.y) - dist(b.x, b.y, p.x, p.y))[0] ?? null;
 }
 
-function stun(s: RunState) {
+/** 벌떼: 둥지를 돌다가(patrol) 가까이 오면 쫓아오고(chase), 너무 멀어지거나 놓치면 둥지로 돌아간다(return). */
+function updateBees(s: RunState, h: Extract<Hazard, { kind: "bees" }>, dt: number, safe: boolean) {
+  const p = s.player, d = dist(h.x, h.y, p.x, p.y);
+  const step = (tx: number, ty: number, speed: number) => { const l = dist(h.x, h.y, tx, ty); if (l > 0.001) { const k = Math.min(1, (speed * dt) / l); h.x += (tx - h.x) * k; h.y += (ty - h.y) * k; } return l; };
+  if (h.mode === "patrol") {
+    h.ang += h.speed * dt;
+    step(h.cx + Math.cos(h.ang) * h.orbit, h.cy + Math.sin(h.ang * 1.3) * h.orbit * 0.7, BEE_RETURN_SPEED);
+    if (!safe && d < BEE_AGGRO) { h.mode = "chase"; h.lostFor = 0; }
+  } else if (h.mode === "chase") {
+    step(p.x, p.y, BEE_CHASE_SPEED);
+    h.lostFor = d > BEE_AGGRO * 1.4 ? h.lostFor + dt : 0;
+    if (safe || h.lostFor >= BEE_LOSE_SECONDS || dist(h.x, h.y, h.cx, h.cy) > BEE_LEASH) h.mode = "return";
+  } else {
+    const home = { x: h.cx + Math.cos(h.ang) * h.orbit, y: h.cy + Math.sin(h.ang * 1.3) * h.orbit * 0.7 };
+    if (step(home.x, home.y, BEE_RETURN_SPEED) < 12) h.mode = "patrol";
+  }
+}
+
+/** 멧돼지: 둥지 근처를 배회하다 플레이어가 가까우면 0.7초 노려보고(예고선) 직선 돌진, 그 뒤 쉰다. */
+function updateBoar(s: RunState, h: Extract<Hazard, { kind: "boar" }>, dt: number, safe: boolean) {
+  const p = s.player, d = dist(h.x, h.y, p.x, p.y);
+  if (h.mode === "roam") {
+    const l = dist(h.x, h.y, h.wx, h.wy);
+    if (l < 8) { const rnd = rngOf(s.seed + h.n * 7919 + h.id.charCodeAt(1)); h.n++; const a = rnd() * Math.PI * 2, r = 60 + rnd() * 160; h.wx = clamp(h.hx + Math.cos(a) * r, 60, WORLD_W - 60); h.wy = clamp(h.hy + Math.sin(a) * r, 60, WORLD_H - 60); }
+    else { const k = Math.min(1, (BOAR_ROAM_SPEED * dt) / l); h.x += (h.wx - h.x) * k; h.y += (h.wy - h.y) * k; }
+    if (!safe && d < BOAR_AGGRO) { h.mode = "aim"; h.until = s.t + BOAR_AIM; h.dx = (p.x - h.x) / (d || 1); h.dy = (p.y - h.y) / (d || 1); }
+  } else if (h.mode === "aim") {
+    if (s.t >= h.until) { h.mode = "charge"; h.until = s.t + BOAR_CHARGE_TIME; }
+  } else if (h.mode === "charge") {
+    h.x = clamp(h.x + h.dx * BOAR_CHARGE_SPEED * dt, h.r, WORLD_W - h.r); h.y = clamp(h.y + h.dy * BOAR_CHARGE_SPEED * dt, h.r, WORLD_H - h.r);
+    // 캠프 안으로는 돌진해 들어오지 않는다
+    if (s.t >= h.until || inCamp(h.x, h.y)) { h.mode = "rest"; h.until = s.t + BOAR_REST; }
+  } else if (s.t >= h.until) { h.mode = "roam"; h.wx = h.x; h.wy = h.y; }
+}
+
+function stun(s: RunState, cry = "🐝 따끔!") {
   const p = s.player;
   s.stuns++; s.hp = Math.max(0, s.hp - 1); s.gather = null; s.dirty = true;
   if (s.hp <= 0) return knockDown(s);
   p.stunUntil = s.t + STUN_SECONDS; s.timeLeft = Math.max(0, s.timeLeft - STUN_TIME_PENALTY);
-  toast(s, `🐝 따끔! 체력 ${s.hp}/${MAX_HP} · 1.5초 멈춤 · 시간 −2초`);
+  toast(s, `${cry} 체력 ${s.hp}/${MAX_HP} · 1.5초 멈춤 · 시간 −2초`);
 }
 
 /** 가방에서 잃을 채집물(쓰러짐): 전체의 40%(내림, 가방이 비어 있지 않으면 최소 1개)를 낱개 단위로 무작위 선택. */
@@ -250,11 +305,16 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
     p.x += mx * PLAYER_SPEED * slow * dt; p.y += my * PLAYER_SPEED * slow * dt;
   }
   p.x = clamp(p.x, PLAYER_R, WORLD_W - PLAYER_R); p.y = clamp(p.y, PLAYER_R, WORLD_H - PLAYER_R);
-  // 벌떼 순찰과 피격(회피 중·경직 중에는 맞지 않음)
+  // 몬스터 움직임과 피격(회피 중·경직 중에는 맞지 않음). 캠프 안의 플레이어는 쫓지 않는다.
+  const safe = inCamp(p.x, p.y);
   for (const h of s.hazards) {
-    if (h.kind !== "bees") continue;
-    const a = h.phase + s.t * h.speed; h.x = h.cx + Math.cos(a) * h.orbit; h.y = h.cy + Math.sin(a * 1.3) * h.orbit * 0.7;
-    if (s.t >= p.stunUntil && s.t >= p.dodgeUntil && (s.hitCd[h.id] ?? 0) <= s.t && dist(h.x, h.y, p.x, p.y) < h.r + PLAYER_R) { s.hitCd[h.id] = s.t + 3; stun(s); if ((s.phase as Phase) === "done") return; }
+    if (h.kind === "mud") continue;
+    if (h.kind === "bees") updateBees(s, h, dt, safe); else updateBoar(s, h, dt, safe);
+    if (s.t >= p.stunUntil && s.t >= p.dodgeUntil && (s.hitCd[h.id] ?? 0) <= s.t && dist(h.x, h.y, p.x, p.y) < h.r + PLAYER_R) {
+      s.hitCd[h.id] = s.t + (h.kind === "bees" ? 3 : 1.5);
+      if (h.kind === "bees") { h.mode = "return"; h.lostFor = 0; } else { h.mode = "rest"; h.until = s.t + BOAR_REST; }
+      stun(s, h.kind === "bees" ? "🐝 따끔!" : "🐗 쿵!"); if ((s.phase as Phase) === "done") return;
+    }
   }
   // 채집
   if (input.gather && !s.gather && !stunned && s.t >= p.dodgeUntil) {
@@ -349,6 +409,7 @@ export function snapshotOf(s: RunState): RunSnapshot {
     nodeLeft, extraNodes: s.nodes.filter(node => !base.has(node.id)).map(node => ({ ...node })),
     event: s.event ? { ...s.event, zone: s.event.zone ? { ...s.event.zone } : undefined } : null,
     bait: s.rewards.bait, stuns: s.stuns, hitCd: { ...s.hitCd }, lunch: s.lunch ? { ...s.lunch } : null,
+    hazards: s.hazards.map(h => ({ ...h })),
   };
 }
 

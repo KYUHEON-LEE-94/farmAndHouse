@@ -18,6 +18,8 @@ export type RunSnapshot = {
   bait: number; stuns: number; hitCd: Record<string, number>;
   /** 입장 때 적용한 도시락(이어 할 때도 같은 효과) */
   lunch: { dishId: string; grade: 0 | 1 | 2; expiresAt: number; actionsLeft: number } | null;
+  /** 몬스터(벌떼·멧돼지) 위치와 상태. 없으면(예전 저장) 지도 기본값 */
+  hazards?: unknown[];
 };
 
 /** 진행 중인 판의 체크포인트(피격·채집·이벤트 직후와 10초 간격 저장). snap이 있으면 재접속 때 이어 하고, 없으면(예전 저장) 가방만 한 번 지급한다. */
@@ -74,6 +76,7 @@ function restoreSnapshot(raw: unknown): RunSnapshot | undefined {
     bait: Math.max(0, Math.floor(Number(r.bait) || 0)), stuns: Math.max(0, Math.floor(Number(r.stuns) || 0)),
     hitCd: isRecordOfNumbers(r.hitCd) ? r.hitCd : {},
     lunch: r.lunch && typeof r.lunch === "object" && typeof r.lunch.dishId === "string" ? r.lunch : null,
+    hazards: Array.isArray(r.hazards) ? r.hazards : undefined,
   };
 }
 

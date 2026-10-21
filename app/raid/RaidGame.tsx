@@ -515,7 +515,8 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   // 전투펫
   if (s.pet && petIcon) { const pt = s.pet; shadow(ctx, pt.x, pt.y, 10); ctx.save(); ctx.translate(pt.x, pt.y + Math.sin(clock * 6) * 2); if (pt.flash > 0) ctx.scale(1.2, 1.2); ctx.fillStyle = "#000"; ctx.font = `22px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(petIcon, 0, 0); ctx.restore(); }
   // 플레이어(내 아바타)
-  const size = 44, flip = Math.cos(p.aim) < 0;
+  // 조준(마우스 커서) 쪽을 바라본다. 방향이 바뀌면 약 0.1초 동안 납작해졌다 펴지며 돌아선다
+  const size = 44, flip = turnToward(s, Math.cos(p.aim) < 0 ? -1 : 1, clock);
   ctx.save();
   shadow(ctx, p.x, p.y + 4, 16);
   ctx.globalAlpha = p.iframes > 0 && Math.floor(clock * 20) % 2 ? 0.45 : 1;
@@ -702,8 +703,18 @@ function drawEnd(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, k: numbe
   ctx.restore();
 }
 
-function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, flip: boolean) {
-  ctx.save(); ctx.translate(x, y); if (flip) ctx.scale(-1, 1);
+/** 판마다 아바타 좌우 값(-1~1)을 부드럽게 따라가게 기억한다. */
+const facing = new WeakMap<object, { f: number; at: number }>();
+function turnToward(s: RaidState, want: -1 | 1, clock: number) {
+  const prev = facing.get(s) ?? { f: want, at: clock }, dt = Math.min(0.1, Math.max(0, clock - prev.at));
+  const f = prev.f + (want - prev.f) * Math.min(1, dt * 18);
+  facing.set(s, { f, at: clock });
+  return f >= 0 ? Math.max(0.15, f) : Math.min(-0.15, f);
+}
+
+/** face: true면 왼쪽을 본다(좌우 반전), 숫자면 좌우 배율(-1~1, 돌아서는 중간 모습). */
+function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, face: boolean | number) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(typeof face === "number" ? face : face ? -1 : 1, 1);
   if (art.avatar) { ctx.imageSmoothingEnabled = !art.pixelated; ctx.drawImage(art.avatar, -size / 2, -size / 2, size, size); }
   else { ctx.beginPath(); ctx.arc(0, 0, PLAYER.radius, 0, Math.PI * 2); ctx.fillStyle = "#fff3d6"; ctx.fill(); ctx.fillStyle = "#000"; ctx.font = `20px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🧑‍🌾", 0, 1); }
   ctx.restore();

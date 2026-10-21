@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FORAGE } from "./data";
 import {
-  EVENT_INFO, MAX_HP, GATHER_BIG, GATHER_RANGE, GATHER_SMALL, NO_INPUT, RETURN_HOLD, START, VIEW_H, VIEW_W, WORLD_H, WORLD_W,
+  EVENT_INFO, MAX_HP, BOAR_AIM, BOAR_CHARGE_SPEED, BOAR_CHARGE_TIME, GATHER_BIG, GATHER_RANGE, GATHER_SMALL, NO_INPUT, RETURN_HOLD, START, VIEW_H, VIEW_W, WORLD_H, WORLD_W,
   bagCount, canAccept, checkpointDue, checkpointOf, nearestNode, resolveEvent, resultOf, rngOf, step,
   type EventKind, type ExploreInput, type RunResult, type RunState,
 } from "./engine";
@@ -64,6 +64,10 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
   const stick = useRef<{ id: number; ox: number; oy: number; x: number; y: number } | null>(null);
   const cam = useRef({ x: Math.max(0, Math.min(WORLD_W - VIEW_W, START.x - VIEW_W / 2)), y: Math.max(0, Math.min(WORLD_H - VIEW_H, START.y - VIEW_H / 2)) });
   const finished = useRef(false);
+  /** 마우스 커서(화면 논리 좌표, 마지막으로 움직인 시각). 매 프레임 카메라 위치로 월드 좌표를 구해 커서 쪽을 보고, 2초 넘게 안 움직이면 이동 방향을 따른다 */
+  const cursor = useRef<{ x: number; y: number; at: number } | null>(null);
+  /** 아바타 좌우(-1 왼쪽 ~ 1 오른쪽). 방향이 바뀌면 약 0.1초 동안 납작해졌다 펴지며 돌아선다 */
+  const face = useRef(1);
   const callbacks = useRef({ onCheckpoint, onFinish });
   useEffect(() => { callbacks.current = { onCheckpoint, onFinish }; });
   const [touch] = useState(isTouchDevice);
@@ -111,8 +115,22 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
         }
       }
       for (const h of s.hazards) if (h.kind === "bees") {
+        // 둥지(순찰 궤도)는 늘 보이고, 추적 중이면 빨간 느낌표
         ctx.strokeStyle = "rgba(240,170,40,.35)"; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.ellipse(h.cx, h.cy, h.orbit, h.orbit * 0.7, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle = "#000"; ctx.font = `26px ${EMOJI_FONT}`; ctx.fillText("🐝", h.x, h.y); ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText("🐝", h.x + 14, h.y + 10);
+        if (h.mode === "chase") { ctx.font = "900 16px sans-serif"; ctx.fillStyle = "#e2557f"; ctx.fillText("!", h.x, h.y - 26); }
+      } else if (h.kind === "boar") {
+        if (h.mode === "aim") {
+          // 돌진 예고선: 실제 돌진 거리와 폭 그대로, 남은 시간에 따라 점점 진해진다
+          const k = 1 - Math.max(0, h.until - s.t) / BOAR_AIM, len = BOAR_CHARGE_SPEED * BOAR_CHARGE_TIME;
+          ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(Math.atan2(h.dy, h.dx));
+          ctx.fillStyle = `rgba(220,60,40,${0.12 + k * 0.25})`; ctx.fillRect(0, -h.r, len, h.r * 2);
+          ctx.setLineDash([10, 7]); ctx.strokeStyle = "#ff6b4a"; ctx.lineWidth = 2; ctx.strokeRect(0, -h.r, len, h.r * 2); ctx.setLineDash([]); ctx.restore();
+          ctx.font = "900 18px sans-serif"; ctx.fillStyle = "#e2557f"; ctx.fillText("!!", h.x, h.y - 32);
+        }
+        ctx.save(); ctx.translate(h.x, h.y); if (h.dx < 0 || (h.mode === "roam" && h.wx < h.x)) ctx.scale(-1, 1);
+        ctx.fillStyle = "#000"; ctx.font = `${h.mode === "charge" ? 36 : 32}px ${EMOJI_FONT}`; ctx.fillText("🐗", 0, 0); ctx.restore();
+        if (h.mode === "rest") { ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText("💤", h.x + 18, h.y - 20); }
       }
       const ev = s.event;
       if (ev?.state === "active" && ev.zone) {
@@ -121,16 +139,19 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
         ctx.strokeStyle = "#4a90d9"; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle = "#000"; ctx.font = `28px ${EMOJI_FONT}`; ctx.fillText("☂️", ev.zone.x, ev.zone.y); ctx.font = "800 14px sans-serif"; ctx.fillStyle = "#1d4f86"; ctx.fillText(`${left.toFixed(1)}초`, ev.zone.x, ev.zone.y + ev.zone.r + 14);
       }
-      // 플레이어
+      // 플레이어: 커서(최근 2초 안에 움직였을 때) 또는 이동 방향을 바라본다
+      const cur = cursor.current, curX = cur ? c.x + cur.x : 0, wantRight = cur && now - cur.at < 2000 && Math.abs(curX - p.x) > 4 ? curX > p.x : p.faceX >= 0;
+      face.current += ((wantRight ? 1 : -1) - face.current) * Math.min(1, dt * 18);
       const stunned = s.t < p.stunUntil, dodging = s.t < p.dodgeUntil;
       ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(p.x, p.y + 18, 18, 7, 0, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = dodging ? 0.55 : 1;
-      const face = avatarImg.current?.img;
-      if (face && face.complete && face.naturalWidth > 0) {
+      const faceImg = avatarImg.current?.img;
+      if (faceImg && faceImg.complete && faceImg.naturalWidth > 0) {
         ctx.save(); ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, Math.PI * 2); ctx.closePath(); ctx.fillStyle = "#fffdf5"; ctx.fill(); ctx.clip();
-        ctx.imageSmoothingEnabled = !avatarImg.current?.pixelated; ctx.drawImage(face, p.x - 22, p.y - 22, 44, 44); ctx.restore();
+        ctx.translate(p.x, p.y); ctx.scale(face.current >= 0 ? Math.max(0.15, face.current) : Math.min(-0.15, face.current), 1);
+        ctx.imageSmoothingEnabled = !avatarImg.current?.pixelated; ctx.drawImage(faceImg, -22, -22, 44, 44); ctx.restore();
         ctx.strokeStyle = stunned ? "#e2557f" : "#fffdf5"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, 23, 0, Math.PI * 2); ctx.stroke();
-      } else { ctx.fillStyle = "#000"; ctx.font = `34px ${EMOJI_FONT}`; ctx.fillText("🧑‍🌾", p.x, p.y); }
+      } else { ctx.save(); ctx.translate(p.x, p.y); ctx.scale(face.current >= 0 ? Math.max(0.15, face.current) : Math.min(-0.15, face.current), 1); ctx.fillStyle = "#000"; ctx.font = `34px ${EMOJI_FONT}`; ctx.fillText("🧑‍🌾", 0, 0); ctx.restore(); }
       ctx.globalAlpha = 1;
       if (stunned) { ctx.font = `18px ${EMOJI_FONT}`; ctx.fillText("💫", p.x, p.y - 28); }
       if (s.gather) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(p.x, p.y, 26, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, s.gather.progress / s.gather.need)); ctx.stroke(); }
@@ -139,7 +160,11 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
       // 미니맵: 전체 지형·플레이어·귀환 지점(자원 위치는 안내소 1단계부터)
       mctx.setTransform(dpr * MINI_W / WORLD_W, 0, 0, dpr * MINI_H / WORLD_H, 0, 0);
       mctx.fillStyle = "#9fca84"; mctx.fillRect(0, 0, WORLD_W, WORLD_H);
-      for (const h of s.hazards) { if (h.kind === "mud") { mctx.fillStyle = "#7a5530"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); } else { mctx.fillStyle = "rgba(230,160,30,.7)"; mctx.beginPath(); mctx.arc(h.cx, h.cy, h.orbit, 0, Math.PI * 2); mctx.fill(); } }
+      for (const h of s.hazards) {
+        if (h.kind === "mud") { mctx.fillStyle = "#7a5530"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
+        else if (h.kind === "bees") { mctx.fillStyle = "rgba(230,160,30,.45)"; mctx.beginPath(); mctx.arc(h.cx, h.cy, h.orbit, 0, Math.PI * 2); mctx.fill(); mctx.fillStyle = h.mode === "chase" ? "#e2557f" : "#e6a01e"; mctx.beginPath(); mctx.arc(h.x, h.y, 30, 0, Math.PI * 2); mctx.fill(); }
+        else { mctx.fillStyle = h.mode === "aim" || h.mode === "charge" ? "#e2557f" : "#8a5a3a"; mctx.beginPath(); mctx.arc(h.x, h.y, 34, 0, Math.PI * 2); mctx.fill(); }
+      }
       if (showResourcesOnMinimap) { mctx.fillStyle = "#fff6c0"; for (const node of s.nodes) if (node.left > 0 && node.size !== "rare") { mctx.beginPath(); mctx.arc(node.x, node.y, 22, 0, Math.PI * 2); mctx.fill(); } }
       mctx.strokeStyle = "rgba(255,255,255,.9)"; mctx.lineWidth = 14; mctx.strokeRect(c.x, c.y, VIEW_W, VIEW_H);
       mctx.fillStyle = "#3b6cb5"; mctx.fillRect(START.x - 30, START.y - 30, 60, 60);
@@ -171,6 +196,12 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
   }, []);
 
   /** 캔버스 클릭: 범위 안 자원을 누르면 채집, 범위 밖이면 안내. */
+  /** 마우스가 움직이면 커서 위치를 월드 좌표로 기억한다(터치는 이동 방향을 따른다). */
+  const moveCursor = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (event.pointerType === "touch") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    cursor.current = { x: (event.clientX - rect.left) / rect.width * VIEW_W, y: (event.clientY - rect.top) / rect.height * VIEW_H, at: performance.now() };
+  };
   const clickCanvas = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.pointerType === "touch") return;
     const rect = event.currentTarget.getBoundingClientRect(), s = state.current;
@@ -193,7 +224,7 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
   const minutes = Math.max(0, Math.ceil(hud.time));
   return <div className={`explore-game ${touch ? "touch" : ""}`}>
     <div className="explore-stage">
-      <canvas ref={canvasRef} className="explore-canvas" onPointerDown={clickCanvas} aria-label="탐험 지도" />
+      <canvas ref={canvasRef} className="explore-canvas" onPointerDown={clickCanvas} onPointerMove={moveCursor} aria-label="탐험 지도" />
       <div className="explore-hud">
         <span className={`explore-time ${hud.time <= 10 ? "low" : ""}`}>⏱ {minutes}초</span>
         <span className={`explore-hp ${hud.hp <= 1 ? "low" : ""}`} aria-label={`체력 ${hud.hp}/${MAX_HP}`}>{Array.from({ length: MAX_HP }, (_, i) => i < hud.hp ? "❤️" : "🤍").join("")}</span>
