@@ -44,6 +44,8 @@ export type Monster = {
   markUntil: number;
   /** 53절: 첫 타격 여부(선제타격), 갑옷 균열 중첩·만료 */
   struck?: boolean; crack?: number; crackUntil?: number;
+  /** 탑의 그림자 순간이동: 도착 시각·위치(예고 원이 먼저 뜬다) */
+  blinkAt?: number; blinkX?: number; blinkY?: number;
   /** 분사형: 마지막 분사 적중 시각, 연속 적중 시간 */
   sprayAt?: number; sprayT?: number;
 };
@@ -357,7 +359,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
 function killMonster(s: RaidState, m: Monster) {
   m.hp = 0; s.kills++;
   // 고대 묘목(21~25층 일반): 쓰러진 자리에 1초 뿌리 장판(피해 없는 회복 묘목 소환물은 제외)
-  if (m.def.id === "ancient-sapling" && !m.boss && m.damage > 0) zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 40, t: 1, tele: 0, damage: Math.max(1, Math.round(m.damage * 0.25)), every: 0.5, slow: 0.35, label: "뿌리 장판", mob: true });
+  if (m.def.id === "ancient-sapling" && !m.boss && m.damage > 0) zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 52, t: 1.5, tele: 0, damage: Math.max(1, Math.round(m.damage * 0.25)), every: 0.5, slow: 0.35, label: "뿌리 장판", mob: true });
   if (m.boss) s.hazards = [];
   s.shake = Math.max(s.shake, m.boss ? 5 : m.elite ? 3 : 1.5);
   s.killTimes = [...s.killTimes.filter(t => t > s.t - 1), s.t];
@@ -718,7 +720,7 @@ const preparing = (m: Monster) => m.state === "tele" || m.state === "dash";
 export function guardBonus(m: Monster) {
   if (m.def.kind !== "crab" || m.boss) return 0;
   if (m.def.id === "dark-armor") return preparing(m) ? -Math.min(5, Math.max(0, m.defense)) : 3;
-  if (m.def.id === "guardian-tree") return preparing(m) ? 0 : 3;
+  if (m.def.id === "guardian-tree") return preparing(m) || m.state === "stun" ? 0 : 3;
   return m.state !== "dash" ? 3 : 0;
 }
 /** 암흑 갑주 정면 방패가 지금 플레이어 쪽을 막고 있는가 */
@@ -732,8 +734,8 @@ function trackPlayerVelocity(s: RaidState, dt: number) {
   e.plx = p.x; e.ply = p.y;
 }
 /** 일반 몬스터 직선 광선(예고 tele초). 주인이 죽으면 예고 중인 광선도 사라진다. */
-function mobBeam(s: RaidState, m: Monster, tele: number, damage: number, len = MOB_BEAM_LEN, width = MOB_BEAM_WIDTH) {
-  addHazard(s, hazard({ kind: "beam", x: m.x, y: m.y, angle: Math.atan2(s.player.y - m.y, s.player.x - m.x), len, width, tele, life: 0.15, damage, label: `${m.name} 광선`, owner: m.uid, mob: true }));
+function mobBeam(s: RaidState, m: Monster, tele: number, damage: number, len = MOB_BEAM_LEN, width = MOB_BEAM_WIDTH, label = `${m.name} 광선`, root?: number) {
+  addHazard(s, hazard({ kind: "beam", x: m.x, y: m.y, angle: Math.atan2(s.player.y - m.y, s.player.x - m.x), len, width, tele, life: 0.15, damage, label, owner: m.uid, mob: true, root }));
   m.flash = Math.max(m.flash, tele);
 }
 /** 돌진이 끝난 직후: 연속 돌진·휴식 */
@@ -743,7 +745,7 @@ function afterDash(s: RaidState, m: Monster) {
   if (m.def.id === "forest-executor") shoot(s, m, [-0.4, 0, 0.4], 150);
   if (m.def.id === "rift-stalker") {
     if (m.t4 === 1) { m.t4 = 2; startCharge(m, p.x, p.y, 0.35, 200); }
-    else if (m.t4 === 2) { m.t4 = 0; m.state = "stun"; m.stateT = 1; }
+    else if (m.t4 === 2) { m.t4 = 0; m.state = "stun"; m.stateT = 1; zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 48, t: 2.2, tele: 0, damage: Math.max(1, Math.round(m.damage * 0.25)), every: 0.5, slow: 0.2, label: "균열", mob: true }); }
   }
   if (m.def.id === "heart-warden" && m.shots === 1) { m.shots = 0; startCharge(m, p.x, p.y, 0.45, 240); }
 }
@@ -751,22 +753,55 @@ function afterDash(s: RaidState, m: Monster) {
 function updateTrait(s: RaidState, m: Monster, dt: number, far: number, slow: number): boolean {
   const p = s.player;
   switch (m.def.id) {
-    case "root-hound": // 2초마다 0.35초 예고 후 짧은 도약
-      moveToward(m, p.x, p.y, m.speed * 0.6, dt, slow);
-      if (m.timer <= 0) { m.timer = 2; startCharge(m, p.x, p.y, 0.35, 160); }
+    case "ancient-sapling": { // 추적 + 3.2초마다 플레이어 발밑에 뿌리 가시(0.9초 예고, 맞으면 0.6초 속박)
+      if (m.damage <= 0) return true; // 회복 묘목(보스 소환물)은 움직이지 않는다
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0 && far < 240) { m.timer = 3.2; addHazard(s, hazard({ kind: "track", x: p.x, y: p.y, r0: 36, tele: 0.9, followFor: 0.3, followSpeed: 120, damage: Math.max(1, Math.round(m.damage * 0.6)), label: "뿌리 가시", owner: m.uid, mob: true, root: 0.6 })); }
       return true;
+    }
+    case "root-hound": { // 옆(±70°)으로 돌아 들어온 뒤 1.6초마다 0.35초 예고 → 긴 도약
+      const side = m.uid % 2 ? 1 : -1, base = Math.atan2(m.y - p.y, m.x - p.x) + side * 1.2;
+      if (far > 150) moveToward(m, clamp(p.x + Math.cos(base) * 120, 20, WORLD_W - 20), clamp(p.y + Math.sin(base) * 120, 20, WORLD_H - 20), m.speed * 0.8, dt, slow);
+      else moveToward(m, p.x, p.y, m.speed * 0.5, dt, slow);
+      if (m.timer <= 0 && far < 260) { m.timer = 1.6; startCharge(m, p.x, p.y, 0.35, 220); }
+      return true;
+    }
+    case "guardian-tree": { // 천천히 다가오다 4초마다 멈춰 덩굴 채찍(1초 예고, 맞으면 0.8초 속박). 준비 중에는 방어 감소
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0 && far < 300) { m.timer = 4; m.state = "stun"; m.stateT = 1; mobBeam(s, m, 1, Math.round(m.damage * 0.8), 300, 34, "덩굴 채찍", 0.8); }
+      return true;
+    }
+    case "dark-armor": { // 정면 방패를 든 채 다가오다 3.2초마다 0.8초 예고 → 긴 방패 돌진(준비·돌진 중 방어 감소)
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0 && far < 300) { m.timer = 3.2; startCharge(m, p.x, p.y, 0.8, 160); }
+      return true;
+    }
     case "spore-shaman": { // 원거리: 플레이어 자리에 착탄 예고 원 → 0.9초 뒤 포자 폭발
       if (far > 220) moveToward(m, p.x, p.y, m.speed, dt, slow); else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; }
       if (m.timer <= 0) {
-        m.timer = 2.2 * MOB_SHOT_INTERVAL;
-        if (far < 380 && !segmentHits(s.terrain.walls, m.x, m.y, p.x, p.y)) zoneAt(s, { kind: "pbomb", x: p.x, y: p.y, r: 46, t: 0.2, tele: 0.9, damage: Math.max(1, Math.round(m.damage * MOB_SHOT_DAMAGE)), every: 0, slow: 0, label: "포자탄", mob: true });
+        m.timer = 2.4 * MOB_SHOT_INTERVAL;
+        // 플레이어 자리 + 양옆 두 곳에 동시에 착탄(한 발 피해는 0.7배)
+        if (far < 380 && !segmentHits(s.terrain.walls, m.x, m.y, p.x, p.y)) {
+          const a = Math.atan2(p.y - m.y, p.x - m.x) + Math.PI / 2, dmg = Math.max(1, Math.round(m.damage * MOB_SHOT_DAMAGE * 0.7));
+          for (const k of [0, 1, -1]) zoneAt(s, { kind: "pbomb", x: clamp(p.x + Math.cos(a) * 72 * k, 20, WORLD_W - 20), y: clamp(p.y + Math.sin(a) * 72 * k, 20, WORLD_H - 20), r: 42, t: 0.2, tele: 1, damage: dmg, every: 0, slow: 0, label: "포자탄", mob: true });
+        }
       }
       return true;
     }
-    case "tower-shadow": { // 플레이어 이동을 0.4초 앞서 예측해 추적(분신은 곧장)
+    case "tower-shadow": { // 예측 추적 + 4.5초마다 플레이어 등 뒤 착지 예고(0.7초) → 순간이동 후 찌르기(분신은 곧장)
       if (m.clone) return false;
+      if (m.blinkAt !== undefined) {
+        if (s.t >= m.blinkAt) { m.x = m.blinkX!; m.y = m.blinkY!; m.blinkAt = undefined; burst(s, m.x, m.y, 10, "#6a4c9c", 160); startCharge(m, p.x, p.y, 0.3, 120); }
+        return true;
+      }
       const ax = clamp(p.x + (s.ext.pvx ?? 0) * 0.4, 20, WORLD_W - 20), ay = clamp(p.y + (s.ext.pvy ?? 0) * 0.4, 20, WORLD_H - 20);
       moveToward(m, far < 60 ? p.x : ax, far < 60 ? p.y : ay, m.speed, dt, slow);
+      if (m.timer <= 0 && far > 120 && far < 420) {
+        m.timer = 4.5;
+        const back = Math.atan2(-(s.ext.pvy ?? 0), -(s.ext.pvx ?? 0)), moving = Math.hypot(s.ext.pvx ?? 0, s.ext.pvy ?? 0) > 20, a = moving ? back : Math.atan2(p.y - m.y, p.x - m.x);
+        m.blinkX = clamp(p.x + Math.cos(a) * 90, 30, WORLD_W - 30); m.blinkY = clamp(p.y + Math.sin(a) * 90, 30, WORLD_H - 30); m.blinkAt = s.t + 0.7;
+        zoneAt(s, { kind: "bolt", x: m.blinkX, y: m.blinkY, r: 34, t: 0.15, tele: 0.7, damage: Math.max(1, Math.round(m.damage * 0.5)), every: 0, slow: 0, label: "그림자 착지", mob: true });
+      }
       return true;
     }
     case "rift-stalker": // 두 번 연속 돌진 → 1초 휴식
@@ -774,7 +809,11 @@ function updateTrait(s: RaidState, m: Monster, dt: number, far: number, slow: nu
       if (m.timer <= 0 && far < 320) { m.timer = 3.4; m.t4 = 1; startCharge(m, p.x, p.y, 0.5, 200); }
       return true;
     case "core-sentry": { // 2.0초 간격 직선 광선, 0.8초 예고(포탑 소환물도 같은 행동)
-      if (m.speed > 0) { if (far > 260) moveToward(m, p.x, p.y, m.speed, dt, slow); else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; } }
+      if (m.speed > 0) {
+        if (far > 260) moveToward(m, p.x, p.y, m.speed, dt, slow);
+        else if (far < 170) { aimAt(m, p.x, p.y); m.x = clamp(m.x - m.dir.x * m.speed * 0.8 * dt, 20, WORLD_W - 20); m.y = clamp(m.y - m.dir.y * m.speed * 0.8 * dt, 20, WORLD_H - 20); } // 가까우면 물러나며 거리 유지
+        else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; }
+      }
       if (m.timer <= 0) { m.timer = 2 * MOB_SHOT_INTERVAL; if (far < MOB_BEAM_LEN && !segmentHits(s.terrain.walls, m.x, m.y, p.x, p.y)) mobBeam(s, m, 0.8, Math.max(1, Math.round(m.damage * MOB_SHOT_DAMAGE))); }
       return true;
     }
