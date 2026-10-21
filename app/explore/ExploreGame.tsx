@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FORAGE } from "./data";
 import {
-  EVENT_INFO, GATHER_BIG, GATHER_RANGE, GATHER_SMALL, NO_INPUT, RETURN_HOLD, START, VIEW_H, VIEW_W, WORLD_H, WORLD_W,
+  EVENT_INFO, MAX_HP, GATHER_BIG, GATHER_RANGE, GATHER_SMALL, NO_INPUT, RETURN_HOLD, START, VIEW_H, VIEW_W, WORLD_H, WORLD_W,
   bagCount, canAccept, checkpointDue, checkpointOf, nearestNode, resolveEvent, resultOf, rngOf, step,
   type EventKind, type ExploreInput, type RunResult, type RunState,
 } from "./engine";
@@ -23,6 +23,8 @@ type Props = {
   run: RunState;
   /** 안내소 1단계 이상이면 미니맵에 미채집 일반 자원 위치를 표시(5.2.1절) */
   showResourcesOnMinimap: boolean;
+  /** 이용자가 고른 아바타(없으면 🧑‍🌾) */
+  avatar?: { src: string; pixelated: boolean };
   onCheckpoint: (checkpoint: ExplorationCheckpoint) => void;
   onFinish: (result: RunResult) => void;
 };
@@ -48,7 +50,13 @@ function paintWorld(run: RunState) {
   return canvas;
 }
 
-export default function ExploreGame({ run, showResourcesOnMinimap, onCheckpoint, onFinish }: Props) {
+export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onCheckpoint, onFinish }: Props) {
+  // 아바타 이미지는 한 번만 불러 두고 캔버스에 그린다(불러오기 전·실패 시 이모지)
+  const avatarImg = useRef<{ img: HTMLImageElement; pixelated: boolean } | null>(null);
+  useEffect(() => {
+    if (!avatar?.src) { avatarImg.current = null; return; }
+    const img = new Image(); img.decoding = "async"; img.src = avatar.src; avatarImg.current = { img, pixelated: avatar.pixelated };
+  }, [avatar?.src, avatar?.pixelated]);
   const canvasRef = useRef<HTMLCanvasElement>(null), miniRef = useRef<HTMLCanvasElement>(null);
   const state = useRef(run);
   const keys = useRef(new Set<string>());
@@ -60,7 +68,7 @@ export default function ExploreGame({ run, showResourcesOnMinimap, onCheckpoint,
   useEffect(() => { callbacks.current = { onCheckpoint, onFinish }; });
   const [touch] = useState(isTouchDevice);
   // HUD는 초당 10번 정도만 갱신한다(매 프레임 React 렌더를 하지 않게).
-  const [hud, setHud] = useState(() => ({ phase: run.phase, ready: run.readyLeft, time: run.timeLeft, bag: 0, cap: run.bagCap, items: {} as Record<string, number>, ret: 0, toast: "", canGather: false, event: null as EventKind | null, accept: false }));
+  const [hud, setHud] = useState(() => ({ phase: run.phase, ready: run.readyLeft, time: run.timeLeft, bag: 0, cap: run.bagCap, items: {} as Record<string, number>, hp: run.hp, ret: 0, toast: "", canGather: false, event: null as EventKind | null, accept: false }));
 
   useEffect(() => {
     const canvas = canvasRef.current!, ctx = canvas.getContext("2d")!, mini = miniRef.current!, mctx = mini.getContext("2d")!;
@@ -116,7 +124,14 @@ export default function ExploreGame({ run, showResourcesOnMinimap, onCheckpoint,
       // 플레이어
       const stunned = s.t < p.stunUntil, dodging = s.t < p.dodgeUntil;
       ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(p.x, p.y + 18, 18, 7, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = dodging ? 0.55 : 1; ctx.fillStyle = "#000"; ctx.font = `34px ${EMOJI_FONT}`; ctx.fillText("🧑‍🌾", p.x, p.y); ctx.globalAlpha = 1;
+      ctx.globalAlpha = dodging ? 0.55 : 1;
+      const face = avatarImg.current?.img;
+      if (face && face.complete && face.naturalWidth > 0) {
+        ctx.save(); ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, Math.PI * 2); ctx.closePath(); ctx.fillStyle = "#fffdf5"; ctx.fill(); ctx.clip();
+        ctx.imageSmoothingEnabled = !avatarImg.current?.pixelated; ctx.drawImage(face, p.x - 22, p.y - 22, 44, 44); ctx.restore();
+        ctx.strokeStyle = stunned ? "#e2557f" : "#fffdf5"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x, p.y, 23, 0, Math.PI * 2); ctx.stroke();
+      } else { ctx.fillStyle = "#000"; ctx.font = `34px ${EMOJI_FONT}`; ctx.fillText("🧑‍🌾", p.x, p.y); }
+      ctx.globalAlpha = 1;
       if (stunned) { ctx.font = `18px ${EMOJI_FONT}`; ctx.fillText("💫", p.x, p.y - 28); }
       if (s.gather) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(p.x, p.y, 26, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, s.gather.progress / s.gather.need)); ctx.stroke(); }
       if (s.returnHold > 0) { ctx.strokeStyle = "#ffd36a"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(p.x, p.y, 32, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, s.returnHold / RETURN_HOLD)); ctx.stroke(); }
@@ -131,7 +146,7 @@ export default function ExploreGame({ run, showResourcesOnMinimap, onCheckpoint,
       mctx.fillStyle = "#c0392b"; mctx.beginPath(); mctx.arc(p.x, p.y, 36, 0, Math.PI * 2); mctx.fill();
       if (now - hudAt > 100) {
         hudAt = now;
-        setHud({ phase: s.phase, ready: s.readyLeft, time: s.timeLeft, bag: bagCount(s), cap: s.bagCap, items: { ...s.bag }, ret: s.returnHold / RETURN_HOLD, toast: s.toast && s.toast.until > s.t ? s.toast.text : "", canGather: Boolean(near) && !s.gather, event: s.phase === "event" && s.event ? s.event.kind : null, accept: s.phase === "event" && canAccept(s) });
+        setHud({ phase: s.phase, ready: s.readyLeft, time: s.timeLeft, bag: bagCount(s), cap: s.bagCap, items: { ...s.bag }, hp: s.hp, ret: s.returnHold / RETURN_HOLD, toast: s.toast && s.toast.until > s.t ? s.toast.text : "", canGather: Boolean(near) && !s.gather, event: s.phase === "event" && s.event ? s.event.kind : null, accept: s.phase === "event" && canAccept(s) });
       }
       raf = requestAnimationFrame(frame);
     };
@@ -181,12 +196,13 @@ export default function ExploreGame({ run, showResourcesOnMinimap, onCheckpoint,
       <canvas ref={canvasRef} className="explore-canvas" onPointerDown={clickCanvas} aria-label="탐험 지도" />
       <div className="explore-hud">
         <span className={`explore-time ${hud.time <= 10 ? "low" : ""}`}>⏱ {minutes}초</span>
+        <span className={`explore-hp ${hud.hp <= 1 ? "low" : ""}`} aria-label={`체력 ${hud.hp}/${MAX_HP}`}>{Array.from({ length: MAX_HP }, (_, i) => i < hud.hp ? "❤️" : "🤍").join("")}</span>
         <span className={`explore-bag ${hud.bag >= hud.cap ? "full" : ""}`}>🎒 {hud.bag}/{hud.cap}</span>
         <span className="explore-bag-items">{Object.entries(hud.items).map(([id, n]) => <i key={id}>{icon(id)}{n}</i>)}</span>
       </div>
       <canvas ref={miniRef} className="explore-mini" style={{ width: touch ? 112 : MINI_W, height: touch ? 63 : MINI_H }} aria-label="미니맵" />
       {hud.toast && <div className="explore-toast">{hud.toast}</div>}
-      {hud.phase === "ready" && <div className="explore-ready"><b>{Math.max(1, Math.ceil(hud.ready))}</b><small>{touch ? "왼쪽 스틱 이동 · 채집 버튼 · 귀환 버튼 1초" : "WASD 이동 · F/클릭 채집 · Space 회피 · R 1초 귀환"}</small></div>}
+      {hud.phase === "ready" && <div className="explore-ready"><b>{Math.max(1, Math.ceil(hud.ready))}</b><small>{touch ? "왼쪽 스틱 이동 · 채집 버튼 · 귀환 버튼 1초 · 벌떼 3번이면 쓰러져요" : "WASD 이동 · F/클릭 채집 · Space 회피 · R 1초 귀환 · ❤️ 3칸, 쓰러지면 채집물 일부를 잃어요"}</small></div>}
       {info && <div className="explore-event" role="dialog" aria-label={info.name}>
         <b>{info.icon} {info.name}</b><p>{info.text}</p>
         <div><button className="save-button" disabled={!hud.accept} onClick={() => choose(true)}>{info.accept}</button>{info.decline && <button className="ghost-button" onClick={() => choose(false)}>{info.decline}</button>}</div>

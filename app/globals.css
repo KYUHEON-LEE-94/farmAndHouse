@@ -1581,3 +1581,6 @@ button { color:inherit; }
 .dealer .laugh-line{color:#ffe19a}
 @media(max-width:760px){.dealer{padding:8px 10px;gap:10px}.dealer-card{min-width:64px}.dealer .dealer-face{width:54px;height:54px;font-size:34px}.dealer .bubble{font-size:13px;padding:9px 12px}}
 .dealer .dealer-face{background:radial-gradient(circle at 50% 40%,#fff6df,#e8c98a)}
+/* 탐험 체력·잃은 채집물 */
+.explore-hp{letter-spacing:1px}.explore-hp.low{background:#ffe1d6}
+.explore-lost{color:#a3361c}

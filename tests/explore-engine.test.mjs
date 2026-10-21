@@ -189,3 +189,25 @@ test('일품 도시락: 동일 시드 1,000판에서 채집물 기준 수익 증
   console.log(`  일품 도시락 채집물 가치 증가 ${(increase * 100).toFixed(2)}% (같은 시드·조작, 제작 비용 제외)`);
   assert.ok(increase >= 0 && increase <= .12);
 });
+
+test('쓰러짐(2026-10-21): 벌떼 3번이면 판이 끝나고 가방의 40%(내림, 최소 1개)를 무작위로 잃는다', () => {
+  const s = run(11); s.phase = 'play'; s.bag = { 'young-herb': 6, wildflower: 4 };
+  const hitOnce = () => { s.player.stunUntil = 0; const b = s.hazards.find(h => h.kind === 'bees'); s.hitCd = {}; E.step(s, E.NO_INPUT, 0.001); s.player.x = b.x; s.player.y = b.y; E.step(s, E.NO_INPUT, 0.001); };
+  hitOnce(); assert.equal(s.hp, 2); assert.equal(s.phase, 'play');
+  hitOnce(); assert.equal(s.hp, 1);
+  hitOnce(); assert.equal(s.hp, 0); assert.equal(s.phase, 'done'); assert.equal(s.endReason, 'down');
+  const lost = Object.values(s.lost).reduce((a, b) => a + b, 0);
+  assert.equal(lost, 4); assert.equal(E.bagCount(s), 6);
+  const r = E.resultOf(s); assert.equal(r.reason, 'down'); assert.deepEqual(r.lost, s.lost);
+  // 같은 판(시드)이면 잃는 품목이 같고, 가방이 1개뿐이어도 1개는 잃으며, 빈 가방은 잃을 것이 없다
+  assert.deepEqual(E.lossOf({ 'young-herb': 6, wildflower: 4 }, 11), E.lossOf({ wildflower: 4, 'young-herb': 6 }, 11));
+  assert.deepEqual(E.lossOf({ 'four-leaf-flower': 1 }, 3), { 'four-leaf-flower': 1 });
+  assert.deepEqual(E.lossOf({}, 3), {});
+  for (let seed = 1; seed <= 200; seed++) {
+    const bag = { 'young-herb': seed % 7, wildflower: seed % 5, 'soft-twig': 3 };
+    const total = Object.values(bag).reduce((a, b) => a + b, 0), loss = E.lossOf(bag, seed);
+    assert.equal(Object.values(loss).reduce((a, b) => a + b, 0), Math.max(1, Math.floor(total * 0.4)));
+    for (const [id, n] of Object.entries(loss)) assert.ok(n <= bag[id]);
+  }
+});
+

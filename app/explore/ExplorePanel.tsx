@@ -20,12 +20,14 @@ type Props = {
   /** 안내소 단계(마을 복구 전에는 0) */
   guideLevel: number;
   onStart?: () => LunchBuff | null;
+  /** 탐험 캐릭터로 그릴 이용자 아바타 */
+  avatar?: { src: string; pixelated: boolean };
   onCheckpoint: (checkpoint: ExplorationCheckpoint) => void;
   onFinish: (result: RunResult) => void;
   onOpenStorage: () => void;
 };
 
-export default function ExplorePanel({ exploration, season, guideLevel, onStart, onCheckpoint, onFinish, onOpenStorage }: Props) {
+export default function ExplorePanel({ exploration, season, guideLevel, onStart, avatar, onCheckpoint, onFinish, onOpenStorage }: Props) {
   const regions = openRegions(season);
   const [regionId, setRegionId] = useState(regions[0]?.id ?? REGIONS[0].id);
   const [run, setRun] = useState<RunState | null>(null);
@@ -43,7 +45,7 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
 
   if (run) return <section className="panel explore-panel playing">
     <Suspense fallback={<p className="explore-loading">🧭 숲길로 가는 중…</p>}>
-      <ExploreGame key={run.runId} run={run} showResourcesOnMinimap={guideLevel >= 1} onCheckpoint={onCheckpoint} onFinish={finish} />
+      <ExploreGame key={run.runId} run={run} avatar={avatar} showResourcesOnMinimap={guideLevel >= 1} onCheckpoint={onCheckpoint} onFinish={finish} />
     </Suspense>
   </section>;
 
@@ -51,10 +53,11 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
   return <section className="panel explore-panel">
     <div className="panel-heading"><div><span className="eyebrow">FORAGING · {RUN_SECONDS}초</span><h3>채집·탐험</h3></div><span className="plot-count">누적 {exploration.totalRuns}회</span></div>
     {result && <div className="explore-result">
-      <b>{result.reason === "time" ? "⏱ 시간 종료 · 무사히 귀환!" : result.reason === "resume" ? "🔄 지난 탐험 기록을 정리했어요" : "🏕️ 귀환 완료!"}</b>
+      <b>{result.reason === "down" ? "💫 쓰러졌어요… 채집물 일부를 떨어뜨렸어요" : result.reason === "time" ? "⏱ 시간 종료 · 무사히 귀환!" : result.reason === "resume" ? "🔄 지난 탐험 기록을 정리했어요" : "🏕️ 귀환 완료!"}</b>
       {Object.keys(result.bag).length === 0 ? <p>이번에는 아무것도 캐지 못했어요.</p> : <ul>{Object.entries(result.bag).map(([id, n]) => { const item = FORAGE.find(entry => entry.id === id); return <li key={id} className={item?.rare ? "rare" : ""}><span>{item?.icon}</span>{item?.name}<em>×{n}</em></li>; })}</ul>}
       {result.bait > 0 && <p>🪱 기본 미끼 +{result.bait}</p>}
-      <small>모두 통합 창고로 옮겼어요.{result.stuns > 0 ? ` 벌떼에 ${result.stuns}번 쏘였어요.` : ""}</small>
+      {result.lost && Object.keys(result.lost).length > 0 && <p className="explore-lost">잃어버린 채집물: {Object.entries(result.lost).map(([id, n]) => { const item = FORAGE.find(entry => entry.id === id); return `${item?.icon ?? ""} ${item?.name ?? id} ×${n}`; }).join(" · ")}</p>}
+      <small>{Object.keys(result.bag).length ? "남은 채집물은 모두 통합 창고로 옮겼어요." : ""}{result.stuns > 0 ? ` 벌떼에 ${result.stuns}번 쏘였어요.` : ""}</small>
       <div className="explore-result-actions"><button className="save-button" onClick={start}>🧭 다시 탐험</button><button className="ghost-button" onClick={onOpenStorage}>📦 창고 열기 (E)</button></div>
     </div>}
     <div className="explore-regions">{REGIONS.map(entry => { const open = regions.some(r => r.id === entry.id), here = entry.id === region.id;
@@ -75,6 +78,6 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
       <small>고른 재료로 일반 자원의 30%를 바꿔요. 자원 수·희귀 확률·가방은 그대로예요.</small>
     </div>}
     <button className="save-button explore-start" onClick={start}>🧭 {region.name} 탐험 시작</button>
-    <p className="hint">입장권·에너지는 없어요. 반짝이는 채집물에 다가가 F(또는 클릭)로 캐고, 시간이 끝나거나 귀환하면 통합 창고로 들어가요. 탐험 중 브라우저를 닫아도 10초마다 저장한 채집물은 다음 접속 때 받아요.</p>
+    <p className="hint">입장권·에너지는 없어요. 반짝이는 채집물에 다가가 F(또는 클릭)로 캐고, 시간이 끝나거나 귀환하면 통합 창고로 들어가요. 벌떼에 3번 쏘이면 쓰러지고, 가방에 든 채집물의 40%를 무작위로 잃어요. 탐험 중 브라우저를 닫아도 10초마다 저장한 채집물은 다음 접속 때 받아요.</p>
   </section>;
 }

@@ -17,6 +17,8 @@ export const GATHER_RANGE = 100, GATHER_SMALL = 0.6, GATHER_BIG = 1.0;
 export const BAG_BASE = 16;
 /** 위험에 맞으면 1.5초 경직, 남은 시간 2초 감소(3.2절). 체력 사망은 없다. */
 export const STUN_SECONDS = 1.5, STUN_TIME_PENALTY = 2;
+/** 체력(2026-10-21 결정): 위험에 맞을 때마다 1칸. 0이 되면 쓰러져 판이 끝나고, 가방 채집물의 40%(최소 1개)를 무작위로 잃는다. */
+export const MAX_HP = 3, DOWN_LOSS_RATE = 0.4;
 export const DODGE_SECONDS = 0.3, DODGE_COOLDOWN = 1.5, DODGE_SPEED = 620;
 export const RETURN_HOLD = 1;
 export const CHECKPOINT_EVERY = 10;
@@ -153,7 +155,10 @@ export type RunState = {
   hitCd: Record<string, number>;
   lastCheckpointAt: number;
   stuns: number;
-  endReason: "time" | "return" | null;
+  hp: number;
+  /** 쓰러져서 잃은 채집물 */
+  lost: Record<string, number>;
+  endReason: "time" | "return" | "down" | null;
   /** 화면 알림(최근 하나) */
   toast: { text: string; until: number } | null;
 };
@@ -171,7 +176,7 @@ export function createRun(opts: MapOptions & { seed: number; runId: string; star
     bag: { ...(opts.resume?.bag ?? {}) }, bagCap: BAG_BASE + (opts.bagBonus ?? 0),
     gather: null, returnHold: 0,
     event: map.event ? { ...map.event, state: "waiting" } : null,
-    rewards: { bait: 0 }, hitCd: {}, lastCheckpointAt: 0, stuns: 0, endReason: null, toast: null,
+    rewards: { bait: 0 }, hitCd: {}, lastCheckpointAt: 0, stuns: 0, hp: MAX_HP, lost: {}, endReason: null, toast: null,
   };
 }
 
@@ -189,8 +194,27 @@ export function nearestNode(s: RunState, targetId?: string | null) {
 
 function stun(s: RunState) {
   const p = s.player;
-  p.stunUntil = s.t + STUN_SECONDS; s.timeLeft = Math.max(0, s.timeLeft - STUN_TIME_PENALTY); s.stuns++;
-  s.gather = null; toast(s, "🐝 따끔! 1.5초 멈춤 · 시간 −2초");
+  s.stuns++; s.hp = Math.max(0, s.hp - 1); s.gather = null;
+  if (s.hp <= 0) return knockDown(s);
+  p.stunUntil = s.t + STUN_SECONDS; s.timeLeft = Math.max(0, s.timeLeft - STUN_TIME_PENALTY);
+  toast(s, `🐝 따끔! 체력 ${s.hp}/${MAX_HP} · 1.5초 멈춤 · 시간 −2초`);
+}
+
+/** 가방에서 잃을 채집물(쓰러짐): 전체의 40%(내림, 가방이 비어 있지 않으면 최소 1개)를 낱개 단위로 무작위 선택. */
+export function lossOf(bag: Record<string, number>, seed: number): Record<string, number> {
+  const units = Object.keys(bag).sort().flatMap(id => Array.from({ length: Math.max(0, bag[id]) }, () => id));
+  if (!units.length) return {};
+  const rnd = rngOf(seed ^ 0x0d0a0), lost: Record<string, number> = {};
+  for (let n = Math.max(1, Math.floor(units.length * DOWN_LOSS_RATE)); n > 0; n--) { const id = units.splice(Math.floor(rnd() * units.length), 1)[0]; lost[id] = (lost[id] ?? 0) + 1; }
+  return lost;
+}
+
+/** 쓰러짐: 판이 끝나고 채집물 일부를 잃는다. */
+function knockDown(s: RunState) {
+  s.lost = lossOf(s.bag, s.seed);
+  for (const [id, n] of Object.entries(s.lost)) { s.bag[id] -= n; if (s.bag[id] <= 0) delete s.bag[id]; }
+  toast(s, "💫 쓰러졌어요! 채집물 일부를 떨어뜨렸어요", 3);
+  finish(s, "down");
 }
 
 /** 한 프레임 진행. 이벤트 선택 창이 열려 있으면(phase "event") 시간이 멈춘다. */
@@ -218,7 +242,7 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
   for (const h of s.hazards) {
     if (h.kind !== "bees") continue;
     const a = h.phase + s.t * h.speed; h.x = h.cx + Math.cos(a) * h.orbit; h.y = h.cy + Math.sin(a * 1.3) * h.orbit * 0.7;
-    if (s.t >= p.stunUntil && s.t >= p.dodgeUntil && (s.hitCd[h.id] ?? 0) <= s.t && dist(h.x, h.y, p.x, p.y) < h.r + PLAYER_R) { s.hitCd[h.id] = s.t + 3; stun(s); }
+    if (s.t >= p.stunUntil && s.t >= p.dodgeUntil && (s.hitCd[h.id] ?? 0) <= s.t && dist(h.x, h.y, p.x, p.y) < h.r + PLAYER_R) { s.hitCd[h.id] = s.t + 3; stun(s); if ((s.phase as Phase) === "done") return; }
   }
   // 채집
   if (input.gather && !s.gather && !stunned && s.t >= p.dodgeUntil) {
@@ -255,7 +279,7 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
   if (s.timeLeft <= 0) { s.timeLeft = 0; finish(s, "time"); }
 }
 
-function finish(s: RunState, reason: "time" | "return") { s.phase = "done"; s.endReason = reason; s.gather = null; }
+function finish(s: RunState, reason: "time" | "return" | "down") { s.phase = "done"; s.endReason = reason; s.gather = null; }
 
 /** 지역 일반 재료 n개를 무작위로 더한다(이벤트 보상, 가방 상한과 별개). */
 function giveCommons(s: RunState, n: number) {
@@ -307,10 +331,10 @@ export function checkpointOf(s: RunState) {
   return { runId: s.runId, regionId: s.regionId, seed: s.seed, startedAt: s.startedAt, bag: { ...s.bag }, gathered: s.nodes.filter(node => node.left < (node.size === "big" ? 2 : 1)).map(node => node.id) };
 }
 
-export type RunResult = { runId: string; regionId: string; bag: Record<string, number>; bait: number; rareFound: boolean; reason: "time" | "return" | "resume"; stuns: number; seconds: number };
+export type RunResult = { runId: string; regionId: string; bag: Record<string, number>; bait: number; rareFound: boolean; reason: "time" | "return" | "down" | "resume"; stuns: number; seconds: number; lost?: Record<string, number> };
 export function resultOf(s: RunState): RunResult {
   const { rare } = regionItems(s.regionId);
-  return { runId: s.runId, regionId: s.regionId, bag: { ...s.bag }, bait: s.rewards.bait, rareFound: (s.bag[rare.id] ?? 0) > 0, reason: s.endReason ?? "return", stuns: s.stuns, seconds: Math.round(s.t) };
+  return { runId: s.runId, regionId: s.regionId, bag: { ...s.bag }, bait: s.rewards.bait, rareFound: (s.bag[rare.id] ?? 0) > 0, reason: s.endReason ?? "return", stuns: s.stuns, seconds: Math.round(s.t), lost: { ...s.lost } };
 }
 
 /** 희귀 천장 갱신(지역별): 희귀를 얻으면 0, 못 얻으면 +1. */
