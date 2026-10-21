@@ -142,17 +142,44 @@ test('희귀 천장: 5회 연속 미획득이면 6번째 판에 시작 화면 �
   assert.equal(E.nextRareMisses(4, false), 5); assert.equal(E.nextRareMisses(5, true), 0);
 });
 
-test('체크포인트: 10초마다, 확정 채집 품목과 캔 노드만 담고 이어 하기에서 다시 캘 수 없다', () => {
-  const s = run(21); s.phase = 'play';
-  assert.equal(E.checkpointDue(s), false);
+test('체크포인트: 판 시작·피격·채집 직후 바로, 그 밖에는 10초마다 저장한다', () => {
+  const s = run(21);
+  assert.equal(E.checkpointDue(s), true, '시작하자마자 한 번 저장');
+  E.checkpointOf(s); assert.equal(E.checkpointDue(s), false);
+  s.phase = 'play';
   while (s.t < 10.05) { E.step(s, E.NO_INPUT, 0.05); if (s.phase === 'event') E.resolveEvent(s, false); }
-  assert.equal(E.checkpointDue(s), true);
-  s.bag = { 'young-herb': 2 }; s.nodes[0].left = 0;
-  const cp = E.checkpointOf(s);
-  assert.equal(E.checkpointDue(s), false);
-  assert.deepEqual(cp.bag, { 'young-herb': 2 }); assert.ok(cp.gathered.includes(s.nodes[0].id));
-  const again = E.createRun({ seed: 21, runId: 'r21', startedAt: 0, regionId: REGION, inSeason: false, resume: { bag: cp.bag, gathered: cp.gathered } });
-  assert.equal(again.nodes.find(n => n.id === s.nodes[0].id).left, 0);
+  assert.equal(E.checkpointDue(s), true, '10초');
+  E.checkpointOf(s);
+  // 채집 직후 즉시
+  const small = s.nodes.find(n => n.size === 'small' && n.left > 0); s.player.x = small.x; s.player.y = small.y;
+  E.step(s, { ...E.NO_INPUT, gather: true, gatherTarget: small.id }, 0.01);
+  for (let i = 0; i < 80 && s.gather; i++) E.step(s, E.NO_INPUT, 0.01);
+  assert.equal(E.checkpointDue(s), true, '채집 직후');
+});
+
+test('이어 하기: 같은 지도·체력·위치·남은 시간·노드 잔량·이벤트·샛길 노드로 되살리고, 다시 캘 수 없다', () => {
+  const s = run(33, { inSeason: true, focusItem: 'soft-twig', guideLevel: 3, rareMisses: 2 }); s.phase = 'play';
+  for (let i = 0; i < 60; i++) { E.step(s, { ...E.NO_INPUT, mx: 0.6, my: 0.3 }, 0.05); if (s.phase === 'event') E.resolveEvent(s, false); }
+  const big = s.nodes.find(n => n.size === 'big'); big.left = 1;
+  s.bag = { 'soft-twig': 1 }; s.hp = 2; s.stuns = 1; s.rewards.bait = 2;
+  s.nodes.push({ id: 'r1', item: 'four-leaf-flower', x: 300, y: 300, size: 'rare', left: 1 });
+  s.event = { kind: 'weather', at: 2, state: 'active', until: s.t + 3, zone: { x: 500, y: 400, r: 70 } };
+  const cp = JSON.parse(JSON.stringify(E.checkpointOf(s)));
+  const r = E.resumeRun(cp);
+  assert.equal(r.phase, 'ready', '이어 할 때도 3초 준비');
+  assert.equal(r.runId, s.runId); assert.equal(r.t, s.t); assert.equal(r.timeLeft, s.timeLeft); assert.equal(r.hp, 2); assert.equal(r.stuns, 1); assert.equal(r.rewards.bait, 2);
+  assert.deepEqual([r.player.x, r.player.y], [s.player.x, s.player.y]);
+  assert.deepEqual(r.bag, { 'soft-twig': 1 });
+  assert.deepEqual(r.nodes.map(n => [n.id, n.item, n.size, n.left]), s.nodes.map(n => [n.id, n.item, n.size, n.left]), '같은 지도(집중 탐색·큰 자원 포함)와 잔량');
+  assert.equal(r.event.state, 'active'); assert.deepEqual(r.event.zone, s.event.zone);
+  // 위험물(벌떼) 위치도 같은 시간 기준으로 이어진다
+  r.phase = 'play'; const s2 = s; E.step(r, E.NO_INPUT, 0.05); E.step(s2, E.NO_INPUT, 0.05);
+  const bees = r.hazards.filter(h => h.kind === 'bees').map(h => [Math.round(h.x), Math.round(h.y)]), bees2 = s2.hazards.filter(h => h.kind === 'bees').map(h => [Math.round(h.x), Math.round(h.y)]);
+  assert.deepEqual(bees, bees2);
+  // 열려 있던 이벤트 창은 이어 할 때 다시 열린다(선택 전 상태로 되돌려 보상 중복 없음)
+  const t = run(5); t.phase = 'play'; t.event = { kind: 'merchant', at: 0, state: 'open' };
+  const rt = E.resumeRun(JSON.parse(JSON.stringify(E.checkpointOf(t)))); rt.phase = 'play'; E.step(rt, E.NO_INPUT, 0.01);
+  assert.equal(rt.phase, 'event');
 });
 
 function simulate(opts) {

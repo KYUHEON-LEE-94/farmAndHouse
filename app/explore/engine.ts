@@ -1,4 +1,5 @@
 import { lunchPower, type LunchBuff } from "../cooking/lunch";
+import type { RunSnapshot } from "./types";
 /**
  * 채집·탐험 한 판의 순수 로직(LIFE_CONTENT_EXPANSION_SPEC 3·3.1.1·3.7절). 화면 없이 테스트할 수 있게 그리기와 입력은 ExploreGame.tsx가 맡는다.
  * 상태는 프레임마다 직접 바꾼다(토벌 엔진과 같은 방식). 저장할 것은 checkpointOf()·resultOf()로만 꺼낸다.
@@ -154,6 +155,10 @@ export type RunState = {
   rewards: { bait: number };
   hitCd: Record<string, number>;
   lastCheckpointAt: number;
+  /** 처음 지도 옵션(이어 하기 때 같은 지도를 다시 만든다) */
+  mapOpts: RunSnapshot["mapOpts"];
+  /** 피격·채집·이벤트처럼 저장해야 할 변화가 생김(다음 프레임에 바로 저장) */
+  dirty: boolean;
   stuns: number;
   hp: number;
   /** 쓰러져서 잃은 채집물 */
@@ -163,21 +168,28 @@ export type RunState = {
   toast: { text: string; until: number } | null;
 };
 
-export function createRun(opts: MapOptions & { seed: number; runId: string; startedAt: number; bagBonus?: number; lunch?: LunchBuff | null; resume?: { bag: Record<string, number>; gathered: string[] } }): RunState {
-  const map = generateMap(opts.seed, opts);
-  const nodes = map.nodes.map(node => ({ ...node }));
-  if (opts.resume) for (const node of nodes) if (opts.resume.gathered.includes(node.id)) node.left = 0;
-  return {
-    runId: opts.runId, seed: opts.seed, regionId: opts.regionId, startedAt: opts.startedAt,
-    lunch: opts.lunch ?? null,
+export function createRun(opts: MapOptions & { seed: number; runId: string; startedAt: number; bagBonus?: number; lunch?: LunchBuff | null; bag?: Record<string, number>; snapshot?: RunSnapshot }): RunState {
+  const snap = opts.snapshot;
+  // 이어 하기: 지도는 처음과 같은 옵션으로 다시 만든다(같은 시드 → 같은 노드·위험·이벤트)
+  const mapOpts = snap?.mapOpts ?? { inSeason: opts.inSeason, focusItem: opts.focusItem ?? null, guideLevel: opts.guideLevel ?? 0, rareMisses: opts.rareMisses ?? 0 };
+  const map = generateMap(opts.seed, { ...opts, ...mapOpts });
+  const nodes = map.nodes.map(node => ({ ...node, left: snap?.nodeLeft[node.id] ?? node.left }));
+  if (snap) for (const extra of snap.extraNodes) if (!nodes.some(node => node.id === extra.id)) nodes.push({ ...extra });
+  const s: RunState = {
+    runId: opts.runId, seed: opts.seed, regionId: opts.regionId, startedAt: opts.startedAt, mapOpts,
+    lunch: snap ? snap.lunch : opts.lunch ?? null,
     map, nodes, hazards: map.hazards.map(h => ({ ...h })),
-    phase: "ready", readyLeft: READY_SECONDS, t: 0, timeLeft: RUN_SECONDS,
-    player: { x: START.x, y: START.y, stunUntil: 0, dodgeUntil: 0, dodgeCd: 0, dx: 0, dy: 0, faceX: 1, faceY: 0 },
-    bag: { ...(opts.resume?.bag ?? {}) }, bagCap: BAG_BASE + (opts.bagBonus ?? 0),
+    phase: "ready", readyLeft: READY_SECONDS, t: snap?.t ?? 0, timeLeft: snap?.timeLeft ?? RUN_SECONDS,
+    player: { x: snap?.x ?? START.x, y: snap?.y ?? START.y, stunUntil: snap?.stunUntil ?? 0, dodgeUntil: 0, dodgeCd: 0, dx: 0, dy: 0, faceX: 1, faceY: 0 },
+    bag: { ...(opts.bag ?? {}) }, bagCap: BAG_BASE + (opts.bagBonus ?? 0),
     gather: null, returnHold: 0,
-    event: map.event ? { ...map.event, state: "waiting" } : null,
-    rewards: { bait: 0 }, hitCd: {}, lastCheckpointAt: 0, stuns: 0, hp: MAX_HP, lost: {}, endReason: null, toast: null,
+    event: snap ? (snap.event ? { ...snap.event, ...(snap.event.state === "open" ? { state: "waiting" as const, at: snap.t } : {}) } : null) : map.event ? { ...map.event, state: "waiting" } : null,
+    rewards: { bait: snap?.bait ?? 0 }, hitCd: { ...(snap?.hitCd ?? {}) }, lastCheckpointAt: snap?.t ?? 0, stuns: snap?.stuns ?? 0, hp: snap?.hp ?? MAX_HP, lost: {}, endReason: null, toast: null,
+    // 판이 시작되거나 이어지자마자 한 번 저장한다
+    dirty: true,
   };
+  if (snap) toast(s, "🔄 지난 탐험을 이어서 해요", 2.4);
+  return s;
 }
 
 export const bagCount = (s: Pick<RunState, "bag">) => Object.values(s.bag).reduce((sum, n) => sum + n, 0);
@@ -194,7 +206,7 @@ export function nearestNode(s: RunState, targetId?: string | null) {
 
 function stun(s: RunState) {
   const p = s.player;
-  s.stuns++; s.hp = Math.max(0, s.hp - 1); s.gather = null;
+  s.stuns++; s.hp = Math.max(0, s.hp - 1); s.gather = null; s.dirty = true;
   if (s.hp <= 0) return knockDown(s);
   p.stunUntil = s.t + STUN_SECONDS; s.timeLeft = Math.max(0, s.timeLeft - STUN_TIME_PENALTY);
   toast(s, `🐝 따끔! 체력 ${s.hp}/${MAX_HP} · 1.5초 멈춤 · 시간 −2초`);
@@ -260,7 +272,7 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
       if (s.gather.progress >= s.gather.need) {
         const room = s.bagCap - bagCount(s), take = Math.min(node.left, room);
         // 큰 자원은 남은 칸이 1개면 1개만 담고 나머지는 노드에 남긴다(중복 지급 없음)
-        addBag(s, node.item, take); node.left -= take; s.gather = null;
+        addBag(s, node.item, take); node.left -= take; s.gather = null; s.dirty = true;
         const info = FORAGE.find(item => item.id === node.item);
         toast(s, `${info?.icon ?? "🌿"} ${info?.name ?? node.item} +${take}${node.size === "rare" ? " ✨희귀!" : ""}`);
       }
@@ -268,10 +280,10 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
   }
   // 돌발 상황
   const ev = s.event;
-  if (ev && ev.state === "waiting" && s.t >= ev.at) { ev.state = "open"; s.phase = "event"; return; }
+  if (ev && ev.state === "waiting" && s.t >= ev.at) { ev.state = "open"; s.phase = "event"; s.dirty = true; return; }
   if (ev && ev.state === "active" && ev.kind === "weather" && ev.zone) {
-    if (dist(ev.zone.x, ev.zone.y, p.x, p.y) < ev.zone.r) { ev.state = "done"; ev.success = true; giveCommons(s, 2); toast(s, "🌦️ 안전지대 도착! 재료 2개 추가", 2); }
-    else if (s.t >= (ev.until ?? 0)) { ev.state = "done"; ev.success = false; toast(s, "🌧️ 소나기가 지나갔어요"); }
+    if (dist(ev.zone.x, ev.zone.y, p.x, p.y) < ev.zone.r) { ev.state = "done"; ev.success = true; s.dirty = true; giveCommons(s, 2); toast(s, "🌦️ 안전지대 도착! 재료 2개 추가", 2); }
+    else if (s.t >= (ev.until ?? 0)) { ev.state = "done"; ev.success = false; s.dirty = true; toast(s, "🌧️ 소나기가 지나갔어요"); }
   }
   // 귀환·시간 종료
   s.returnHold = input.returnHeld && !stunned ? s.returnHold + dt : 0;
@@ -300,7 +312,7 @@ export function canAccept(s: RunState): boolean {
 /** 이벤트 선택. 선택하지 않아도 손해는 없다(3.7절). */
 export function resolveEvent(s: RunState, accept: boolean) {
   const ev = s.event; if (!ev || ev.state !== "open") return;
-  s.phase = "play";
+  s.phase = "play"; s.dirty = true;
   if (!accept || !canAccept(s)) { ev.state = "done"; ev.success = false; return; }
   const p = s.player, { commons, rare } = regionItems(s.regionId);
   if (ev.kind === "merchant") {
@@ -324,11 +336,31 @@ export function resolveEvent(s: RunState, accept: boolean) {
 }
 
 // ---------- 저장·결과 ----------
-export const checkpointDue = (s: RunState) => s.phase !== "ready" && s.phase !== "done" && s.t - s.lastCheckpointAt >= CHECKPOINT_EVERY;
-/** 10초 체크포인트에 남길 내용(확정 채집 품목과 이미 캔 노드). */
+/** 저장할 때: 피격·채집·이벤트 같은 변화가 생겼거나(즉시) 마지막 저장 뒤 10초. 끝난 판은 정산이 맡는다. */
+export const checkpointDue = (s: RunState) => s.phase !== "done" && (s.dirty || s.t - s.lastCheckpointAt >= CHECKPOINT_EVERY);
+
+/** 이어 하기용 전체 상태(같은 지도·체력·위치·남은 시간·노드 잔량·이벤트·피격 대기). */
+export function snapshotOf(s: RunState): RunSnapshot {
+  const base = new Map(s.map.nodes.map(node => [node.id, node.left]));
+  const nodeLeft: Record<string, number> = {};
+  for (const node of s.nodes) if (base.has(node.id) && base.get(node.id) !== node.left) nodeLeft[node.id] = node.left;
+  return {
+    mapOpts: { ...s.mapOpts }, t: s.t, timeLeft: s.timeLeft, hp: s.hp, x: s.player.x, y: s.player.y, stunUntil: s.player.stunUntil,
+    nodeLeft, extraNodes: s.nodes.filter(node => !base.has(node.id)).map(node => ({ ...node })),
+    event: s.event ? { ...s.event, zone: s.event.zone ? { ...s.event.zone } : undefined } : null,
+    bait: s.rewards.bait, stuns: s.stuns, hitCd: { ...s.hitCd }, lunch: s.lunch ? { ...s.lunch } : null,
+  };
+}
+
+/** 체크포인트: 확정 채집 품목 + 이어 하기 상태. */
 export function checkpointOf(s: RunState) {
-  s.lastCheckpointAt = s.t;
-  return { runId: s.runId, regionId: s.regionId, seed: s.seed, startedAt: s.startedAt, bag: { ...s.bag }, gathered: s.nodes.filter(node => node.left < (node.size === "big" ? 2 : 1)).map(node => node.id) };
+  s.lastCheckpointAt = s.t; s.dirty = false;
+  return { runId: s.runId, regionId: s.regionId, seed: s.seed, startedAt: s.startedAt, bag: { ...s.bag }, gathered: s.nodes.filter(node => node.left < (node.size === "big" ? 2 : 1)).map(node => node.id), snap: snapshotOf(s) };
+}
+
+/** 체크포인트로 같은 판을 다시 만든다(준비 3초 뒤 이어 하기). */
+export function resumeRun(cp: { runId: string; regionId: string; seed: number; startedAt: number; bag: Record<string, number>; snap: RunSnapshot }, bagBonus = 0): RunState {
+  return createRun({ seed: cp.seed, runId: cp.runId, startedAt: cp.startedAt, regionId: cp.regionId, inSeason: cp.snap.mapOpts.inSeason, bag: cp.bag, snapshot: cp.snap, bagBonus });
 }
 
 export type RunResult = { runId: string; regionId: string; bag: Record<string, number>; bait: number; rareFound: boolean; reason: "time" | "return" | "down" | "resume"; stuns: number; seconds: number; lost?: Record<string, number> };

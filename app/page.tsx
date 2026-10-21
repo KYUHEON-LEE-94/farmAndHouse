@@ -552,7 +552,11 @@ export default function Home() {
         setInventory(restoredInventory); setCookedDishIds(restoreCookedDishIds(data.cookedDishIds, restoredInventory, DISHES.map(dish => dish.id)));
         const restoredExploration = restoreExploration(data.exploration);
         // 탐험 중 창을 닫았으면 마지막 10초 체크포인트의 채집물을 지금 지급하고 그 판을 끝낸다(중복 지급 없음, 3.1·9절).
-        if (restoredExploration.checkpoint) {
+        // 이어 하기 상태(snap)가 있으면 보상 없이 진행 중 판을 보관하고, 탐험 탭에서 같은 판을 이어 한다(2026-10-21).
+        if (restoredExploration.checkpoint?.snap) {
+          setExploration(restoredExploration);
+          setNotice("🧭 진행 중인 탐험이 있어요. 탐험 탭에서 같은 자리부터 이어 해요.");
+        } else if (restoredExploration.checkpoint) {
           const settled = settleExploration(restoredInventory, restoredExploration, { runId: restoredExploration.checkpoint.runId, regionId: restoredExploration.checkpoint.regionId, bag: restoredExploration.checkpoint.bag, bait: 0, rareFound: false, reason: "resume", stuns: 0, seconds: 0 });
           setInventory(settled.inventory); setExploration(settled.exploration);
           if (Object.keys(restoredExploration.checkpoint.bag).length) setNotice("🧭 지난 탐험에서 저장된 채집물을 통합 창고에 넣었어요.");

@@ -7,7 +7,7 @@ import { lazy, Suspense, useState } from "react";
 import type { LunchBuff } from "../cooking/lunch";
 import type { Season } from "../fishing";
 import { FORAGE, inSeasonBonus, openRegions, REGIONS, type ExploreRegion } from "./data";
-import { createRun, RARE_PITY_MISSES, RUN_SECONDS, type RunResult, type RunState } from "./engine";
+import { createRun, resumeRun, RARE_PITY_MISSES, RUN_SECONDS, type RunResult, type RunState } from "./engine";
 import type { ExplorationCheckpoint, ExplorationState } from "./types";
 
 const ExploreGame = lazy(() => import("./ExploreGame"));
@@ -30,7 +30,9 @@ type Props = {
 export default function ExplorePanel({ exploration, season, guideLevel, onStart, avatar, onCheckpoint, onFinish, onOpenStorage }: Props) {
   const regions = openRegions(season);
   const [regionId, setRegionId] = useState(regions[0]?.id ?? REGIONS[0].id);
-  const [run, setRun] = useState<RunState | null>(null);
+  // 진행 중이던 판이 있으면(창 닫기·새로고침) 같은 판을 이어 한다
+  const saved = exploration.checkpoint?.snap ? exploration.checkpoint : null;
+  const [run, setRun] = useState<RunState | null>(() => (saved?.snap ? resumeRun({ ...saved, snap: saved.snap }) : null));
   const [result, setResult] = useState<RunResult | null>(null);
   /** 안내소 2단계 집중 탐색 재료(5.2.1절). 선택하지 않으면 기본 분포 */
   const [focusItem, setFocusItem] = useState<string | null>(null);
@@ -50,6 +52,10 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
   </section>;
 
   const misses = exploration.rareMissesByRegion[region.id] ?? 0;
+  if (saved?.snap) return <section className="panel explore-panel">
+    <div className="explore-result"><b>🔄 진행 중인 탐험이 있어요</b><p>남은 시간 {Math.ceil(saved.snap.timeLeft)}초 · 체력 {saved.snap.hp} · 가방 {Object.values(saved.bag).reduce((a, b) => a + b, 0)}개. 같은 자리에서 이어 해요.</p>
+      <div className="explore-result-actions"><button className="save-button" onClick={() => setRun(resumeRun({ ...saved, snap: saved.snap! }))}>▶ 이어 하기</button></div></div>
+  </section>;
   return <section className="panel explore-panel">
     <div className="panel-heading"><div><span className="eyebrow">FORAGING · {RUN_SECONDS}초</span><h3>채집·탐험</h3></div><span className="plot-count">누적 {exploration.totalRuns}회</span></div>
     {result && <div className="explore-result">
