@@ -9,6 +9,8 @@ const out = buildSync({
 });
 const R = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 function seeded(seed) { let x = seed >>> 0; return () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// 이 파일의 모든 전투는 고정 난수로(치명타·생성 위치 등에 따라 결과가 흔들리지 않게)
+Math.random = seeded(20261021);
 const input = (s, o = {}) => ({ up: false, down: false, left: false, right: false, aimX: s.player.x - s.cam.x + 50, aimY: s.player.y - s.cam.y, attack: false, special: false, dash: false, food: [false, false, false], ...o });
 
 /** 웨이브 생성 없이 지정 몬스터 하나만 둔 전투(플레이어는 공격하지 않게 아주 약한 무기) */
@@ -77,10 +79,18 @@ test('포자 주술사: 플레이어 자리에 0.9초 착탄 예고 원 → 포�
 });
 
 test('숲의 집행자: 도약(돌진)이 끝나면 포자 3방향', () => {
-  const { s, m } = arena(25, 'forest-executor', 220, 0);
-  let fired = 0, wasDash = false;
-  run(s, 6, () => { if (wasDash && m.state === 'move' && !fired) fired = s.projectiles.filter(p => !p.mine).length; wasDash = m.state === 'dash'; });
-  assert.ok(fired >= 3, `포자 ${fired}`);
+  // 결정적으로: 난수를 고정하고, 돌진 예고가 시작되면 플레이어를 멀리 옮겨 포자가 같은 프레임에 플레이어에 맞아 사라지지 않게 한다
+  const keep = Math.random; Math.random = seeded(2525);
+  try {
+    const { s, m } = arena(25, 'forest-executor', 220, 0);
+    let fired = 0, wasDash = false, moved = false;
+    run(s, 8, () => {
+      if (!moved && m.state === 'tele') { moved = true; s.player.x = m.x - 420; s.player.y = m.y + 260; }
+      if (wasDash && m.state === 'move' && !fired) fired = s.projectiles.filter(p => !p.mine).length;
+      wasDash = m.state === 'dash';
+    });
+    assert.ok(moved, '돌진 예고'); assert.equal(fired, 3);
+  } finally { Math.random = keep; }
 });
 
 test('탑의 그림자: 플레이어가 움직이는 방향을 앞질러 추적, 분신은 곧장 추적', () => {
