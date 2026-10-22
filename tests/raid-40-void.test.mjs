@@ -24,12 +24,12 @@ function run(s, seconds, each = () => {}) {
   for (let i = 0; i < seconds * 60 && !s.over; i++) { s.player.hp = s.player.maxHp; s.choices = null; R.stepRaid(s, 1 / 60, input(s)); each(i); }
 }
 
-test('36~40층 데이터: 공허 왕좌 5개 층, 36층은 별빛 망령·공허 사냥개만, 보스 전용 id, 테스트 데이터 상한 40·운영 30 유지', () => {
+test('36~40층 데이터: 공허 왕좌 5개 층, 36층은 별빛 망령·공허 사냥개만, 보스 전용 id, 운영·데이터 상한 모두 40', () => {
   const f = R.FLOORS.filter(x => x.floor >= 36 && x.floor <= 40);
   assert.equal(f.length, 5);
   assert.deepEqual(f[0].monsters, ['star-wraith', 'void-hound']);
   assert.deepEqual(f.map(x => x.boss.id), ['star-shade', 'void-beast', 'prism-warden', 'throne-keeper', 'void-king']);
-  assert.equal(R.RAID_DATA_FLOOR, 40); assert.equal(R.RAID_MAX_FLOOR, 30);
+  assert.equal(R.RAID_DATA_FLOOR, 40); assert.equal(R.RAID_MAX_FLOOR, 40);
   for (const id of ['star-wraith', 'void-hound', 'prism-eye', 'throne-guard', 'void-judge']) assert.ok(R.MONSTERS[id], id);
   assert.ok(R.MONSTERS['throne-guard'].defense + 3 <= 16, '방어형 최대 16(16절)');
 });

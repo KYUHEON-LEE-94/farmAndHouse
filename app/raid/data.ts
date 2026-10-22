@@ -16,7 +16,7 @@ export function floorBand(floor: number) {
   if (floor >= 4) return { fodder: 1.05, elite: 1.08, eliteTime: 0.95 };
   return { fodder: 1, elite: 1, eliteTime: 1 };
 }
-export const RAID_MAX_FLOOR = 30; // 21~30층(보통 구간 1차) 운영 공개(2026-10-19). 31~40층은 데이터만 있고 숨김(로컬 테스트 모드에서만 개방)
+export const RAID_MAX_FLOOR = 40; // 21~30층 운영 공개(2026-10-19), 31~40층 운영 공개(2026-10-22, 사용자 요청)
 /** 데이터가 있는 마지막 층(로컬 테스트 모드의 전 층 개방 상한) */
 export const RAID_DATA_FLOOR = 40;
 /** 보이는 최고 방어구 단계: 31층이 열려야 7단계, 36층이 열려야 8단계(숨김 층의 장비가 운영 화면에 나오지 않게) */
@@ -158,7 +158,7 @@ export const FLOORS: FloorDef[] = [
   { floor: 33, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.1, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "cloud-sage", name: "구름 대현자", icon: "🌩️", hp: 15600, damage: 58, defense: 15, base: "cloud-mage" } },
   { floor: 34, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.2, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "ruin-colossus", name: "유적 거신", icon: "🗿", hp: 16100, damage: 61, defense: 15, base: "ruin-guardian" } },
   { floor: 35, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.3, maxAlive: 40, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "storm-executor", name: "폭풍의 집행자", icon: "⛈️", hp: 18800, damage: 66, defense: 16, base: "storm-enforcer" } },
-  // 36~40층 공허 왕좌(숨김): 보스 HP는 처치 시간 기준(16절: 36~39층 55~80초, 40층 80~105초)으로 측정해 정했다
+  // 36~40층 공허 왕좌: 보스 HP는 처치 시간 기준(16절: 36~39층 55~80초, 40층 80~105초)으로 측정해 정했다
   { floor: 36, zone: z8, monsters: ["star-wraith", "void-hound"], spawnRate: 2.0, maxAlive: 40, elite: { id: "void-judge", hp: 1350, count: 2 }, boss: { id: "star-shade", name: "별 그림자", icon: "🌌", hp: 17500, damage: 64, defense: 15, base: "star-wraith" } },
   { floor: 37, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye"], spawnRate: 2.15, maxAlive: 40, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "void-beast", name: "공허 야수", icon: "🐺", hp: 19500, damage: 67, defense: 16, base: "void-hound" } },
   { floor: 38, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye", "throne-guard"], spawnRate: 2.3, maxAlive: 40, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "prism-warden", name: "프리즘 감시자", icon: "👁️", hp: 20500, damage: 70, defense: 16, base: "prism-eye" } },

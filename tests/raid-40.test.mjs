@@ -18,7 +18,7 @@ test('+19~+22 표: 성공률·하락률·골드·보정 천장이 문서 4절과
     assert.deepEqual([s.chance, s.drop, s.gold, s.open.gold], [chance, drop, gold, open], `+${to}`);
     assert.deepEqual([p.start, p.step, p.max, p.ceiling], [start, inc, 0.12, ceiling], `+${to} 보정`);
   }
-  assert.equal(F.RAID_MAX_FLOOR, 30, '숨김 단계: 최대 층은 올리지 않는다');
+  assert.equal(F.RAID_MAX_FLOOR, 40, '31~40층 운영 공개(2026-10-22)');
 });
 
 test('+18 안전선: +18에서 실패는 하락 판정이 없고, +19 이상에서 하락해도 최저 +18', () => {
