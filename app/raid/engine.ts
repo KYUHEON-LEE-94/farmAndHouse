@@ -79,7 +79,7 @@ export type RaidState = {
   floor: FloorDef; t: number; over: null | "clear" | "dead" | "timeout"; paused: boolean;
   weapon: WeaponStats; evolution: Evolution | null; gear: Gear;
   pet: { id: string; mult: number; x: number; y: number; timer: number; shieldUsed: boolean; flash: number } | null;
-  player: { x: number; y: number; hp: number; maxHp: number; shield: number; shieldUntil: number; iframes: number; dashCd: number; dashT: number;
+  player: { x: number; y: number; hp: number; maxHp: number; shield: number; shieldUntil: number; hurtUntil?: number; iframes: number; dashCd: number; dashT: number;
     /** 회피 무적이 끝나는 시각(대시 + 여유 0.2초), 마지막 "회피!" 표시 시각 */
     dodgeUntil: number; dodgePop: number; dashDir: { x: number; y: number }; swingCd: number; windup: number; aim: number; attacks: number; slowUntil: number; emergencyUsed: boolean; stormUntil: number; stormTick: number; chainAt: number[];
     /** 채널형(물뿌리개) 틱, 계속 쏜 시간, 대시 보너스, 마지막 타격 대상, 주기 효과 타이머, 보스 피격 감소 쿨 */
@@ -251,7 +251,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   // 방어 비율식(RAID_BALANCE_RESEARCH 6절): 원래 피해 × 100 ÷ (100 + 방어 × 8), 최소 1
   let dmg = Math.max(1, Math.round(raw * 100 / (100 + Math.max(0, derived(s).armor) * DEFENSE_K)));
   if (p.shield > 0) { const used = Math.min(p.shield, dmg); p.shield -= used; dmg -= used; }
-  p.hp -= dmg; p.iframes = PLAYER.iframes; s.damageTaken[source] = (s.damageTaken[source] ?? 0) + dmg;
+  p.hp -= dmg; p.hurtUntil = s.t + PLAYER.iframes; p.iframes = PLAYER.iframes; s.damageTaken[source] = (s.damageTaken[source] ?? 0) + dmg;
   if (fromBoss) s.bossHits = (s.bossHits ?? 0) + 1;
   if (dmg > 0) s.pops.push({ x: p.x, y: p.y - 24, text: `-${dmg}`, t: 0.8, kind: "hurt" });
   if (!p.emergencyUsed && pick(s, "emergency-shield") && p.hp > 0 && p.hp <= p.maxHp * 0.3) { p.emergencyUsed = true; p.shield += Math.round(p.maxHp * 0.2); p.shieldUntil = s.t + 60; s.pops.push({ x: p.x, y: p.y - 40, text: "비상 보호막!", t: 1.2, kind: "info" }); }

@@ -1,5 +1,9 @@
 /** 기본 아바타: 밀짚모자 농부 고양이(원본 public/avatar-farmer-cat-v2.png를 384px로 줄인 것). */
 export const DEFAULT_AVATAR = "avatar-farmer-cat.png";
+/** 기본 농부 고양이에만 적용한다. 업로드·다른 프리셋의 정체성은 유지한다. */
+export function hurtAvatarSrc(src: string): string | null {
+  return src === DEFAULT_AVATAR || src === `/${DEFAULT_AVATAR}` ? "/avatar-farmer-cat-hurt.png" : null;
+}
 /** 예전 기본 아바타(검은 고양이). 아바타 고르기에서 계속 선택할 수 있다. */
 export const BLACKCAT_AVATAR = "avatar-blackcat.svg";
 /** 예전 기본 아바타(픽셀 고양이). 아바타 고르기에서 계속 선택할 수 있다. */

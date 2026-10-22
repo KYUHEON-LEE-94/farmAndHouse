@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { hurtAvatarSrc } from "../avatar";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
 import { WORLD_H, WORLD_W, fieldLike, segmentHits, type Terrain } from "./terrain";
 import { ringRadius } from "./bossKit";
@@ -91,7 +92,7 @@ type Ui = { choices: AwakenId[] | null; paused: boolean; over: RaidState["over"]
   /** 카드별 "지금 무기 기준 바뀌는 수치"(WEAPON_CARD_UI_DESIGN_SPEC) */
   previews: Record<string, string | null> };
 type Avatar = { src: string; pixelated: boolean };
-type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; pixelated: boolean; weapon?: HTMLImageElement };
+type Art = { bg: HTMLCanvasElement; avatar: HTMLImageElement | null; hurtAvatar?: HTMLImageElement; pixelated: boolean; weapon?: HTMLImageElement };
 
 /**
  * 탑 토벌 전투 화면. canvas + requestAnimationFrame 고정 스텝 루프로 그리고,
@@ -131,6 +132,8 @@ export default function RaidGame({ floor, weapon, evolution, foods, gear, pet = 
     stateRef.current.input = touchMode ? "mobile" : "pc";
     const art: Art = { bg: paintWorld(stateRef.current.terrain), avatar: null, pixelated: avatar.pixelated };
     const img = new Image(); img.onload = () => { art.avatar = img; }; img.src = avatar.src;
+    const hurtSrc = hurtAvatarSrc(avatar.src);
+    if (hurtSrc) { const hurt = new Image(); hurt.onload = () => { art.hurtAvatar = hurt; }; hurt.src = hurtSrc; }
     // 들고 있는 무기 그림(진화했으면 진화 그림)
     const wimg = new Image(); wimg.onload = () => { art.weapon = wimg; }; wimg.src = weaponArtUrl(stateRef.current.weapon.art ?? "raid-scythe");
     let raf = 0, last = performance.now(), acc = 0, uiKey = "";
@@ -521,7 +524,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   shadow(ctx, p.x, p.y + 4, 16);
   ctx.globalAlpha = p.iframes > 0 && Math.floor(clock * 20) % 2 ? 0.45 : 1;
   if (p.dashT > 0) { ctx.globalAlpha = 0.35; for (let k = 1; k <= 3; k++) drawAvatar(ctx, art, p.x - p.dashDir.x * k * 12, p.y - p.dashDir.y * k * 12, size, flip); ctx.globalAlpha = 1; }
-  drawAvatar(ctx, art, p.x, p.y, size, flip);
+  drawAvatar(ctx, art, p.x, p.y, size, flip, s.t < (p.hurtUntil ?? 0));
   ctx.globalAlpha = 1;
   if (p.shield > 0) { ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 6, 0, Math.PI * 2); ctx.strokeStyle = `rgba(120,200,255,${0.6 + pulse * 0.3})`; ctx.lineWidth = 3; ctx.stroke(); }
   // 들고 있는 무기(조준 방향)
@@ -713,9 +716,10 @@ function turnToward(s: RaidState, want: -1 | 1, clock: number) {
 }
 
 /** face: true면 왼쪽을 본다(좌우 반전), 숫자면 좌우 배율(-1~1, 돌아서는 중간 모습). */
-function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, face: boolean | number) {
+function drawAvatar(ctx: CanvasRenderingContext2D, art: Art, x: number, y: number, size: number, face: boolean | number, hurt = false) {
   ctx.save(); ctx.translate(x, y); ctx.scale(typeof face === "number" ? face : face ? -1 : 1, 1);
-  if (art.avatar) { ctx.imageSmoothingEnabled = !art.pixelated; ctx.drawImage(art.avatar, -size / 2, -size / 2, size, size); }
+  const sprite = hurt && art.hurtAvatar ? art.hurtAvatar : art.avatar;
+  if (sprite) { ctx.imageSmoothingEnabled = !art.pixelated; ctx.drawImage(sprite, -size / 2, -size / 2, size, size); }
   else { ctx.beginPath(); ctx.arc(0, 0, PLAYER.radius, 0, Math.PI * 2); ctx.fillStyle = "#fff3d6"; ctx.fill(); ctx.fillStyle = "#000"; ctx.font = `20px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("🧑‍🌾", 0, 1); }
   ctx.restore();
 }
