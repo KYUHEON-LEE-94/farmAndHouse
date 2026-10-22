@@ -18,7 +18,7 @@ export type Input = { up: boolean; down: boolean; left: boolean; right: boolean;
   /** 모바일 가상 스틱(−1~1, 길이 1 이하). 있으면 방향키 대신 쓴다. */
   moveX?: number; moveY?: number };
 /** 방어구 합계 능력(26절). */
-export type Gear = { hp: number; defense: number; crit: number; absorb: number; xpGain?: number; speed: number; dashCd: number; startShield: number; freezeResist?: number; hazardCut?: number; bossDamage?: number; /** 특수공격 숙련: 피해·재사용 감소·잔향(★3) */ specialDmg?: number; specialCd?: number; specialEcho?: number };
+export type Gear = { hp: number; defense: number; crit: number; absorb: number; xpGain?: number; speed: number; dashCd: number; startShield: number; freezeResist?: number; hazardCut?: number; bossDamage?: number; /** 7단계 천공 파수꾼: 투사체(일반·보스 탄막) 피해 감소, 강풍·횡풍에 밀리는 정도 감소 */ projectileCut?: number; windResist?: number; /** 특수공격 숙련: 피해·재사용 감소·잔향(★3) */ specialDmg?: number; specialCd?: number; specialEcho?: number };
 export const NO_GEAR: Gear = { hp: 0, defense: 0, crit: 0, absorb: 0, speed: 0, dashCd: 0, startShield: 0 };
 export type FoodSlot = { dishId: string; grade: number; key: string; effect: FoodEffect; icon: string; name: string } | null;
 
@@ -117,7 +117,7 @@ export type RaidState = {
   /** 판 기록: 보스 등장 순간 체력 비율, 회피 횟수, 입력 방식 */
   waveEndHp: number | null; dodges: number; input: "pc" | "mobile";
   /** 53절 카드 진행 상태 */
-  ext: { /** 플레이어 이동 속도 추정(탑의 그림자 예측 추적) */ pvx?: number; pvy?: number; plx?: number; ply?: number; /** 같은 층 직전 최고 실패 기록(3.4.3 비교 표식) */ prevBest?: { waveTime: number; bossHpRatio: number }; prevBeat?: boolean; dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
+  ext: { /** 32층 질풍의 대붕 횡풍: 이 시각까지 (gustX, gustY) 방향으로 밀림 */ gustUntil?: number; gustX?: number; gustY?: number; /** 플레이어 이동 속도 추정(탑의 그림자 예측 추적) */ pvx?: number; pvy?: number; plx?: number; ply?: number; /** 같은 층 직전 최고 실패 기록(3.4.3 비교 표식) */ prevBest?: { waveTime: number; bossHpRatio: number }; prevBeat?: boolean; dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
     specialHitAt: number; castId: number; firstHitCast: number; perfectUntil: number; dashBoostUntil: number; cut: number[]; wasDashing: boolean };
   kills: number; damageTaken: Record<string, number>; uid: number; prevDash: boolean; prevFood: [boolean, boolean, boolean]; bossHpAtEnd: number;
 };
@@ -245,6 +245,7 @@ function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = fal
   if (p.dashT > 0 || s.t < p.dodgeUntil) { if (s.t - p.dodgePop > 0.5) { p.dodgePop = s.t; s.pops.push({ x: p.x, y: p.y - 34, text: "회피!", t: 0.6, kind: "info" }); } return false; }
   if (p.iframes > 0) return false;
   if (s.gear.hazardCut && HAZARD_SOURCES.includes(source)) raw *= 1 - s.gear.hazardCut; // 설산 장화: 바닥 피해 감소
+  if (s.gear.projectileCut && (source === "투사체" || source === "보스 탄막")) raw *= 1 - s.gear.projectileCut; // 천공 파수꾼 갑옷
   // 피해 감소 합계 85% 상한(53.9)
   raw *= 1 - Math.min(0.85, (s.weapon.fx?.guard ?? 0) + (s.picks["frost-veil"] && p.holdT > 0 ? 0.25 : 0) + buffSum(s, ["armor"]) + (pick(s, "safe-route") && HAZARD_SOURCES.includes(source) ? 0.3 : 0));
   if (s.special.stanceUntil > s.t) { raw *= 0.2; if (!s.special.stanceHit) { s.special.stanceHit = true; s.special.stanceUntil = 0; counterBlast(s, true); } }
@@ -718,6 +719,8 @@ export const DARK_ARMOR_FRONT = 0.5;
 export const RUIN_GUARD_FRONT = 0.65;
 /** 천공 유적 강풍이 플레이어를 미는 속도(px/s) */
 export const SKY_WIND = 70;
+/** 32층 질풍의 대붕 횡풍 세기(px/s) */
+export const GUST_SPEED = 150;
 const FRONT_ARC = 1.05;
 const MOB_BEAM_LEN = 440, MOB_BEAM_WIDTH = 22;
 const preparing = (m: Monster) => m.state === "tele" || m.state === "dash";
@@ -877,7 +880,7 @@ function updateMonster(s: RaidState, m: Monster, dt: number) {
     const wall = m.x < m.r || m.x > WORLD_W - m.r || m.y < m.r || m.y > WORLD_H - m.r || blockedAt(s.terrain, m.x, m.y, m.r * 0.6);
     if (wall && m.boss === "pollen-boar") { m.state = "stun"; m.stateT = 1; s.pops.push({ x: m.x, y: m.y - 50, text: "기절!", t: 1, kind: "info" }); }
     else if (wall && m.boss === "iron-bear") { m.state = "move"; exposeBear(s, m); }
-    else if (wall && m.script === "dark-colossus") { m.state = "move"; exposeBear(s, m); }
+    else if (wall && (m.script === "dark-colossus" || m.script === "ruin-colossus")) { m.state = "move"; exposeBear(s, m); }
     else if (m.stateT <= 0 || wall) { m.state = "move"; if (m.def.kind === "elite" && !m.boss) zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 50, t: 3, tele: 0, damage: 6, every: 0.5, slow: 0.25 }); afterDash(s, m); }
     { const o = pushOut(m.x, m.y, m.r, blockers(s.terrain)); m.x = o.x; m.y = o.y; }
     return;
@@ -945,14 +948,15 @@ function updateCatfish(s: RaidState, m: Monster, dt: number) {
 export type BossPattern = (s: RaidState, m: Monster) => number;
 /** 단계: 체력 비율 at 이하에서 사용. gap은 패턴 사이 공백, combo는 한 번에 묶는 최대 패턴 수 */
 export type BossPhase = { at: number; patterns: string[]; gap: number; combo: number };
-export type BossScript = { phases: BossPhase[]; patterns: Record<string, BossPattern>; speed?: number; /** 매 프레임(방패 회전·과부하 등) */ tick?: (s: RaidState, m: Monster, dt: number) => void };
+export type BossScript = { phases: BossPhase[]; patterns: Record<string, BossPattern>; speed?: number; /** 단계 전환 무적(초). 31층부터 0.8초(RAID_FLOOR_40_EXPANSION_AUDIT 7.3), 없으면 1초 */ phaseInvuln?: number; /** 매 프레임(방패 회전·과부하 등) */ tick?: (s: RaidState, m: Monster, dt: number) => void };
 export const BOSS_SCRIPTS: Record<string, BossScript> = {};
 /** 연계 사이 공백(초) */
 export const COMBO_GAP = 0.3;
 
 /** 구간 표준 장비 기준 "최대 체력의 몇 %" 피해를 보스 원피해로 바꾼다(방어 비율식 적용 전 값). */
 export function bossPct(s: RaidState, pct: number) {
-  const f = s.floor.floor, std = f <= 25 ? { hp: 160, def: 9 } : { hp: 175, def: 11 };
+  // 구간 표준 장비 체력·방어: 21~25 설산 방벽, 26~30 고대 수호자, 31~35 심장부 정복자, 36~ 천공 파수꾼
+  const f = s.floor.floor, std = f <= 25 ? { hp: 160, def: 9 } : f <= 30 ? { hp: 175, def: 11 } : f <= 35 ? { hp: 190, def: 14 } : { hp: 210, def: 15 };
   return Math.round(pct * std.hp * (100 + std.def * DEFENSE_K) / 100);
 }
 /** 방사 탄막: n발을 offset부터 고르게(보스 탄은 원피해 그대로) */
@@ -969,7 +973,7 @@ function updateScriptedBoss(s: RaidState, m: Monster, dt: number) {
   let ph = 0; sc.phases.forEach((phase, i) => { if (ratio <= phase.at) ph = i; });
   if (ph !== (m.phase ?? 0)) {
     // 단계 전환: 1초 무적 연출, 진행 중 위험은 그대로 두고 다음 패턴까지 1.2초
-    m.phase = ph; m.invulnUntil = s.t + 1; m.gap = 1.2; s.shake = Math.max(s.shake, 6);
+    m.phase = ph; m.invulnUntil = s.t + (sc.phaseInvuln ?? 1); m.gap = 1.2; s.shake = Math.max(s.shake, 6);
     s.pops.push({ x: m.x, y: m.y - m.r - 30, text: `⚠ ${ph + 1}단계!`, t: 1.4, kind: "info" });
   }
   moveToward(m, p.x, p.y, m.speed * (sc.speed ?? 1), dt, 1);
@@ -1207,6 +1211,130 @@ BOSS_SCRIPTS["core-guardian"] = {
   ],
 };
 
+// ---------- 31~35층 보스 대본(RAID_FLOOR_40_EXPANSION_AUDIT 7.3, 16·17.2절) ----------
+// 큰 공격(최대 체력 10% 이상)은 예고 1.2초 이상, 작은 공격 0.6초 이상(14.2절). 단계 전환 무적 0.8초. 같은 패턴 연속 금지(실행기).
+const BIG_TELE = 1.2;
+/** 보스 탄막을 플레이어 방향 부채꼴로(0.6초 경고 뒤) */
+function fanShot(s: RaidState, m: Monster, n: number, spread: number, speed: number, pct: number, warn = "⚠") {
+  s.pops.push({ x: m.x, y: m.y - m.r - 18, text: warn, t: 0.6, kind: "info" });
+  later(s, 0.6, () => {
+    if (m.hp <= 0) return;
+    const base = aimP(s, m);
+    for (let i = 0; i < n; i++) { const a = base + (n === 1 ? 0 : -spread / 2 + (spread * i) / (n - 1)); s.projectiles.push({ x: m.x, y: m.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: 7, damage: bossPct(s, pct), life: 5, mine: false, pierce: null, boss: true }); }
+  });
+}
+/** 바람길(2초 감속 장판) */
+const windLane = (s: RaidState, x: number, y: number) => zoneAt(s, { kind: "leaf", x: clamp(x, 40, WORLD_W - 40), y: clamp(y, 40, WORLD_H - 40), r: 55, t: 2, tele: 0.6, damage: bossPct(s, 0.02), every: 0.5, slow: 0.35, label: "바람길" });
+
+BOSS_SCRIPTS["sky-golem"] = { // 31층 천공 골렘
+  speed: 0.7, phaseInvuln: 0.8,
+  patterns: {
+    fist: (s, m) => { beamFrom(s, m.x, m.y, aimP(s, m), 400, 70, BIG_TELE, 0.13, "바람 주먹"); return 1.5; },
+    rocks: s => { for (let i = 0; i < 5; i++) { const at = nearPlayer(s, 260); later(s, 0.15 * i, () => trackAt(s, at.x, at.y, 55, BIG_TELE, 0, 0, 0.1, "낙하석")); } return 2.0; },
+    charge: (s, m) => { if (m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 560); return 2.0; },
+    chargeRing: (s, m) => {
+      if (m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 520);
+      later(s, BIG_TELE + 0.6, () => { if (m.hp > 0) ringAt(s, m.x, m.y, 40, 420, 34, BIG_TELE, 1.4, 0.12, "충격 고리", 0.9); });
+      return BIG_TELE + 0.6 + BIG_TELE + 0.4;
+    },
+    fistRocks: (s, m) => { beamFrom(s, m.x, m.y, aimP(s, m), 400, 70, BIG_TELE, 0.13, "바람 주먹"); later(s, 1.5, () => { if (m.hp > 0) for (let i = 0; i < 5; i++) { const at = nearPlayer(s, 260); trackAt(s, at.x, at.y, 55, BIG_TELE, 0, 0, 0.1, "낙하석"); } }); return 3.0; },
+  },
+  phases: [
+    { at: 1, patterns: ["fist", "rocks", "charge"], gap: 0.7, combo: 1 },
+    { at: 0.5, patterns: ["fist", "rocks", "chargeRing", "fistRocks"], gap: 0.6, combo: 1 },
+  ],
+};
+BOSS_SCRIPTS["gale-roc"] = { // 32층 질풍의 대붕
+  speed: 0.9, phaseInvuln: 0.8,
+  patterns: {
+    dives: (s, m) => {
+      const lanes = (m.phase ?? 0) >= 1;
+      for (let k = 0; k < 3; k++) later(s, 0.75 * k, () => {
+        if (m.hp <= 0) return;
+        const a = rnd() * Math.PI * 2, sx = clamp(s.player.x + Math.cos(a) * 380, 40, WORLD_W - 40), sy = clamp(s.player.y + Math.sin(a) * 380, 40, WORLD_H - 40), ang = Math.atan2(s.player.y - sy, s.player.x - sx);
+        beamFrom(s, sx, sy, ang, 760, 56, BIG_TELE, 0.12, "급강하");
+        later(s, BIG_TELE, () => { if (m.hp <= 0) return; m.x = clamp(sx + Math.cos(ang) * 700, 60, WORLD_W - 60); m.y = clamp(sy + Math.sin(ang) * 700, 60, WORLD_H - 60); if (lanes) for (let i = 1; i <= 3; i++) windLane(s, sx + Math.cos(ang) * 180 * i, sy + Math.sin(ang) * 180 * i); });
+      });
+      return 0.75 * 2 + BIG_TELE + 0.6;
+    },
+    feathers: (s, m) => { fanShot(s, m, 7, 1.2, 210, 0.07, "🪶"); return 1.2; },
+    crosswind: s => {
+      const dir = rnd() < 0.5 ? -1 : 1;
+      s.pops.push({ x: s.player.x, y: s.player.y - 50, text: dir > 0 ? "횡풍 ➡➡" : "⬅⬅ 횡풍", t: BIG_TELE, kind: "info" });
+      later(s, BIG_TELE, () => { s.ext.gustUntil = s.t + 3; s.ext.gustX = dir; s.ext.gustY = 0; });
+      return BIG_TELE + 1.2;
+    },
+  },
+  phases: [
+    { at: 1, patterns: ["dives", "feathers", "crosswind"], gap: 0.7, combo: 1 },
+    { at: 0.5, patterns: ["dives", "feathers", "crosswind"], gap: 0.55, combo: 2 },
+  ],
+};
+BOSS_SCRIPTS["cloud-sage"] = { // 33층 구름 대현자
+  speed: 0.6, phaseInvuln: 0.8,
+  patterns: {
+    teleport: (s, m) => { const a = rnd() * Math.PI * 2; blink(s, m, s.player.x + Math.cos(a) * 240, s.player.y + Math.sin(a) * 240, () => radial(s, m, 8, rnd() * 6, 170, bossPct(s, 0.06))); return 1.2; },
+    marks: s => { s.pops.push({ x: s.player.x, y: s.player.y - 40, text: "⚡ 표식!", t: 1, kind: "info" }); for (let i = 0; i < 3; i++) later(s, 0.6 * i, () => zoneAt(s, { kind: "bolt", x: s.player.x, y: s.player.y, r: 62, t: 0.15, tele: BIG_TELE, damage: bossPct(s, 0.12), every: 0, slow: 0, label: "번개 표식" })); return 0.6 * 2 + BIG_TELE + 0.3; },
+    clouds: s => { for (let i = 0; i < 3; i++) leafZone(s, nearPlayer(s, 320), "구름 장판"); return 1.0; },
+    markBlink: (s, m) => {
+      for (let i = 0; i < 3; i++) later(s, 0.6 * i, () => zoneAt(s, { kind: "bolt", x: s.player.x, y: s.player.y, r: 62, t: 0.15, tele: BIG_TELE, damage: bossPct(s, 0.12), every: 0, slow: 0, label: "번개 표식" }));
+      later(s, 0.6 * 2 + BIG_TELE + 0.3, () => { if (m.hp <= 0) return; const a = rnd() * Math.PI * 2; blink(s, m, s.player.x + Math.cos(a) * 200, s.player.y + Math.sin(a) * 200, () => { radial(s, m, 10, rnd() * 6, 175, bossPct(s, 0.07)); later(s, 0.5, () => { if (m.hp > 0) radial(s, m, 10, rnd() * 6, 175, bossPct(s, 0.07)); }); }); });
+      return 0.6 * 2 + BIG_TELE + 0.3 + 1.4;
+    },
+  },
+  phases: [
+    { at: 1, patterns: ["teleport", "marks", "clouds"], gap: 0.7, combo: 1 },
+    { at: 0.5, patterns: ["teleport", "marks", "clouds", "markBlink"], gap: 0.55, combo: 1 },
+  ],
+};
+BOSS_SCRIPTS["ruin-colossus"] = { // 34층 유적 거신
+  speed: 0.6, phaseInvuln: 0.8,
+  /** 방향 방패: 플레이어 쪽으로 천천히 돈다(정면 피해 −70%). 2단계는 계속 회전해 틈이 생긴다. */
+  tick: (s, m, dt) => {
+    if ((m.phase ?? 0) >= 1) { m.shieldFacing = (m.shieldFacing ?? 0) + 1.4 * dt; return; }
+    const want = aimP(s, m), cur = m.shieldFacing ?? want; let d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur)); d = Math.max(-0.6 * dt, Math.min(0.6 * dt, d)); m.shieldFacing = cur + d;
+  },
+  patterns: {
+    rings3: (s, m) => { for (let k = 0; k < 3; k++) later(s, 0.9 * k, () => { if (m.hp > 0) ringAt(s, m.x, m.y, 40, 380, 34, BIG_TELE, 1.3, 0.11, "지면 고리", 0.9); }); return 0.9 * 2 + BIG_TELE + 1.4; },
+    pillars: s => { for (let i = 0; i < 3; i++) { const at = i === 0 ? { x: s.player.x, y: s.player.y } : nearPlayer(s, 240); trackAt(s, at.x, at.y, 62, BIG_TELE, 0, 0, 0.13, "낙하 기둥"); } return 1.7; },
+    charge: (s, m) => { if (m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 640); return 2.1; },
+  },
+  phases: [
+    { at: 1, patterns: ["rings3", "pillars", "charge"], gap: 0.7, combo: 1 },
+    { at: 0.5, patterns: ["rings3", "pillars", "charge"], gap: 0.55, combo: 2 },
+  ],
+};
+BOSS_SCRIPTS["storm-executor"] = { // 35층 폭풍의 집행자(구간 보스)
+  speed: 0.75, phaseInvuln: 0.8,
+  patterns: {
+    grid: s => {
+      const px = s.player.x, py = s.player.y, ox = (rnd() - 0.5) * 80, oy = (rnd() - 0.5) * 80;
+      for (const dy of [-200, 0, 200]) beamCross(s, px, py + dy + oy, 0, 900, 40, 1.3, 0.12, "번개 격자");
+      for (const dx of [-140, 140]) beamCross(s, px + dx + ox, py, Math.PI / 2, 900, 40, 1.3, 0.12, "번개 격자");
+      return 1.7;
+    },
+    blades: (s, m) => { fanShot(s, m, 5, 0.8, 260, 0.08, "🌪"); later(s, 0.5, () => { if (m.hp > 0) fanShot(s, m, 4, 0.6, 260, 0.08, "🌪"); }); return 1.6; },
+    cores: (s, m) => { summonN(s, m, "cloud-mage", 2, { name: "폭풍의 핵", icon: "🌀", speed: 0, hp: 900, maxHp: 900, xp: 0 }); return 0.8; },
+    dashes: (s, m) => {
+      if (m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 520);
+      later(s, BIG_TELE + 0.7, () => { if (m.hp > 0 && m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 520); });
+      return (BIG_TELE + 0.7) * 2 + 0.3;
+    },
+    gridDash: (s, m) => { BOSS_SCRIPTS["storm-executor"].patterns.grid(s, m); later(s, 1.9, () => { if (m.hp > 0 && m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 560); }); return 1.9 + BIG_TELE + 0.8; },
+    tempest: (s, m) => {
+      addHazard(s, hazard({ kind: "spin", x: m.x, y: m.y, angle: aimP(s, m), len: 320, width: 32, tele: 1.3, life: 6, spin: Math.PI / 3.5, every: 1, damage: bossPct(s, 0.08), label: "회전 폭풍", owner: m.uid }));
+      later(s, 1.5, () => { if (m.hp > 0) fanShot(s, m, 5, 0.8, 260, 0.08, "🌪"); });
+      return 2.4;
+    },
+  },
+  phases: [
+    { at: 1, patterns: ["grid", "blades", "cores", "dashes"], gap: 0.6, combo: 1 },
+    { at: 0.7, patterns: ["grid", "blades", "cores", "dashes", "gridDash"], gap: 0.55, combo: 2 },
+    // 35% 이하: 폭풍 핵 소환 중단
+    { at: 0.35, patterns: ["grid", "blades", "dashes", "gridDash", "tempest"], gap: 0.42, combo: 2 },
+  ],
+};
+
 /** 1·2·3분 보스 간접 개입. */
 function intervention(s: RaidState, n: number) {
   const f = s.floor.floor, p = s.player;
@@ -1395,7 +1523,10 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   if (s.ext.wasDashing && p.dashT <= 0 && pick(s, "long-dash")) s.ext.dashBoostUntil = s.t + 1;
   s.ext.wasDashing = p.dashT > 0;
   // 천공 유적 강풍 지대(7.4절): 화살 방향으로 초당 70px 밀림, 대시 중에는 영향 없음
-  if (s.terrain.zone === "sky" && p.dashT <= 0) { const w = windAt(s.terrain, p.x, p.y); if (w) { p.x = clamp(p.x + w.dx * SKY_WIND * dt, PLAYER.radius, WORLD_W - PLAYER.radius); p.y = clamp(p.y + w.dy * SKY_WIND * dt, PLAYER.radius, WORLD_H - PLAYER.radius); } }
+  const windK = 1 - (s.gear.windResist ?? 0);
+  if (s.terrain.zone === "sky" && p.dashT <= 0) { const w = windAt(s.terrain, p.x, p.y); if (w) { p.x = clamp(p.x + w.dx * SKY_WIND * windK * dt, PLAYER.radius, WORLD_W - PLAYER.radius); p.y = clamp(p.y + w.dy * SKY_WIND * windK * dt, PLAYER.radius, WORLD_H - PLAYER.radius); } }
+  // 32층 질풍의 대붕 횡풍(회피 중에는 밀리지 않음)
+  if ((s.ext.gustUntil ?? 0) > s.t && p.dashT <= 0) { p.x = clamp(p.x + (s.ext.gustX ?? 0) * GUST_SPEED * windK * dt, PLAYER.radius, WORLD_W - PLAYER.radius); p.y = clamp(p.y + (s.ext.gustY ?? 0) * GUST_SPEED * windK * dt, PLAYER.radius, WORLD_H - PLAYER.radius); }
   { const o = pushOut(p.x, p.y, PLAYER.radius, blockers(s.terrain)); p.x = o.x; p.y = o.y; }
   updateWorld(s, dt);
   // 꾸준한 회복: 20초마다 체력 5(중첩마다)

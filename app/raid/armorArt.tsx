@@ -16,6 +16,8 @@ const tint = (svg: string, map: Record<string, string>) => Object.entries(map).r
 const MAPLE = { [DARK]: "#a3401f", [LEATHER]: "#d9772f", [METAL]: "#e6a23c", [FUR]: "#f6d9a8" }, FROST = { [DARK]: "#4f7d99", [LEATHER]: "#8fb8cf", [METAL]: "#d8eef8", [FUR]: "#ffffff" };
 const ANCIENT = { [DARK]: "#2f5236", [LEATHER]: "#6f9a5c", [METAL]: "#c9b16a", [FUR]: "#e6f0d0" }, CORE = { [DARK]: "#2a2150", [LEATHER]: "#6b58b0", [METAL]: "#ffd36a", [FUR]: "#d9ccff" };
 for (const slot of ["hood", "vest", "boots"]) { ART[`ancient-${slot}`] = tint(ART[`reinforced-${slot}`], ANCIENT); ART[`core-${slot}`] = tint(ART[`reinforced-${slot}`], CORE); }
+const SKY = { [DARK]: "#3b6ea8", [LEATHER]: "#8fc0e8", [METAL]: "#f2f6ff", [FUR]: "#ffe9a8" };
+for (const slot of ["hood", "vest", "boots"]) ART[`sky-${slot}`] = tint(ART[`reinforced-${slot}`], SKY);
 for (const slot of ["hood", "vest", "boots"]) { ART[`maple-${slot}`] = tint(ART[`reinforced-${slot}`], MAPLE); ART[`frost-${slot}`] = tint(ART[`reinforced-${slot}`], FROST); }
 
 export function armorSvg(id: string) { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${ART[id] ?? ART["leather-hood"]}</svg>`; }

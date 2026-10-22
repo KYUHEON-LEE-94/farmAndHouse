@@ -20,7 +20,7 @@ async function loadLiteral(file, names) {
 }
 
 const hunt = await loadLiteral('../app/hunting.ts', ['ANIMALS']);
-const raid = await loadLiteral('../app/raid/data.ts', ['RAID_MAX_FLOOR', 'RAID_ITEMS', 'FLOOR_REWARDS', 'LIFE_MATS', 'HUNT_COMMON_LOOT', 'HUNT_RARE_LOOT', 'ENHANCE', 'UPPER_ITEMS', 'ARMORS']);
+const raid = await loadLiteral('../app/raid/data.ts', ['RAID_MAX_FLOOR', 'RAID_DATA_FLOOR', 'RAID_ITEMS', 'FLOOR_REWARDS', 'LIFE_MATS', 'HUNT_COMMON_LOOT', 'HUNT_RARE_LOOT', 'ENHANCE', 'UPPER_ITEMS', 'ARMORS']);
 
 const huntBase = new Set(hunt.ANIMALS.map(a => a.loot.id));
 const huntRare = new Set(hunt.ANIMALS.map(a => a.rare.id));
@@ -40,8 +40,12 @@ test('every current hunting material belongs to an actual animal drop', () => {
 });
 
 test('every armor ingredient has a current acquisition source', () => {
+  // 운영에 보이는 단계는 공개 층에서, 숨긴 단계(31층 이상 장비)는 데이터가 있는 층에서 재료가 나와야 한다
+  const dataDrops = new Set(Object.entries(raid.FLOOR_REWARDS).filter(([floor]) => Number(floor) <= raid.RAID_DATA_FLOOR).flatMap(([, reward]) => [...reward.first, ...reward.repeat].map(([id]) => id)));
+  const visible = raid.RAID_MAX_FLOOR >= 36 ? 8 : raid.RAID_MAX_FLOOR >= 31 ? 7 : 6; // data.ts armorTierLimit와 같은 규칙
   for (const armor of raid.ARMORS) for (const id of Object.keys(armor.need)) {
-    assert.ok(huntAll.has(id) || floorDrops.has(id) || id in raid.LIFE_MATS, `${armor.name}: no source for ${id}`);
+    const drops = armor.tier <= visible ? floorDrops : dataDrops;
+    assert.ok(huntAll.has(id) || drops.has(id) || id in raid.LIFE_MATS, `${armor.name}: no source for ${id}`);
   }
 });
 

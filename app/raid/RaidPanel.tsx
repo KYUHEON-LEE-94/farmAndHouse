@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, RAID_DATA_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY, MONSTERS, SPECIAL_MASTERY } from "./data";
+import { armorTierLimit, zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, RAID_DATA_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY, MONSTERS, SPECIAL_MASTERY } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance, pityChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -244,7 +244,7 @@ export function RaidGearView({ raid, forge }: { raid: RaidSave; forge: ForgeActi
     </div>}
     {kind === "armor" && <div className="raid-armor-groups">{(["head", "body", "legs"] as const).map(slot => <section key={slot} className="raid-armor-group">
       <h4>{{ head: "🧢", body: "🦺", legs: "👢" }[slot]} {SLOT_NAME[slot]} <small>왼쪽부터 순서대로 만들어요 · 아래 단계를 가지고 있어야 다음 단계를 만들 수 있어요(소모 안 함)</small></h4>
-      <div className="raid-armors">{ARMORS.filter(a => a.slot === slot).sort((x, y) => x.tier - y.tier).map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, prerequisite = ARMORS.find(item => item.id === a.prerequisite), ready = hasArmorPrerequisite(a, raid.armorOwned), ok = ready && canPay(a.need, forge.have) && forge.money >= a.gold;
+      <div className="raid-armors">{ARMORS.filter(a => a.slot === slot && a.tier <= armorTierLimit(TEST_MODE ? RAID_DATA_FLOOR : RAID_MAX_FLOOR)).sort((x, y) => x.tier - y.tier).map(a => { const owned = raid.armorOwned.includes(a.id), worn = raid.equipped[a.slot] === a.id, prerequisite = ARMORS.find(item => item.id === a.prerequisite), ready = hasArmorPrerequisite(a, raid.armorOwned), ok = ready && canPay(a.need, forge.have) && forge.money >= a.gold;
       return <div key={a.id} className={`raid-armor ${worn ? "worn" : owned ? "owned" : ""}`}>
         <span className="raid-armor-icon"><ArmorIcon id={a.id} size={48} /></span>
         <div><i className={`raid-armor-tier t${a.tier}`}>{a.tier}단계 · {["", "가죽", "강화 가죽", "단풍 추적자", "설산 방벽", "고대 수호자", "심장부 정복자"][a.tier]}</i><b>{a.name}</b><span>{a.text}</span>

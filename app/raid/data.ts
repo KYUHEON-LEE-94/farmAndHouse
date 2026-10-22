@@ -19,6 +19,8 @@ export function floorBand(floor: number) {
 export const RAID_MAX_FLOOR = 30; // 21~30층(보통 구간 1차) 운영 공개(2026-10-19). 31~40층은 데이터만 있고 숨김(로컬 테스트 모드에서만 개방)
 /** 데이터가 있는 마지막 층(로컬 테스트 모드의 전 층 개방 상한) */
 export const RAID_DATA_FLOOR = 35;
+/** 보이는 최고 방어구 단계: 31층이 열려야 7단계, 36층이 열려야 8단계(숨김 층의 장비가 운영 화면에 나오지 않게) */
+export const armorTierLimit = (maxFloor: number) => (maxFloor >= 36 ? 8 : maxFloor >= 31 ? 7 : 6);
 /**
  * 31층 이상 일반·정예 몬스터 층별 상승(RAID_FLOOR_40_EXPANSION_AUDIT 7.2): 몬스터 표는 구간 첫 층 기준.
  * 31~35층 HP +3%·피해 +2%(정예 HP +4%)/층, 36~40층 HP +4%·피해 +2.5%(정예 HP +5%)/층. 보스는 층 표 수치 그대로.
@@ -145,11 +147,11 @@ export const FLOORS: FloorDef[] = [
   { floor: 30, zone: z6, monsters: ["tower-shadow", "rift-stalker", "core-sentry", "dark-armor"], spawnRate: 2.1, maxAlive: 38, elite: { id: "heart-warden", hp: 1000, every: 22 }, boss: { id: "core-guardian", name: "탑의 핵 수호자", icon: "💠", hp: 16500, damage: 62, defense: 14, base: "heart-warden" } },
   // 31~35층 천공 유적(7절 생성량, 2026-10-21 보스 HP 결정: 30층 실측 HP 16,500·방어 14·+18 약 68초에서 권장 강화 화력으로 역산, 목표 60~72초)
   // 보스는 전용 대본을 붙이기 전까지 기본 보스 행동(mini)으로 둔다.
-  { floor: 31, zone: z7, monsters: ["sky-remnant", "wind-raptor"], spawnRate: 1.9, maxAlive: 38, elite: { id: "storm-enforcer", hp: 1150, count: 2 }, boss: { id: "mini", name: "천공 골렘", icon: "🗿", hp: 14500, damage: 54, defense: 14, base: "ruin-guardian" } },
-  { floor: 32, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage"], spawnRate: 2.0, maxAlive: 38, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "질풍의 대붕", icon: "🦅", hp: 15000, damage: 56, defense: 14, base: "wind-raptor" } },
-  { floor: 33, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.1, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "구름 대현자", icon: "🌩️", hp: 15600, damage: 58, defense: 15, base: "cloud-mage" } },
-  { floor: 34, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.2, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "유적 거신", icon: "🗿", hp: 16100, damage: 61, defense: 15, base: "ruin-guardian" } },
-  { floor: 35, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.3, maxAlive: 40, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "mini", name: "폭풍의 집행자", icon: "⛈️", hp: 18800, damage: 66, defense: 16, base: "storm-enforcer" } },
+  { floor: 31, zone: z7, monsters: ["sky-remnant", "wind-raptor"], spawnRate: 1.9, maxAlive: 38, elite: { id: "storm-enforcer", hp: 1150, count: 2 }, boss: { id: "sky-golem", name: "천공 골렘", icon: "🗿", hp: 14500, damage: 54, defense: 14, base: "ruin-guardian" } },
+  { floor: 32, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage"], spawnRate: 2.0, maxAlive: 38, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "gale-roc", name: "질풍의 대붕", icon: "🦅", hp: 13300, damage: 56, defense: 14, base: "wind-raptor" } },
+  { floor: 33, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.1, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "cloud-sage", name: "구름 대현자", icon: "🌩️", hp: 15600, damage: 58, defense: 15, base: "cloud-mage" } },
+  { floor: 34, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.2, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "ruin-colossus", name: "유적 거신", icon: "🗿", hp: 16100, damage: 61, defense: 15, base: "ruin-guardian" } },
+  { floor: 35, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.3, maxAlive: 40, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "storm-executor", name: "폭풍의 집행자", icon: "⛈️", hp: 18800, damage: 66, defense: 16, base: "storm-enforcer" } },
 ];
 /** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부, 31~35 천공 유적, 36~40 공허 왕좌 */
 export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
@@ -459,9 +461,9 @@ export const EVOLUTION_CHANGE = { gold: 30000, need: { "artisan-core": 3 } as Re
 
 // ---------- 방어구(26절) ----------
 export type ArmorSlot = "head" | "body" | "legs";
-export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2 | 3 | 4 | 5 | 6; prerequisite?: string; gold: number; need: Record<string, number>;
+export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8; prerequisite?: string; gold: number; need: Record<string, number>;
   /** freezeResist: 빙판·빙결 둔화 감소, hazardCut: 바닥(장판·감전) 피해 감소 */
-  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number; freezeResist?: number; hazardCut?: number; bossDamage?: number }; text: string };
+  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number; freezeResist?: number; hazardCut?: number; bossDamage?: number; projectileCut?: number; windResist?: number }; text: string };
 export const ARMORS: ArmorDef[] = [
   { id: "leather-hood", slot: "head", name: "가죽 두건", icon: "🧢", tier: 1, gold: 2000, need: { rabbitfur: 8, foxfur: 3 }, stats: { crit: 0.05, xpGain: 0.03 }, text: "치명타 +5% · 경험치 +3%" },
   { id: "reinforced-hood", prerequisite: "leather-hood", slot: "head", name: "강화 가죽 두건", icon: "⛑️", tier: 2, gold: 5000, need: { rabbitfur: 12, foxfur: 8, antler: 2, "field-essence": 2 }, stats: { crit: 0.1, xpGain: 0.05 }, text: "치명타 +10% · 경험치 +5%" },
@@ -482,6 +484,10 @@ export const ARMORS: ArmorDef[] = [
   { id: "core-hood", prerequisite: "ancient-hood", slot: "head", name: "심장부 정복자 투구", icon: "🔆", tier: 6, gold: 22000, need: { "dark-alloy": 6, "core-shard": 3 }, stats: { crit: 0.17, xpGain: 0.09, bossDamage: 0.06 }, text: "치명타 +17% · 경험치 +9% · 보스 피해 +6%" },
   { id: "core-vest", prerequisite: "ancient-vest", slot: "body", name: "심장부 정복자 갑옷", icon: "💠", tier: 6, gold: 28000, need: { "dark-alloy": 8, "core-shard": 4 }, stats: { hp: 90, defense: 14, startShield: 35 }, text: "최대 체력 +90 · 방어력 +14 · 시작 보호막 35" },
   { id: "core-boots", prerequisite: "ancient-boots", slot: "legs", name: "심장부 정복자 장화", icon: "⚡", tier: 6, gold: 22000, need: { "dark-alloy": 6, "core-shard": 3 }, stats: { speed: 0.2, dashCd: 0.28, hazardCut: 0.3 }, text: "이동속도 +20% · 회피 재사용 −28% · 바닥 피해 −30%" },
+  // 7단계 천공 파수꾼(31~35층, RAID_FLOOR_40_EXPANSION_AUDIT 8·16절): 같은 부위 6단계 보유 필요(소모 안 함), 천공철·구름 결정만 요구
+  { id: "sky-hood", prerequisite: "core-hood", slot: "head", name: "천공 파수꾼 투구", icon: "🪽", tier: 7, gold: 30000, need: { "sky-iron": 6, "cloud-crystal": 2 }, stats: { crit: 0.19, xpGain: 0.1, bossDamage: 0.07 }, text: "치명타 +19% · 경험치 +10% · 보스 피해 +7%" },
+  { id: "sky-vest", prerequisite: "core-vest", slot: "body", name: "천공 파수꾼 갑옷", icon: "🛡️", tier: 7, gold: 38000, need: { "sky-iron": 8, "cloud-crystal": 3 }, stats: { hp: 110, defense: 15, startShield: 40, projectileCut: 0.1 }, text: "최대 체력 +110 · 방어력 +15 · 시작 보호막 40 · 투사체 피해 −10%" },
+  { id: "sky-boots", prerequisite: "core-boots", slot: "legs", name: "천공 파수꾼 장화", icon: "🌬️", tier: 7, gold: 30000, need: { "sky-iron": 6, "cloud-crystal": 2 }, stats: { speed: 0.22, dashCd: 0.32, hazardCut: 0.35, windResist: 0.6 }, text: "이동속도 +22% · 회피 재사용 −32% · 바닥 피해 −35% · 강풍 저항 60%" },
   { id: "reinforced-boots", prerequisite: "leather-boots", slot: "legs", name: "강화 가죽 장화", icon: "🥾", tier: 2, gold: 5000, need: { rabbitfur: 10, foxfur: 6, antler: 4, "field-essence": 2 }, stats: { speed: 0.14, dashCd: 0.2 }, text: "이동속도 +14% · 회피 재사용 −20% · 밀려남 −25%" },
 ];
 export const SLOT_NAME: Record<ArmorSlot, string> = { head: "머리", body: "몸통", legs: "다리" };
@@ -525,7 +531,7 @@ export const SPECIAL_MASTERY = [
 ];
 export function gearOf(raid: RaidSave) {
   const evo = raid.weapons[raid.equipped.weapon]?.evolution, star = evo ? raid.mastery?.[evo] ?? 0 : 0, mst = SPECIAL_MASTERY[star - 1];
-  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0, freezeResist: 0, hazardCut: 0, bossDamage: 0, specialDmg: mst?.dmg ?? 0, specialCd: mst?.cd ?? 0, specialEcho: star >= 3 ? 1 : 0 };
+  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0, freezeResist: 0, hazardCut: 0, bossDamage: 0, projectileCut: 0, windResist: 0, specialDmg: mst?.dmg ?? 0, specialCd: mst?.cd ?? 0, specialEcho: star >= 3 ? 1 : 0 };
   for (const slot of ["head", "body", "legs"] as ArmorSlot[]) {
     const a = ARMORS.find(item => item.id === raid.equipped[slot]);
     if (a) for (const [k, v] of Object.entries(a.stats)) g[k as keyof typeof g] += v ?? 0;
