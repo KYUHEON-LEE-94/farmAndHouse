@@ -18,6 +18,8 @@ const ANCIENT = { [DARK]: "#2f5236", [LEATHER]: "#6f9a5c", [METAL]: "#c9b16a", [
 for (const slot of ["hood", "vest", "boots"]) { ART[`ancient-${slot}`] = tint(ART[`reinforced-${slot}`], ANCIENT); ART[`core-${slot}`] = tint(ART[`reinforced-${slot}`], CORE); }
 const SKY = { [DARK]: "#3b6ea8", [LEATHER]: "#8fc0e8", [METAL]: "#f2f6ff", [FUR]: "#ffe9a8" };
 for (const slot of ["hood", "vest", "boots"]) ART[`sky-${slot}`] = tint(ART[`reinforced-${slot}`], SKY);
+const STAR = { [DARK]: "#2b1f5c", [LEATHER]: "#7b62d6", [METAL]: "#ffe58a", [FUR]: "#e9e1ff" };
+for (const slot of ["hood", "vest", "boots"]) ART[`star-${slot}`] = tint(ART[`reinforced-${slot}`], STAR);
 for (const slot of ["hood", "vest", "boots"]) { ART[`maple-${slot}`] = tint(ART[`reinforced-${slot}`], MAPLE); ART[`frost-${slot}`] = tint(ART[`reinforced-${slot}`], FROST); }
 
 export function armorSvg(id: string) { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${ART[id] ?? ART["leather-hood"]}</svg>`; }

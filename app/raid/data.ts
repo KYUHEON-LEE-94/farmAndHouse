@@ -18,7 +18,7 @@ export function floorBand(floor: number) {
 }
 export const RAID_MAX_FLOOR = 30; // 21~30층(보통 구간 1차) 운영 공개(2026-10-19). 31~40층은 데이터만 있고 숨김(로컬 테스트 모드에서만 개방)
 /** 데이터가 있는 마지막 층(로컬 테스트 모드의 전 층 개방 상한) */
-export const RAID_DATA_FLOOR = 35;
+export const RAID_DATA_FLOOR = 40;
 /** 보이는 최고 방어구 단계: 31층이 열려야 7단계, 36층이 열려야 8단계(숨김 층의 장비가 운영 화면에 나오지 않게) */
 export const armorTierLimit = (maxFloor: number) => (maxFloor >= 36 ? 8 : maxFloor >= 31 ? 7 : 6);
 /**
@@ -96,6 +96,12 @@ export const MONSTERS: Record<string, MonsterDef> = {
   "cloud-mage": { id: "cloud-mage", name: "구름 술사", icon: "🌩️", kind: "ranged", hp: 165, damage: 31, defense: 4, speed: 58, radius: 13, xp: 1 },
   "ruin-guardian": { id: "ruin-guardian", name: "유적 수호병", icon: "🗿", kind: "crab", hp: 365, damage: 34, defense: 10, speed: 36, radius: 20, xp: 2 },
   "storm-enforcer": { id: "storm-enforcer", name: "폭풍 집행관", icon: "⚡", kind: "elite", hp: 1150, damage: 42, defense: 11, speed: 50, radius: 26, xp: 12 },
+  // 36~40층 공허 왕좌(RAID_FLOOR_40_EXPANSION_AUDIT 7.2): 36층 기준, 층마다 HP +4%·피해 +2.5%(정예 HP +5%)
+  "star-wraith": { id: "star-wraith", name: "별빛 망령", icon: "🌠", kind: "chase", hp: 225, damage: 35, defense: 5, speed: 66, radius: 14, xp: 1 },
+  "void-hound": { id: "void-hound", name: "공허 사냥개", icon: "🐕‍🦺", kind: "hop", hp: 180, damage: 36, defense: 4, speed: 108, radius: 13, xp: 1 },
+  "prism-eye": { id: "prism-eye", name: "프리즘 눈", icon: "🔮", kind: "ranged", hp: 195, damage: 35, defense: 5, speed: 56, radius: 13, xp: 1 },
+  "throne-guard": { id: "throne-guard", name: "왕좌 근위병", icon: "💂", kind: "crab", hp: 420, damage: 38, defense: 10, speed: 34, radius: 20, xp: 2 },
+  "void-judge": { id: "void-judge", name: "공허 심판관", icon: "⚖️", kind: "elite", hp: 1350, damage: 47, defense: 12, speed: 48, radius: 26, xp: 12 },
   "mine-warden": { id: "mine-warden", name: "광산 감시자", icon: "🗿", kind: "canal-elite", hp: 620, damage: 36, defense: 7, speed: 50, radius: 26, xp: 12 },
 };
 
@@ -111,7 +117,7 @@ export type FloorDef = {
   /** 진화 훈련장: 보스·간접 개입 없음, 체력이 1 아래로 내려가지 않는다. */
   training?: boolean;
 };
-const z1 = "꽃가루 들판", z2 = "침수된 수로", z3 = "단풍 미궁", z4 = "서리 광산", z5 = "고대 숲", z6 = "탑의 심장부", z7 = "천공 유적";
+const z1 = "꽃가루 들판", z2 = "침수된 수로", z3 = "단풍 미궁", z4 = "서리 광산", z5 = "고대 숲", z6 = "탑의 심장부", z7 = "천공 유적", z8 = "공허 왕좌";
 export const FLOORS: FloorDef[] = [
   { floor: 1, zone: z1, monsters: ["pollen-mite"], spawnRate: 0.8, maxAlive: 16, elite: null, boss: { id: "mini", name: "강화 진드기", icon: "🐞", hp: 300, damage: 10, defense: 0, base: "pollen-mite" } },
   { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 520, damage: 12, defense: 0, base: "thorn-rabbit" } },
@@ -152,6 +158,12 @@ export const FLOORS: FloorDef[] = [
   { floor: 33, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.1, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "cloud-sage", name: "구름 대현자", icon: "🌩️", hp: 15600, damage: 58, defense: 15, base: "cloud-mage" } },
   { floor: 34, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.2, maxAlive: 39, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "ruin-colossus", name: "유적 거신", icon: "🗿", hp: 16100, damage: 61, defense: 15, base: "ruin-guardian" } },
   { floor: 35, zone: z7, monsters: ["sky-remnant", "wind-raptor", "cloud-mage", "ruin-guardian"], spawnRate: 2.3, maxAlive: 40, elite: { id: "storm-enforcer", hp: 1150, every: 22 }, boss: { id: "storm-executor", name: "폭풍의 집행자", icon: "⛈️", hp: 18800, damage: 66, defense: 16, base: "storm-enforcer" } },
+  // 36~40층 공허 왕좌(숨김): 보스 HP는 처치 시간 기준(16절: 36~39층 55~80초, 40층 80~105초)으로 측정해 정했다
+  { floor: 36, zone: z8, monsters: ["star-wraith", "void-hound"], spawnRate: 2.0, maxAlive: 40, elite: { id: "void-judge", hp: 1350, count: 2 }, boss: { id: "star-shade", name: "별 그림자", icon: "🌌", hp: 17500, damage: 64, defense: 15, base: "star-wraith" } },
+  { floor: 37, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye"], spawnRate: 2.15, maxAlive: 40, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "void-beast", name: "공허 야수", icon: "🐺", hp: 19500, damage: 67, defense: 16, base: "void-hound" } },
+  { floor: 38, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye", "throne-guard"], spawnRate: 2.3, maxAlive: 40, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "prism-warden", name: "프리즘 감시자", icon: "👁️", hp: 20500, damage: 70, defense: 16, base: "prism-eye" } },
+  { floor: 39, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye", "throne-guard"], spawnRate: 2.45, maxAlive: 41, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "throne-keeper", name: "왕좌 수문장", icon: "🛡️", hp: 21000, damage: 73, defense: 17, base: "throne-guard" } },
+  { floor: 40, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye", "throne-guard"], spawnRate: 2.6, maxAlive: 41, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "void-king", name: "공허의 왕", icon: "👑", hp: 27500, damage: 78, defense: 17, base: "void-judge" } },
 ];
 /** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부, 31~35 천공 유적, 36~40 공허 왕좌 */
 export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
@@ -463,7 +475,7 @@ export const EVOLUTION_CHANGE = { gold: 30000, need: { "artisan-core": 3 } as Re
 export type ArmorSlot = "head" | "body" | "legs";
 export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8; prerequisite?: string; gold: number; need: Record<string, number>;
   /** freezeResist: 빙판·빙결 둔화 감소, hazardCut: 바닥(장판·감전) 피해 감소 */
-  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number; freezeResist?: number; hazardCut?: number; bossDamage?: number; projectileCut?: number; windResist?: number }; text: string };
+  stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number; freezeResist?: number; hazardCut?: number; bossDamage?: number; projectileCut?: number; windResist?: number; darkSight?: number }; text: string };
 export const ARMORS: ArmorDef[] = [
   { id: "leather-hood", slot: "head", name: "가죽 두건", icon: "🧢", tier: 1, gold: 2000, need: { rabbitfur: 8, foxfur: 3 }, stats: { crit: 0.05, xpGain: 0.03 }, text: "치명타 +5% · 경험치 +3%" },
   { id: "reinforced-hood", prerequisite: "leather-hood", slot: "head", name: "강화 가죽 두건", icon: "⛑️", tier: 2, gold: 5000, need: { rabbitfur: 12, foxfur: 8, antler: 2, "field-essence": 2 }, stats: { crit: 0.1, xpGain: 0.05 }, text: "치명타 +10% · 경험치 +5%" },
@@ -488,6 +500,10 @@ export const ARMORS: ArmorDef[] = [
   { id: "sky-hood", prerequisite: "core-hood", slot: "head", name: "천공 파수꾼 투구", icon: "🪽", tier: 7, gold: 30000, need: { "sky-iron": 6, "cloud-crystal": 2 }, stats: { crit: 0.19, xpGain: 0.1, bossDamage: 0.07 }, text: "치명타 +19% · 경험치 +10% · 보스 피해 +7%" },
   { id: "sky-vest", prerequisite: "core-vest", slot: "body", name: "천공 파수꾼 갑옷", icon: "🛡️", tier: 7, gold: 38000, need: { "sky-iron": 8, "cloud-crystal": 3 }, stats: { hp: 110, defense: 15, startShield: 40, projectileCut: 0.1 }, text: "최대 체력 +110 · 방어력 +15 · 시작 보호막 40 · 투사체 피해 −10%" },
   { id: "sky-boots", prerequisite: "core-boots", slot: "legs", name: "천공 파수꾼 장화", icon: "🌬️", tier: 7, gold: 30000, need: { "sky-iron": 6, "cloud-crystal": 2 }, stats: { speed: 0.22, dashCd: 0.32, hazardCut: 0.35, windResist: 0.6 }, text: "이동속도 +22% · 회피 재사용 −32% · 바닥 피해 −35% · 강풍 저항 60%" },
+  // 8단계 성좌 수호자(36~40층, 8.1절): 같은 부위 7단계 보유 필요, 별의 재·공허 결정만 요구
+  { id: "star-hood", prerequisite: "sky-hood", slot: "head", name: "성좌 수호자 투구", icon: "🌟", tier: 8, gold: 46000, need: { "star-ash": 6, "void-crystal": 2 }, stats: { crit: 0.21, xpGain: 0.11, bossDamage: 0.09 }, text: "치명타 +21% · 경험치 +11% · 보스 피해 +9%" },
+  { id: "star-vest", prerequisite: "sky-vest", slot: "body", name: "성좌 수호자 갑옷", icon: "🌌", tier: 8, gold: 58000, need: { "star-ash": 8, "void-crystal": 3 }, stats: { hp: 130, defense: 16, startShield: 45, projectileCut: 0.14 }, text: "최대 체력 +130 · 방어력 +16 · 시작 보호막 45 · 투사체 피해 −14%" },
+  { id: "star-boots", prerequisite: "sky-boots", slot: "legs", name: "성좌 수호자 장화", icon: "✨", tier: 8, gold: 46000, need: { "star-ash": 6, "void-crystal": 2 }, stats: { speed: 0.24, dashCd: 0.35, hazardCut: 0.4, darkSight: 50 }, text: "이동속도 +24% · 회피 재사용 −35% · 바닥 피해 −40% · 암전 시야 +50px" },
   { id: "reinforced-boots", prerequisite: "leather-boots", slot: "legs", name: "강화 가죽 장화", icon: "🥾", tier: 2, gold: 5000, need: { rabbitfur: 10, foxfur: 6, antler: 4, "field-essence": 2 }, stats: { speed: 0.14, dashCd: 0.2 }, text: "이동속도 +14% · 회피 재사용 −20% · 밀려남 −25%" },
 ];
 export const SLOT_NAME: Record<ArmorSlot, string> = { head: "머리", body: "몸통", legs: "다리" };
@@ -531,7 +547,7 @@ export const SPECIAL_MASTERY = [
 ];
 export function gearOf(raid: RaidSave) {
   const evo = raid.weapons[raid.equipped.weapon]?.evolution, star = evo ? raid.mastery?.[evo] ?? 0 : 0, mst = SPECIAL_MASTERY[star - 1];
-  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0, freezeResist: 0, hazardCut: 0, bossDamage: 0, projectileCut: 0, windResist: 0, specialDmg: mst?.dmg ?? 0, specialCd: mst?.cd ?? 0, specialEcho: star >= 3 ? 1 : 0 };
+  const g = { hp: 0, defense: 0, crit: 0, absorb: 0, xpGain: 0, speed: 0, dashCd: 0, startShield: 0, freezeResist: 0, hazardCut: 0, bossDamage: 0, projectileCut: 0, windResist: 0, darkSight: 0, specialDmg: mst?.dmg ?? 0, specialCd: mst?.cd ?? 0, specialEcho: star >= 3 ? 1 : 0 };
   for (const slot of ["head", "body", "legs"] as ArmorSlot[]) {
     const a = ARMORS.find(item => item.id === raid.equipped[slot]);
     if (a) for (const [k, v] of Object.entries(a.stats)) g[k as keyof typeof g] += v ?? 0;

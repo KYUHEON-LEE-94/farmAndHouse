@@ -13,6 +13,8 @@ export type Terrain = {
   seed: number; zone: "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
   /** 고대 숲 이끼 길(플레이어 이동 +8%), 심장부 가속 지대(모두 +12%), 수문·균열벽 전환 주기(초) */
   moss?: Rect[]; boost?: Rect[]; gatePeriod?: number;
+  /** 공허 왕좌 별빛 발판(틈을 건너는 다리): 4초 켜짐·4초 꺼짐, 꺼진 발판은 지나갈 수 없다(엔진이 platformOff를 갱신) */
+  platforms?: Rect[]; platformOff?: boolean[];
   walls: Rect[]; grass: Rect[]; mud: Rect[]; wind: (Rect & { dx: number; dy: number })[];
   flowers: Flower[];
   deep: Rect[]; bridges: Rect[]; shallow: Rect[]; puddles: { x: number; y: number; r: number }[]; gates: Gate[];
@@ -59,6 +61,16 @@ export function makeTerrain(floor: number, seed: number): Terrain {
     pieces.push({ x: from, y: ry, w: WORLD_W - from, h: rh }); t.deep = pieces;
     place(t.walls, () => { const w = 50 + r() * 40, h = 50 + r() * 40; return { x: r() * WORLD_W, y: r() * WORLD_H, w, h }; }, 4 + Math.min(2, floor - 31), [t.deep]);
     place(t.wind as Rect[], () => { const a = [0, Math.PI / 2, Math.PI, -Math.PI / 2][Math.floor(r() * 4)]; return Object.assign({ x: r() * WORLD_W, y: r() * WORLD_H, w: 280, h: 140 }, { dx: Math.cos(a), dy: Math.sin(a) }); }, 2 + (floor >= 33 ? 1 : 0), [t.walls, t.deep]);
+  } else if (zone === "void") {
+    // 공허 왕좌(36~40층, 7.4절): 건널 수 없는 공허 틈 + 별빛 발판 4개(4초 켜짐·4초 꺼짐, 2초씩 어긋나 항상 2개 이상) + 왕좌 기둥
+    const top = template !== 1, ry = top ? 140 + r() * 40 : WORLD_H - 300 - r() * 40, rh = 120;
+    const slots = [[120, 400], [560, 840], [1000, 1280], [1440, 1760]];
+    t.platforms = [];
+    for (const [a, b] of slots) { const w = 120 + r() * 30, x = a + r() * (b - a - w); t.platforms.push({ x, y: ry - 6, w, h: rh + 12 }); }
+    const pieces: Rect[] = []; let from = 0;
+    for (const pl of [...t.platforms].sort((p, q) => p.x - q.x)) { pieces.push({ x: from, y: ry, w: pl.x - from, h: rh }); from = pl.x + pl.w; }
+    pieces.push({ x: from, y: ry, w: WORLD_W - from, h: rh }); t.deep = pieces; t.platformOff = t.platforms.map(() => false);
+    place(t.walls, () => { const w = 50 + r() * 40, h = 60 + r() * 50; return { x: r() * WORLD_W, y: r() * WORLD_H, w, h }; }, 4 + Math.min(2, floor - 36), [t.deep, t.platforms]);
   } else if (zone === "maple") {
     // 단풍 미궁(11~15층): 덤불 울타리 미로 + 낙엽 더미(적 감속) + 단풍 덤불(모두 감속). 층이 오를수록 울타리가 늘어난다.
     place(t.walls, () => { const horiz = r() < 0.5, len = 150 + r() * 120; return horiz ? { x: r() * WORLD_W, y: r() * WORLD_H, w: len, h: 24 } : { x: r() * WORLD_W, y: r() * WORLD_H, w: 24, h: len }; }, 5 + (floor - 11), [t.walls]);
@@ -108,7 +120,10 @@ export function makeTerrain(floor: number, seed: number): Terrain {
 export const fieldLike = (t: Pick<Terrain, "zone">) => t.zone === "field" || t.zone === "maple" || t.zone === "ancient";
 
 /** 이동을 막는 사각형(돌담·깊은 물·닫힌 수문). */
-export function blockers(t: Terrain): Rect[] { return [...t.walls, ...t.deep, ...t.gates.filter(g => g.closed).map(g => g.rect)]; }
+export function blockers(t: Terrain): Rect[] { return [...t.walls, ...t.deep, ...t.gates.filter(g => g.closed).map(g => g.rect), ...(t.platforms ?? []).filter((_, i) => t.platformOff?.[i])]; }
+/** 별빛 발판 주기(초): 켜짐 4초·꺼짐 4초. 발판 4개를 2초씩 어긋나게 돌려 항상 2개 이상 켜져 있다. */
+export const PLATFORM_PERIOD = 8, PLATFORM_ON = 4, PLATFORM_STEP = 2;
+export const platformOn = (i: number, t: number) => ((t + i * PLATFORM_STEP) % PLATFORM_PERIOD) < PLATFORM_ON;
 
 /** 원을 사각형들 밖으로 밀어낸다(미끄러지듯). */
 export function pushOut(x: number, y: number, rad: number, rects: Rect[]) {
@@ -149,8 +164,11 @@ export function routeTarget(t: Terrain, fromX: number, fromY: number, toX: numbe
   const side = (y: number) => (y < top ? -1 : y > bottom ? 1 : 0);
   const a = side(fromY), b = side(toY);
   if (a === b || a === 0) return { x: toX, y: toY };
-  const open = t.bridges.filter((br, i) => !t.gates[i]?.closed);
-  const pick = (open.length ? open : t.bridges).reduce((best, br) => (Math.abs(br.x + br.w / 2 - fromX) < Math.abs(best.x + best.w / 2 - fromX) ? br : best));
+  // 건널 곳: 다리(수로·천공 유적) 또는 지금 켜진 별빛 발판(공허 왕좌, 모두 꺼져 있으면 곧 켜질 발판)
+  const crossings = t.platforms?.length ? t.platforms : t.bridges;
+  if (!crossings.length) return { x: toX, y: toY };
+  const open = t.platforms?.length ? t.platforms.filter((_, i) => !t.platformOff?.[i]) : t.bridges.filter((br, i) => !t.gates[i]?.closed);
+  const pick = (open.length ? open : crossings).reduce((best, br) => (Math.abs(br.x + br.w / 2 - fromX) < Math.abs(best.x + best.w / 2 - fromX) ? br : best));
   const cx = pick.x + pick.w / 2;
   return Math.abs(fromX - cx) > pick.w / 2 - 10 ? { x: cx, y: a < 0 ? top - 20 : bottom + 20 } : { x: cx, y: b < 0 ? top - 30 : bottom + 30 };
 }

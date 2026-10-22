@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { hurtAvatarSrc } from "../avatar";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
-import { WORLD_H, WORLD_W, fieldLike, segmentHits, type Terrain } from "./terrain";
+import { PLATFORM_ON, PLATFORM_PERIOD, PLATFORM_STEP, WORLD_H, WORLD_W, fieldLike, segmentHits, type Terrain } from "./terrain";
 import { ringRadius } from "./bossKit";
 import { SPECIALS } from "./weapons";
 import { AUX_WEAPONS, AWAKEN_META, CATEGORY_LABEL, cardTag } from "./awakenings";
 import { weaponArtUrl } from "./weaponArt";
-import { chooseAwakening, createRaid, derived, previewCard, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
+import { arenaBounds, BLACKOUT_SIGHT, chooseAwakening, createRaid, derived, previewCard, raidResult, stepRaid, type FoodSlot, type Gear, type Input, type RaidResult, type RaidState } from "./engine";
 
 const STEP = 1 / 60;
 /** 터치 기기(손가락이 주 입력)면 모바일 조작(가상 스틱·자동 공격·버튼)을 쓴다(HUNTING_RAID.md 65절). */
@@ -402,6 +402,19 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
     ctx.beginPath(); ctx.arc(ch.x, ch.y, ch.r + 6 + glow * 4, 0, Math.PI * 2); ctx.fillStyle = fieldLike(T) ? `rgba(255,216,74,${0.18 + glow * 0.15})` : T.zone === "frost" ? `rgba(255,170,90,${0.2 + glow * 0.12})` : `rgba(150,230,255,${0.2 + glow * 0.12})`; ctx.fill();
     ctx.fillStyle = "#000"; ctx.font = `${fieldLike(T) ? 30 : 34}px ${EMOJI_FONT}`; ctx.fillText({ field: "🌻", maple: "🍁", canal: "⛲", frost: "🔥", ancient: "🌺", core: "💎", sky: "☁️", void: "🌟" }[T.zone], ch.x, ch.y);
   }
+  // 공허 왕좌: 별빛 발판(켜짐은 빛나는 발판, 꺼지기 1초 전 점멸, 꺼짐은 옅은 점선 = 지나갈 수 없음)
+  if (T.platforms) T.platforms.forEach((b, i) => {
+    const on = !T.platformOff?.[i], left = PLATFORM_ON - ((s.t + i * PLATFORM_STEP) % PLATFORM_PERIOD), blink = on && left < 1 && Math.sin(clock * 22) > 0;
+    ctx.save();
+    if (on && !blink) { ctx.fillStyle = "rgba(196,180,255,.88)"; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = "#fff1a8"; ctx.lineWidth = 3; ctx.strokeRect(b.x, b.y, b.w, b.h); ctx.fillStyle = "#fff6c8"; ctx.font = `14px ${EMOJI_FONT}`; ctx.textAlign = "center"; for (let y = b.y + 18; y < b.y + b.h; y += 34) ctx.fillText("✦", b.x + b.w / 2, y); }
+    else { ctx.setLineDash([6, 6]); ctx.strokeStyle = on ? "rgba(255,240,160,.9)" : "rgba(170,150,240,.45)"; ctx.lineWidth = 2; ctx.strokeRect(b.x, b.y, b.w, b.h); }
+    ctx.restore();
+  });
+  // 전장 수축(39·40층 보스): 바깥은 어둡게, 경계는 보랏빛 선
+  if (s.ext.shrink) { const b = arenaBounds(s); ctx.save(); ctx.fillStyle = "rgba(12,6,28,.82)"; ctx.fillRect(0, 0, WORLD_W, b.y0); ctx.fillRect(0, b.y1, WORLD_W, WORLD_H - b.y1); ctx.fillRect(0, b.y0, b.x0, b.y1 - b.y0); ctx.fillRect(b.x1, b.y0, WORLD_W - b.x1, b.y1 - b.y0); ctx.strokeStyle = "#c58cff"; ctx.lineWidth = 4; ctx.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); ctx.restore(); }
+  // 순간 암전: 지형만 어둡게 덮고(예고·안전 구역·보스·투사체·플레이어는 이 위에 그린다), 시야 밖 일반 몬스터는 그리지 않는다
+  const dark = (s.ext.blackoutUntil ?? 0) > s.t, sight = BLACKOUT_SIGHT + (s.gear.darkSight ?? 0);
+  if (dark) { ctx.save(); const gr = ctx.createRadialGradient(p.x, p.y, sight * 0.75, p.x, p.y, sight); gr.addColorStop(0, "rgba(6,3,16,0)"); gr.addColorStop(1, "rgba(6,3,16,.94)"); ctx.fillStyle = gr; ctx.fillRect(0, 0, WORLD_W, WORLD_H); ctx.restore(); }
   // 정예 예고(바닥 표시)
   for (const w of s.warns) { const left = w.at - s.t; ctx.beginPath(); ctx.arc(w.x, w.y, 30, 0, Math.PI * 2); ctx.strokeStyle = `rgba(240,150,40,${0.5 + 0.5 * Math.sin(clock * 10)})`; ctx.lineWidth = 3; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#f0a030"; ctx.font = "800 16px sans-serif"; ctx.fillText(`! ${Math.ceil(left)}`, w.x, w.y); }
 
@@ -475,6 +488,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   // 몬스터(그림자 · 살짝 통통 · 정예/보스 테두리)
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const m of s.monsters) {
+    if (dark && !m.boss && !m.elite && Math.hypot(m.x - p.x, m.y - p.y) > sight + m.r) continue;
     shadow(ctx, m.x, m.y, m.r);
     if (m.elite || m.boss) { ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 4, 0, Math.PI * 2); ctx.fillStyle = m.boss ? "rgba(255,216,74,.18)" : "rgba(231,163,62,.15)"; ctx.fill(); ctx.strokeStyle = m.boss ? "#ffd84a" : "#e7a33e"; ctx.lineWidth = 2.5; ctx.stroke(); }
     const bob = m.state === "move" ? Math.sin(clock * 9 + m.uid) * 1.5 : 0;

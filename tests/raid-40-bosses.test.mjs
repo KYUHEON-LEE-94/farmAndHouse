@@ -40,17 +40,18 @@ function observe(floorNo, seconds = 40) {
   } finally { Math.random = keep; }
 }
 
-const IDS = { 31: 'sky-golem', 32: 'gale-roc', 33: 'cloud-sage', 34: 'ruin-colossus', 35: 'storm-executor' };
-for (const floorNo of [31, 32, 33, 34, 35]) {
+const IDS = { 31: 'sky-golem', 32: 'gale-roc', 33: 'cloud-sage', 34: 'ruin-colossus', 35: 'storm-executor', 36: 'star-shade', 37: 'void-beast', 38: 'prism-warden', 39: 'throne-keeper', 40: 'void-king' };
+for (const floorNo of [31, 32, 33, 34, 35, 36, 37, 38, 39, 40]) {
   test(`${floorNo}층 보스(${IDS[floorNo]}): 전용 대본, 모든 단계·패턴 사용, 큰 공격 예고 1.2초, 단계 무적 0.8초, 피해 상한`, () => {
     const { s, seen } = observe(floorNo);
     assert.equal(s.floor.boss.id, IDS[floorNo]);
     const script = R.BOSS_SCRIPTS[IDS[floorNo]];
     assert.ok(script && s.boss.script === IDS[floorNo], '스크립트 보스');
     const last = script.phases.length - 1;
-    assert.equal(script.phases.length, floorNo === 35 ? 3 : 2);
+    const zoneBoss = floorNo % 5 === 0;
+    assert.equal(script.phases.length, zoneBoss ? 3 : 2);
     assert.ok(seen.phases.has(last), `마지막 단계 도달: ${[...seen.phases]}`);
-    const minPatterns = floorNo === 35 ? 5 : 3;
+    const minPatterns = zoneBoss ? 5 : 3;
     assert.ok(seen.patterns.size >= minPatterns, `패턴 ${seen.patterns.size}종 사용(${[...seen.patterns]})`);
     // 큰 공격(표준 체력 10% 이상)은 1.2초, 작은 공격은 0.6초 이상 예고(14.2절)
     const big = R.bossPct(s, 0.1);
@@ -104,7 +105,7 @@ test('7단계 천공 파수꾼 3종: 같은 부위 6단계 보유 필요, 천공
 test('숨김: 운영 최대 층 30에서는 7단계가 보이지 않고, 31층이 열리면 보인다', () => {
   assert.equal(R.RAID_MAX_FLOOR, 30);
   assert.equal(R.armorTierLimit(R.RAID_MAX_FLOOR), 6);
-  assert.equal(R.armorTierLimit(31), 7); assert.equal(R.armorTierLimit(R.RAID_DATA_FLOOR), 7); assert.equal(R.armorTierLimit(36), 8);
+  assert.equal(R.armorTierLimit(31), 7); assert.equal(R.armorTierLimit(35), 7); assert.equal(R.armorTierLimit(36), 8); assert.equal(R.armorTierLimit(R.RAID_DATA_FLOOR), 8);
 });
 
 test('천공 파수꾼 갑옷: 투사체 피해 −10%(바닥·보스 광선에는 적용하지 않음)', () => {
