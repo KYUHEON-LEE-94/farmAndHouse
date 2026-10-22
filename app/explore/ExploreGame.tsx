@@ -6,6 +6,7 @@
  * 모바일: 왼쪽 가상 스틱, 오른쪽 채집·회피 버튼, 위쪽 귀환 버튼 1초 유지.
  */
 import { useEffect, useRef, useState } from "react";
+import { hurtAvatarSrc } from "../avatar";
 import { FORAGE } from "./data";
 import {
   EVENT_INFO, MAX_HP, BOAR_AIM, BOAR_CHARGE_SPEED, BOAR_CHARGE_TIME, GATHER_BIG, GATHER_RANGE, GATHER_SMALL, NO_INPUT, RETURN_HOLD, START, VIEW_H, VIEW_W, WORLD_H, WORLD_W,
@@ -52,10 +53,13 @@ function paintWorld(run: RunState) {
 
 export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onCheckpoint, onFinish }: Props) {
   // 아바타 이미지는 한 번만 불러 두고 캔버스에 그린다(불러오기 전·실패 시 이모지)
-  const avatarImg = useRef<{ img: HTMLImageElement; pixelated: boolean } | null>(null);
+  const avatarImg = useRef<{ img: HTMLImageElement; hurt?: HTMLImageElement; pixelated: boolean } | null>(null);
   useEffect(() => {
     if (!avatar?.src) { avatarImg.current = null; return; }
-    const img = new Image(); img.decoding = "async"; img.src = avatar.src; avatarImg.current = { img, pixelated: avatar.pixelated };
+    const img = new Image(); img.decoding = "async"; img.src = avatar.src;
+    const hurtSrc = hurtAvatarSrc(avatar.src), hurt = hurtSrc ? new Image() : undefined;
+    if (hurt && hurtSrc) { hurt.decoding = "async"; hurt.src = hurtSrc; }
+    avatarImg.current = { img, hurt, pixelated: avatar.pixelated };
   }, [avatar?.src, avatar?.pixelated]);
   const canvasRef = useRef<HTMLCanvasElement>(null), miniRef = useRef<HTMLCanvasElement>(null);
   const state = useRef(run);
@@ -145,7 +149,8 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
       const stunned = s.t < p.stunUntil, dodging = s.t < p.dodgeUntil;
       ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(p.x, p.y + 18, 18, 7, 0, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = dodging ? 0.55 : 1;
-      const faceImg = avatarImg.current?.img;
+      const hurtImg = avatarImg.current?.hurt;
+      const faceImg = stunned && hurtImg?.complete && hurtImg.naturalWidth > 0 ? hurtImg : avatarImg.current?.img;
       if (faceImg && faceImg.complete && faceImg.naturalWidth > 0) {
         ctx.save(); ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, Math.PI * 2); ctx.closePath(); ctx.fillStyle = "#fffdf5"; ctx.fill(); ctx.clip();
         ctx.translate(p.x, p.y); ctx.scale(face.current >= 0 ? Math.max(0.15, face.current) : Math.min(-0.15, face.current), 1);
