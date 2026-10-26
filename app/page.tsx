@@ -35,8 +35,9 @@ import LunchPanel, { LunchBag } from "./cooking/LunchPanel";
 import { LUNCHES, lunchRecipe } from "./cooking/recipes";
 import { useLunchCooking } from "./cooking/useLunchCooking";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rollGrade, type Dish } from "./kitchen";
-import { reservedToItemKeys, categoryLocks, replaceCategoryLocks, restoreItemLocks, type ItemLocks } from "./stock";
-import { EXPLORE_ENABLED, FORAGE, forageKey } from "./explore/data";
+import { applyTake, reservedToItemKeys, categoryLocks, replaceCategoryLocks, restoreItemLocks, type ItemLocks } from "./stock";
+import { EXPLORE_ENABLED, FORAGE, LIFE2_ENABLED, forageKey } from "./explore/data";
+import { toolInfo, toolPlan } from "./explore/tools";
 import ExplorePanel from "./explore/ExplorePanel";
 import { nextRareMisses, type RunResult } from "./explore/engine";
 import { EMPTY_EXPLORATION, explorationUnlockMet, restoreExploration, villageUnlockMet, type ExplorationCheckpoint, type ExplorationState } from "./explore/types";
@@ -446,6 +447,9 @@ export default function Home() {
   const [fieldSel, setFieldSel] = useState<{ cells: number[]; label: string }>({ cells: [], label: "" });
   /** 선택 구획을 마지막으로 계산한 칸·도구(같은 칸 위에서 반복 계산하지 않게). */
   const selKeyRef = useRef("");
+  /** 선착장 2단계 미끼 프리셋 2칸(화면 편의 설정이라 이 기기에만 저장) */
+  const [baitPresets, setBaitPresets] = useState<(string | null)[]>(() => { try { const raw = JSON.parse(localStorage.getItem("bait-presets") ?? "[]"); return [0, 1].map(i => (typeof raw[i] === "string" ? raw[i] : null)); } catch { return [null, null]; } });
+  const saveBaitPresets = (next: (string | null)[]) => { setBaitPresets(next); try { localStorage.setItem("bait-presets", JSON.stringify(next)); } catch { /* 저장 불가 환경 */ } };
   const [fishPicker, setFishPicker] = useState<"rod" | "bait" | null>(null);
   const [seedSort, setSeedSort] = useState<"reco" | "short" | "profit">("reco");
   const plotsRef = useRef<HTMLDivElement>(null);
@@ -1563,6 +1567,21 @@ export default function Home() {
     setNotice(opensVillage ? `🏘️ 마을이 열렸어요! 집·마을 → 마을에서 무너진 마을을 복구해 보세요. ${message}` : message);
     playCoinSound(opensVillage ? [660, 880, 1100] : [660, 880]);
   }
+  /** 탐험 장비 제작(3.5절): 골드와 재료를 내고 바로 장착한다. 잠금·예약분은 쓰지 않는다. */
+  function craftExploreTool(id: string) {
+    const tool = toolInfo(id);
+    if (!tool || exploration.ownedTools.includes(id)) return;
+    const plan = toolPlan(inventory, tool, lunchOptions);
+    if (!plan.ok) return setNotice(`🎒 ${tool.name} 재료가 모자라요.`);
+    if (money < tool.gold) return setNotice(`🎒 ${tool.name}은 ${tool.gold.toLocaleString()}원이 필요해요.`);
+    setInventory(stock => applyTake(stock, plan.take)); setMoney(value => value - tool.gold);
+    setExploration(state => ({ ...state, ownedTools: [...state.ownedTools, id], equippedTool: id }));
+    playCoinSound([660, 990, 1320]); setNotice(`${tool.icon} ${josa(tool.name, "을를")} 만들어 장착했어요! (${tool.note})`);
+  }
+  function equipExploreTool(id: string | null) {
+    setExploration(state => ({ ...state, equippedTool: id && state.ownedTools.includes(id) ? id : null }));
+    const tool = toolInfo(id); setNotice(tool ? `${tool.icon} ${josa(tool.name, "을를")} 장착했어요. (${tool.note})` : "🎒 탐험 장비를 해제했어요.");
+  }
   /** 채집물 판매: 고정 저가, 잠금은 팔지 않는다(7.1절). */
   function sellForage(id: string, count: number) {
     const item = FORAGE.find(entry => entry.id === id);
@@ -2607,6 +2626,8 @@ export default function Home() {
   const heldFert = FERTILIZERS.find(item => item.id === (activeFert ? activeFert.id : fertId)) ?? FERTILIZERS[0];
   const reachNow = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : currentSpreader;
 
+  /** 선착장 단계(1 어종 누적 수 · 2 미끼 프리셋 · 3 전설 힌트) */
+  const pierLevel = village.facilityLevels.pier ?? 0;
   const pondScene = (
     <div className={`pond phase-${fishState.phase} spot-${currentSpot.id}`}>
       <div className="pond-scenery" aria-hidden="true"><span className="far" /><span className="mid" /><i className="deco d1" /><i className="deco d2" /><i className="deco d3" /></div>
@@ -2619,7 +2640,7 @@ export default function Home() {
       <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
       {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} rod={gameRod} barBonus={fishState.bait?.barBonus ?? 0} onFinish={finishFishing} /></Suspense>}
       {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : fishState.fish?.rarity === "신화" ? "legend mythic" : ""}`}>
-        {fishState.fish ? <><EffectBurst id={equipment.fish} />{LEGEND_ART[fishState.fish.id] ? <span className={`legend-fish-art ${LEGEND_ART[fishState.fish.id]}`} role="img" aria-label={fishState.fish.name} /> : fishArt(fishState.fish, "fish-art big") ?? <b>{fishState.fish.icon}</b>}<strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트!</span>}<small>{fishState.fish.note}</small><em>{fishState.stored ? "📦 통합 창고 보관" : `＋${(fishState.price ?? fishState.fish.price).toLocaleString()}원`}</em></> : <><b>💨</b><small>{fishState.text}</small></>}
+        {fishState.fish ? <><EffectBurst id={equipment.fish} />{LEGEND_ART[fishState.fish.id] ? <span className={`legend-fish-art ${LEGEND_ART[fishState.fish.id]}`} role="img" aria-label={fishState.fish.name} /> : fishArt(fishState.fish, "fish-art big") ?? <b>{fishState.fish.icon}</b>}<strong>{fishState.fish.name}</strong>{pierLevel >= 1 && fishState.fish.rarity !== "신화" && <span className="catch-count">📒 지금까지 {fishLog[fishState.fish.id] ?? 0}마리</span>}<span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트!</span>}<small>{fishState.fish.note}</small><em>{fishState.stored ? "📦 통합 창고 보관" : `＋${(fishState.price ?? fishState.fish.price).toLocaleString()}원`}</em></> : <><b>💨</b><small>{fishState.text}</small></>}
         {fishState.reward && <span className="treasure">🎁 보물상자: {fishState.reward}</span>}
       </div>}
     </div>
@@ -2840,6 +2861,9 @@ export default function Home() {
             <div className="fish2-gear"><span className="fish2-gear-icon">{currentRod.icon}</span><div><b>{currentRod.name}</b><small>{currentRod.note}</small><span className="fish2-stat"><i>막대</i><em><u style={{ width: `${Math.min(100, currentRod.bar * 220)}%` }} /></em></span></div></div>
             <div className="fish2-gear"><span className="fish2-gear-icon">{fishBare ? BARE_HAND.icon : currentBait.icon}</span><div><b>{fishBare ? BARE_HAND.name : `${currentBait.name} × ${baits[currentBait.id] ?? 0}`}</b><small>{fishBare ? "입질 느림 · 흔함·보통만" : currentBait.note}</small></div></div>
             <div className="fish2-gear-buttons"><button onClick={() => setFishPicker("rod")} disabled={fishState.phase === "game"}>낚싯대 변경</button><button onClick={() => setFishPicker("bait")}>미끼 변경</button></div>
+            {pierLevel >= 2 && <div className="fish2-presets" role="group" aria-label="미끼 프리셋">{baitPresets.map((id, i) => { const bait = id ? [BARE_HAND, ...BAITS].find(item => item.id === id) : null;
+              return <span key={i} className={bait && selectedBait === bait.id ? "on" : ""}>{bait ? <><button onClick={() => setSelectedBait(bait.id)}>{bait.icon} {bait.name}{bait.id !== BARE_HAND.id ? ` ${baits[bait.id] ?? 0}` : ""}</button><button className="x" aria-label={`프리셋 ${i + 1} 비우기`} onClick={() => saveBaitPresets(baitPresets.map((v, k) => (k === i ? null : v)))}>✕</button></>
+                : <button onClick={() => saveBaitPresets(baitPresets.map((v, k) => (k === i ? selectedBait : v)))}>＋ 지금 미끼를 프리셋 {i + 1}에</button>}</span>; })}</div>}
             <div className="fish2-odds">
               <b>이번 지역 확률 정보</b>
               <span className="fish2-odds-bar" aria-hidden="true">{(["흔함", "보통", "희귀", "전설"] as const).map(rarity => <i key={rarity} className={`r-${rarity}`} style={{ flexGrow: Math.max(0.001, fishOdds[rarity]) }} />)}</span>
@@ -2864,7 +2888,7 @@ export default function Home() {
               return <li key={rarity} className={`r-${rarity}`}>{fishArt(face) ?? <span className="fish2-today-icon">{face.icon}</span>}<span><b>{group.slice(0, 2).map(entry => entry.fish.name).join(" · ")}{group.length > 2 ? ` 외 ${group.length - 2}종` : ""}</b><small>{rarity} · 종마다 {pct(group[0].chance)} · 합계 {pct(fishOdds[rarity])}</small></span><em>{group.filter(entry => fishLog[entry.fish.id]).length}/{group.length}</em></li>; })}
               {todayFish.filter(entry => entry.fish.rarity === "전설").map(({ fish, chance }) => <li key={fish.id} className="r-전설">
                 {LEGEND_ART[fish.id] ? <span className={`legend-fish-art book ${LEGEND_ART[fish.id]}`} role="img" aria-label={fish.name} /> : <span className="fish2-today-icon">{fish.icon}</span>}
-                <span><b>👑 {fishLog[fish.id] ? fish.name : "???"}</b><small>전설 · {pct(chance)}</small></span><em>{fishLog[fish.id] ? "📖" : ""}</em></li>)}</ul>
+                <span><b>👑 {fishLog[fish.id] ? fish.name : "???"}</b><small>전설 · {pct(chance)}{!fishLog[fish.id] && pierLevel >= 3 ? ` · 힌트: ${fish.note}` : ""}</small></span><em>{fishLog[fish.id] ? "📖" : ""}</em></li>)}</ul>
             <div className="fish2-title small"><h4>최근 어획</h4><button onClick={() => switchTab("book")}>도감 ›</button></div>
             {recentCatches.length ? <ul className="fish2-recent">{recentCatches.map(c => { const left = fishStock[c.id] ?? 0, locked = Boolean(fishLocks[c.id]);
               return <li key={c.at} className={`r-${c.fish.rarity}`}>{fishArt(c.fish) ?? <span className="fish2-today-icon">{c.fish.icon}</span>}<span><b>{c.fish.name}{c.perfect ? " ✨" : ""}</b><small>{c.stored ? `창고 · 보유 ${left}` : `${c.price.toLocaleString()}원 판매`}</small></span>
@@ -3120,7 +3144,8 @@ export default function Home() {
       </div>}
 
       {tab === "explore" && EXPLORE_ENABLED && <ExplorePanel exploration={exploration} season={season} guideLevel={village.facilityLevels["guide-office"] ?? 0}
-        avatar={avatar} onStart={lunchCooking.enterRun} onCheckpoint={saveExploreCheckpoint} onFinish={finishExploration} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }} />}
+        avatar={avatar} onStart={lunchCooking.enterRun} onCheckpoint={saveExploreCheckpoint} onFinish={finishExploration} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }}
+        tools={LIFE2_ENABLED ? { inventory, money, options: lunchOptions, onCraft: craftExploreTool, onEquip: equipExploreTool } : undefined} />}
       {tab === "village" && VILLAGE_ENABLED && !villageOpen && <section className="panel village-panel village-locked">
         <div className="panel-heading"><div><span className="eyebrow">VILLAGE · 잠김</span><h3>🔒 마을 복구</h3></div></div>
         <p>채집 탐험을 <b>3번</b> 마치면 무너진 마을을 복구할 수 있어요. (지금 {Math.min(3, exploration.totalRuns)}/3회)</p>

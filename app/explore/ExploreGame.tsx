@@ -9,8 +9,8 @@ import { useEffect, useRef, useState } from "react";
 import { hurtAvatarSrc } from "../avatar";
 import { FORAGE } from "./data";
 import {
-  EVENT_INFO, MAX_HP, BOAR_AIM, BOAR_CHARGE_SPEED, BOAR_CHARGE_TIME, GATHER_BIG, GATHER_RANGE, GATHER_SMALL, NO_INPUT, RETURN_HOLD, START, VIEW_H, VIEW_W, WORLD_H, WORLD_W,
-  bagCount, canAccept, checkpointDue, checkpointOf, nearestNode, resolveEvent, resultOf, rngOf, step,
+  EVENT_INFO, MAX_HP, SPORE_TELE, BOAR_AIM, BOAR_CHARGE_SPEED, BOAR_CHARGE_TIME, GATHER_BIG, GATHER_RANGE, GATHER_SMALL, NO_INPUT, RETURN_HOLD, START, VIEW_H, VIEW_W, WORLD_H, WORLD_W,
+  bagCount, canAccept, checkpointDue, checkpointOf, herbOf, nearestNode, regionItems, resolveEvent, resultOf, rngOf, sporePhase, step,
   type EventKind, type ExploreInput, type RunResult, type RunState,
 } from "./engine";
 import type { ExplorationCheckpoint } from "./types";
@@ -30,22 +30,33 @@ type Props = {
   onFinish: (result: RunResult) => void;
 };
 
+/** 지역별 바탕색·장식(봄 숲길 / 여름 햇빛 습지). 미니맵 바탕도 같이 쓴다. */
+const WORLD_LOOK: Record<string, { top: string; bottom: string; mini: string; path: string; big: string[]; small: string[] }> = {
+  봄: { top: "#a9d18e", bottom: "#8fbf72", mini: "#9fca84", path: "rgba(196,166,112,.55)", big: ["🌳", "🌳", "🌲"], small: ["🌸", "🌱"] },
+  여름: { top: "#9fd0a4", bottom: "#6fb59a", mini: "#86c3a2", path: "rgba(170,150,96,.5)", big: ["🌴", "🌿", "🌾"], small: ["🪷", "🌾", "🌼"] },
+};
+const lookOf = (regionId: string) => WORLD_LOOK[regionItems(regionId).region.season] ?? WORLD_LOOK.봄;
+
 /** 월드 배경(풀밭·나무·꽃)을 한 번만 그려 둔다. 자원 근처에는 장식을 두지 않는다. */
 function paintWorld(run: RunState) {
   const canvas = document.createElement("canvas"); canvas.width = WORLD_W; canvas.height = WORLD_H;
-  const ctx = canvas.getContext("2d")!, rnd = rngOf(run.seed ^ 0x5eed);
-  const grad = ctx.createLinearGradient(0, 0, 0, WORLD_H); grad.addColorStop(0, "#a9d18e"); grad.addColorStop(1, "#8fbf72");
+  const ctx = canvas.getContext("2d")!, rnd = rngOf(run.seed ^ 0x5eed), look = lookOf(run.regionId);
+  const grad = ctx.createLinearGradient(0, 0, 0, WORLD_H); grad.addColorStop(0, look.top); grad.addColorStop(1, look.bottom);
   ctx.fillStyle = grad; ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   for (let i = 0; i < 900; i++) { ctx.fillStyle = rnd() < 0.5 ? "rgba(60,110,50,.18)" : "rgba(255,255,220,.18)"; ctx.fillRect(rnd() * WORLD_W, rnd() * WORLD_H, 3, 6); }
   // 흙길: 시작점에서 사방으로
-  ctx.strokeStyle = "rgba(196,166,112,.55)"; ctx.lineWidth = 46; ctx.lineCap = "round";
+  ctx.strokeStyle = look.path; ctx.lineWidth = 46; ctx.lineCap = "round";
   for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + rnd() * 0.6; ctx.beginPath(); ctx.moveTo(START.x, START.y); ctx.quadraticCurveTo(START.x + Math.cos(a + 0.5) * 380, START.y + Math.sin(a + 0.5) * 300, START.x + Math.cos(a) * 900, START.y + Math.sin(a) * 520); ctx.stroke(); }
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   const clear = (x: number, y: number) => Math.hypot(x - START.x, y - START.y) > 190 && run.nodes.every(node => Math.hypot(node.x - x, node.y - y) > 90) && run.hazards.every(h => Math.hypot((h.kind === "bees" ? h.cx : h.x) - x, (h.kind === "bees" ? h.cy : h.y) - y) > 130);
-  for (let i = 0; i < 70; i++) { const x = rnd() * WORLD_W, y = rnd() * WORLD_H; if (!clear(x, y)) continue; ctx.fillStyle = "#000"; ctx.font = `${30 + rnd() * 22}px ${EMOJI_FONT}`; ctx.fillText(rnd() < 0.7 ? "🌳" : "🌲", x, y); }
-  for (let i = 0; i < 60; i++) { const x = rnd() * WORLD_W, y = rnd() * WORLD_H; if (!clear(x, y)) continue; ctx.fillStyle = "#000"; ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText(rnd() < 0.5 ? "🌸" : "🌱", x, y); }
-  // 진흙
-  for (const h of run.hazards) if (h.kind === "mud") { ctx.fillStyle = "rgba(110,78,44,.55)"; ctx.beginPath(); ctx.ellipse(h.x, h.y, h.r, h.r * 0.72, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "rgba(80,55,30,.35)"; ctx.beginPath(); ctx.ellipse(h.x - h.r * 0.2, h.y - h.r * 0.1, h.r * 0.45, h.r * 0.3, 0, 0, Math.PI * 2); ctx.fill(); }
+  for (let i = 0; i < 70; i++) { const x = rnd() * WORLD_W, y = rnd() * WORLD_H; if (!clear(x, y)) continue; ctx.fillStyle = "#000"; ctx.font = `${30 + rnd() * 22}px ${EMOJI_FONT}`; ctx.fillText(look.big[Math.floor(rnd() * look.big.length)], x, y); }
+  for (let i = 0; i < 60; i++) { const x = rnd() * WORLD_W, y = rnd() * WORLD_H; if (!clear(x, y)) continue; ctx.fillStyle = "#000"; ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText(look.small[Math.floor(rnd() * look.small.length)], x, y); }
+  // 진흙(봄) · 물웅덩이(여름)
+  for (const h of run.hazards) if (h.kind === "mud") {
+    const puddle = h.skin === "puddle";
+    ctx.fillStyle = puddle ? "rgba(70,140,190,.5)" : "rgba(110,78,44,.55)"; ctx.beginPath(); ctx.ellipse(h.x, h.y, h.r, h.r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = puddle ? "rgba(220,245,255,.35)" : "rgba(80,55,30,.35)"; ctx.beginPath(); ctx.ellipse(h.x - h.r * 0.2, h.y - h.r * 0.1, h.r * 0.45, h.r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+  }
   // 귀환 지점
   ctx.fillStyle = "#000"; ctx.font = `40px ${EMOJI_FONT}`; ctx.fillText("🏕️", START.x, START.y - 40);
   return canvas;
@@ -118,7 +129,14 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
           ctx.font = "800 12px sans-serif"; ctx.fillStyle = "#24372b"; ctx.fillText(`${node.size === "small" ? GATHER_SMALL : GATHER_BIG.toFixed(1)}초 · ${touch ? "채집" : "F"}`, node.x, node.y - (big ? 46 : 38));
         }
       }
-      for (const h of s.hazards) if (h.kind === "bees") {
+      for (const h of s.hazards) if (h.kind === "spores") {
+        // 독버섯: 예고는 보라 점선 고리가 차오르고, 구름일 때는 보라 안개
+        const ph = sporePhase(h, s.t);
+        if (ph?.kind === "tele") { ctx.strokeStyle = `rgba(150,80,190,${0.35 + ph.k * 0.5})`; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = `rgba(160,90,200,${0.08 + ph.k * 0.14})`; ctx.beginPath(); ctx.arc(h.x, h.y, h.r * ph.k, 0, Math.PI * 2); ctx.fill(); }
+        else if (ph?.kind === "cloud") { ctx.fillStyle = "rgba(150,80,190,.38)"; ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "#000"; ctx.font = `18px ${EMOJI_FONT}`; ctx.fillText("💨", h.x + 30, h.y - 26); }
+        ctx.fillStyle = "#000"; ctx.font = `30px ${EMOJI_FONT}`; ctx.fillText("🍄", h.x, h.y);
+        if (ph?.kind === "tele") { ctx.font = "900 15px sans-serif"; ctx.fillStyle = "#8a3fb0"; ctx.fillText(`${Math.max(0.1, (1 - ph.k) * SPORE_TELE).toFixed(1)}`, h.x, h.y - 30); }
+      } else if (h.kind === "bees") {
         // 둥지(순찰 궤도)는 늘 보이고, 추적 중이면 빨간 느낌표
         ctx.strokeStyle = "rgba(240,170,40,.35)"; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.ellipse(h.cx, h.cy, h.orbit, h.orbit * 0.7, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle = "#000"; ctx.font = `26px ${EMOJI_FONT}`; ctx.fillText("🐝", h.x, h.y); ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText("🐝", h.x + 14, h.y + 10);
@@ -133,7 +151,7 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
           ctx.font = "900 18px sans-serif"; ctx.fillStyle = "#e2557f"; ctx.fillText("!!", h.x, h.y - 32);
         }
         ctx.save(); ctx.translate(h.x, h.y); if (h.dx < 0 || (h.mode === "roam" && h.wx < h.x)) ctx.scale(-1, 1);
-        ctx.fillStyle = "#000"; ctx.font = `${h.mode === "charge" ? 36 : 32}px ${EMOJI_FONT}`; ctx.fillText("🐗", 0, 0); ctx.restore();
+        ctx.fillStyle = "#000"; ctx.font = `${h.mode === "charge" ? 36 : 32}px ${EMOJI_FONT}`; ctx.fillText(h.skin === "snake" ? "🐍" : "🐗", 0, 0); ctx.restore();
         if (h.mode === "rest") { ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText("💤", h.x + 18, h.y - 20); }
       }
       const ev = s.event;
@@ -164,9 +182,10 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
       ctx.restore();
       // 미니맵: 전체 지형·플레이어·귀환 지점(자원 위치는 안내소 1단계부터)
       mctx.setTransform(dpr * MINI_W / WORLD_W, 0, 0, dpr * MINI_H / WORLD_H, 0, 0);
-      mctx.fillStyle = "#9fca84"; mctx.fillRect(0, 0, WORLD_W, WORLD_H);
+      mctx.fillStyle = lookOf(s.regionId).mini; mctx.fillRect(0, 0, WORLD_W, WORLD_H);
       for (const h of s.hazards) {
-        if (h.kind === "mud") { mctx.fillStyle = "#7a5530"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
+        if (h.kind === "mud") { mctx.fillStyle = h.skin === "puddle" ? "#4a8cc0" : "#7a5530"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
+        else if (h.kind === "spores") { mctx.fillStyle = sporePhase(h, s.t) ? "#9a4fc0" : "rgba(150,80,190,.45)"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
         else if (h.kind === "bees") { mctx.fillStyle = "rgba(230,160,30,.45)"; mctx.beginPath(); mctx.arc(h.cx, h.cy, h.orbit, 0, Math.PI * 2); mctx.fill(); mctx.fillStyle = h.mode === "chase" ? "#e2557f" : "#e6a01e"; mctx.beginPath(); mctx.arc(h.x, h.y, 30, 0, Math.PI * 2); mctx.fill(); }
         else { mctx.fillStyle = h.mode === "aim" || h.mode === "charge" ? "#e2557f" : "#8a5a3a"; mctx.beginPath(); mctx.arc(h.x, h.y, 34, 0, Math.PI * 2); mctx.fill(); }
       }
@@ -224,7 +243,8 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
   const returnButton = <button className="explore-return" onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); holdReturn(true); }} onPointerUp={() => holdReturn(false)} onPointerCancel={() => holdReturn(false)} onLostPointerCapture={() => holdReturn(false)}>
     <i style={{ width: `${Math.min(100, hud.ret * 100)}%` }} />🏕️ 귀환 {touch ? "(1초 누르기)" : "(R 1초)"}
   </button>;
-  const info = hud.event ? EVENT_INFO[hud.event] : null;
+  const herb = herbOf(run.regionId), base = hud.event ? EVENT_INFO[hud.event] : null;
+  const info = base && hud.event === "injured" ? { ...base, text: `다친 동물이 있어요. ${herb.name} 1개로 치료해 줄까요?`, accept: `${herb.name} 1개 사용 → 재료 2개` } : base;
   const choose = (accept: boolean) => { resolveEvent(state.current, accept); setHud(prev => ({ ...prev, event: null })); };
   const minutes = Math.max(0, Math.ceil(hud.time));
   return <div className={`explore-game ${touch ? "touch" : ""}`}>
@@ -238,11 +258,11 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
       </div>
       <canvas ref={miniRef} className="explore-mini" style={{ width: touch ? 112 : MINI_W, height: touch ? 63 : MINI_H }} aria-label="미니맵" />
       {hud.toast && <div className="explore-toast">{hud.toast}</div>}
-      {hud.phase === "ready" && <div className="explore-ready"><b>{Math.max(1, Math.ceil(hud.ready))}</b><small>{touch ? "왼쪽 스틱 이동 · 채집 버튼 · 귀환 버튼 1초 · 벌떼 3번이면 쓰러져요" : "WASD 이동 · F/클릭 채집 · Space 회피 · R 1초 귀환 · ❤️ 3칸, 쓰러지면 채집물 일부를 잃어요"}</small></div>}
+      {hud.phase === "ready" && <div className="explore-ready"><b>{Math.max(1, Math.ceil(hud.ready))}</b><small>{touch ? "왼쪽 스틱 이동 · 채집 버튼 · 귀환 버튼 1초 · 위험에 3번 맞으면 쓰러져요" : "WASD 이동 · F/클릭 채집 · Space 회피 · R 1초 귀환 · ❤️ 3칸, 쓰러지면 채집물 일부를 잃어요"}</small></div>}
       {info && <div className="explore-event" role="dialog" aria-label={info.name}>
         <b>{info.icon} {info.name}</b><p>{info.text}</p>
         <div><button className="save-button" disabled={!hud.accept} onClick={() => choose(true)}>{info.accept}</button>{info.decline && <button className="ghost-button" onClick={() => choose(false)}>{info.decline}</button>}</div>
-        {!hud.accept && <small>{hud.event === "injured" ? "가방에 어린 약초가 있어야 해요." : hud.event === "merchant" ? "가방에 채집 재료 2개가 있어야 해요." : "남은 시간이 부족해요."}</small>}
+        {!hud.accept && <small>{hud.event === "injured" ? `가방에 ${herb.name}가 있어야 해요.` : hud.event === "merchant" ? "가방에 채집 재료 2개가 있어야 해요." : "남은 시간이 부족해요."}</small>}
       </div>}
     </div>
     {touch ? <div className="explore-controls">

@@ -8,7 +8,7 @@ const fish = L.ALL_FISH.filter(f => f.rarity !== '전설' && f.rarity !== '신�
 const cheap = `fish:${fish[0].id}`, next = `fish:${fish[1].id}`;
 const inv = { 'crop:potato:0:0': 10, 'crop:potato:2:1': 3, 'forage:young-herb': 5, [cheap]: 5, [next]: 5 };
 test('도시락 3종: 잠금·예약 제외, 낮은 품질·비황금 및 싼 물고기 우선 소비', () => {
-  assert.equal(L.LUNCHES.length, 3);
+  assert.equal(L.LUNCHES.filter(d => !d.stage).length, 3);
   const plan = L.lunchPlan(inv,L.LUNCHES[0],2,{ locks: { [cheap]:true },reserved:{'crop:potato:0:0':8} });
   assert.equal(plan.ok,true);
   assert.deepEqual(plan.take, {'crop:potato:0:0':2,'crop:potato:2:1':2,'forage:young-herb':2,[next]:2});
@@ -45,7 +45,7 @@ test('시간·횟수 제한: 오프라인 만료, 마지막 탐험에도 효과 
   assert.equal(L.lunchPower(buff,'explore',buff.expiresAt),0);
   const last=L.enterLunchRun({...buff,actionsLeft:1},now);
   assert.equal(last.applied.actionsLeft,1);assert.equal(last.next,null);
-  for(const d of L.LUNCHES.slice(1)) { const b=L.activateLunch(d.id,0,now);assert.deepEqual(L.enterLunchRun(b,now),{applied:null,next:b}); }
+  for(const d of L.LUNCHES.filter(d => d.target !== 'explore')) { const b=L.activateLunch(d.id,0,now);assert.deepEqual(L.enterLunchRun(b,now),{applied:null,next:b}); }
 });
 test('탐험 실제 엔진에서 도시락 채집 시간 감소, 만료시 기본 시간',()=>{
   for(const expired of [false,true]){
@@ -56,4 +56,21 @@ test('탐험 실제 엔진에서 도시락 채집 시간 감소, 만료시 기�
     L.step(run,{...L.NO_INPUT,gather:true,gatherTarget:node.id},.001);
     assert.ok(Math.abs(run.gather.need-L.GATHER_SMALL*(expired?1:.85))<1e-9);
   }
+});
+
+test('꽃꿀 과일 도시락: 서로 다른 과일 2종 각 1개 + 꽃꿀, 이동 속도 효과는 채집 시간에 섞이지 않음', () => {
+  const dish = L.lunchRecipe('nectar-fruit-lunch');
+  assert.equal(dish.stage, 2); assert.equal(dish.effect, 'speed');
+  const inv = { 'crop:strawberry:0:0': 5, 'crop:apple:1:0': 2, 'crop:grape:0:0': 1, 'forage:flower-nectar': 3 };
+  const two = L.lunchPlan(inv, dish, 2, { locks: {} });
+  assert.equal(two.ok, true);
+  // 많이 가진 딸기·사과를 2개씩, 포도(1개)는 2개 만들기에 부족해 고르지 않는다
+  assert.deepEqual(Object.keys(two.take).sort(), ['crop:apple:1:0', 'crop:strawberry:0:0', 'forage:flower-nectar']);
+  assert.equal(two.take['crop:strawberry:0:0'], 2); assert.equal(two.take['forage:flower-nectar'], 2);
+  const short = L.lunchPlan({ 'crop:strawberry:0:0': 5, 'forage:flower-nectar': 1 }, dish, 1, { locks: {} });
+  assert.equal(short.ok, false); assert.ok(short.missing.some(m => m.id === 'fruit-mix'));
+  const now = 100000, buff = L.activateLunch(dish.id, 2, now);
+  assert.equal(L.lunchPower(buff, 'explore', now, 'speed'), .12);
+  assert.equal(L.lunchPower(buff, 'explore', now, 'gather'), 0);
+  assert.equal(L.lunchPower(L.activateLunch(L.LUNCHES[0].id, 2, now), 'explore', now, 'speed'), 0);
 });

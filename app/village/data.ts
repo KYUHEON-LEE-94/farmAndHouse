@@ -1,5 +1,6 @@
 /** 마을 시설 정의·단계별 비용·외형(LIFE_CONTENT_EXPANSION_SPEC 5.2·5.2.1·5.3·5.5절). */
 import { TEST_MODE } from "../testMode";
+import { LIFE2_ENABLED } from "../explore/data";
 
 /** 마을 기능 공개 여부. 운영 공개 승인 뒤 true로 바꾼다. 로컬 테스트 모드에서는 항상 보인다. */
 export const VILLAGE_RELEASED = true; // 2026-10-21 운영 공개(사용자 요청)
@@ -49,6 +50,19 @@ export const STAGE_COSTS: Record<string, StageCost[]> = {
     { gold: 150_000, needs: [{ category: "forage", id: "wildflower", count: 60 }, { category: "forage", id: "soft-twig", count: 40 }, { category: "forage", id: "young-herb", count: 40 }, { category: "crop", id: "strawberry", count: 40 }, { category: "forage", id: "four-leaf-flower", count: 5 }] },
   ],
 };
+
+/**
+ * 생활 콘텐츠 2단계 시설(여름 햇빛 습지와 함께 공개). 선착장: 낚시 + 여름 채집 + 농사(5.3절 예산 안).
+ * 2단계 플래그가 꺼져 있으면 STAGE_COSTS에 넣지 않아 지도에서 '준비 중'으로 남는다.
+ */
+export const STAGE2_COSTS: Record<string, StageCost[]> = {
+  pier: [
+    { gold: 12_000, needs: [{ category: "fish", id: "any", count: 12 }, { category: "forage", id: "thick-reed", count: 10 }, { category: "crop", id: "corn", count: 8 }] },
+    { gold: 55_000, needs: [{ category: "fish", id: "any", count: 30 }, { category: "forage", id: "thick-reed", count: 25 }, { category: "forage", id: "flower-nectar", count: 20 }, { category: "forage", id: "blue-firefly", count: 1 }] },
+    { gold: 180_000, needs: [{ category: "fish", id: "any", count: 60 }, { category: "forage", id: "thick-reed", count: 55 }, { category: "forage", id: "fragrant-herb", count: 40 }, { category: "crop", id: "corn", count: 30 }, { category: "forage", id: "blue-firefly", count: 4 }] },
+  ],
+};
+if (LIFE2_ENABLED) Object.assign(STAGE_COSTS, STAGE2_COSTS);
 
 /** 지금 복구할 수 있는(데이터가 있는) 시설. 나머지는 지도에 "준비 중"으로만 보인다. */
 export const isOpenFacility = (id: string) => Boolean(STAGE_COSTS[id]);

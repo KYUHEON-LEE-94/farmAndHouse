@@ -8,6 +8,12 @@ import { TEST_MODE } from "../testMode";
 /** 탐험 기능 공개 여부. 운영 공개 승인 뒤 true로 바꾼다(10절 출시 기준). 로컬 테스트 모드에서는 항상 보인다. */
 export const EXPLORE_RELEASED = true; // 2026-10-21 운영 공개(사용자 요청)
 export const EXPLORE_ENABLED = EXPLORE_RELEASED || TEST_MODE;
+/** 생활 콘텐츠 2단계(여름: 햇빛 습지·꽃꿀 과일 도시락·온실·선착장·채집 장갑·튼튼한 바구니). 운영 공개 승인 뒤 true. */
+export const LIFE2_RELEASED = false;
+export const LIFE2_ENABLED = LIFE2_RELEASED || TEST_MODE;
+/** 생활 콘텐츠 3단계(가을·겨울 지역, 나머지 도시락, 광차 정거장, 장비 2종, 4계절 전환). 운영 공개 승인 뒤 true. */
+export const LIFE3_RELEASED = false;
+export const LIFE3_ENABLED = LIFE3_RELEASED || TEST_MODE;
 
 export type ForageItem = {
   id: string;
@@ -48,7 +54,7 @@ export type ExploreRegion = { id: string; name: string; icon: string; season: Se
 /** 계절별 기본 지역(3.3절). 첫 공개는 봄 숲길 하나. */
 export const REGIONS: ExploreRegion[] = [
   { id: "sprout-trail", name: "새싹 숲길", icon: "🌳", season: "봄", released: true },
-  { id: "sun-marsh", name: "햇빛 습지", icon: "🌾", season: "여름", released: false },
+  { id: "sun-marsh", name: "햇빛 습지", icon: "🌾", season: "여름", released: LIFE2_ENABLED },
   { id: "maple-valley", name: "단풍 골짜기", icon: "🍂", season: "가을", released: false },
   { id: "frost-cave", name: "서리 동굴", icon: "🕳️", season: "겨울", released: false },
 ];

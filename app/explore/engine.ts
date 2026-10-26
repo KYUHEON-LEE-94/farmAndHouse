@@ -49,19 +49,32 @@ export type ForageNode = { id: string; item: string; x: number; y: number; size:
  */
 export type Hazard =
   | { id: string; kind: "bees"; cx: number; cy: number; orbit: number; r: number; speed: number; phase: number; x: number; y: number; mode: "patrol" | "chase" | "return"; ang: number; lostFor: number }
-  | { id: string; kind: "boar"; x: number; y: number; r: number; hx: number; hy: number; mode: "roam" | "aim" | "charge" | "rest"; until: number; dx: number; dy: number; wx: number; wy: number; n: number }
-  | { id: string; kind: "mud"; x: number; y: number; r: number };
+  | { id: string; kind: "boar"; x: number; y: number; r: number; hx: number; hy: number; mode: "roam" | "aim" | "charge" | "rest"; until: number; dx: number; dy: number; wx: number; wy: number; n: number; /** 여름 습지는 물뱀(동작은 멧돼지와 같다) */ skin?: "snake" }
+  | { id: string; kind: "mud"; x: number; y: number; r: number; /** 여름 습지는 물웅덩이(감속은 진흙과 같다) */ skin?: "puddle" }
+  /** 독버섯(여름 습지): 주기마다 0.8초 예고 고리 → 0.6초 포자 구름. 시간으로만 정해져 저장할 상태가 없다. */
+  | { id: string; kind: "spores"; x: number; y: number; r: number; period: number; offset: number };
 
 /** 벌떼: 감지 200px, 추적 초당 140px(플레이어 240보다 느림), 둥지에서 340px 넘거나 1.2초 놓치면 복귀(봇 1,000판 조정, 문서 16절) */
 export const BEE_AGGRO = 200, BEE_CHASE_SPEED = 140, BEE_LEASH = 340, BEE_LOSE_SECONDS = 1.2, BEE_RETURN_SPEED = 220;
 /** 멧돼지: 배회 초당 70px, 감지 260px, 0.9초 예고 → 0.5초 돌진(초당 460px), 3.5초 휴식 */
 export const BOAR_ROAM_SPEED = 70, BOAR_AGGRO = 260, BOAR_AIM = 0.9, BOAR_CHARGE_SPEED = 460, BOAR_CHARGE_TIME = 0.5, BOAR_REST = 3.5;
 export const inCamp = (x: number, y: number) => dist(x, y, START.x, START.y) < START_SAFE_R;
+/** 독버섯 포자: 반경 85px, 3.2~4초 주기, 예고 0.8초 → 구름 0.6초(구름 안에서 회피 중이 아니면 피격) */
+export const SPORE_TELE = 0.8, SPORE_CLOUD = 0.6;
+/** 독버섯 주기 상태: 예고(0~1 진행도) 또는 구름. 그 밖에는 null */
+export function sporePhase(h: { period: number; offset: number }, t: number): { kind: "tele"; k: number } | { kind: "cloud" } | null {
+  const c = ((t + h.offset) % h.period + h.period) % h.period, start = h.period - SPORE_TELE - SPORE_CLOUD;
+  if (c >= h.period - SPORE_CLOUD) return { kind: "cloud" };
+  if (c >= start) return { kind: "tele", k: (c - start) / SPORE_TELE };
+  return null;
+}
+/** 지역 일반 재료 중 '약초'(다친 동물 치료에 쓰는 첫 번째 재료) */
+export const herbOf = (regionId: string) => regionItems(regionId).commons[0];
 export type EventKind = "merchant" | "sidepath" | "injured" | "weather";
 export const EVENT_INFO: Record<EventKind, { icon: string; name: string; text: string; accept: string; decline: string | null }> = {
   merchant: { icon: "🧳", name: "길 잃은 상인", text: "길을 잃은 상인이 채집 재료 2개를 나눠 달래요. 고마움의 표시로 미끼를 준대요.", accept: "재료 2개 전달 → 기본 미끼 2개", decline: "지나가기" },
   sidepath: { icon: "🌿", name: "숨겨진 샛길", text: "덤불 사이로 샛길이 보여요. 들어가면 희귀 자원이 있는 방이 나오지만 시간이 8초 줄어요.", accept: "8초 써서 들어가기", decline: "무시하기" },
-  injured: { icon: "🦔", name: "다친 동물", text: "다친 고슴도치가 있어요. 어린 약초 1개로 치료해 줄까요?", accept: "어린 약초 1개 사용 → 재료 2개", decline: "지나가기" },
+  injured: { icon: "🦔", name: "다친 동물", text: "다친 동물이 있어요. 약초 1개로 치료해 줄까요?", accept: "약초 1개 사용 → 재료 2개", decline: "지나가기" },
   weather: { icon: "🌦️", name: "갑작스러운 날씨", text: "소나기가 몰려와요! 표시된 안전지대로 8초 안에 들어가면 재료 2개를 더 얻어요.", accept: "안전지대로 가기", decline: null },
 };
 
@@ -142,9 +155,12 @@ export function generateMap(seed: number, opts: MapOptions): ExploreMap {
   const hazardFree = (x: number, y: number, reach: number) =>
     dist(x, y, START.x, START.y) > START_SAFE_R + reach + 40 && nodes.every(node => dist(node.x, node.y, x, y) > reach + 60) && hazards.every(h => dist(h.kind === "bees" ? h.cx : h.x, h.kind === "bees" ? h.cy : h.y, x, y) > reach + 120);
   const spot = (reach: number) => { for (let i = 0; i < 300; i++) { const x = 120 + rnd() * (WORLD_W - 240), y = 120 + rnd() * (WORLD_H - 240); if (hazardFree(x, y, reach)) return { x, y }; } return null; };
-  for (let i = 0; i < 3; i++) { const orbit = 60 + rnd() * 30, at = spot(orbit + 22); if (at) { const phase = rnd() * Math.PI * 2; hazards.push({ id: `b${i}`, kind: "bees", cx: at.x, cy: at.y, orbit, r: 22, speed: 1.3 + rnd() * 0.6, phase, x: at.x + Math.cos(phase) * orbit, y: at.y + Math.sin(phase * 1.3) * orbit * 0.7, mode: "patrol", ang: phase, lostFor: 0 }); } }
-  for (let i = 0; i < 2; i++) { const at = spot(90); if (at) hazards.push({ id: `w${i}`, kind: "boar", x: at.x, y: at.y, r: 24, hx: at.x, hy: at.y, mode: "roam", until: 0, dx: 1, dy: 0, wx: at.x, wy: at.y, n: 0 }); }
-  for (let i = 0; i < 4; i++) { const r = 55 + rnd() * 35, at = spot(r); if (at) hazards.push({ id: `m${i}`, kind: "mud", x: at.x, y: at.y, r }); }
+  const summer = regionItems(opts.regionId).region.season === "여름";
+  // 봄 숲길: 벌떼 3·멧돼지 2·진흙 4 / 여름 습지: 독버섯 5·물뱀 2·물웅덩이 4(3.3절)
+  if (summer) for (let i = 0; i < 5; i++) { const at = spot(85); if (at) hazards.push({ id: `p${i}`, kind: "spores", x: at.x, y: at.y, r: 85, period: 3.2 + rnd() * 0.8, offset: rnd() * 4 }); }
+  else for (let i = 0; i < 3; i++) { const orbit = 60 + rnd() * 30, at = spot(orbit + 22); if (at) { const phase = rnd() * Math.PI * 2; hazards.push({ id: `b${i}`, kind: "bees", cx: at.x, cy: at.y, orbit, r: 22, speed: 1.3 + rnd() * 0.6, phase, x: at.x + Math.cos(phase) * orbit, y: at.y + Math.sin(phase * 1.3) * orbit * 0.7, mode: "patrol", ang: phase, lostFor: 0 }); } }
+  for (let i = 0; i < 2; i++) { const at = spot(90); if (at) hazards.push({ id: `w${i}`, kind: "boar", x: at.x, y: at.y, r: 24, hx: at.x, hy: at.y, mode: "roam", until: 0, dx: 1, dy: 0, wx: at.x, wy: at.y, n: 0, ...(summer ? { skin: "snake" as const } : {}) }); }
+  for (let i = 0; i < 4; i++) { const r = 55 + rnd() * 35, at = spot(r); if (at) hazards.push({ id: `m${i}`, kind: "mud", x: at.x, y: at.y, r, ...(summer ? { skin: "puddle" as const } : {}) }); }
   const kind = rollEvent(rnd(), opts.sidepathBonus);
   return { nodes, hazards, event: kind ? { kind, at: 7 + rnd() * 12 } : null, rareGuaranteed, baseNodes: baseCount };
 }
@@ -178,9 +194,11 @@ export type RunState = {
   endReason: "time" | "return" | "down" | null;
   /** 화면 알림(최근 하나) */
   toast: { text: string; until: number } | null;
+  /** 탐험 장비 채집 시간 감소(채집 장갑 0.2) */
+  gearGather?: number;
 };
 
-export function createRun(opts: MapOptions & { seed: number; runId: string; startedAt: number; bagBonus?: number; lunch?: LunchBuff | null; bag?: Record<string, number>; snapshot?: RunSnapshot }): RunState {
+export function createRun(opts: MapOptions & { seed: number; runId: string; startedAt: number; bagBonus?: number; gatherBonus?: number; lunch?: LunchBuff | null; bag?: Record<string, number>; snapshot?: RunSnapshot }): RunState {
   const snap = opts.snapshot;
   // 이어 하기: 지도는 처음과 같은 옵션으로 다시 만든다(같은 시드 → 같은 노드·위험·이벤트)
   const mapOpts = snap?.mapOpts ?? { inSeason: opts.inSeason, focusItem: opts.focusItem ?? null, guideLevel: opts.guideLevel ?? 0, rareMisses: opts.rareMisses ?? 0 };
@@ -196,7 +214,7 @@ export function createRun(opts: MapOptions & { seed: number; runId: string; star
     bag: { ...(opts.bag ?? {}) }, bagCap: BAG_BASE + (opts.bagBonus ?? 0),
     gather: null, returnHold: 0,
     event: snap ? (snap.event ? { ...snap.event, ...(snap.event.state === "open" ? { state: "waiting" as const, at: snap.t } : {}) } : null) : map.event ? { ...map.event, state: "waiting" } : null,
-    rewards: { bait: snap?.bait ?? 0 }, hitCd: { ...(snap?.hitCd ?? {}) }, lastCheckpointAt: snap?.t ?? 0, stuns: snap?.stuns ?? 0, hp: snap?.hp ?? MAX_HP, lost: {}, endReason: null, toast: null,
+    rewards: { bait: snap?.bait ?? 0 }, hitCd: { ...(snap?.hitCd ?? {}) }, lastCheckpointAt: snap?.t ?? 0, stuns: snap?.stuns ?? 0, hp: snap?.hp ?? MAX_HP, lost: {}, endReason: null, toast: null, gearGather: opts.gatherBonus ?? 0,
     // 판이 시작되거나 이어지자마자 한 번 저장한다
     dirty: true,
   };
@@ -208,7 +226,7 @@ export function createRun(opts: MapOptions & { seed: number; runId: string; star
 function restoreHazards(base: Hazard[], saved?: unknown[]): Hazard[] {
   return base.map(h => {
     const found = Array.isArray(saved) ? saved.find(entry => entry && typeof entry === "object" && (entry as Hazard).id === h.id && (entry as Hazard).kind === h.kind) as Hazard | undefined : undefined;
-    return found && h.kind !== "mud" && Number.isFinite(found.x) && Number.isFinite(found.y) ? { ...h, ...found } as Hazard : { ...h };
+    return found && h.kind !== "mud" && h.kind !== "spores" && Number.isFinite(found.x) && Number.isFinite(found.y) ? { ...h, ...found } as Hazard : { ...h };
   });
 }
 
@@ -302,18 +320,26 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
   if (s.t < p.dodgeUntil) { p.x += p.dx * DODGE_SPEED * dt; p.y += p.dy * DODGE_SPEED * dt; }
   else if (!stunned) {
     const slow = s.hazards.some(h => h.kind === "mud" && dist(h.x, h.y, p.x, p.y) < h.r) ? 1 - MUD_SLOW : 1;
-    p.x += mx * PLAYER_SPEED * slow * dt; p.y += my * PLAYER_SPEED * slow * dt;
+    const speed = PLAYER_SPEED * (1 + lunchPower(s.lunch, "explore", Date.now(), "speed"));
+    p.x += mx * speed * slow * dt; p.y += my * speed * slow * dt;
   }
   p.x = clamp(p.x, PLAYER_R, WORLD_W - PLAYER_R); p.y = clamp(p.y, PLAYER_R, WORLD_H - PLAYER_R);
   // 몬스터 움직임과 피격(회피 중·경직 중에는 맞지 않음). 캠프 안의 플레이어는 쫓지 않는다.
   const safe = inCamp(p.x, p.y);
   for (const h of s.hazards) {
     if (h.kind === "mud") continue;
+    if (h.kind === "spores") {
+      // 포자 구름: 캠프 안·회피 중·경직 중에는 맞지 않는다. 같은 독버섯은 한 주기에 한 번만
+      if (sporePhase(h, s.t)?.kind === "cloud" && !safe && s.t >= p.stunUntil && s.t >= p.dodgeUntil && (s.hitCd[h.id] ?? 0) <= s.t && dist(h.x, h.y, p.x, p.y) < h.r + PLAYER_R * 0.5) {
+        s.hitCd[h.id] = s.t + SPORE_CLOUD + 0.1; stun(s, "🍄 콜록!"); if ((s.phase as Phase) === "done") return;
+      }
+      continue;
+    }
     if (h.kind === "bees") updateBees(s, h, dt, safe); else updateBoar(s, h, dt, safe);
     if (s.t >= p.stunUntil && s.t >= p.dodgeUntil && (s.hitCd[h.id] ?? 0) <= s.t && dist(h.x, h.y, p.x, p.y) < h.r + PLAYER_R) {
       s.hitCd[h.id] = s.t + (h.kind === "bees" ? 3 : 1.5);
       if (h.kind === "bees") { h.mode = "return"; h.lostFor = 0; } else { h.mode = "rest"; h.until = s.t + BOAR_REST; }
-      stun(s, h.kind === "bees" ? "🐝 따끔!" : "🐗 쿵!"); if ((s.phase as Phase) === "done") return;
+      stun(s, h.kind === "bees" ? "🐝 따끔!" : h.skin === "snake" ? "🐍 앗!" : "🐗 쿵!"); if ((s.phase as Phase) === "done") return;
     }
   }
   // 채집
@@ -321,7 +347,7 @@ export function step(s: RunState, input: ExploreInput, dt: number) {
     const node = nearestNode(s, input.gatherTarget);
     if (node) {
       if (bagCount(s) >= s.bagCap) toast(s, "🎒 가방이 가득 찼어요! R을 1초 눌러 귀환하세요.", 2.2);
-      else s.gather = { nodeId: node.id, progress: 0, need: (node.size === "small" ? GATHER_SMALL : GATHER_BIG) * (1 - lunchPower(s.lunch, "explore")) };
+      else s.gather = { nodeId: node.id, progress: 0, need: (node.size === "small" ? GATHER_SMALL : GATHER_BIG) * (1 - lunchPower(s.lunch, "explore", Date.now(), "gather")) * (node.size === "small" ? 1 - (s.gearGather ?? 0) : 1) };
     }
   }
   if (s.gather) {
@@ -364,7 +390,7 @@ export function canAccept(s: RunState): boolean {
   const ev = s.event; if (!ev) return false;
   const { commons } = regionItems(s.regionId);
   if (ev.kind === "merchant") return commons.reduce((sum, item) => sum + (s.bag[item.id] ?? 0), 0) >= 2;
-  if (ev.kind === "injured") return (s.bag["young-herb"] ?? 0) >= 1;
+  if (ev.kind === "injured") return (s.bag[herbOf(s.regionId).id] ?? 0) >= 1;
   if (ev.kind === "sidepath") return s.timeLeft > SIDEPATH_SECONDS + 2;
   return true;
 }
@@ -380,7 +406,7 @@ export function resolveEvent(s: RunState, accept: boolean) {
     for (const item of [...commons].sort((a, b) => (s.bag[b.id] ?? 0) - (s.bag[a.id] ?? 0))) { const take = Math.min(need, s.bag[item.id] ?? 0); if (take > 0) { s.bag[item.id] -= take; if (!s.bag[item.id]) delete s.bag[item.id]; need -= take; } }
     s.rewards.bait += 2; ev.state = "done"; ev.success = true; toast(s, "🧳 상인에게 받은 기본 미끼 +2", 2);
   } else if (ev.kind === "injured") {
-    s.bag["young-herb"] -= 1; if (!s.bag["young-herb"]) delete s.bag["young-herb"];
+    const herb = herbOf(s.regionId).id; s.bag[herb] -= 1; if (!s.bag[herb]) delete s.bag[herb];
     giveCommons(s, 2); ev.state = "done"; ev.success = true; toast(s, "🦔 고마워요! 재료 2개를 받았어요", 2);
   } else if (ev.kind === "sidepath") {
     // 샛길 보너스 희귀 1개: 기본 희귀와 합쳐 한 판 최대 2개
@@ -420,8 +446,8 @@ export function checkpointOf(s: RunState) {
 }
 
 /** 체크포인트로 같은 판을 다시 만든다(준비 3초 뒤 이어 하기). */
-export function resumeRun(cp: { runId: string; regionId: string; seed: number; startedAt: number; bag: Record<string, number>; snap: RunSnapshot }, bagBonus = 0): RunState {
-  return createRun({ seed: cp.seed, runId: cp.runId, startedAt: cp.startedAt, regionId: cp.regionId, inSeason: cp.snap.mapOpts.inSeason, bag: cp.bag, snapshot: cp.snap, bagBonus });
+export function resumeRun(cp: { runId: string; regionId: string; seed: number; startedAt: number; bag: Record<string, number>; snap: RunSnapshot }, bagBonus = 0, gatherBonus = 0): RunState {
+  return createRun({ seed: cp.seed, runId: cp.runId, startedAt: cp.startedAt, regionId: cp.regionId, inSeason: cp.snap.mapOpts.inSeason, bag: cp.bag, snapshot: cp.snap, bagBonus, gatherBonus });
 }
 
 export type RunResult = { runId: string; regionId: string; bag: Record<string, number>; bait: number; rareFound: boolean; reason: "time" | "return" | "down" | "resume"; stuns: number; seconds: number; lost?: Record<string, number> };

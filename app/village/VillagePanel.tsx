@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { ALL_FISH } from "../fishing";
 import { CROPS, QUALITIES } from "../farming";
-import { FORAGE } from "../explore/data";
+import { FORAGE, REGIONS } from "../explore/data";
 import { parseItemKey, type Inventory } from "../items";
 import { usableOf, type ConsumeOptions } from "../stock";
 import { FACILITIES, MAX_FACILITY_LEVEL, STAGE_EFFECTS, isOpenFacility, type VillageReq } from "./data";
@@ -26,7 +26,7 @@ export function reqLabel(req: VillageReq) {
   if (req.category === "crop") { const crop = CROPS.find(c => c.id === req.id); return `${crop?.icon ?? "🌱"} ${crop?.name ?? req.id} (품질 무관·황금 제외)`; }
   return itemLabel(`forage:${req.id}`);
 }
-const SOURCE: Record<VillageReq["category"], string> = { crop: "농사", fish: "낚시", forage: "봄 숲길 탐험" };
+const sourceOf = (req: VillageReq) => req.category === "crop" ? "농사" : req.category === "fish" ? "낚시" : `${REGIONS.find(r => r.season === FORAGE.find(f => f.id === req.id)?.season)?.name ?? "숲길"} 탐험`;
 
 /** 지도 그림(public/images/village/map.webp, 1270×824) 위 시설 위치. hit = 누르는 영역, thumb = 상세 카드 그림(중심·너비, 비율 1.75). 단위 px. */
 const MAP_W = 1270, MAP_H = 824, THUMB_RATIO = 1.75;
@@ -110,7 +110,7 @@ export default function VillagePanel({ village, inventory, money, options, onDel
           <h4 className="village-needs-title">필요한 재료</h4>
           <ul className="village-needs">{progress.rows.map((row, index) => { const can = candidatesFor(inventory, row.req, options).reduce((sum, key) => sum + usableOf(inventory, key, options), 0), one = planDelivery(inventory, village, facility.id, options, index);
             return <li key={index} className={row.left === 0 ? "full" : ""}>
-              <span className="village-need-name">{reqLabel(row.req)}<small>{SOURCE[row.req.category]}{row.left > 0 ? ` · 창고 ${can}` : ""}</small></span>
+              <span className="village-need-name">{reqLabel(row.req)}<small>{sourceOf(row.req)}{row.left > 0 ? ` · 창고 ${can}` : ""}</small></span>
               <span className="village-need-bar"><i style={{ width: `${(row.have / row.req.count) * 100}%` }} /></span>
               <span className="village-need-count">{row.have} / {row.req.count}</span>
               <button disabled={row.left === 0 || takeCount(one) === 0} onClick={() => setConfirm({ kind: "deliver", facility: facility.id, take: one })}>납품</button>

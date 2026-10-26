@@ -1762,3 +1762,10 @@ button { color:inherit; }
 @keyframes fish2Ripple{from{transform:scale(.4);opacity:.9}to{transform:scale(1.4);opacity:0}}
 @media(prefers-reduced-motion:reduce){.fish2-bob,.fish2-bob i{animation:none!important}}
 @media(max-width:860px){.fish2-dock{height:62%}}
+.explore-tools{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#f4efe2;margin-bottom:10px}.explore-tools>b{font-size:13px}.explore-tools>b small{font-weight:400;color:#8a7a5a;margin-left:6px}
+.explore-tool{display:grid;grid-template-columns:36px 1fr auto;gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:#fffdf8;border:1px solid var(--line)}.explore-tool.on{border:2px solid #6c9a4f;background:#f1f7e8}
+.explore-tool-icon{font-size:24px;text-align:center}.explore-tool-info{display:grid;gap:1px;min-width:0}.explore-tool-info b{font-size:13px}.explore-tool-info small{font-size:11px;color:#7d6a52}
+.explore-tool button{padding:6px 12px;font-size:12px}.explore-tool button:disabled{opacity:.45;cursor:not-allowed}
+.catch-count{display:block;font-size:12px;color:#5b4630;margin-top:2px}
+.fish2-presets{display:grid;gap:6px}.fish2-presets span{display:flex;gap:4px}.fish2-presets button{flex:1;padding:7px 8px;border-radius:10px;border:1px dashed #b98a52;background:#fffaf0;font-size:12px;font-weight:700;color:#5b4630;cursor:pointer}
+.fish2-presets span.on button:first-child{border:2px solid #3f6b45;background:#e8f2df}.fish2-presets button.x{flex:0 0 30px;border-style:solid}

@@ -85,3 +85,19 @@ test('추천 복구는 가장 많이 채워지는 시설을 고르고 창고를 
   assert.equal(JSON.stringify(inv), before);
   assert.equal(V.recommendFacility({}, fresh(), opts()), 'guide-office');
 });
+
+test('생활 2단계 선착장 비용(5.3절 예산): 여름 채집물·낚시·농사, 시설당 최대 3개 콘텐츠, 2단계 플래그 전에는 복구 불가', () => {
+  const budget = [[8000, 15000, 20, 35, 0, 0], [35000, 70000, 60, 100, 1, 2], [120000, 250000, 140, 220, 3, 5]];
+  const summer = new Set(V.FORAGE.filter(f => f.season === '여름').map(f => f.id));
+  const kinds = new Set();
+  V.STAGE2_COSTS.pier.forEach((cost, i) => {
+    const [glo, ghi, clo, chi, rlo, rhi] = budget[i];
+    const rare = cost.needs.filter(n => n.id === 'blue-firefly').reduce((s, n) => s + n.count, 0), common = cost.needs.reduce((s, n) => s + n.count, 0) - rare;
+    assert.ok(cost.gold >= glo && cost.gold <= ghi, `pier ${i + 1} gold`);
+    assert.ok(common >= clo && common <= chi, `pier ${i + 1} common ${common}`);
+    assert.ok(rare >= rlo && rare <= rhi, `pier ${i + 1} rare ${rare}`);
+    for (const n of cost.needs) { kinds.add(n.category); if (n.category === 'forage') assert.ok(summer.has(n.id), n.id); }
+  });
+  assert.ok(kinds.size <= 3);
+  assert.equal(V.isOpenFacility('pier'), false);
+});

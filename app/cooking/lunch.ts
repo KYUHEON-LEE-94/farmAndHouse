@@ -38,9 +38,12 @@ export function enterLunchRun(buff: LunchBuff | null, now = Date.now()) {
   if (!active || lunchRecipe(active.dishId)?.target !== "explore") return { applied: null, next: active };
   return { applied: active, next: active.actionsLeft > 1 ? { ...active, actionsLeft: active.actionsLeft - 1 } : null };
 }
-export function lunchPower(buff: LunchBuff | null, target: "farm" | "fish" | "explore", now = Date.now()) {
+/** 도시락 효과 값. 탐험 도시락은 효과 종류(채집 시간·이동 속도)가 나뉘므로 effect를 주면 그 종류일 때만 값을 준다. */
+export function lunchPower(buff: LunchBuff | null, target: "farm" | "fish" | "explore", now = Date.now(), effect?: "gather" | "speed") {
   const active = restoreLunchBuff(buff, now), recipe = active && lunchRecipe(active.dishId);
-  return recipe && recipe.target === target ? recipe.values[active!.grade] : 0;
+  if (!recipe || recipe.target !== target) return 0;
+  if (effect && (recipe.effect ?? "gather") !== effect) return 0;
+  return recipe.values[active!.grade];
 }
 export function activateLunch(dishId: string, grade: 0 | 1 | 2, now = Date.now()): LunchBuff {
   return { dishId, grade, expiresAt: now + LUNCH_DURATION[grade].minutes * 60_000, actionsLeft: LUNCH_DURATION[grade].runs };

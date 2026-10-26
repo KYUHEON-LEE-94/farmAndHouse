@@ -239,3 +239,30 @@ test('쓰러짐(2026-10-21): 벌떼 3번이면 판이 끝나고 가방의 40%(�
   }
 });
 
+
+test('여름 햇빛 습지: 여름 재료·독버섯 5·물뱀 2·물웅덩이 4, 포자 구름 피격·회피·캠프 안전, 다친 동물은 향초', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const m = E.generateMap(seed, { regionId: 'sun-marsh', inSeason: false });
+    const items = new Set(m.nodes.map(n => n.item));
+    for (const id of items) assert.ok(['fragrant-herb', 'flower-nectar', 'thick-reed', 'blue-firefly'].includes(id), `${seed} ${id}`);
+    assert.equal(m.hazards.filter(h => h.kind === 'bees').length, 0);
+    assert.ok(m.hazards.filter(h => h.kind === 'spores').length >= 4, `${seed} spores`);
+    assert.ok(m.hazards.filter(h => h.kind === 'boar').every(h => h.skin === 'snake'));
+    assert.ok(m.hazards.filter(h => h.kind === 'mud').every(h => h.skin === 'puddle'));
+    // 독버섯은 시작 안전지대와 자원에서 떨어져 있다
+    for (const h of m.hazards.filter(h => h.kind === 'spores')) { assert.ok(d(h, E.START) > E.START_SAFE_R + h.r); for (const n of m.nodes) assert.ok(d(h, n) > h.r + 60); }
+  }
+  const s = E.createRun({ seed: 7, runId: 'm7', startedAt: 0, regionId: 'sun-marsh', inSeason: false }); s.phase = 'play';
+  const sp = s.hazards.find(h => h.kind === 'spores');
+  for (const h of s.hazards) if (h.kind === 'boar') { h.x = h.hx = 30; h.y = h.hy = 30; h.wx = 30; h.wy = 30; }
+  // 예고(0.8초) 동안은 맞지 않고, 구름이 되면 1칸
+  const cloudAt = (sp.period - E.SPORE_CLOUD - sp.offset % sp.period + sp.period * 4) % sp.period;
+  s.t = cloudAt - 0.5; s.player.x = sp.x; s.player.y = sp.y; E.step(s, E.NO_INPUT, 0.01);
+  assert.equal(E.sporePhase(sp, s.t).kind, 'tele'); assert.equal(s.hp, E.MAX_HP);
+  s.t = cloudAt + 0.05; E.step(s, E.NO_INPUT, 0.01); assert.equal(s.hp, E.MAX_HP - 1);
+  // 회피 중이면 맞지 않는다
+  const t = E.createRun({ seed: 7, runId: 'm7b', startedAt: 0, regionId: 'sun-marsh', inSeason: false }); t.phase = 'play';
+  const sp2 = t.hazards.find(h => h.kind === 'spores'); for (const h of t.hazards) if (h.kind === 'boar') { h.x = h.hx = h.wx = 30; h.y = h.hy = h.wy = 30; }
+  t.t = cloudAt + 0.05; t.player.x = sp2.x; t.player.y = sp2.y; t.player.dodgeUntil = t.t + 1; E.step(t, E.NO_INPUT, 0.01); assert.equal(t.hp, E.MAX_HP);
+  assert.equal(E.herbOf('sun-marsh').id, 'fragrant-herb'); assert.equal(E.herbOf('sprout-trail').id, 'young-herb');
+});
