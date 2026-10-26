@@ -1746,3 +1746,19 @@ button { color:inherit; }
 @media(max-width:1200px){.fish2-head{grid-template-columns:1fr}.fish2-pills{justify-content:flex-start}.fish2-body{grid-template-columns:240px minmax(0,1fr)}.fish2-side{grid-column:1/-1}}
 @media(max-width:860px){.fish2-body{grid-template-columns:1fr}.fish2-stage{order:1}.fish2-bag{order:2}.fish2-side{order:3}.fish2 .pond{height:340px}.fish2-gauge{right:8%;top:20%;width:110px;height:110px}.fish2-main{min-width:0;width:100%}}
 .fish2-today em{font-size:11px;color:#7d6a52;font-weight:700}
+/* 물고기 카드 그림·낚시꾼 고양이 선착장(public/images/fishing) */
+.fish-art{display:block;width:44px;height:44px;border-radius:9px;background:#fbf3e2 center/175% no-repeat;box-shadow:inset 0 0 0 1px rgba(122,84,40,.18)}
+.fish-art.big{width:150px;height:96px;margin:0 auto;background-size:135%;border-radius:12px}
+.fish2 .pond .angler,.fish2 .pond svg.rod,.fish2 .pond .bobber,.fish2 .pond .ripple,.fish2 .pond .bite-mark{display:none}
+.fish2-dock{position:absolute;left:-1%;bottom:-4%;height:76%;aspect-ratio:1;z-index:2;pointer-events:none;background:url("/images/fishing/angler-cat-dock.webp") center/contain no-repeat;filter:drop-shadow(0 8px 10px rgba(20,30,20,.35))}
+.fish2-bob{position:absolute;left:96.5%;top:64%;width:12px;height:16px;margin:-8px 0 0 -6px;border-radius:50% 50% 45% 45%;background:linear-gradient(180deg,#e0442c 0 50%,#fff 50%);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.fish2-bob i{position:absolute;left:50%;top:85%;width:46px;height:12px;margin-left:-23px;border-radius:50%;border:2px solid rgba(255,255,255,.55);opacity:0}
+.fish2 .pond.phase-waiting .fish2-bob{animation:fish2Bob 1.6s ease-in-out infinite}
+.fish2 .pond.phase-waiting .fish2-bob i{animation:fish2Ripple 1.6s ease-out infinite}
+.fish2 .pond.phase-bite .fish2-bob{animation:fish2Dunk .32s ease-in-out infinite alternate}
+.fish2 .pond.phase-bite .fish2-bob i{animation:fish2Ripple .5s ease-out infinite;border-color:#fff}
+@keyframes fish2Bob{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+@keyframes fish2Dunk{from{transform:translateY(2px)}to{transform:translateY(10px) scale(.85)}}
+@keyframes fish2Ripple{from{transform:scale(.4);opacity:.9}to{transform:scale(1.4);opacity:0}}
+@media(prefers-reduced-motion:reduce){.fish2-bob,.fish2-bob i{animation:none!important}}
+@media(max-width:860px){.fish2-dock{height:62%}}
