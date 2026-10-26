@@ -38,7 +38,14 @@ const MAP_SPOTS: Record<string, { hit: [number, number, number, number]; thumb: 
   greenhouse: { hit: [492, 500, 380, 230], thumb: [650, 600, 400], line: "계절을 넘어 자라는 작은 정원." },
   pier: { hit: [932, 400, 330, 370], thumb: [1100, 550, 360], line: "물길이 다시 열리면, 먼 바다의 이야기가 들어옵니다." },
 };
+/** 0~3단계 복구 원화가 있는 시설과 지도 위 합성 범위. */
+const STAGE_ART: Record<string, [number, number, number, number]> = {
+  "guide-office": [104, 8, 360, 250],
+  plaza: [475, 42, 445, 430],
+  "craft-street": [0, 314, 475, 330],
+};
 const pct = (v: number, total: number) => `${(v / total) * 100}%`;
+const stageArtUrl = (id: string, level: number) => `/images/village/stages/${id}-${Math.min(MAX_FACILITY_LEVEL, Math.max(0, level))}.webp`;
 function thumbStyle(id: string) {
   const [cx, cy, tw] = MAP_SPOTS[id].thumb, th = tw / THUMB_RATIO;
   const x = Math.min(Math.max(cx - tw / 2, 0), MAP_W - tw), y = Math.min(Math.max(cy - th / 2, 0), MAP_H - th);
@@ -90,6 +97,13 @@ export default function VillagePanel({ village, inventory, money, options, onDel
     </header>
     <div className="village-layout">
       <div className="village-map" role="group" aria-label="마을 지도">
+        {FACILITIES.map(entry => { const art = STAGE_ART[entry.id]; if (!art) return null;
+          const [x, y, w, h] = art, lv = levelOf(village, entry.id);
+          // Stage artwork uses authored map-relative bounds, so a responsive img wrapper is not appropriate here.
+          // eslint-disable-next-line @next/next/no-img-element
+          return <img key={`${entry.id}-${lv}`} className={`village-facility-layer stage-${lv}`} src={stageArtUrl(entry.id, lv)} alt="" aria-hidden="true" draggable={false}
+            style={{ left: pct(x, MAP_W), top: pct(y, MAP_H), width: pct(w, MAP_W), height: pct(h, MAP_H) }} />;
+        })}
         {FACILITIES.map(entry => { const [x, y, w, h] = MAP_SPOTS[entry.id].hit, lv = levelOf(village, entry.id), state = stateOf(entry.id), here = entry.id === facility.id;
           return <button key={entry.id} className={`village-spot ${state} ${here ? "on" : ""}`} style={{ left: pct(x, MAP_W), top: pct(y, MAP_H), width: pct(w, MAP_W), height: pct(h, MAP_H) }}
             onClick={() => setSelected(entry.id)} aria-pressed={here} aria-label={`${entry.name} · ${state === "soon" ? "준비 중" : `${lv}/${MAX_FACILITY_LEVEL}단계`}${state === "ready" ? " · 복구 가능" : ""}`}>
@@ -100,7 +114,7 @@ export default function VillagePanel({ village, inventory, money, options, onDel
       </div>
       <div className="village-detail">
         <div className="village-detail-head"><span className="village-icon" aria-hidden="true">{facility.icon}</span><div><b>{facility.name}</b><small>{MAP_SPOTS[facility.id].line}</small></div></div>
-        <div className={`village-thumb ${open ? "" : "soon"}`} style={thumbStyle(facility.id)} role="img" aria-label={`${facility.name} 그림`}>{!open && <span>🔒 준비 중</span>}</div>
+        <div key={`${facility.id}-${level}`} className={`village-thumb ${open ? "" : "soon"}`} style={STAGE_ART[facility.id] ? { backgroundImage: `url(${stageArtUrl(facility.id, level)})`, backgroundSize: "cover", backgroundPosition: "center" } : thumbStyle(facility.id)} role="img" aria-label={`${facility.name} 그림`}>{!open && <span>🔒 준비 중</span>}</div>
         <div className="village-stage"><b>{open ? `${level}단계` : "준비 중"}</b>{open && <span>/ {MAX_FACILITY_LEVEL}단계</span>}</div>
         <i className="village-stage-bar"><em style={{ width: pct(open ? level : 0, MAX_FACILITY_LEVEL) }} /></i>
         <ol className="village-effects">{STAGE_EFFECTS[facility.id].map((text, i) => <li key={i} className={i < level ? "done" : i === level && open ? "next" : "lock"}>
