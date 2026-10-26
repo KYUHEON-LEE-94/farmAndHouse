@@ -5,7 +5,7 @@ import { hasArmorPrerequisite } from "./raid/armorRequirements";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { FURNITURE, isSellable, FLOORS, FURNITURE_GACHA_PRICE, furnitureGachaOdds, gachaPool, GACHA_LEGEND_CHANCE, GACHA_PRICE, GACHA_RARE_CHANCE, HOUSE_SIZES, PET_BUFFS, TIER_NAME, rollGachaFurniture, rollPet, REMODEL_PRICE, SECOND_FLOOR_PRICE, SHAPES, TINTS, WALLPAPERS, WALL_HEIGHT, YARD_SIZES, FurnitureArt, fitsInRoom, fitsInYard, roomFor, wallInfo, type Furniture, type PlacedItem, type Room, type RoomShape, type ShopGroup, type Theme, isResizable, RUG_SCALE } from "./house";
 import { DEFAULT_PLACE, WEATHER_REFRESH_MINUTES, WEATHER_RETRY_SECONDS, fetchWeather, weatherEffect, type WeatherState } from "./weather";
-import { ALL_FISH, BAITS, BARE_HAND, FISH, LEGEND_CHANCE, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
+import { ALL_FISH, BAITS, BARE_HAND, FISH, HIDDEN_CHANCE, LEGEND_CHANCE, RARITY_WEIGHT, RODS, SPECIAL_FISH, SPOTS, STARTER_BAIT, rollFish, rollSpecialFish, type Bait, type Fish, type FishingSpot, type Rod, type Season } from "./fishing";
 import type { FishingResult } from "./fishingGame";
 import { BUFF_INFO, EVENT_CHANCE, EVENT_CHECK_SECONDS, EVENT_COOLDOWN_MINUTES, PRICE_EVENT_COUNT, RECENT_EVENT_LIMIT, buffMultiplier, consumePriceBuffs, pickEvent, priceBuffFactor, resolveChoice, type Buff, type Effect, type EventContext, type StoryEvent } from "./events";
 import { BLACKJACK_TAUNTS, DEALER_IDLE, JACKPOT_GRUMBLES, LOSE_TAUNTS, NEAR_MISS_TAUNTS, PARITY_TAUNTS, STREAK_TAUNTS, WIN_GRUMBLES, cardLabel, dealerLine, dealerShouldHit, drawCard, handValue, isBlackjack, settleBlackjack, type BlackjackOutcome, type Card } from "./casino";
@@ -29,7 +29,7 @@ import CoinGame from "./CoinGame";
 import { COIN_ENABLED, COIN_MIN_QTY, coinBoard, settleCoin, type CoinHoldings } from "./coin";
 import { ALL_LOOT, HUNT_ENABLED, HUNT_TEST_UNLOCK_ALL, HUNT_TICKET_MINUTES, HUNT_TICKET_PRICE, WEAPONS, type Weapon } from "./hunting";
 import { TEST_MODE, ownsItem } from "./testMode";
-import { FARM_V2_ENABLED } from "./farm/ui";
+import { FARM_V2_ENABLED, FISH_V2_ENABLED } from "./farm/ui";
 import { KitchenPanel } from "./KitchenPanel";
 import LunchPanel, { LunchBag } from "./cooking/LunchPanel";
 import { LUNCHES, lunchRecipe } from "./cooking/recipes";
@@ -100,6 +100,8 @@ const FISH_BOOST_MAX = 1.5;
 /** 이 금액 미만이면 파산으로 본다. */
 const BAILOUT_THRESHOLD = 50;
 const BITE_WINDOW_MS = 1300;
+/** 새 낚시터 화면의 장소 분위기 한 줄. */
+const FISH_MOOD: Record<string, string> = { river: "물결이 잔잔한 오후", lake: "거울 같은 호수 위로 바람이 불어요", sea: "방파제에 파도 소리가 부서져요", valley: "차가운 물이 바위 사이로 흘러요", reservoir: "안개 속에 감춰진 깊은 물" };
 
 function marketPrice(crop: Crop, bucket: number) {
   return cycleCrop(crop, bucket).price;
@@ -441,6 +443,7 @@ export default function Home() {
   const [fieldSel, setFieldSel] = useState<{ cells: number[]; label: string }>({ cells: [], label: "" });
   /** 선택 구획을 마지막으로 계산한 칸·도구(같은 칸 위에서 반복 계산하지 않게). */
   const selKeyRef = useRef("");
+  const [fishPicker, setFishPicker] = useState<"rod" | "bait" | null>(null);
   const [seedSort, setSeedSort] = useState<"reco" | "short" | "profit">("reco");
   const plotsRef = useRef<HTMLDivElement>(null);
   const [waterFx, setWaterFx] = useState<{ id: number; plotIndex: number }[]>([]);
@@ -1008,6 +1011,21 @@ export default function Home() {
     if (!element.closest(".tool-dock, .topbar")) element.scrollIntoView({ block: "center", behavior: "smooth" });
     return () => element.classList.remove("guide-focus");
   }, [guideStep, tab]);
+
+  // 새 낚시터: Space로 던지기·당기기(미니게임 중에는 미니게임이 Space를 쓴다). 버튼에 초점이 있으면 브라우저 기본 클릭에 맡긴다.
+  useEffect(() => {
+    if (!FISH_V2_ENABLED || tab !== "fish") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, select, button, [contenteditable=true], .modal")) return;
+      const main = document.querySelector<HTMLButtonElement>("button.fish2-main");
+      if (!main || main.disabled) return;
+      event.preventDefault(); main.click();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab]);
 
   function switchTab(next: typeof tab) {
     if (next !== "fish" && (fishState.phase === "waiting" || fishState.phase === "bite" || fishState.phase === "game")) { window.clearTimeout(fishTimer.current); setFishState({ phase: "idle" }); }
@@ -2586,6 +2604,48 @@ export default function Home() {
   const heldFert = FERTILIZERS.find(item => item.id === (activeFert ? activeFert.id : fertId)) ?? FERTILIZERS[0];
   const reachNow = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : currentSpreader;
 
+  const pondScene = (
+    <div className={`pond phase-${fishState.phase} spot-${currentSpot.id}`}>
+      <div className="pond-scenery" aria-hidden="true"><span className="far" /><span className="mid" /><i className="deco d1" /><i className="deco d2" /><i className="deco d3" /></div>
+      <div className="pond-bank" />
+      {currentSpot.price > 0 && <span className={`ticket-badge ${ticketLeft > 0 && ticketLeft <= 60 ? "ending" : ""} ${ticketLeft === 0 ? "expired" : ""}`}>{ticketLeft > 0 ? `🎫 남은 시간 ${formatClock(ticketLeft)}` : "🎫 입장권 만료"}</span>}
+      {currentSpot.price > 0 && ticketLeft === 0 && fishState.phase !== "game" && <div className="ticket-expired"><b>🎫 입장권이 만료됐어요</b><button onClick={() => chooseSpot(currentSpot)}>다시 입장 · {currentSpot.price.toLocaleString()}원</button><button className="ghost" onClick={() => chooseSpot(SPOTS[0])}>무료 강가로</button></div>}
+      <svg className={`rod rod-${currentRod.id}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line className="rod-shaft" x1="21" y1="58" x2="40" y2="36" /><line className="rod-shine" x1="22" y1="56.5" x2="39" y2="37" /><circle className="rod-reel" cx="23.5" cy="55" r="1.6" />{(fishState.phase === "waiting" || fishState.phase === "bite") && <line className="line" x1="40" y1="36" x2="60" y2={fishState.phase === "bite" ? 70 : 64} />}</svg>
+      <div className="angler">{avatarImg}</div>
+      <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
+      {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} rod={gameRod} barBonus={fishState.bait?.barBonus ?? 0} onFinish={finishFishing} /></Suspense>}
+      {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : fishState.fish?.rarity === "신화" ? "legend mythic" : ""}`}>
+        {fishState.fish ? <><EffectBurst id={equipment.fish} />{LEGEND_ART[fishState.fish.id] ? <span className={`legend-fish-art ${LEGEND_ART[fishState.fish.id]}`} role="img" aria-label={fishState.fish.name} /> : <b>{fishState.fish.icon}</b>}<strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트!</span>}<small>{fishState.fish.note}</small><em>{fishState.stored ? "📦 통합 창고 보관" : `＋${(fishState.price ?? fishState.fish.price).toLocaleString()}원`}</em></> : <><b>💨</b><small>{fishState.text}</small></>}
+        {fishState.reward && <span className="treasure">🎁 보물상자: {fishState.reward}</span>}
+      </div>}
+    </div>
+  );
+  const rodList = (
+    <div className="rod-list">{RODS.map(rod => { const owned = ownsItem(ownedRods, rod.id);
+      return <button key={rod.id} className={rodId === rod.id ? "on" : ""} onClick={() => chooseRod(rod)} disabled={fishState.phase === "game"} aria-pressed={rodId === rod.id}><span>{rod.icon}</span><b>{rod.name}</b><small>{rod.note}</small><em>{rodId === rod.id ? "사용 중" : owned ? "들기" : `${rod.price.toLocaleString()}원`}</em><i className="rod-bar" style={{ width: `${rod.bar * 220}%` }} /></button>; })}</div>
+  );
+  const baitList = (
+    <div className="bait-list"><div className={`bait bare ${selectedBait === BARE_HAND.id ? "on" : ""}`}>
+      <button className="bait-pick" onClick={() => setSelectedBait(BARE_HAND.id)} aria-pressed={selectedBait === BARE_HAND.id}><span>{BARE_HAND.icon}</span><b>{BARE_HAND.name}</b><small>강가·호숫가 전용 · 입질 느림 · 흔함·보통만</small><em>공짜</em></button>
+    </div>{BAITS.map(bait => <div key={bait.id} className={`bait ${selectedBait === bait.id ? "on" : ""}`}>
+      <button className="bait-pick" onClick={() => setSelectedBait(bait.id)} aria-pressed={selectedBait === bait.id}><span>{bait.icon}</span><b>{bait.name}</b><small>{bait.note}</small><em>{baits[bait.id] ?? 0}개</em></button>
+      <QtyBuy label={bait.name} unitPrice={bait.price / bait.pack} money={money} initial={bait.pack} step={bait.pack >= 10 ? 5 : 1} onBuy={count => buyBait(bait, count)} />
+    </div>)}</div>
+  );
+  // 새 낚시터 화면(FISH_V2): 등급 확률은 reelIn의 rollFish와 같은 가중치로 계산한다(특별 물고기 제외).
+  const fishBare = currentSpot.price === 0 && (selectedBait === BARE_HAND.id || !baits[currentBait.id]);
+  const fishOdds = (() => {
+    const bait = fishBare ? BARE_HAND : currentBait, rare = fishBare ? 0 : bait.rareBoost * currentSpot.rareBoost * Math.min(FISH_BOOST_MAX, fishMul * (1 + PET_BASE.cat * pw("cat")));
+    const w = { 흔함: RARITY_WEIGHT.흔함, 보통: RARITY_WEIGHT.보통 * bait.normalBoost * currentSpot.normalBoost, 희귀: RARITY_WEIGHT.희귀 * rare };
+    const hidden = fishBare ? 0 : HIDDEN_CHANCE, legend = fishBare ? 0 : (1 - hidden) * LEGEND_CHANCE, rest = (1 - hidden) * (1 - (fishBare ? 0 : LEGEND_CHANCE)), total = w.흔함 + w.보통 + w.희귀;
+    return { 흔함: rest * w.흔함 / total, 보통: rest * w.보통 / total, 희귀: rest * w.희귀 / total, 전설: legend };
+  })();
+  const todayFish = FISH.filter(fish => fish.season === season && fish.rarity !== "신화").map(fish => {
+    const same = FISH.filter(other => other.season === season && other.rarity === fish.rarity).length;
+    return { fish, chance: (fishOdds[fish.rarity as keyof typeof fishOdds] ?? 0) / same };
+  }).sort((a, b) => (a.fish.rarity === "전설" ? 1 : 0) - (b.fish.rarity === "전설" ? 1 : 0) || b.chance - a.chance);
+  const pct = (v: number) => `${(v * 100) >= 10 ? Math.round(v * 100) : (v * 100).toFixed(1)}%`;
+
   return (
     <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4} ${tab === "farm" && !FARM_V2_ENABLED ? "has-dock" : ""}`}>
       <header className="topbar">
@@ -2758,26 +2818,70 @@ export default function Home() {
         </aside>
       </div>}
 
-      {tab === "fish" && <div className="game-grid">
+      {tab === "fish" && FISH_V2_ENABLED && <div className={`fish2 spot-${currentSpot.id}`}>
+        <header className="fish2-head">
+          <div className="fish2-sign"><h3>{season} {currentSpot.name}</h3><span>{FISH_MOOD[currentSpot.id] ?? "물결이 잔잔한 오후"}</span></div>
+          <div className="fish2-spots" role="group" aria-label="낚시 장소">{SPOTS.map(spot => { const left = spot.price > 0 ? Math.max(0, Math.ceil(((tickets[spot.id] ?? 0) - nowMs) / 1000)) : -1;
+            return <button key={spot.id} className={`fish2-spot spot-${spot.id} ${spotId === spot.id ? "on" : ""}`} onClick={() => chooseSpot(spot)} title={spot.note} aria-pressed={spotId === spot.id}>
+              <span className="fish2-spot-art" aria-hidden="true" /><b>{spot.name}</b>{spot.price > 0 && <small>{left > 0 ? `🎫 ${formatClock(left)}` : `🪙 ${spot.price.toLocaleString()}원`}</small>}</button>; })}</div>
+          <div className="fish2-pills">
+            <span>🎫 입장 <b>{currentSpot.price === 0 ? "무료" : ticketLeft > 0 ? formatClock(ticketLeft) : "만료"}</b></span>
+            <span>👑 전설 확률 <b>{pct(fishOdds.전설)}</b></span>
+            <span title={wx.notes.join(" · ")}>{wx.icon} {weather ? wx.name : "날씨"} <b>{fishMul > 1 ? "입질 좋음" : fishMul < 1 ? "입질 나쁨" : "입질 보통"}</b></span>
+          </div>
+        </header>
+        <div className="fish2-body">
+          <aside className="fish2-bag">
+            <div className="fish2-title"><span aria-hidden="true">🎒</span><h4>낚시 가방</h4></div>
+            <div className="fish2-gear"><span className="fish2-gear-icon">{currentRod.icon}</span><div><b>{currentRod.name}</b><small>{currentRod.note}</small><span className="fish2-stat"><i>막대</i><em><u style={{ width: `${Math.min(100, currentRod.bar * 220)}%` }} /></em></span></div></div>
+            <div className="fish2-gear"><span className="fish2-gear-icon">{fishBare ? BARE_HAND.icon : currentBait.icon}</span><div><b>{fishBare ? BARE_HAND.name : `${currentBait.name} × ${baits[currentBait.id] ?? 0}`}</b><small>{fishBare ? "입질 느림 · 흔함·보통만" : currentBait.note}</small></div></div>
+            <div className="fish2-gear-buttons"><button onClick={() => setFishPicker("rod")} disabled={fishState.phase === "game"}>낚싯대 변경</button><button onClick={() => setFishPicker("bait")}>미끼 변경</button></div>
+            <div className="fish2-odds">
+              <b>이번 지역 확률 정보</b>
+              <span className="fish2-odds-bar" aria-hidden="true">{(["흔함", "보통", "희귀", "전설"] as const).map(rarity => <i key={rarity} className={`r-${rarity}`} style={{ flexGrow: Math.max(0.001, fishOdds[rarity]) }} />)}</span>
+              <ul>{(["흔함", "보통", "희귀", "전설"] as const).map(rarity => <li key={rarity} className={`r-${rarity}`}><span>{rarity}</span><b>{pct(fishOdds[rarity])}</b></li>)}</ul>
+            </div>
+            <div className="fish2-quick"><button onClick={() => setShowMissions(true)}>📜 미션</button><button onClick={() => { setShowMissions(false); setShowStorage(true); }}>📦 통합 창고 <kbd>E</kbd></button></div>
+          </aside>
+          <section className="fish2-stage">
+            {pondScene}
+            {fishState.phase === "bite" && <div className="fish2-gauge" aria-live="assertive"><span className="fish2-gauge-ring" style={{ animationDuration: `${BITE_WINDOW_MS}ms` }} /><b>지금!</b><kbd>Space</kbd></div>}
+            <div className="fish2-controls">
+              <p className="fish2-tip">{fishState.phase === "game" ? "🐟 초록 막대 안에! 누르면 올라가고 떼면 내려가요" : fishState.phase === "waiting" ? "❗ 찌가 잠기면 당기세요" : fishState.phase === "bite" ? "🎣 지금 당기세요!" : bareReady ? "🫳 맨손으로 던져 볼까요?" : "🎣 던질 준비 완료"}</p>
+              {fishState.phase === "game" ? <span className="fish2-main idle">🐟 씨름 중…</span>
+                : fishState.phase === "waiting" || fishState.phase === "bite" ? <button className={`fish2-main ${fishState.phase === "bite" ? "hot" : ""}`} onClick={reelIn}>🎣 당기기 <kbd>Space</kbd></button>
+                : <button className="fish2-main" onClick={castLine} disabled={!isWorkTime || (!baits[currentBait.id] && !bareReady)}>{bareReady ? "🫳 맨손으로 던지기" : fishState.phase === "result" ? "🎣 다시 던지기" : "🎣 던지기"} <kbd>Space</kbd></button>}
+            </div>
+          </section>
+          <aside className="fish2-side">
+            <div className="fish2-title"><span aria-hidden="true">🌊</span><h4>오늘의 물길</h4></div>
+            <ul className="fish2-today">{(["흔함", "보통", "희귀"] as const).map(rarity => { const group = todayFish.filter(entry => entry.fish.rarity === rarity); if (!group.length) return null;
+              return <li key={rarity} className={`r-${rarity}`}><span className="fish2-today-icon">{group[0].fish.icon}</span><span><b>{group.slice(0, 2).map(entry => entry.fish.name).join(" · ")}{group.length > 2 ? ` 외 ${group.length - 2}종` : ""}</b><small>{rarity} · 종마다 {pct(group[0].chance)} · 합계 {pct(fishOdds[rarity])}</small></span><em>{group.filter(entry => fishLog[entry.fish.id]).length}/{group.length}</em></li>; })}
+              {todayFish.filter(entry => entry.fish.rarity === "전설").map(({ fish, chance }) => <li key={fish.id} className="r-전설">
+                {LEGEND_ART[fish.id] ? <span className={`legend-fish-art book ${LEGEND_ART[fish.id]}`} role="img" aria-label={fish.name} /> : <span className="fish2-today-icon">{fish.icon}</span>}
+                <span><b>👑 {fishLog[fish.id] ? fish.name : "???"}</b><small>전설 · {pct(chance)}</small></span><em>{fishLog[fish.id] ? "📖" : ""}</em></li>)}</ul>
+            <div className="fish2-title small"><h4>최근 어획</h4><button onClick={() => switchTab("book")}>도감 ›</button></div>
+            {recentCatches.length ? <ul className="fish2-recent">{recentCatches.map(c => { const left = fishStock[c.id] ?? 0, locked = Boolean(fishLocks[c.id]);
+              return <li key={c.at} className={`r-${c.fish.rarity}`}><span className="fish2-today-icon">{c.fish.icon}</span><span><b>{c.fish.name}{c.perfect ? " ✨" : ""}</b><small>{c.stored ? `창고 · 보유 ${left}` : `${c.price.toLocaleString()}원 판매`}</small></span>
+                {c.stored && left > 0 ? <button onClick={() => sellStoredFish(c.id, 1)} disabled={locked}>팔기</button> : <time>{new Date(c.at).toTimeString().slice(0, 5)}</time>}</li>; })}</ul> : <p className="hint">아직 잡은 물고기가 없어요.</p>}
+            <div className="fish2-mode" role="radiogroup" aria-label="잡은 물고기 처리">
+              <button role="radio" aria-checked={fishHarvestMode === "store"} className={fishHarvestMode === "store" ? "on" : ""} onClick={() => setFishHarvestMode("store")}>📦 잡은 물고기 → 창고 보관</button>
+              <button role="radio" aria-checked={fishHarvestMode === "sell"} className={fishHarvestMode === "sell" ? "on" : ""} onClick={() => setFishHarvestMode("sell")}>🪙 바로 판매</button>
+            </div>
+          </aside>
+        </div>
+        {fishPicker && <div className="modal-backdrop" onClick={event => { if (event.target === event.currentTarget) setFishPicker(null); }}><section className="modal fish2-picker" role="dialog" aria-modal="true" aria-label={fishPicker === "rod" ? "낚싯대 고르기" : "미끼 고르기"}>
+          <div className="fish2-title"><h4>{fishPicker === "rod" ? "🎣 낚싯대" : "🪱 미끼 가방"}</h4><button className="ghost-button small" onClick={() => setFishPicker(null)}>닫기</button></div>
+          {fishPicker === "rod" ? rodList : baitList}
+        </section></div>}
+      </div>}
+      {tab === "fish" && !FISH_V2_ENABLED && <div className="game-grid">
         <section className="panel fish-panel">
           <div className="panel-heading"><div><span className="eyebrow">FISHING SPOT</span><h3>{season} {currentSpot.name} {currentSpot.icon}</h3></div><div className="farm-actions"><button className="ghost-button small" onClick={() => setShowAvatar(true)}>🪞 캐릭터 바꾸기</button><span className="plot-count">전설 출현 {LEGEND_CHANCE * 100}% (고정)</span></div></div>
           <div className="spot-bar" role="group" aria-label="낚시 장소">{SPOTS.map(spot => { const left = spot.price > 0 ? Math.max(0, Math.ceil(((tickets[spot.id] ?? 0) - nowMs) / 1000)) : -1;
             return <button key={spot.id} className={`${spotId === spot.id ? "on" : ""} ${spot.price ? "paid" : ""}`} onClick={() => chooseSpot(spot)} title={spot.note}><b>{spot.icon}</b><span>{spot.name}</span><small>{spot.price === 0 ? "무료" : left > 0 ? `🎫 ${formatClock(left)}` : `${spot.price.toLocaleString()}원/${spot.minutes}분`}</small></button>; })}</div>
           <div className="fish-summary"><span>📍 {currentSpot.name}</span><span>{currentRod.icon} {currentRod.name}</span><span>{currentBait.icon} {currentBait.name} {baits[currentBait.id] ?? 0}개</span><span className="legend">🌈 전설 {LEGEND_CHANCE * 100}%</span><span>{fishHarvestMode === "store" ? "📦 창고 보관" : "💰 바로 판매"}</span></div>
-          <div className={`pond phase-${fishState.phase} spot-${currentSpot.id}`}>
-            <div className="pond-scenery" aria-hidden="true"><span className="far" /><span className="mid" /><i className="deco d1" /><i className="deco d2" /><i className="deco d3" /></div>
-            <div className="pond-bank" />
-            {currentSpot.price > 0 && <span className={`ticket-badge ${ticketLeft > 0 && ticketLeft <= 60 ? "ending" : ""} ${ticketLeft === 0 ? "expired" : ""}`}>{ticketLeft > 0 ? `🎫 남은 시간 ${formatClock(ticketLeft)}` : "🎫 입장권 만료"}</span>}
-            {currentSpot.price > 0 && ticketLeft === 0 && fishState.phase !== "game" && <div className="ticket-expired"><b>🎫 입장권이 만료됐어요</b><button onClick={() => chooseSpot(currentSpot)}>다시 입장 · {currentSpot.price.toLocaleString()}원</button><button className="ghost" onClick={() => chooseSpot(SPOTS[0])}>무료 강가로</button></div>}
-            <svg className={`rod rod-${currentRod.id}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line className="rod-shaft" x1="21" y1="58" x2="40" y2="36" /><line className="rod-shine" x1="22" y1="56.5" x2="39" y2="37" /><circle className="rod-reel" cx="23.5" cy="55" r="1.6" />{(fishState.phase === "waiting" || fishState.phase === "bite") && <line className="line" x1="40" y1="36" x2="60" y2={fishState.phase === "bite" ? 70 : 64} />}</svg>
-            <div className="angler">{avatarImg}</div>
-            <span className="ripple r1" /><span className="ripple r2" /><span className="bobber" />{fishState.phase === "bite" && <span className="bite-mark">!</span>}
-            {fishState.phase === "game" && fishState.fish && <Suspense fallback={null}><FishingGame fish={fishState.fish} rod={gameRod} barBonus={fishState.bait?.barBonus ?? 0} onFinish={finishFishing} /></Suspense>}
-            {fishState.phase === "result" && <div className={`catch-card ${fishState.fish?.rarity === "전설" ? "legend" : fishState.fish?.rarity === "신화" ? "legend mythic" : ""}`}>
-              {fishState.fish ? <><EffectBurst id={equipment.fish} />{LEGEND_ART[fishState.fish.id] ? <span className={`legend-fish-art ${LEGEND_ART[fishState.fish.id]}`} role="img" aria-label={fishState.fish.name} /> : <b>{fishState.fish.icon}</b>}<strong>{fishState.fish.name}</strong><span className={`rarity rarity-${fishState.fish.rarity}`}>{fishState.fish.rarity}</span>{fishState.perfect && <span className="perfect">✨ 퍼펙트!</span>}<small>{fishState.fish.note}</small><em>{fishState.stored ? "📦 통합 창고 보관" : `＋${(fishState.price ?? fishState.fish.price).toLocaleString()}원`}</em></> : <><b>💨</b><small>{fishState.text}</small></>}
-              {fishState.reward && <span className="treasure">🎁 보물상자: {fishState.reward}</span>}
-            </div>}
-          </div>
+          {pondScene}
           <div className="fish-controls">
             <p>{fishState.phase === "game" ? "🐟 물고기를 초록 막대 안에! 누르고 있으면 올라가고, 떼면 내려가요. 🎁가 보이면 막대에 함께 담아 보세요." : fishState.phase === "waiting" ? "찌가 흔들리길 기다리는 중… 입질 전에 채면 놓쳐요." : fishState.phase === "bite" ? "입질이 왔어요! 지금 당겨요!" : bareReady ? `${currentRod.icon} ${currentRod.name} · 🫳 미끼가 없어 맨손 낚시를 해요 (입질 느림 · 흔함·보통만, 공짜)` : `${currentRod.icon} ${currentRod.name} · ${currentBait.icon} ${currentBait.name} ${baits[currentBait.id] ?? 0}개 남음 · 던질 때마다 1개씩 써요.`}</p>
             <button className={`mode-toggle ${fishHarvestMode}`} onClick={() => setFishHarvestMode(mode => mode === "sell" ? "store" : "sell")}>{fishHarvestMode === "store" ? "📦 창고 보관" : "💰 바로 판매"} ⇄</button>
@@ -2789,15 +2893,9 @@ export default function Home() {
         </section>
         <aside className="panel fish-book">
           <div className="panel-heading"><div><span className="eyebrow">FISHING ROD</span><h3>낚싯대</h3></div></div>
-          <div className="rod-list">{RODS.map(rod => { const owned = ownsItem(ownedRods, rod.id);
-            return <button key={rod.id} className={rodId === rod.id ? "on" : ""} onClick={() => chooseRod(rod)} disabled={fishState.phase === "game"} aria-pressed={rodId === rod.id}><span>{rod.icon}</span><b>{rod.name}</b><small>{rod.note}</small><em>{rodId === rod.id ? "사용 중" : owned ? "들기" : `${rod.price.toLocaleString()}원`}</em><i className="rod-bar" style={{ width: `${rod.bar * 220}%` }} /></button>; })}</div>
+          {rodList}
           <div className="panel-heading"><div><span className="eyebrow">BAIT BAG</span><h3>미끼 가방</h3></div></div>
-          <div className="bait-list"><div className={`bait bare ${selectedBait === BARE_HAND.id ? "on" : ""}`}>
-            <button className="bait-pick" onClick={() => setSelectedBait(BARE_HAND.id)} aria-pressed={selectedBait === BARE_HAND.id}><span>{BARE_HAND.icon}</span><b>{BARE_HAND.name}</b><small>강가·호숫가 전용 · 입질 느림 · 흔함·보통만</small><em>공짜</em></button>
-          </div>{BAITS.map(bait => <div key={bait.id} className={`bait ${selectedBait === bait.id ? "on" : ""}`}>
-            <button className="bait-pick" onClick={() => setSelectedBait(bait.id)} aria-pressed={selectedBait === bait.id}><span>{bait.icon}</span><b>{bait.name}</b><small>{bait.note}</small><em>{baits[bait.id] ?? 0}개</em></button>
-            <QtyBuy label={bait.name} unitPrice={bait.price / bait.pack} money={money} initial={bait.pack} step={bait.pack >= 10 ? 5 : 1} onBuy={count => buyBait(bait, count)} />
-          </div>)}</div>
+          {baitList}
           <button className="book-link" onClick={() => switchTab("book")}>📖 물고기 도감 보기 <b>{[...FISH, ...SPECIAL_FISH].filter(fish => fishLog[fish.id]).length}/{FISH.length + SPECIAL_FISH.length}</b></button>
         </aside>
       </div>}

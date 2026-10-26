@@ -1686,3 +1686,63 @@ button { color:inherit; }
 .farm2 .plot:hover{transform:none;filter:brightness(1.06)}
 .farm2 .plots{grid-template-columns:repeat(4,minmax(0,1fr))}.farm2 .plots.cols-6{grid-template-columns:repeat(6,minmax(0,1fr))}
 @media(max-width:760px){.farm2 .plots.cols-6{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* ---------- 새 낚시터 화면(FISH_V2) ---------- */
+.fish2{max-width:1440px;margin:0 auto 16px}
+.fish2-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;margin-bottom:12px}
+.fish2-sign{display:grid;padding:6px 4px}.fish2-sign h3{margin:0;font:700 clamp(26px,2.8vw,38px) "Gowun Batang";color:#3b2a18;letter-spacing:-.02em}.fish2-sign span{font-size:13px;color:#5b4630}
+.fish2-spots{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 6px}
+.fish2-spot{position:relative;flex:0 0 118px;display:grid;grid-template-rows:64px auto auto;justify-items:center;gap:2px;padding:5px 5px 7px;border-radius:12px;border:2px solid #d9bd8a;background:#fffaf0;cursor:pointer;box-shadow:0 3px 8px rgba(60,35,10,.15)}
+.fish2-spot.on{border-color:#8a5f36;box-shadow:0 0 0 3px #e8c37a,0 4px 10px rgba(60,35,10,.25);transform:translateY(-2px)}
+.fish2-spot-art{width:100%;border-radius:8px;background:#9fc3d6 center/cover no-repeat}
+.fish2-spot.spot-river .fish2-spot-art{background-image:url("/images/fishing/river.webp")}.fish2-spot.spot-lake .fish2-spot-art{background-image:url("/images/fishing/lake.webp")}
+.fish2-spot.spot-sea .fish2-spot-art{background-image:url("/images/fishing/sea.webp")}.fish2-spot.spot-valley .fish2-spot-art{background-image:url("/images/fishing/valley.webp")}
+.fish2-spot.spot-reservoir .fish2-spot-art{background-image:url("/images/fishing/reservoir.webp")}
+.fish2-spot b{font-size:13px;color:#3b2a18}.fish2-spot small{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;background:#5b3a18;color:#ffe9b0}
+.fish2-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.fish2-pills span{display:grid;padding:7px 12px;border-radius:12px;background:#fffaf0;border:1px solid rgba(122,84,40,.22);font-size:11.5px;color:#5b4630;white-space:nowrap}.fish2-pills b{font-size:15px;color:#2e3f2b}
+.fish2-body{display:grid;grid-template-columns:260px minmax(0,1fr) 290px;gap:14px;align-items:start}
+.fish2-title{display:flex;align-items:center;gap:8px}.fish2-title h4{margin:0;font:700 20px "Gowun Batang";color:#3b2a18}.fish2-title span{font-size:22px}
+.fish2-title.small{justify-content:space-between;margin-top:6px}.fish2-title.small h4{font-size:17px}.fish2-title.small button{border:0;background:none;color:#7d6a52;cursor:pointer}
+.fish2-bag,.fish2-side{display:grid;gap:10px;padding:14px;border-radius:16px;background:linear-gradient(180deg,#fbf1dc,#f3e2bf);border:3px solid #b98a52;box-shadow:inset 0 0 0 2px #fff6e0,0 6px 14px rgba(80,50,20,.18)}
+.fish2-gear{display:grid;grid-template-columns:56px 1fr;gap:10px;align-items:center;padding:10px;border-radius:12px;background:#fffaf0;border:1px solid rgba(122,84,40,.18)}
+.fish2-gear-icon{display:grid;place-items:center;width:56px;height:56px;border-radius:12px;background:#f3e6cc;font-size:30px}
+.fish2-gear div{display:grid;gap:2px;min-width:0}.fish2-gear b{font-size:15px;color:#2e2a20}.fish2-gear small{font-size:11px;color:#7d6a52}
+.fish2-stat{display:flex;align-items:center;gap:6px;font-size:10px;color:#7d6a52}.fish2-stat i{font-style:normal}.fish2-stat em{flex:1;height:7px;border-radius:7px;background:#e9dcc2;overflow:hidden}.fish2-stat u{display:block;height:100%;background:linear-gradient(90deg,#6fbf4f,#3f8a45)}
+.fish2-gear-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fish2-gear-buttons button,.fish2-quick button{padding:10px 8px;border-radius:12px;border:2px solid #24452c;background:linear-gradient(180deg,#3f6b45,#2c5133);color:#fff;font-weight:700;cursor:pointer}
+.fish2-gear-buttons button:disabled{opacity:.5;cursor:not-allowed}
+.fish2-odds{display:grid;gap:6px;padding:10px;border-radius:12px;background:#fffaf0;border:1px solid rgba(122,84,40,.18)}.fish2-odds>b{font-size:13px;color:#3b2a18}
+.fish2-odds-bar{display:flex;height:10px;border-radius:8px;overflow:hidden;background:#e9dcc2}.fish2-odds-bar i{display:block;flex-basis:0}
+.fish2-odds ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(4,1fr);text-align:center;font-size:11px}.fish2-odds li{display:grid}.fish2-odds li b{font-size:13px}
+.r-흔함 .fish2-odds-bar i,.fish2-odds-bar .r-흔함{background:#a9a59b}.fish2-odds-bar .r-보통{background:#6fbf4f}.fish2-odds-bar .r-희귀{background:#4f8fd6}.fish2-odds-bar .r-전설{background:#e8a32a}
+.fish2-odds li.r-보통 span{color:#3f8a45}.fish2-odds li.r-희귀 span{color:#2f6fb6}.fish2-odds li.r-전설 span,.fish2-odds li.r-전설 b{color:#d0661c}
+.fish2-quick{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}.fish2-quick kbd{font:700 10px "Gowun Dodum";padding:0 5px;border:1px solid rgba(255,255,255,.6);border-radius:4px;margin-left:4px}
+.fish2-stage{position:relative;display:grid;gap:10px;min-width:0}
+.fish2 .pond{height:clamp(380px,44vw,580px);border-radius:20px;border:4px solid #8a5f36;box-shadow:inset 0 0 0 3px #c99b60,0 10px 24px rgba(60,35,10,.25)}
+.fish2-gauge{position:absolute;right:16%;top:32%;z-index:6;display:grid;place-items:center;width:136px;height:136px;border-radius:50%;background:radial-gradient(circle,#1f4a35 0 52%,transparent 53%);pointer-events:none}
+.fish2-gauge-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(#f0c040 var(--p,360deg),rgba(255,255,255,.18) 0);-webkit-mask:radial-gradient(circle,transparent 56%,#000 57%);mask:radial-gradient(circle,transparent 56%,#000 57%);animation:fish2Gauge linear forwards}
+@property --p{syntax:"<angle>";inherits:false;initial-value:360deg}
+@keyframes fish2Gauge{from{--p:360deg;filter:hue-rotate(0)}to{--p:0deg;filter:hue-rotate(-60deg)}}
+.fish2-gauge b{position:relative;font:800 26px "Gowun Batang";color:#ffe27a;text-shadow:0 2px 0 #2a1a08}.fish2-gauge kbd{position:absolute;bottom:26px;font:700 10px "Gowun Dodum";padding:1px 6px;border-radius:5px;background:#fff;color:#2c5133}
+.fish2-controls{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.fish2-tip{margin:0;padding:6px 14px;border-radius:999px;background:#5b3a18;color:#ffe9b0;font-size:13px;font-weight:700}
+.fish2-main{min-width:260px;padding:14px 26px;border-radius:16px;border:3px solid #24452c;background:linear-gradient(180deg,#3f6b45,#2c5133);color:#fff;font:700 22px "Gowun Batang";cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 0 0 4px #8a5f36,0 6px 14px rgba(30,60,35,.3)}
+.fish2-main kbd{font:700 12px "Gowun Dodum";padding:2px 8px;border:1px solid rgba(255,255,255,.7);border-radius:6px;margin-left:8px;vertical-align:middle}
+.fish2-main.hot{background:linear-gradient(180deg,#e0732a,#b8501a);border-color:#7a2f0c;animation:fish2Pulse .5s ease-in-out infinite alternate}
+.fish2-main.idle{display:inline-block;text-align:center;opacity:.85;cursor:default}.fish2-main:disabled{opacity:.5;cursor:not-allowed}
+@keyframes fish2Pulse{to{transform:scale(1.04)}}
+@media(prefers-reduced-motion:reduce){.fish2-main.hot{animation:none}}
+.fish2-today,.fish2-recent{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.fish2-today li,.fish2-recent li{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;padding:7px 9px;border-radius:12px;background:#fffaf0;border:1px solid rgba(122,84,40,.16)}
+.fish2-today li span:nth-child(2),.fish2-recent li span:nth-child(2){display:grid;min-width:0}.fish2-today b,.fish2-recent b{font-size:14px;color:#2e2a20}.fish2-today small,.fish2-recent small{font-size:11px;color:#7d6a52}
+.fish2-today-icon{display:grid;place-items:center;font-size:28px}
+.fish2-today .legend-fish-art.book{width:44px;height:30px}
+.fish2-today li.r-희귀 small{color:#2f6fb6}.fish2-today li.r-전설{background:linear-gradient(135deg,#fff3c8,#ffd98a);border:2px solid #e8a32a}.fish2-today li.r-전설 small{color:#c0561a;font-weight:700}
+.fish2-today em{font-style:normal}
+.fish2-recent button{padding:4px 10px;border-radius:999px;border:1px solid rgba(122,84,40,.3);background:#fff;font-size:11px;font-weight:700;cursor:pointer}.fish2-recent time{font-size:11px;color:#7d6a52}
+.fish2-mode{display:grid;gap:6px}.fish2-mode button{padding:9px 10px;border-radius:12px;border:2px solid #d9bd8a;background:#fffaf0;text-align:left;font-weight:700;color:#5b4630;cursor:pointer}
+.fish2-mode button.on{border-color:#3f6b45;background:#e8f2df;color:#24452c}
+.fish2-picker{max-width:520px;width:calc(100% - 32px);max-height:80vh;overflow:auto;display:grid;gap:10px}
+@media(max-width:1200px){.fish2-head{grid-template-columns:1fr}.fish2-pills{justify-content:flex-start}.fish2-body{grid-template-columns:240px minmax(0,1fr)}.fish2-side{grid-column:1/-1}}
+@media(max-width:860px){.fish2-body{grid-template-columns:1fr}.fish2-stage{order:1}.fish2-bag{order:2}.fish2-side{order:3}.fish2 .pond{height:340px}.fish2-gauge{right:8%;top:20%;width:110px;height:110px}.fish2-main{min-width:0;width:100%}}
+.fish2-today em{font-size:11px;color:#7d6a52;font-weight:700}

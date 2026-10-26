@@ -2,7 +2,7 @@
 
 > 작성: 2026-10-26
 > 콘셉트: `public/concepts/farm-field-ui-concept-v1.png`
-> 상태: **숨김 구현**. `app/farm/ui.ts`의 `FARM_V2_RELEASED = false`라서 운영에는 기존 화면이 보이고, 로컬 테스트 모드(`TEST_MODE`)에서만 새 화면이 보인다. 운영 공개는 사용자 승인 뒤 `true`로 바꾼다.
+> 상태: **운영 공개(2026-10-26, 사용자 승인)**. `app/farm/ui.ts`의 `FARM_V2_RELEASED = true`. 문제가 생기면 `false`로 되돌리면 기존 화면이 보인다.
 
 ## 1. 유지한 규칙
 
