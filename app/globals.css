@@ -1425,38 +1425,67 @@ button { color:inherit; }
 .village-panel{max-width:1440px;margin:0 auto 16px}
 .village-locked p{margin:8px 0}
 .village-locked .ghost-button{margin-top:6px}
-.village-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-top:10px}
-.village-map{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px;border-radius:18px;background:linear-gradient(160deg,#cfe3b4,#b8d39a);align-content:start}
-.village-map.decorated{background:linear-gradient(160deg,#f3d9e4,#cfe3b4 40%,#b8d39a)}
-.village-tile{position:relative;display:grid;justify-items:center;gap:2px;padding:12px 6px;border:2px solid transparent;border-radius:14px;background:rgba(255,253,245,.85);cursor:pointer;font-family:"Gowun Dodum"}
-.village-tile.on{border-color:var(--ink)}
-.village-tile.level-0 .village-look{filter:grayscale(.85) brightness(.9)}
-.village-tile.soon{opacity:.55}
-.village-tile b{font-size:12px}.village-tile small{font-size:11px;color:#a0702a;letter-spacing:.05em}
-.village-look{font-size:30px;line-height:1.1;white-space:nowrap}.village-look.big{font-size:40px}
-.village-hammer{position:absolute;right:6px;top:4px;font-style:normal;font-size:16px}
-.village-reco{position:absolute;left:6px;top:6px;font:800 10px "Gowun Dodum";font-style:normal;color:#fff;background:#6c9a4f;border-radius:999px;padding:1px 6px}
-.village-detail{display:grid;gap:10px;align-content:start}
-.village-detail-head{display:flex;gap:10px;align-items:center}.village-detail-head div{display:grid}.village-detail-head small{color:#6e786f}
-.village-effects{margin:0;padding:0;list-style:none;display:grid;gap:4px}
-.village-effects li{display:grid;grid-template-columns:70px 1fr;gap:6px;font-size:12px;color:#8a8f86}
-.village-effects li.done{color:#41603f}.village-effects li.next{color:var(--ink);font-weight:700}
-.village-needs{margin:0;padding:0;list-style:none;display:grid;gap:6px}
-.village-needs li{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(50px,1fr) auto auto;gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:#fffdf8;border:1px solid var(--line);font-size:12px}
-.village-needs li.full{background:#eef5e6}
-.village-need-name{display:grid}.village-need-name small{color:#8a8f86;font-size:10px}
-.village-need-bar{height:6px;border-radius:6px;background:#ece4d2;overflow:hidden}.village-need-bar i{display:block;height:100%;background:#6c9a4f}
-.village-need-count{font-weight:800;white-space:nowrap}.village-need-count small{font-weight:400;color:#8a8f86}
-.village-needs button{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
+.village-panel.panel{background:linear-gradient(180deg,#fbf3e2,#f6ead2);border-color:rgba(122,84,40,.22)}
+.village-head{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+.village-title{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.village-title h3{margin:0;font:700 clamp(26px,3vw,40px) "Gowun Batang";color:#3b2a18;letter-spacing:-.02em}.village-title h3 small{font-size:15px;color:#a0702a}
+.village-title>span{font:600 15px "Gowun Batang";color:#5b4630}
+.village-total{flex:1;min-width:220px;max-width:420px;display:flex;align-items:center;gap:12px;padding:9px 16px;border:1px solid rgba(122,84,40,.2);border-radius:14px;background:#fffaf0}
+.village-total span{white-space:nowrap;font-size:14px;color:#5b4630}.village-total b{color:#3b2a18}
+.village-total i,.village-stage-bar{flex:1;display:block;height:9px;border-radius:9px;background:#e9dcc2;overflow:hidden}
+.village-total em,.village-stage-bar em{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#3f6b45,#5e8f5f)}
+.village-storage{margin-left:auto;display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid rgba(122,84,40,.25);border-radius:12px;background:#fffaf0;cursor:pointer;font-weight:700;color:#3b2a18}
+.village-storage kbd{font:700 11px "Gowun Dodum";padding:1px 6px;border:1px solid #b9a27e;border-radius:5px;background:#fff}
+.village-layout{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(340px,1fr);gap:14px;align-items:start}
+.village-map{position:sticky;top:96px;container-type:inline-size;aspect-ratio:1270/824;border-radius:18px;overflow:hidden;border:3px solid #e8d6b4;box-shadow:0 0 0 1px rgba(122,84,40,.25),0 10px 24px rgba(80,50,20,.18);background:#d9c9a3 url("/images/village/map.webp") center/100% 100% no-repeat}
+.village-spot{position:absolute;padding:0;border:0;border-radius:22px;background:transparent;cursor:pointer;transition:box-shadow .2s,background .2s}
+.village-spot:hover{background:rgba(255,236,170,.14)}
+.village-spot:focus-visible{outline:3px solid #ffd76a;outline-offset:2px}
+.village-spot.on{box-shadow:0 0 0 3px rgba(255,214,102,.95),0 0 26px 8px rgba(255,200,80,.55);background:rgba(255,236,170,.16)}
+.village-badge{position:absolute;left:50%;top:6%;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:1px;font-size:clamp(14px,2.4cqw,30px);line-height:1;padding:.35em .45em;border-radius:999px;background:#fff6df;border:2px solid #c99b52;box-shadow:0 3px 8px rgba(60,35,10,.3)}
+.village-badge small{font-size:.42em;color:#a0702a;letter-spacing:.05em}
+.village-spot.ready .village-badge{background:#ffe9a8;border-color:#e0a832;animation:villageBob 1.6s ease-in-out infinite}
+.village-spot.soon .village-badge{background:#ece6da;border-color:#a39a8a;filter:saturate(.4)}
+.village-spot.ruin .village-badge{background:#f4ece0;border-color:#b8a78a}
+@keyframes villageBob{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,-62%)}}
+@media(prefers-reduced-motion:reduce){.village-spot.ready .village-badge{animation:none}}
+.village-reco{position:absolute;right:6%;top:2%;font:800 clamp(9px,1.1cqw,13px) "Gowun Dodum";font-style:normal;color:#fff;background:#5e8f5f;border-radius:999px;padding:2px 8px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.village-legend{position:absolute;left:1.4%;top:89.4%;min-width:37.8%;height:9.4%;padding:0 .9em;display:flex;align-items:center;justify-content:space-around;gap:.9em;border-radius:12px;background:#fffaf0;border:1px solid rgba(122,84,40,.25);box-shadow:0 4px 12px rgba(60,35,10,.18);font-size:clamp(9px,1.25cqw,15px);color:#3b2a18;pointer-events:none}
+.village-legend span{display:flex;align-items:center;gap:.5em;white-space:nowrap}.village-legend b{display:grid;place-items:center;width:2em;height:2em;border-radius:50%;background:#f3e6cc;border:1px solid #c99b52;font-size:1.05em}
+.village-detail{display:grid;gap:10px;align-content:start;padding:16px;border-radius:18px;background:#fffaf0;border:1px solid rgba(122,84,40,.2);box-shadow:0 8px 20px rgba(80,50,20,.1)}
+.village-detail-head{display:flex;gap:12px;align-items:center}.village-detail-head div{display:grid;gap:3px}
+.village-detail-head b{font:700 24px "Gowun Batang";color:#3b2a18}.village-detail-head small{color:#6f5a40;font-size:12px}
+.village-icon{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#f7e7c4;border:2px solid #d8b077;font-size:24px}
+.village-thumb{position:relative;aspect-ratio:1.75;border-radius:14px;background-image:url("/images/village/map.webp");background-repeat:no-repeat;border:1px solid rgba(122,84,40,.2)}
+.village-thumb.soon{filter:grayscale(.55) brightness(.92)}.village-thumb span{position:absolute;right:8px;bottom:8px;padding:3px 10px;border-radius:999px;background:rgba(255,250,240,.92);font-size:12px;font-weight:700}
+.village-stage{display:flex;align-items:baseline;gap:6px}.village-stage b{font:700 22px "Gowun Batang";color:#3b2a18}.village-stage span{color:#8a7458;font-size:13px}
+.village-stage-bar{flex:none}
+.village-effects{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.village-effects li{display:grid;grid-template-columns:24px 46px 1fr;gap:8px;align-items:start;font-size:13px;color:#9a8f80}
+.village-effects li b{font-weight:700}
+.village-step-mark{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:800;border:2px solid #cbbfa9;background:#fff}
+.village-effects li.done{color:#3f5a3c}.village-effects li.done .village-step-mark{background:#4f8a55;border-color:#4f8a55;color:#fff}
+.village-effects li.next{color:#3b2a18}.village-effects li.next .village-step-mark{border:3px solid #e0a832;background:#fff6df}
+.village-effects li.lock .village-step-mark{border-color:transparent;background:transparent}
+.village-needs-title{margin:4px 0 0;padding-top:10px;border-top:1px solid rgba(122,84,40,.18);font:700 16px "Gowun Batang";color:#3b2a18}
+.village-needs{margin:0;padding:8px 10px;list-style:none;display:grid;gap:8px;border-radius:12px;border:1px solid rgba(122,84,40,.16);background:#fffdf8}
+.village-needs li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-rows:auto auto;column-gap:8px;row-gap:5px;align-items:center;font-size:13px}
+.village-needs li .village-need-bar{grid-column:1/-1;grid-row:2}
+.village-need-name{display:flex;align-items:baseline;gap:6px;min-width:0;flex-wrap:wrap}.village-need-name small{color:#8a8f86;font-size:10px}
+.village-need-bar{height:8px;border-radius:8px;background:#e9dcc2;overflow:hidden}.village-need-bar i{display:block;height:100%;border-radius:8px;background:#3f6b45}
+.village-needs li.gold .village-need-bar i{background:#d49a2a}
+.village-need-count{font-weight:800;white-space:nowrap}
+.village-needs button{border:1px solid rgba(122,84,40,.3);border-radius:999px;padding:4px 10px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
 .village-needs button:disabled{opacity:.4;cursor:not-allowed}
-.village-actions{display:grid;gap:6px}
-.village-actions .danger{color:#a3361c}
+.village-main{width:100%;padding:15px 12px;border:2px solid #24452c;border-radius:14px;background:linear-gradient(180deg,#3f6b45,#2c5133);color:#fff;font:700 18px "Gowun Batang";cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 4px 10px rgba(30,60,35,.25)}
+.village-main:disabled{opacity:.5;cursor:not-allowed}
+.village-cancel{justify-self:center;border:0;background:none;color:#a3361c;font-size:12px;text-decoration:underline;cursor:pointer}
 .village-max{font-weight:800;color:#41603f}
 .village-confirm{max-width:420px}.village-confirm ul{margin:8px 0;padding:0;list-style:none;display:grid;gap:4px;max-height:40vh;overflow:auto}
 .village-confirm li{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:5px 8px;border-radius:8px;background:#fbf6ea}
 .village-confirm-actions{display:flex;gap:8px;flex-wrap:wrap}
-@media(max-width:760px){.village-layout{grid-template-columns:1fr}.village-map{gap:6px;padding:10px}.village-look{font-size:24px}.village-needs li{grid-template-columns:1fr auto auto}.village-need-bar{grid-column:1/-1;grid-row:2}}
-.village-actions .save-button:disabled,.village-actions .ghost-button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:900px){.village-layout{grid-template-columns:1fr}.village-map{position:relative;top:auto}.village-total{max-width:none}}
+@media(max-width:560px){.village-head{gap:10px}.village-storage{margin-left:0}.village-detail{padding:12px}}
 /* 2단 메뉴(PC): 그룹 3개 + 현재 그룹의 탭 한 줄 */
 .tabs.two-level{display:grid;gap:8px;justify-items:start}
 .tab-groups{display:flex;flex-wrap:wrap;gap:8px}
