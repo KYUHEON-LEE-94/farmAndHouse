@@ -1616,3 +1616,73 @@ button { color:inherit; }
 /* 탐험 체력·잃은 채집물 */
 .explore-hp{letter-spacing:1px}.explore-hp.low{background:#ffe1d6}
 .explore-lost{color:#a3361c}
+/* ---------- 새 텃밭 화면(FARM_V2, public/concepts/farm-field-ui-concept-v1.png) ---------- */
+.farm2{max-width:1440px;margin:0 auto 16px}
+.farm2-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.farm2-sign{display:grid;justify-items:center;padding:8px 22px 9px;border-radius:14px;background:linear-gradient(180deg,#fff6e2,#f1dcb2);border:3px solid #9a6a3c;box-shadow:inset 0 0 0 2px #fff7e6,0 4px 10px rgba(80,50,20,.25)}
+.farm2-sign h3{margin:0;font:700 clamp(24px,2.6vw,34px) "Gowun Batang";color:#3b2a18;letter-spacing:-.02em}.farm2-sign span{font-size:12px;color:#5b4630}
+.farm2-pill{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:12px;background:#fffaf0;border:1px solid rgba(122,84,40,.22);box-shadow:0 2px 6px rgba(80,50,20,.08);font-size:13px;color:#5b4630;white-space:nowrap}
+.farm2-pill b{color:#2e3f2b;font-size:15px}.farm2-pill.hot{background:#fff1c9;border-color:#e0a832}.farm2-pill.warn{background:#e8f3fb;border-color:#8fb7d6}.farm2-pill.bad{background:#fde6e0;border-color:#e0533a}
+.farm2-body{display:grid;grid-template-columns:250px minmax(0,1fr) 270px;gap:14px;align-items:start}
+.farm2-card-title{display:flex;align-items:center;gap:8px}.farm2-card-title h4{margin:0;font:700 20px "Gowun Batang";color:#3b2a18}.farm2-card-title span{font-size:22px}
+.farm2-seeds,.farm2-sel,.farm2-expand{display:grid;gap:10px;padding:14px;border-radius:16px;background:linear-gradient(180deg,#fbf1dc,#f3e2bf);border:3px solid #b98a52;box-shadow:inset 0 0 0 2px #fff6e0,0 6px 14px rgba(80,50,20,.18)}
+.farm2-sort{display:flex;gap:6px}.farm2-sort button{flex:1;padding:6px 4px;border-radius:999px;border:1px solid rgba(122,84,40,.3);background:#fffaf0;font-size:12px;cursor:pointer;color:#5b4630}
+.farm2-sort button.on{background:#2f5a36;border-color:#2f5a36;color:#fff;font-weight:700}
+.farm2-seed-list{display:grid;gap:6px;max-height:560px;overflow:auto;padding-right:2px}
+.farm2-seed{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;padding:7px 9px;border-radius:12px;border:1px solid rgba(122,84,40,.18);background:#fffaf0;text-align:left;cursor:pointer}
+.farm2-seed:hover{border-color:#9bbf6a}.farm2-seed.on{background:#fbf6d0;border:2px solid #8fbf4f;box-shadow:0 0 0 2px rgba(143,191,79,.25)}
+.farm2-seed.late{opacity:.6}.farm2-seed:disabled{opacity:.45;cursor:not-allowed}
+.farm2-seed-icon{font-size:30px;line-height:1;text-align:center}
+.farm2-seed-info{display:grid;gap:1px;min-width:0}.farm2-seed-info b{font-size:14px;color:#2e2a20}.farm2-seed-info small{font-size:11px;color:#7d6a52}.farm2-seed-info em{font-style:normal;font-size:12px;font-weight:800;color:#2f5a36}
+.farm2-seed-time{display:grid;justify-items:end;font-size:11px;color:#5b4630;white-space:nowrap}.farm2-seed-time small{font-size:10px;color:#a0702a}
+.farm2-quick{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}
+.farm2-quick button{padding:10px 8px;border-radius:12px;border:2px solid #24452c;background:linear-gradient(180deg,#3f6b45,#2c5133);color:#fff;font-weight:700;cursor:pointer}
+.farm2-quick kbd{font:700 10px "Gowun Dodum";padding:0 5px;border:1px solid rgba(255,255,255,.6);border-radius:4px;margin-left:4px}
+.farm2-field-wrap{display:grid;gap:12px;min-width:0}
+.farm2-field{position:relative;border-radius:22px;overflow:hidden;padding:0 14px 16px;border:4px solid #8a5f36;box-shadow:inset 0 0 0 3px #c99b60,0 10px 24px rgba(60,35,10,.25);background:radial-gradient(circle at 20% 30%,rgba(255,255,255,.18) 0 2px,transparent 3px) 0 0/30px 30px,radial-gradient(circle at 70% 70%,rgba(80,110,40,.25) 0 2px,transparent 3px) 0 0/26px 26px,linear-gradient(180deg,#9fb46a,#c8b07a 26%,#c9ad78)}
+.farm2-scenery{height:clamp(70px,9vw,118px);margin:0 -14px 8px;background:url("/images/farm/scenery.webp") center bottom/cover no-repeat;border-bottom:4px solid #7a5532;box-shadow:0 4px 0 #a77a46}
+.farm2 .plots{min-height:0;padding:6px;gap:12px;background:transparent;border:0;box-shadow:none}
+.farm2 .plots.cols-6{gap:10px}
+.farm2 .plot{border-radius:12px;border:5px solid #7b5330;box-shadow:inset 0 0 0 2px #a8773f,inset 0 6px 10px rgba(40,22,8,.35),0 4px 0 #5a3b20,0 7px 10px rgba(40,25,10,.3);background:repeating-linear-gradient(180deg,transparent 0 11px,rgba(45,25,10,.32) 11px 14px),radial-gradient(ellipse at 40% 30%,#8e5f38,#6a4323 78%)}
+.farm2 .plot.thirsty{background:repeating-linear-gradient(180deg,transparent 0 11px,rgba(80,50,25,.28) 11px 14px),radial-gradient(ellipse at 40% 30%,#b58c5e,#987046 78%)}
+.farm2 .plot.ready{box-shadow:inset 0 0 0 2px #e6c25a,inset 0 6px 10px rgba(40,22,8,.3),0 4px 0 #5a3b20,0 0 16px 3px rgba(255,214,90,.55)}
+.farm2 .plant{filter:drop-shadow(0 4px 2px rgba(30,15,5,.35))}
+.farm2 .plot-cell.sel>.plot{border-color:#9ccf4f;box-shadow:inset 0 0 0 2px #d8f59a,0 0 0 3px #b9f06a,0 0 20px 6px rgba(170,240,90,.55)}
+.sel-label{position:absolute;z-index:7;left:50%;top:-12px;transform:translateX(-25%);padding:3px 12px;border-radius:999px;background:#2f5a36;color:#fff;font:700 12px "Gowun Dodum";white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);pointer-events:none}
+.farm2-tools{display:grid;grid-template-columns:repeat(5,minmax(64px,92px)) minmax(200px,1fr);gap:8px;align-items:stretch;padding:10px;border-radius:18px;background:linear-gradient(180deg,#8a5f36,#6f4a2a);box-shadow:inset 0 2px 0 #b98a52,0 6px 14px rgba(60,35,10,.3)}
+.farm2-tools>button,.farm2-fert>button{position:relative;display:grid;justify-items:center;align-content:center;gap:2px;padding:10px 4px 8px;border-radius:12px;border:2px solid #d9bd8a;background:linear-gradient(180deg,#fffaf0,#f1e2c2);cursor:pointer;min-height:86px;width:100%}
+.farm2-tools>button b,.farm2-fert>button b{font-size:28px;line-height:1}.farm2-tools>button span,.farm2-fert>button span{font-weight:800;font-size:13px;color:#3b2a18}
+.farm2-tools>button small,.farm2-fert>button small{font-size:10px;color:#7d6a52}.farm2-fert>button small.empty{color:#b04a2a}
+.farm2-tools kbd{position:absolute;left:6px;top:5px;font:800 10px "Gowun Dodum";padding:0 5px;border-radius:5px;background:#6f4a2a;color:#fff}
+.farm2-tools>button.on,.farm2-fert>button.on{background:linear-gradient(180deg,#3f6b45,#2c5133);border-color:#b9f06a;box-shadow:0 0 0 2px #b9f06a}
+.farm2-tools>button.on span,.farm2-tools>button.on small,.farm2-fert>button.on span,.farm2-fert>button.on small{color:#fff}
+.farm2-tools>button:disabled{opacity:.6;cursor:default}.farm2-tools>button.empty{border-color:#e07a5a}
+.farm2-meter{display:grid;justify-items:center;width:100%}.farm2-meter i{display:block;height:6px;border-radius:6px;background:#6fb6e8;justify-self:stretch;margin:2px 6px 1px}.farm2-meter em{font-style:normal}
+.farm2-fert{position:relative}
+.farm2-fert-menu{position:absolute;bottom:calc(100% + 8px);left:0;z-index:20;min-width:240px}
+.farm2-hint{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:#fffaf0;border:2px solid #d9bd8a;font-size:12px;color:#3b2a18;min-width:0}
+.farm2-hint>div{display:grid;gap:3px;min-width:0}.farm2-hint small{color:#7d6a52}
+.farm2-reach{display:grid;gap:2px;flex:none;width:58px}.farm2-reach i{display:block;aspect-ratio:1;border-radius:3px;background:#6fbf4f;border:1px solid #3f7a33}
+.farm2-side{display:grid;gap:12px}
+.farm2-sel-tag{padding:5px 10px;border-radius:999px;background:#f1e6cc;font-size:13px;font-weight:700;color:#3b2a18}
+.farm2-sel-crops,.farm2-sel-stats{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.farm2-sel-crops li,.farm2-sel-stats li{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#3b2a18}
+.farm2-sel-stats{padding-top:8px;border-top:1px dashed rgba(122,84,40,.35)}.farm2-sel-stats b{color:#2f5a36}
+.farm2-water-all{padding:12px;border-radius:12px;border:2px solid #24452c;background:linear-gradient(180deg,#3f6b45,#2c5133);color:#fff;font:700 15px "Gowun Batang";cursor:pointer}
+.farm2-water-all:disabled{opacity:.5;cursor:not-allowed}
+.farm2-fert-pick{padding:10px;border-radius:12px;border:2px solid #c99b52;background:linear-gradient(180deg,#fbe7c2,#f1d3a0);font-weight:700;color:#5b3a18;cursor:pointer}
+.farm2-clear{padding:9px;border-radius:12px;border:1px solid rgba(122,84,40,.3);background:#fffaf0;color:#5b4630;cursor:pointer}
+.farm2-expand h4{margin:0;font:700 16px "Gowun Batang";color:#3b2a18}
+.farm2-expand>div{display:flex;align-items:center;gap:10px}.farm2-expand p{margin:0;font-size:12px;color:#5b4630}
+.farm2-expand-art{display:grid;place-items:center;width:58px;height:46px;border-radius:10px;background:linear-gradient(180deg,#9fb46a,#8a5f36);font-size:24px;border:2px solid #7b5330}
+.farm2-expand>button{padding:9px;border-radius:12px;border:2px solid #c99b52;background:#fff3d6;font:800 15px "Gowun Dodum";color:#5b3a18;cursor:pointer}.farm2-expand>button:disabled{opacity:.55;cursor:default}
+.farm2-shop{border-radius:14px;background:#fffaf0;border:1px solid rgba(122,84,40,.25);padding:10px 12px}
+.farm2-shop summary{cursor:pointer;font-weight:800;color:#3b2a18}.farm2-shop summary small{font-weight:400;color:#7d6a52;margin-left:4px}
+.farm2-shop .tool-shop{margin-top:8px}
+.farm2-workshop{position:relative;padding:10px;border-radius:12px;border:1px solid rgba(122,84,40,.3);background:#fffaf0;font-weight:700;cursor:pointer}
+@media(max-width:1200px){.farm2-body{grid-template-columns:220px minmax(0,1fr)}.farm2-side{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:start}}
+@media(max-width:860px){.farm2-body{grid-template-columns:1fr}.farm2-seeds{order:2}.farm2-field-wrap{order:1}.farm2-side{order:3}.farm2-seed-list{max-height:320px}.farm2-tools{grid-template-columns:repeat(5,1fr)}.farm2-hint{grid-column:1/-1}.farm2-tools>button,.farm2-fert>button{min-height:72px}.farm2-tools>button b,.farm2-fert>button b{font-size:22px}}
+@media(max-width:520px){.farm2-head{gap:6px}.farm2-pill{padding:6px 9px;font-size:12px}.farm2-field{padding:0 6px 8px}.farm2 .plots{gap:6px;padding:2px}.farm2-tools{gap:5px;padding:7px}.farm2-tools>button span,.farm2-fert>button span{font-size:11px}.farm2-tools>button small,.farm2-fert>button small{display:none}.farm2-tools>button small.farm2-meter{display:grid}.farm2-meter em{font-size:9px}}
+.farm2 .plot:hover{transform:none;filter:brightness(1.06)}
+.farm2 .plots{grid-template-columns:repeat(4,minmax(0,1fr))}.farm2 .plots.cols-6{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:760px){.farm2 .plots.cols-6{grid-template-columns:repeat(4,minmax(0,1fr))}}

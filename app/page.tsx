@@ -29,6 +29,7 @@ import CoinGame from "./CoinGame";
 import { COIN_ENABLED, COIN_MIN_QTY, coinBoard, settleCoin, type CoinHoldings } from "./coin";
 import { ALL_LOOT, HUNT_ENABLED, HUNT_TEST_UNLOCK_ALL, HUNT_TICKET_MINUTES, HUNT_TICKET_PRICE, WEAPONS, type Weapon } from "./hunting";
 import { TEST_MODE, ownsItem } from "./testMode";
+import { FARM_V2_ENABLED } from "./farm/ui";
 import { KitchenPanel } from "./KitchenPanel";
 import LunchPanel, { LunchBag } from "./cooking/LunchPanel";
 import { LUNCHES, lunchRecipe } from "./cooking/recipes";
@@ -436,6 +437,11 @@ export default function Home() {
   const justHarvested = useRef(new Set<number>());
   const [canId, setCanId] = useState("tin");
   const [hoverArea, setHoverArea] = useState<number[]>([]);
+  /** 새 텃밭 화면의 선택 구획(마지막으로 가리킨 도구 범위). */
+  const [fieldSel, setFieldSel] = useState<{ cells: number[]; label: string }>({ cells: [], label: "" });
+  /** 선택 구획을 마지막으로 계산한 칸·도구(같은 칸 위에서 반복 계산하지 않게). */
+  const selKeyRef = useRef("");
+  const [seedSort, setSeedSort] = useState<"reco" | "short" | "profit">("reco");
   const plotsRef = useRef<HTMLDivElement>(null);
   const [waterFx, setWaterFx] = useState<{ id: number; plotIndex: number }[]>([]);
   const [squashFx, setSquashFx] = useState<{ id: number; plotIndex: number; x: number; y: number }[]>([]);
@@ -1091,6 +1097,22 @@ export default function Home() {
     setNotice(`${can.icon} ${josa(can.name, "을를")} 샀어요! 물을 가득 채워 드렸어요. (${can.note})`);
   }
 
+  /** 선택 구획 전체 물주기: 목마른 칸에만 주고, 물뿌리개 범위(칸 수)마다 물 1을 쓴다. */
+  function waterArea(cells: number[]) {
+    const time = Date.now();
+    const targets = cells.filter(i => { const plot = plots[i], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
+      return plot && crop && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod && plotStatus(plot, crop, time, bugPenalty).thirsty; });
+    if (!targets.length) return setNotice("💧 선택한 구획에 목마른 작물이 없어요.");
+    const cost = Math.ceil(targets.length / (currentCan.w * currentCan.h));
+    if (canWater - pendingPours.current < cost) return setNotice(`🚿 물이 모자라요. 이 구획엔 물 ${cost}이 필요해요(남은 ${Math.max(0, canWater)}). 🚰 우물(4)에서 채워 주세요.`);
+    targets.forEach(i => justWatered.current.set(i, time));
+    pendingPours.current += cost; setCanWater(value => Math.max(0, value - cost));
+    setPlots(current => current.map((item, i) => (targets.includes(i) && item ? { ...item, water: [...(item.water ?? []), time] } : item)));
+    setWaterFx(items => [...items, ...targets.map(i => ({ id: time + i, plotIndex: i }))]);
+    window.setTimeout(() => setWaterFx(items => items.filter(item => item.id < time || item.id > time + plotCount)), 900);
+    playSplash();
+    setNotice(`💧 선택 구획 ${targets.length}칸에 물을 줬어요. (물 ${cost} 사용 · 남은 ${Math.max(0, canWater - cost)}/${canMax})`);
+  }
   function refillCan() {
     if (canWater >= canMax) return setNotice("🚿 물뿌리개는 이미 가득 차 있어요.");
     setCanWater(canMax); setTool("water"); playSplash();
@@ -2508,8 +2530,64 @@ export default function Home() {
   const bareReady = currentSpot.price === 0 && (selectedBait === BARE_HAND.id || !baits[currentBait.id]);
   const ticketLeft = currentSpot.price > 0 ? Math.max(0, Math.ceil(((tickets[currentSpot.id] ?? 0) - nowMs) / 1000)) : -1;
 
+  const fieldGrid = (
+    <div ref={plotsRef} onPointerLeave={() => setHoverArea([])} className={`plots plots-${plotCount} cols-${fieldColumns(plotCount)} ${plots.filter(Boolean).length >= LITE_FIELD_PLANTS ? "lite" : ""} hand-${handId} planter-${planterId} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
+      {Array.from({ length: plotCount }).map((_, index) => {
+        const plot = plots[index] || null; const crop = plot ? CROPS.find(c => c.id === plot.cropId)! : null;
+        const withered = Boolean(plot && seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod);
+        const status = plot && crop ? plotStatus(plot, crop, nowMs, bugPenalty) : null;
+        const progress = status?.progress ?? 0, bugLeft = plot?.bug ? Math.max(0, BUG_SECONDS - Math.floor((nowMs - plot.bug) / 1000)) : 0;
+        return <div key={index} className={`plot-cell ${FARM_V2_ENABLED && fieldSel.cells.includes(index) ? "sel" : ""} ${hoverArea.includes(index) ? (tool === "water" ? "can-area" : tool === "hand" ? "hand-area" : tool === "seed" ? "seed-area" : activeFert ? "fert-area" : "") : ""}`}><button className={`plot ${withered ? "withered" : status?.ready ? "ready" : status?.thirsty ? "thirsty" : ""} ${FERTILIZERS.some(item => item.id === tool) && status && !status.ready && !status.fert && !withered ? "fert-target" : ""} ${status?.fert && !withered ? `fert-${status.fert.id}` : ""}`}
+          onClick={event => { if (tool === "water" && event.detail > 0) return; clickPlot(index); }}
+          onPointerDown={event => { if (tool !== "water" && tool !== "hand" && tool !== "seed" && !activeFert) return; event.currentTarget.releasePointerCapture?.(event.pointerId); if (tool === "water") { if (plot?.bug) catchBug(index); else waterPlot(index); } }}
+          onPointerEnter={event => { const reach = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : activeFert ? currentSpreader : null;
+            const selKey = `${index}:${tool}:${reach ? `${reach.w}x${reach.h}` : "1"}`;
+                  if (FARM_V2_ENABLED && selKeyRef.current !== selKey) { selKeyRef.current = selKey; const r = reach ?? { w: 1, h: 1 }, area = canArea(index, plotColumns(), plotCount, r), label = r.h > 1 ? `${Math.min(r.w, plotColumns())}×${Math.ceil(area.length / Math.min(r.w, plotColumns()))}칸` : `가로 ${area.length}칸`; setFieldSel(prev => prev.label === label && prev.cells.length === area.length && prev.cells.every((v, i) => v === area[i]) ? prev : { cells: area, label }); }
+            if (reach && (tool === "water" || reach.w * reach.h > 1)) { const area = canArea(index, plotColumns(), plotCount, reach); setHoverArea(prev => prev.length === area.length && prev.every((v, i) => v === area[i]) ? prev : area); }
+            if (!(event.buttons & 1)) return;
+            if (plot?.bug) return catchBug(index);
+            if (tool === "water") waterPlot(index); else if (tool === "hand") harvest(index, true); else if (tool === "seed") plant(index, true); else if (activeFert) fertilize(index, activeFert, true); }}>
+          {status?.fert && !withered && <span className={`fert-tag fert-tag-${status.fert.id}`}>{status.fert.icon} {status.fert.name}</span>}
+          {crop && withered ? <><span className="plant">🥀</span><span className="plot-label">시듦 · 치우기</span></> : crop && status ? <>
+            <span className={`plant stage-${status.ready ? "ripe" : progress < 35 ? "sprout" : progress < 75 ? "grow" : "mature"}`}>{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span>{status.ready && <span className="ripe-sparkle" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i></span>}
+            <span className="plot-label">{status.ready ? `수확하기 ${status.quality.stars}` : status.thirsty ? "💧 목말라요" : `⏱ ${status.remaining >= 60 ? formatClock(status.remaining) : `${status.remaining}초`}`}</span>
+            <span className="grow-bar"><i style={{ width: `${progress}%` }} /></span>
+            <span className="plot-badges">{Array.from({ length: status.total }).map((_, k) => <i key={k} className={k < status.satisfied ? "on" : ""}>💧</i>)}{plot?.bugHits ? <i className="hurt">🐛-{Math.round((1 - status.bugMultiplier) * 100)}%</i> : null}</span>
+          </> : <><span className="soil-lines">╱ ╱ ╱</span><span className="plot-label">{tool === "seed" ? `${selectedCropInfo.icon} 심기` : "빈 밭"}</span></>}
+          {waterFx.filter(fx => fx.plotIndex === index).map(fx => <span className="water-fx" key={fx.id}><i>💧</i><i>💧</i><i>💧</i><i>💧</i></span>)}
+          {harvestFx.filter(fx => fx.plotIndex === index).map(fx => <span className="harvest-fx" key={fx.id}><EffectBurst id={equipment.farm} /><b>{fx.icon}</b><i>{fx.amount ? `＋${fx.amount.toLocaleString()}원 ` : ""}{fx.stars}</i><em>✦</em><em>✦</em><em>●</em></span>)}
+        </button>{squashFx.filter(fx => fx.plotIndex === index).map(fx => <span key={fx.id} className="squash-fx" style={{ left: fx.x, top: fx.y }} aria-hidden="true"><b>🐛</b>{[0, 1, 2, 3, 4, 5, 6].map(k => <i key={k} style={{ "--a": `${k * 51}deg` } as CSSProperties} />)}<em>찍!</em></span>)}{plot?.bug && !withered && <button className="bug" aria-label={`벌레 잡기, ${bugLeft}초 남음`} onPointerDown={event => { event.stopPropagation(); catchBug(index, event.currentTarget); }} onPointerEnter={event => { if (event.buttons & 1) catchBug(index, event.currentTarget); }} onClick={event => { event.stopPropagation(); if (event.detail === 0) catchBug(index, event.currentTarget); }}>🐛<b>{bugLeft}</b></button>}{FARM_V2_ENABLED && fieldSel.cells[0] === index && fieldSel.cells.length > 1 && <span className="sel-label" aria-hidden="true">← {fieldSel.label} →</span>}</div>;
+      })}
+    </div>
+  );
+  const toolShopBox = (
+    <div className="tool-shop">
+      <div className="tool-shop-tabs" role="tablist" aria-label="도구 상점">{([["seed", "🌱 심기"], ["hand", "🧺 수확"], ["water", "🚿 물"], ["fert", "🌿 거름"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={toolShop === id} className={toolShop === id ? "on" : ""} onClick={() => setToolShop(id)}>{label}</button>)}</div>
+      <small>{toolShop === "seed" ? "좋은 도구일수록 빈 밭 넓은 범위에 씨앗을 한꺼번에 심어요(씨앗값은 칸마다)" : toolShop === "hand" ? "좋은 도구일수록 다 자란 작물을 넓은 범위로 한꺼번에 거둬요" : toolShop === "fert" ? "거름은 미리 사 두고 칸마다 1개씩 써요. 좋은 뿌리개일수록 자라는 작물 넓은 범위에 한꺼번에 뿌려요" : "좋을수록 물을 많이 담고, 한 번에 여러 칸에 물을 줘요"}</small>
+      <div className="can-shop-list">{toolShop === "seed" ? PLANT_TOOLS.map(item => <button key={item.id} className={planterId === item.id ? "on" : ""} onClick={() => choosePlanter(item)} aria-pressed={planterId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 심기</small><em>{planterId === item.id ? "사용 중" : ownsItem(ownedPlanters, item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)
+        : toolShop === "hand" ? HARVEST_TOOLS.map(hand => <button key={hand.id} className={handId === hand.id ? "on" : ""} onClick={() => chooseHand(hand)} aria-pressed={handId === hand.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${hand.w}, 1fr)` }}>{Array.from({ length: hand.w * hand.h }).map((_, k) => <i key={k} />)}</span><b>{hand.icon} {hand.name}</b><small>{hand.note} 수확</small><em>{handId === hand.id ? "사용 중" : ownsItem(ownedHands, hand.id) ? "들기" : `${hand.price.toLocaleString()}원`}</em></button>)
+        : toolShop === "fert" ? [...FERTILIZERS.map(item => <div key={item.id} className={`fert-stock ${tool === item.id ? "on" : ""}`}><button className="fert-pick" onClick={() => holdFert(item.id)} aria-pressed={tool === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.note}</small><em>{fertStock[item.id] ?? 0}개</em></button><QtyBuy label={item.name} unitPrice={item.price} money={money} initial={item.pack} step={item.pack >= 10 ? 5 : 1} onBuy={count => buyFert(item, count)} /></div>), <b key="spreader-title" className="tool-shop-sub">🧺 거름 뿌리개</b>, ...SPREADERS.map(item => <button key={item.id} className={spreaderId === item.id ? "on" : ""} onClick={() => chooseSpreader(item)} aria-pressed={spreaderId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 거름</small><em>{spreaderId === item.id ? "사용 중" : ownsItem(ownedSpreaders, item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)]
+        : CANS.map(can => <button key={can.id} className={canId === can.id ? "on" : ""} onClick={() => chooseCan(can)} aria-pressed={canId === can.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${can.w}, 1fr)` }}>{Array.from({ length: can.w * can.h }).map((_, k) => <i key={k} />)}</span><b>{can.name}</b><small>{can.note}</small><em>{canId === can.id ? "사용 중" : ownsItem(ownedCans, can.id) ? "들기" : `${can.price.toLocaleString()}원`}</em></button>)}</div>
+    </div>
+  );
+  // 새 텃밭 화면(FARM_V2): 씨앗 주머니·선택 구획·하단 도구대(public/concepts/farm-field-ui-concept-v1.png)
+  const cropSeconds = (crop: Crop) => Math.round(cycleCrop(crop, marketBucket).seconds * growthMul * (1 - PET_BASE.mole * pw("mole")) * (1 - PET_BASE.dragon * pw("dragon")));
+  const seedRows = [...available].sort((a, b) => seedSort === "short" ? cropSeconds(a) - cropSeconds(b) : seedSort === "profit" ? (salePrice(b) - seedPrice(b)) - (salePrice(a) - seedPrice(a)) : 0);
+  const selInfo = fieldSel.cells.filter(i => i < plotCount).reduce((acc, i) => {
+    const plot = plots[i], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
+    if (!plot || !crop) { acc.empty++; return acc; }
+    if (seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod) { acc.withered++; return acc; }
+    const status = plotStatus(plot, crop, nowMs, bugPenalty);
+    acc.crops[crop.id] = (acc.crops[crop.id] ?? 0) + 1; acc.progress += status.ready ? 100 : status.progress; acc.growing++;
+    if (status.thirsty) acc.thirsty++; if (status.ready) acc.ready++;
+    acc.value += Math.round(salePrice(crop) * status.quality.multiplier * status.bugMultiplier);
+    return acc;
+  }, { crops: {} as Record<string, number>, empty: 0, withered: 0, growing: 0, thirsty: 0, ready: 0, progress: 0, value: 0 });
+  const heldFert = FERTILIZERS.find(item => item.id === (activeFert ? activeFert.id : fertId)) ?? FERTILIZERS[0];
+  const reachNow = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : currentSpreader;
+
   return (
-    <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4} ${tab === "farm" ? "has-dock" : ""}`}>
+    <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4} ${tab === "farm" && !FARM_V2_ENABLED ? "has-dock" : ""}`}>
       <header className="topbar">
         {TEST_MODE && <span className="test-badge" title="로컬 개발 서버 전용: 숨긴 기능 공개 · 상점 아이템 모두 사용 · 계정 자동 저장 꺼짐">🧪 테스트 모드</span>}
         <div className="brand"><button className="avatar-button" onClick={() => setShowAvatar(true)} aria-label="내 아바타 바꾸기">{avatarImg}</button><div><h1>월루농가</h1><p>월급은 루팡, 농사는 진심</p></div></div>
@@ -2551,7 +2629,7 @@ export default function Home() {
       ]} />
 
       {/* 계절 배너: 텃밭에서는 크게, 다른 탭에서는 한 줄로 줄여 콘텐츠가 위에서 시작하게 */}
-      <section className={`season-strip ${tab === "farm" ? "" : "compact"}`}>
+      <section className={`season-strip ${tab === "farm" && !FARM_V2_ENABLED ? "" : "compact"}`}>
         <div className="season-copy"><span className="eyebrow">REAL-TIME SEASON</span><h2>{isWorkTime ? `${season}의 농장` : "오늘의 농사가 끝났어요"}</h2><p>{isWorkTime ? `${toClock(seasonStart)}—${toClock(seasonEnd)} · ${formatClock(seasonSecondsLeft)} 뒤 ${nextSeason}` : `${startHour}:00—${endHour}:00 사이에 농사를 지을 수 있어요`}</p>{isWorkTime && seasonIndex >= 0 && seasonIndex < 3 && seasonSecondsLeft <= SEASON_WARN_SECONDS && <p className={`season-omen omen-${seasonIndex + 1}`}>🍃 {seasonOmen((["여름", "가을", "겨울"] as const)[seasonIndex], now)}</p>}</div>
         <div className="season-track" aria-label="오늘의 계절 진행도">
           {SEASONS.map((s, i) => <div key={s} className={`season-step ${i === seasonIndex ? "active" : ""}`}><span>{SEASON_ICON[s]}</span><b>{s}</b></div>)}
@@ -2568,7 +2646,7 @@ export default function Home() {
 
 
 
-      {tab === "farm" && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~5)">
+      {tab === "farm" && !FARM_V2_ENABLED && <div className="tool-dock" role="toolbar" aria-label="농사 도구 (단축키 1~5)">
         <span className="dock-title">도구</span>
         <button className={`seed ${tool === "seed" ? "on" : ""}`} onClick={() => setTool("seed")} aria-pressed={tool === "seed"} title={`${currentPlanter.name}: 빈 밭 ${currentPlanter.note}에 ${selectedCropInfo.name} 심기. 누른 채 쓸어도 돼요 (1)`}><b>{selectedCropInfo.icon}</b><span>{currentPlanter.w * currentPlanter.h > 1 ? `${currentPlanter.icon} ${currentPlanter.note}` : "심기"}</span><small>{seedPrice(selectedCropInfo)}원</small><kbd>1</kbd></button>
         <button className={`harvest ${tool === "hand" ? "on" : ""}`} onClick={() => setTool("hand")} aria-pressed={tool === "hand"} title={`${currentHand.name}: 다 자란 작물 ${currentHand.note} 수확. 누른 채 쓸어도 돼요 (2)`}><b>{currentHand.icon}</b><span>{currentHand.w * currentHand.h > 1 ? currentHand.note : "수확"}</span><small>{currentHand.name}</small><kbd>2</kbd></button>
@@ -2582,7 +2660,76 @@ export default function Home() {
             {fertMenu && <div className="fert-menu" role="menu" aria-label="비료 고르기">{FERTILIZERS.map(item => <button key={item.id} role="menuitemradio" aria-checked={held.id === item.id} className={held.id === item.id ? "on" : ""} onClick={() => holdFert(item.id)}><b>{item.icon}</b><span>{item.name}<small>{item.note}</small></span><em className={fertStock[item.id] ? "" : "empty"}>{fertStock[item.id] ?? 0}개</em></button>)}</div>}
           </div>; })()}
       </div>}
-      {tab === "farm" && <div className="game-grid">
+      {tab === "farm" && FARM_V2_ENABLED && <div className={`farm2 season-${seasonIndex >= 0 ? seasonIndex : 4}`}>
+        <header className="farm2-head">
+          <div className="farm2-sign"><h3>{isWorkTime ? `${season} 텃밭` : "쉬는 텃밭"}</h3><span>오늘도 천천히, 한 칸씩</span></div>
+          <span className="farm2-pill">{SEASON_ICON[season]} {isWorkTime ? <>{season} · <b>{formatClock(seasonSecondsLeft)}</b></> : `${startHour}:00—${endHour}:00`}</span>
+          <span className="farm2-pill">🌱 재배 <b>{fieldStats.growing} / {plotCount}</b></span>
+          <span className={`farm2-pill ${fieldStats.ready ? "hot" : ""}`}>🧺 수확 <b>{fieldStats.ready}</b></span>
+          {fieldStats.thirsty > 0 && <span className="farm2-pill warn">💧 목마름 <b>{fieldStats.thirsty}</b></span>}
+          {fieldStats.bugs > 0 && <span className="farm2-pill bad">🐛 <b>{fieldStats.bugs}</b></span>}
+          <span className="farm2-pill">🪙 시세 갱신 <b>{formatClock(marketSecondsLeft)}</b></span>
+        </header>
+        <div className="farm2-body">
+          <aside className="farm2-seeds">
+            <div className="farm2-card-title"><span aria-hidden="true">👝</span><h4>씨앗 주머니</h4></div>
+            <div className="farm2-sort" role="tablist" aria-label="씨앗 정렬">{([["reco", "추천"], ["short", "짧은 재배"], ["profit", "수익"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={seedSort === id} className={seedSort === id ? "on" : ""} onClick={() => setSeedSort(id)}>{label}</button>)}</div>
+            {demandLeft(market) <= 0 && <p className="demand-out">🛒 이번 5분 수요를 다 채웠어요 · 시세 −{Math.round((1 - OVERFLOW_RATE) * 100)}%</p>}
+            <div className="farm2-seed-list">{seedRows.map(crop => { const secs = cropSeconds(crop), tooLate = isWorkTime && secs > seasonSecondsLeft, allowance = plantingAllowance(crop, specialPlantings, plantingDate), sat = saturationOf(market, crop.id);
+              return <button key={crop.id} className={`farm2-seed ${selectedCrop === crop.id ? "on" : ""} ${tooLate ? "late" : ""}`} onClick={() => { setSelectedCrop(crop.id); setTool("seed"); }} aria-pressed={selectedCrop === crop.id} disabled={allowance <= 0}>
+                <span className="farm2-seed-icon">{crop.icon}</span>
+                <span className="farm2-seed-info"><b>{crop.seasonalLimit ? "👑 " : ""}{crop.name}</b><small>씨앗 {seedPrice(crop).toLocaleString()}원</small><em>예상 {salePrice(crop).toLocaleString()}원{sat > 0 ? ` · 📉-${Math.round(sat * 100)}%` : ""}</em></span>
+                <span className="farm2-seed-time">{tooLate ? "시간 부족" : <>⏱ {formatClock(secs)}</>}{crop.seasonalLimit ? <small>파종 {allowance}/30</small> : null}</span>
+              </button>; })}</div>
+            <div className="farm2-quick"><button onClick={() => setShowMissions(true)}>📜 미션</button><button onClick={() => { setShowMissions(false); setShowStorage(true); }}>📦 통합 창고 <kbd>E</kbd></button></div>
+          </aside>
+          <section className="farm2-field-wrap">
+            {broke && lastBailout === today && <div className="broke-banner">💸 돈이 바닥났어요. <b>🎣 강가 맨손 낚시</b>로 다시 벌어 봐요!<button onClick={() => { setSelectedBait(BARE_HAND.id); goBareFishing(); }}>맨손 낚시하러 가기</button></div>}
+            <div className={`farm2-field cols-${fieldColumns(plotCount)}`}>
+              <div className="farm2-scenery" aria-hidden="true" />
+              {fieldGrid}
+            </div>
+            <div className="farm2-tools" role="toolbar" aria-label="농사 도구 (단축키 1~5)">
+              <button className={tool === "seed" ? "on" : ""} onClick={() => setTool("seed")} aria-pressed={tool === "seed"}><kbd>1</kbd><b>{selectedCropInfo.icon}</b><span>심기</span><small>{currentPlanter.note}</small></button>
+              <button className={tool === "hand" ? "on" : ""} onClick={() => setTool("hand")} aria-pressed={tool === "hand"}><kbd>2</kbd><b>🧺</b><span>수확</span><small>{currentHand.note}</small></button>
+              <button className={tool === "water" ? "on" : ""} onClick={() => setTool("water")} aria-pressed={tool === "water"}><kbd>3</kbd><b>🚿</b><span>물주기</span><small className="farm2-meter"><i style={{ width: `${(Math.min(canWater, canMax) / canMax) * 100}%` }} /><em>{Math.min(canWater, canMax)} / {canMax}</em></small></button>
+              <button className={canWater === 0 ? "empty" : ""} onClick={refillCan} disabled={canWater >= canMax}><kbd>4</kbd><b>🪣</b><span>우물</span><small>가득 채우기</small></button>
+              <div className="fert-slot farm2-fert">
+                <button className={activeFert ? "on" : ""} onClick={() => setFertMenu(open => !open)} aria-expanded={fertMenu} aria-haspopup="menu"><kbd>5</kbd><b>{heldFert.icon}</b><span>비료 ▾</span><small className={fertStock[heldFert.id] ? "" : "empty"}>{heldFert.name} {fertStock[heldFert.id] ?? 0}개</small></button>
+                {fertMenu && <div className="fert-menu farm2-fert-menu" role="menu" aria-label="비료 고르기">{FERTILIZERS.map(item => <button key={item.id} role="menuitemradio" aria-checked={heldFert.id === item.id} className={heldFert.id === item.id ? "on" : ""} onClick={() => holdFert(item.id)}><b>{item.icon}</b><span>{item.name}<small>{item.note}</small></span><em className={fertStock[item.id] ? "" : "empty"}>{fertStock[item.id] ?? 0}개</em></button>)}</div>}
+              </div>
+              <div className={`farm2-hint tb-${activeFert ? "fert" : tool}`}><span className="farm2-reach" style={{ gridTemplateColumns: `repeat(${reachNow.w}, 1fr)` }} aria-hidden="true">{Array.from({ length: reachNow.w * reachNow.h }).map((_, k) => <i key={k} />)}</span><div>{toolBanner}</div></div>
+            </div>
+          </section>
+          <aside className="farm2-side">
+            <div className="farm2-sel">
+              <div className="farm2-card-title"><span aria-hidden="true">🌱</span><h4>선택 구획</h4></div>
+              {fieldSel.cells.length ? <>
+                <span className="farm2-sel-tag">{fieldSel.label} ({fieldSel.cells.filter(i => i < plotCount).length}개 밭)</span>
+                <ul className="farm2-sel-crops">{Object.entries(selInfo.crops).map(([id, n]) => { const crop = CROPS.find(c => c.id === id)!; return <li key={id}><span>{crop.icon} {crop.name}</span><b>{n}칸</b></li>; })}
+                  {selInfo.empty > 0 && <li><span>🟫 빈 밭</span><b>{selInfo.empty}칸</b></li>}{selInfo.withered > 0 && <li><span>🥀 시든 밭</span><b>{selInfo.withered}칸</b></li>}</ul>
+                <ul className="farm2-sel-stats">
+                  <li><span>🌿 평균 성장도</span><b>{selInfo.growing ? `약 ${Math.round(selInfo.progress / selInfo.growing)}%` : "—"}</b></li>
+                  <li><span>💧 물 필요</span><b>{selInfo.thirsty}칸</b></li>
+                  <li><span>🪙 예상 수확 가치</span><b>약 {selInfo.value.toLocaleString()}원</b></li>
+                </ul>
+                <button className="farm2-water-all" onClick={() => waterArea(fieldSel.cells)} disabled={!selInfo.thirsty}>💧 전체 물주기</button>
+                <button className="farm2-fert-pick" onClick={() => setFertMenu(true)}>{heldFert.icon} 비료 선택</button>
+                <button className="farm2-clear" onClick={() => { selKeyRef.current = ""; setFieldSel({ cells: [], label: "" }); }}>✕ 구획 해제</button>
+              </> : <p className="hint">밭 위에 마우스를 올리면 지금 도구 범위가 선택 구획이 돼요. 여기서 물·성장도·예상 가치를 확인하고 한 번에 물을 줄 수 있어요.</p>}
+            </div>
+            <div className="farm2-expand">
+              <h4>다음 밭 확장 · {ownedPlots} → {Math.min(MAX_PLOTS, ownedPlots + 2)}칸</h4>
+              <div><span className="farm2-expand-art" aria-hidden="true">🌾</span><p>더 넓은 텃밭으로<br />다양한 작물을 재배해요!</p></div>
+              <span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span>
+              <button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `🪙 ${fieldPrice(ownedPlots).toLocaleString()}원`}</button>
+            </div>
+            <details className="farm2-shop"><summary>🧰 도구 상점 <small>심기·수확·물·거름</small></summary>{toolShopBox}</details>
+            <button className="farm2-workshop" onClick={() => switchTab("workshop")}>🏭 공방 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot">{doneJobs}</i>}</button>
+          </aside>
+        </div>
+      </div>}
+      {tab === "farm" && !FARM_V2_ENABLED && <div className="game-grid">
         <section className="farm-panel panel">
           <div className="panel-heading"><div><span className="eyebrow">MY FIELD · {plotCount}칸</span><h3>햇살 텃밭</h3></div><div className="field-summary">
             <span title="재배 중">🌱 {fieldStats.growing}/{plotCount}</span>
@@ -2592,32 +2739,7 @@ export default function Home() {
           </div></div>
           {broke && lastBailout === today && <div className="broke-banner">💸 돈이 바닥났어요. 🦝 “지원금은 오늘 벌써 받았잖아~ 맨손으로 물고기나 잡아 ㅋㅋ” <b>🎣 강가 맨손 낚시</b>로 다시 벌어 봐요!<button onClick={() => { setSelectedBait(BARE_HAND.id); goBareFishing(); }}>맨손 낚시하러 가기</button></div>}
           <div className={`tool-banner tb-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>{toolBanner}</div>
-          <div ref={plotsRef} onPointerLeave={() => setHoverArea([])} className={`plots plots-${plotCount} cols-${fieldColumns(plotCount)} ${plots.filter(Boolean).length >= LITE_FIELD_PLANTS ? "lite" : ""} hand-${handId} planter-${planterId} tool-${FERTILIZERS.some(item => item.id === tool) ? "fert" : tool}`}>
-            {Array.from({ length: plotCount }).map((_, index) => {
-              const plot = plots[index] || null; const crop = plot ? CROPS.find(c => c.id === plot.cropId)! : null;
-              const withered = Boolean(plot && seasonPeriod(plot.plantedAt, startHour, endHour) !== currentPeriod);
-              const status = plot && crop ? plotStatus(plot, crop, nowMs, bugPenalty) : null;
-              const progress = status?.progress ?? 0, bugLeft = plot?.bug ? Math.max(0, BUG_SECONDS - Math.floor((nowMs - plot.bug) / 1000)) : 0;
-              return <div key={index} className={`plot-cell ${hoverArea.includes(index) ? (tool === "water" ? "can-area" : tool === "hand" ? "hand-area" : tool === "seed" ? "seed-area" : activeFert ? "fert-area" : "") : ""}`}><button className={`plot ${withered ? "withered" : status?.ready ? "ready" : status?.thirsty ? "thirsty" : ""} ${FERTILIZERS.some(item => item.id === tool) && status && !status.ready && !status.fert && !withered ? "fert-target" : ""} ${status?.fert && !withered ? `fert-${status.fert.id}` : ""}`}
-                onClick={event => { if (tool === "water" && event.detail > 0) return; clickPlot(index); }}
-                onPointerDown={event => { if (tool !== "water" && tool !== "hand" && tool !== "seed" && !activeFert) return; event.currentTarget.releasePointerCapture?.(event.pointerId); if (tool === "water") { if (plot?.bug) catchBug(index); else waterPlot(index); } }}
-                onPointerEnter={event => { const reach = tool === "water" ? currentCan : tool === "hand" ? currentHand : tool === "seed" ? currentPlanter : activeFert ? currentSpreader : null;
-                  if (reach && (tool === "water" || reach.w * reach.h > 1)) { const area = canArea(index, plotColumns(), plotCount, reach); setHoverArea(prev => prev.length === area.length && prev.every((v, i) => v === area[i]) ? prev : area); }
-                  if (!(event.buttons & 1)) return;
-                  if (plot?.bug) return catchBug(index);
-                  if (tool === "water") waterPlot(index); else if (tool === "hand") harvest(index, true); else if (tool === "seed") plant(index, true); else if (activeFert) fertilize(index, activeFert, true); }}>
-                {status?.fert && !withered && <span className={`fert-tag fert-tag-${status.fert.id}`}>{status.fert.icon} {status.fert.name}</span>}
-                {crop && withered ? <><span className="plant">🥀</span><span className="plot-label">시듦 · 치우기</span></> : crop && status ? <>
-                  <span className={`plant stage-${status.ready ? "ripe" : progress < 35 ? "sprout" : progress < 75 ? "grow" : "mature"}`}>{progress < 35 ? "🌱" : progress < 75 ? "🌿" : crop.icon}</span>{status.ready && <span className="ripe-sparkle" aria-hidden="true"><i>✦</i><i>✧</i><i>✦</i></span>}
-                  <span className="plot-label">{status.ready ? `수확하기 ${status.quality.stars}` : status.thirsty ? "💧 목말라요" : `⏱ ${status.remaining >= 60 ? formatClock(status.remaining) : `${status.remaining}초`}`}</span>
-                  <span className="grow-bar"><i style={{ width: `${progress}%` }} /></span>
-                  <span className="plot-badges">{Array.from({ length: status.total }).map((_, k) => <i key={k} className={k < status.satisfied ? "on" : ""}>💧</i>)}{plot?.bugHits ? <i className="hurt">🐛-{Math.round((1 - status.bugMultiplier) * 100)}%</i> : null}</span>
-                </> : <><span className="soil-lines">╱ ╱ ╱</span><span className="plot-label">{tool === "seed" ? `${selectedCropInfo.icon} 심기` : "빈 밭"}</span></>}
-                {waterFx.filter(fx => fx.plotIndex === index).map(fx => <span className="water-fx" key={fx.id}><i>💧</i><i>💧</i><i>💧</i><i>💧</i></span>)}
-                {harvestFx.filter(fx => fx.plotIndex === index).map(fx => <span className="harvest-fx" key={fx.id}><EffectBurst id={equipment.farm} /><b>{fx.icon}</b><i>{fx.amount ? `＋${fx.amount.toLocaleString()}원 ` : ""}{fx.stars}</i><em>✦</em><em>✦</em><em>●</em></span>)}
-              </button>{squashFx.filter(fx => fx.plotIndex === index).map(fx => <span key={fx.id} className="squash-fx" style={{ left: fx.x, top: fx.y }} aria-hidden="true"><b>🐛</b>{[0, 1, 2, 3, 4, 5, 6].map(k => <i key={k} style={{ "--a": `${k * 51}deg` } as CSSProperties} />)}<em>찍!</em></span>)}{plot?.bug && !withered && <button className="bug" aria-label={`벌레 잡기, ${bugLeft}초 남음`} onPointerDown={event => { event.stopPropagation(); catchBug(index, event.currentTarget); }} onPointerEnter={event => { if (event.buttons & 1) catchBug(index, event.currentTarget); }} onClick={event => { event.stopPropagation(); if (event.detail === 0) catchBug(index, event.currentTarget); }}>🐛<b>{bugLeft}</b></button>}</div>;
-            })}
-          </div>
+          {fieldGrid}
         </section>
         <aside className="seed-panel panel">
           <div className="side-tabs" role="tablist" aria-label="씨앗과 가공">
@@ -2631,14 +2753,7 @@ export default function Home() {
           <div className="crop-list">{cropCards}</div>
           </> : null}
           <div className="field-shop"><div><b>🌾 밭 두 칸 확장</b><small>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `${fieldPrice(ownedPlots).toLocaleString()}원 · ${ownedPlots}/${MAX_PLOTS}칸`}</small><span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span></div><button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>구매</button></div>
-          <div className="tool-shop">
-            <div className="tool-shop-tabs" role="tablist" aria-label="도구 상점">{([["seed", "🌱 심기"], ["hand", "🧺 수확"], ["water", "🚿 물"], ["fert", "🌿 거름"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={toolShop === id} className={toolShop === id ? "on" : ""} onClick={() => setToolShop(id)}>{label}</button>)}</div>
-            <small>{toolShop === "seed" ? "좋은 도구일수록 빈 밭 넓은 범위에 씨앗을 한꺼번에 심어요(씨앗값은 칸마다)" : toolShop === "hand" ? "좋은 도구일수록 다 자란 작물을 넓은 범위로 한꺼번에 거둬요" : toolShop === "fert" ? "거름은 미리 사 두고 칸마다 1개씩 써요. 좋은 뿌리개일수록 자라는 작물 넓은 범위에 한꺼번에 뿌려요" : "좋을수록 물을 많이 담고, 한 번에 여러 칸에 물을 줘요"}</small>
-            <div className="can-shop-list">{toolShop === "seed" ? PLANT_TOOLS.map(item => <button key={item.id} className={planterId === item.id ? "on" : ""} onClick={() => choosePlanter(item)} aria-pressed={planterId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 심기</small><em>{planterId === item.id ? "사용 중" : ownsItem(ownedPlanters, item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)
-              : toolShop === "hand" ? HARVEST_TOOLS.map(hand => <button key={hand.id} className={handId === hand.id ? "on" : ""} onClick={() => chooseHand(hand)} aria-pressed={handId === hand.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${hand.w}, 1fr)` }}>{Array.from({ length: hand.w * hand.h }).map((_, k) => <i key={k} />)}</span><b>{hand.icon} {hand.name}</b><small>{hand.note} 수확</small><em>{handId === hand.id ? "사용 중" : ownsItem(ownedHands, hand.id) ? "들기" : `${hand.price.toLocaleString()}원`}</em></button>)
-              : toolShop === "fert" ? [...FERTILIZERS.map(item => <div key={item.id} className={`fert-stock ${tool === item.id ? "on" : ""}`}><button className="fert-pick" onClick={() => holdFert(item.id)} aria-pressed={tool === item.id}><span>{item.icon}</span><b>{item.name}</b><small>{item.note}</small><em>{fertStock[item.id] ?? 0}개</em></button><QtyBuy label={item.name} unitPrice={item.price} money={money} initial={item.pack} step={item.pack >= 10 ? 5 : 1} onBuy={count => buyFert(item, count)} /></div>), <b key="spreader-title" className="tool-shop-sub">🧺 거름 뿌리개</b>, ...SPREADERS.map(item => <button key={item.id} className={spreaderId === item.id ? "on" : ""} onClick={() => chooseSpreader(item)} aria-pressed={spreaderId === item.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${item.w}, 1fr)` }}>{Array.from({ length: item.w * item.h }).map((_, k) => <i key={k} />)}</span><b>{item.icon} {item.name}</b><small>{item.note} 거름</small><em>{spreaderId === item.id ? "사용 중" : ownsItem(ownedSpreaders, item.id) ? "들기" : `${item.price.toLocaleString()}원`}</em></button>)]
-              : CANS.map(can => <button key={can.id} className={canId === can.id ? "on" : ""} onClick={() => chooseCan(can)} aria-pressed={canId === can.id}><span className="can-grid" style={{ gridTemplateColumns: `repeat(${can.w}, 1fr)` }}>{Array.from({ length: can.w * can.h }).map((_, k) => <i key={k} />)}</span><b>{can.name}</b><small>{can.note}</small><em>{canId === can.id ? "사용 중" : ownsItem(ownedCans, can.id) ? "들기" : `${can.price.toLocaleString()}원`}</em></button>)}</div>
-          </div>
+          {toolShopBox}
           <div className="tip">🧰 오른쪽 도구함에서 도구를 고르세요(단축키 1~5, 5는 고른 비료). 🌱 심기와 🧺 수확은 따로예요. 둘 다 누른 채 밭 위를 쓸면 연달아 돼요.<br />🌿 거름을 들면 자라는 작물을 눌러 줘요(작물당 1번).<br />🚿 자라는 동안 2~3번 목말라해요. 물뿌리개로 제때 물을 주면 품질이 올라 더 비싸게 팔려요(좋음 ×1.12, 최상 ×1.3).<br />🐛 벌레가 날아오면 {BUG_SECONDS}초 안에 어떤 도구로든 눌러 잡으세요(벌레 있는 밭을 눌러도 돼요). 놓치면 그 작물 판매가 -{Math.round(bugPenalty * 100)}%.<br />🥀 계절이 바뀌면 지난 계절 작물은 시들어요.</div>
         </aside>
       </div>}
