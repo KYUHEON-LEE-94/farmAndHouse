@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { createRequire } from "node:module";
 import { buildSync } from "esbuild";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const { outputFiles } = buildSync({
   stdin: {
     contents: `export * from "./app/casino"; export * from "./app/casinoPresentation";

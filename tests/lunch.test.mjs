@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSync } from 'esbuild';
-const root = new URL('..', import.meta.url).pathname;
+const root = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const out = buildSync({ stdin: { contents: `export * from './app/cooking/recipes'; export * from './app/cooking/lunch'; export * from './app/cooking/batch'; export * from './app/items'; export * from './app/stock'; export { ALL_FISH } from './app/fishing'; export { createRun, step, NO_INPUT, GATHER_SMALL } from './app/explore/engine';`, resolveDir: root, loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent' });
 const L = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 const fish = L.ALL_FISH.filter(f => f.rarity !== '전설' && f.rarity !== '신화').sort((a,b) => a.price-b.price || a.id.localeCompare(b.id));

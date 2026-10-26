@@ -64,7 +64,7 @@ test('왕좌 근위병: 방패 방향이 몸과 따로 회전하고, 정면에�
 });
 
 test('공허 심판관: 추적 장판 2개(1.4초 예고)와 근접 내려찍기(1.2초 예고)를 번갈아', () => {
-  const { s, m } = arena(36, 'void-judge', 160, 0);
+  const { s } = arena(36, 'void-judge', 160, 0);
   let tracks = 0, slamTele = null;
   run(s, 12, () => { tracks = Math.max(tracks, s.hazards.filter(h => h.label === '심판 장판').length); const z = s.zones.find(x => x.label === '심판 내려찍기'); if (z && slamTele === null) slamTele = z.tele + 1 / 60; });
   assert.equal(tracks, 2); assert.ok(slamTele !== null && Math.abs(slamTele - 1.2) < 0.02, `내려찍기 예고 ${slamTele}`);
