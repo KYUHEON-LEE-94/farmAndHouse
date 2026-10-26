@@ -19,7 +19,7 @@ import type { CasinoReaction, CasinoReactionKind } from "./casinoPresentation";
 import { CookingGame } from "./CookingGame";
 import { HuntingGround } from "./HuntingGround";
 import RaidPanel, { BattlePetGacha, BattlePetRoster, RaidCraftView, RaidGearView } from "./raid/RaidPanel";
-import { ALL_RAID_ITEMS, gearOf, SPECIAL_MASTERY, RAID_BALANCE_VERSION, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
+import { ALL_RAID_ITEMS, enhanceLimit, RAID_DATA_FLOOR, gearOf, SPECIAL_MASTERY, RAID_BALANCE_VERSION, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, EVOLUTION_CHANGE, PET_EXCHANGE, PET_GACHA, PET_LEVELS, rollBattlePet, EMPTY_RAID, FLOOR_REWARDS, HUNT_COMMON_LOOT, HUNT_RARE_LOOT, LIFE_MATS, RAID_ENABLED, RAID_ITEMS, RAID_MAX_FLOOR, zoneCommon, type ArmorSlot, type Drop, type Evolution, type RaidSave } from "./raid/data";
 import { applyEnhance, nextStep, rollEnhance, setEvolution, pityChance, rollDrops } from "./raid/forge";
 import { WEAPON_CRAFT, weaponDef } from "./raid/weapons";
 import { breakthrough, gearChanges, recordOf, updateProgress } from "./raid/progress";
@@ -2407,7 +2407,7 @@ export default function Home() {
       playCoinSound([660, 880, 1100, 1320]); setNotice(`⭐ 특수공격 숙련 ★${next.star}! 특수 피해 +${Math.round(next.dmg * 100)}%${next.star === 3 ? " · 잔향 폭발 해금" : ""}`);
     },
     enhance: useStabilizer => {
-      const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement);
+      const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement, enhanceLimit(TEST_MODE ? RAID_DATA_FLOOR : RAID_MAX_FLOOR));
       if (!step || (w.enhancement >= 10 && !w.evolution) || (step.open && !w.unlockedEnhancements.includes(step.to))) return;
       const plan = planFor(step.need, step.gold); if (!plan) return setNotice("강화 재료나 돈이 모자라요.");
       spendPlan(plan);
@@ -2419,7 +2419,7 @@ export default function Home() {
       else { playCoinSound([440, 330]); setNotice(`🔨 강화 실패… +${w.enhancement} 그대로예요. (재료와 돈은 사용됐어요)`); }
     },
     openStep: () => {
-      const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement);
+      const w = raid.weapons[raid.equipped.weapon], step = nextStep(w.enhancement, enhanceLimit(TEST_MODE ? RAID_DATA_FLOOR : RAID_MAX_FLOOR));
       if (!step?.open || w.unlockedEnhancements.includes(step.to)) return;
       const plan = planFor(step.open.need, step.open.gold); if (!plan) return setNotice("개방 재료나 돈이 모자라요.");
       spendPlan(plan);

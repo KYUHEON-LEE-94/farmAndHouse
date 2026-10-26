@@ -71,14 +71,28 @@ export function weaponArtUrl(id: string) {
 }
 /** +22 공통 최종 광휘(RAID_FLOOR_40_EXPANSION_AUDIT 5절): 무기별 외형은 그대로, 테두리 빛만 더한다. */
 export const RADIANT_ENHANCEMENT = 22;
-/** 무기 아이콘. id는 무기 id 또는 진화 id. enhancement를 주면 +22 이상에서 최종 광휘. */
+/**
+ * +23~+26 공통 외형(RAID_FLOOR_50_IMPLEMENTATION_PLAN 2.1절): 무기마다 그림을 새로 그리지 않고 아이콘 위에 공통 레이어를 겹친다.
+ * 현재 단계의 가장 높은 효과 하나만 보이고(+22 광휘와 누적하지 않음), 레이어는 아이콘 바깥 4px 안에만 그린다(CSS inset −4px).
+ * +23 청동 테두리와 작은 시계 불티, +24 옅은 청록 시간 고리 1개(초당 90도). 회전·반짝임은 prefers-reduced-motion에서 멈춘다(globals.css).
+ */
+export const AURA_LEVELS = [24, 23] as const;
+export const auraLevel = (enhancement: number) => AURA_LEVELS.find(level => enhancement >= level) ?? null;
+const SPARK = (x: number, y: number) => `<g class="clock-spark"><circle cx="${x}" cy="${y}" r="2.6" fill="#f2c66d" stroke="#7a5220" stroke-width="1"/><path d="M${x} ${y - 3.6}V${y + 3.6}M${x - 3.6} ${y}H${x + 3.6}" stroke="#ffe7a8" stroke-width="1" stroke-linecap="round"/></g>`;
+export function auraSvg(level: number | null) {
+  if (!level) return "";
+  const sparks = SPARK(5, 6) + SPARK(67, 66) + SPARK(66, 7);
+  const ring = level >= 24 ? `<circle class="time-ring" cx="36" cy="36" r="33.5" fill="none" stroke="#7fe0d6" stroke-opacity=".7" stroke-width="2" stroke-dasharray="44 9 6 9"/>` : "";
+  return `<svg class="weapon-aura" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">${ring}${sparks}</svg>`;
+}
+/** 무기 아이콘. id는 무기 id 또는 진화 id. enhancement를 주면 +22에서 최종 광휘, +23·+24에서 공통 외형 레이어(광휘 대신). */
 export function WeaponIcon({ id, size = 36, className = "", enhancement = 0 }: { id: string; size?: number; className?: string; enhancement?: number }) {
-  const route = GLOW[id], radiant = Boolean(route) && enhancement >= RADIANT_ENHANCEMENT;
+  const route = GLOW[id], aura = route ? auraLevel(enhancement) : null, radiant = Boolean(route) && !aura && enhancement >= RADIANT_ENHANCEMENT;
   return <span
-    className={`weapon-icon ${route ? `evolved route-${route}` : "life-tool"} ${radiant ? "radiant" : ""} ${className}`}
-    data-rank={route ? (radiant ? `+${RADIANT_ENHANCEMENT}` : "+10") : undefined}
+    className={`weapon-icon ${route ? `evolved route-${route}` : "life-tool"} ${radiant ? "radiant" : ""} ${aura ? `aura-${aura}` : ""} ${className}`}
+    data-rank={route ? (aura ? `+${aura}` : radiant ? `+${RADIANT_ENHANCEMENT}` : "+10") : undefined}
     style={{ width: size, height: size }}
     aria-hidden="true"
-    dangerouslySetInnerHTML={{ __html: weaponSvg(id) }}
+    dangerouslySetInnerHTML={{ __html: weaponSvg(id) + auraSvg(aura) }}
   />;
 }

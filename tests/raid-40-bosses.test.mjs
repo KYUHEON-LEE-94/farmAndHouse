@@ -105,7 +105,7 @@ test('7단계 천공 파수꾼 3종: 같은 부위 6단계 보유 필요, 천공
 test('방어구 단계 표시: 30층까지는 6단계, 31층이 열리면 7단계, 36층이 열리면 8단계(운영 40층 공개 후 8단계까지 보임)', () => {
   assert.equal(R.RAID_MAX_FLOOR, 40);
   assert.equal(R.armorTierLimit(30), 6); assert.equal(R.armorTierLimit(R.RAID_MAX_FLOOR), 8);
-  assert.equal(R.armorTierLimit(31), 7); assert.equal(R.armorTierLimit(35), 7); assert.equal(R.armorTierLimit(36), 8); assert.equal(R.armorTierLimit(R.RAID_DATA_FLOOR), 8);
+  assert.equal(R.armorTierLimit(31), 7); assert.equal(R.armorTierLimit(35), 7); assert.equal(R.armorTierLimit(36), 8); assert.equal(R.armorTierLimit(40), 8); assert.equal(R.armorTierLimit(R.RAID_DATA_FLOOR), 9, '41~45층 숨김 데이터(로컬 테스트 모드)는 9단계');
 });
 
 test('천공 파수꾼 갑옷: 투사체 피해 −10%(바닥·보스 광선에는 적용하지 않음)', () => {

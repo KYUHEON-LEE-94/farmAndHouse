@@ -56,10 +56,12 @@ export function recommendedEnh(floor: number) {
   if (floor <= 5) return 3; if (floor <= 10) return 10; if (floor <= 15) return 12; if (floor <= 20) return 13;
   if (floor <= 22) return 14; if (floor <= 25) return 15; if (floor <= 27) return 16; if (floor <= 29) return 17;
   // 31~40층(RAID_FLOOR_40_EXPANSION_AUDIT 7절)
-  if (floor <= 32) return 18; if (floor <= 34) return 19; if (floor <= 36) return 20; if (floor <= 38) return 21; return 22;
+  if (floor <= 32) return 18; if (floor <= 34) return 19; if (floor <= 36) return 20; if (floor <= 38) return 21; if (floor <= 42) return 22;
+  // 41~45층(RAID_FLOOR_50_IMPLEMENTATION_PLAN 2절): 43~44층 +23, 45층 +24(권장치일 뿐 입장 조건 아님)
+  if (floor <= 44) return 23; return 24;
 }
 
-const TERRAIN = ["꽃가루 장판", "감전", "전도성 웅덩이", "낙엽 회오리", "빙판", "핵 방전", "균열 흔적", "포자 구름", "봄 덩굴"];
+const TERRAIN = ["꽃가루 장판", "감전", "전도성 웅덩이", "낙엽 회오리", "빙판", "핵 방전", "균열 흔적", "포자 구름", "봄 덩굴", "시계 바닥"];
 const RANGED = ["투사체", "보스 탄막"];
 export type Diagnosis = { title: string; hint: string };
 /**

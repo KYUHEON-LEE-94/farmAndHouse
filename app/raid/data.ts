@@ -17,18 +17,22 @@ export function floorBand(floor: number) {
   return { fodder: 1, elite: 1, eliteTime: 1 };
 }
 export const RAID_MAX_FLOOR = 40; // 21~30층 운영 공개(2026-10-19), 31~40층 운영 공개(2026-10-22, 사용자 요청)
-/** 데이터가 있는 마지막 층(로컬 테스트 모드의 전 층 개방 상한) */
-export const RAID_DATA_FLOOR = 40;
-/** 보이는 최고 방어구 단계: 31층이 열려야 7단계, 36층이 열려야 8단계(숨김 층의 장비가 운영 화면에 나오지 않게) */
-export const armorTierLimit = (maxFloor: number) => (maxFloor >= 36 ? 8 : maxFloor >= 31 ? 7 : 6);
+/** 데이터가 있는 마지막 층(로컬 테스트 모드의 전 층 개방 상한). 41~45층 시계 정원은 raid-50 숨김 개발(RAID_FLOOR_50_IMPLEMENTATION_PLAN 9절 3번) */
+export const RAID_DATA_FLOOR = 45;
+/** 보이는 최고 방어구 단계: 31층이 열려야 7단계, 36층이 열려야 8단계, 41층이 열려야 9단계(숨김 층의 장비가 운영 화면에 나오지 않게) */
+export const armorTierLimit = (maxFloor: number) => (maxFloor >= 41 ? 9 : maxFloor >= 36 ? 8 : maxFloor >= 31 ? 7 : 6);
+/** 보이는 최고 강화 단계: 41층이 열려야 +23·+24(숨김 층의 강화가 운영 화면·강화 버튼에 나오지 않게) */
+export const enhanceLimit = (maxFloor: number) => (maxFloor >= 41 ? 24 : 22);
 /**
  * 31층 이상 일반·정예 몬스터 층별 상승(RAID_FLOOR_40_EXPANSION_AUDIT 7.2): 몬스터 표는 구간 첫 층 기준.
- * 31~35층 HP +3%·피해 +2%(정예 HP +4%)/층, 36~40층 HP +4%·피해 +2.5%(정예 HP +5%)/층. 보스는 층 표 수치 그대로.
+ * 31~35층 HP +3%·피해 +2%(정예 HP +4%)/층, 36~40층 HP +4%·피해 +2.5%(정예 HP +5%)/층, 41~45층 HP +4%·피해 +2.5%(정예 HP +4.5%)/층. 보스는 층 표 수치 그대로.
  */
 export function mobLift(floor: number, elite: boolean) {
   if (floor <= 31) return { hp: 1, damage: 1 };
   if (floor <= 35) { const n = floor - 31; return { hp: Math.pow(elite ? 1.04 : 1.03, n), damage: Math.pow(1.02, n) }; }
-  const n = floor - 36; return { hp: Math.pow(elite ? 1.05 : 1.04, n), damage: Math.pow(1.025, n) };
+  if (floor <= 40) { const n = floor - 36; return { hp: Math.pow(elite ? 1.05 : 1.04, n), damage: Math.pow(1.025, n) }; }
+  // 41~45층(RAID_FLOOR_50_IMPLEMENTATION_PLAN 3절): 몬스터 표가 41층 기준(40층 동급 대비 HP +8~12%·피해 +3~6%), 층당 HP +4%(정예 +4.5%)·피해 +2.5%
+  const n = floor - 41; return { hp: Math.pow(elite ? 1.045 : 1.04, n), damage: Math.pow(1.025, n) };
 }
 
 export const ARENA_W = 960, ARENA_H = 540;
@@ -102,6 +106,12 @@ export const MONSTERS: Record<string, MonsterDef> = {
   "prism-eye": { id: "prism-eye", name: "프리즘 눈", icon: "🔮", kind: "ranged", hp: 195, damage: 35, defense: 5, speed: 56, radius: 13, xp: 1 },
   "throne-guard": { id: "throne-guard", name: "왕좌 근위병", icon: "💂", kind: "crab", hp: 420, damage: 38, defense: 10, speed: 34, radius: 20, xp: 2 },
   "void-judge": { id: "void-judge", name: "공허 심판관", icon: "⚖️", kind: "elite", hp: 1350, damage: 47, defense: 12, speed: 48, radius: 26, xp: 12 },
+  // 41~45층 시계 정원(RAID_FLOOR_50_IMPLEMENTATION_PLAN 3절): 41층 기준. 40층 동급(mobLift 적용 뒤) 대비 HP +10%·피해 +4~5%, 방어 +0~1
+  "clock-rat": { id: "clock-rat", name: "태엽 들쥐", icon: "🐀", kind: "chase", hp: 290, damage: 40, defense: 5, speed: 70, radius: 13, xp: 1 },
+  "bronze-moth": { id: "bronze-moth", name: "청동 나방", icon: "🦋", kind: "ranged", hp: 250, damage: 40, defense: 5, speed: 58, radius: 13, xp: 1 },
+  "sand-spirit": { id: "sand-spirit", name: "모래시계 정령", icon: "⏳", kind: "frog", hp: 250, damage: 40, defense: 5, speed: 56, radius: 13, xp: 1 },
+  "clock-shield": { id: "clock-shield", name: "태엽 방패병", icon: "🛡️", kind: "crab", hp: 540, damage: 44, defense: 11, speed: 34, radius: 20, xp: 2 },
+  "garden-executor": { id: "garden-executor", name: "정원 집행자", icon: "⚔️", kind: "elite", hp: 1800, damage: 54, defense: 13, speed: 50, radius: 26, xp: 12 },
   "mine-warden": { id: "mine-warden", name: "광산 감시자", icon: "🗿", kind: "canal-elite", hp: 620, damage: 36, defense: 7, speed: 50, radius: 26, xp: 12 },
 };
 
@@ -117,7 +127,7 @@ export type FloorDef = {
   /** 진화 훈련장: 보스·간접 개입 없음, 체력이 1 아래로 내려가지 않는다. */
   training?: boolean;
 };
-const z1 = "꽃가루 들판", z2 = "침수된 수로", z3 = "단풍 미궁", z4 = "서리 광산", z5 = "고대 숲", z6 = "탑의 심장부", z7 = "천공 유적", z8 = "공허 왕좌";
+const z1 = "꽃가루 들판", z2 = "침수된 수로", z3 = "단풍 미궁", z4 = "서리 광산", z5 = "고대 숲", z6 = "탑의 심장부", z7 = "천공 유적", z8 = "공허 왕좌", z9 = "시계 정원";
 export const FLOORS: FloorDef[] = [
   { floor: 1, zone: z1, monsters: ["pollen-mite"], spawnRate: 0.8, maxAlive: 16, elite: null, boss: { id: "mini", name: "강화 진드기", icon: "🐞", hp: 300, damage: 10, defense: 0, base: "pollen-mite" } },
   { floor: 2, zone: z1, monsters: ["pollen-mite", "thorn-rabbit"], spawnRate: 1.0, maxAlive: 20, elite: { id: "thorn-rabbit", hp: 220, count: 2 }, boss: { id: "mini", name: "토끼 정예", icon: "🐇", hp: 520, damage: 12, defense: 0, base: "thorn-rabbit" } },
@@ -164,10 +174,16 @@ export const FLOORS: FloorDef[] = [
   { floor: 38, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye", "throne-guard"], spawnRate: 2.3, maxAlive: 40, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "prism-warden", name: "프리즘 감시자", icon: "👁️", hp: 20500, damage: 70, defense: 16, base: "prism-eye" } },
   { floor: 39, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye", "throne-guard"], spawnRate: 2.45, maxAlive: 41, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "throne-keeper", name: "왕좌 수문장", icon: "🛡️", hp: 21000, damage: 73, defense: 17, base: "throne-guard" } },
   { floor: 40, zone: z8, monsters: ["star-wraith", "void-hound", "prism-eye", "throne-guard"], spawnRate: 2.6, maxAlive: 41, elite: { id: "void-judge", hp: 1350, every: 22 }, boss: { id: "void-king", name: "공허의 왕", icon: "👑", hp: 27500, damage: 78, defense: 17, base: "void-judge" } },
+  // 41~45층 시계 정원(숨김, RAID_FLOOR_50_IMPLEMENTATION_PLAN 3·4절): 보스 HP는 무적 봇 처치 시간(41~42층 +22, 43~44층 +23, 45층 +24)으로 맞춘다
+  { floor: 41, zone: z9, monsters: ["clock-rat", "bronze-moth"], spawnRate: 2.2, maxAlive: 40, elite: { id: "garden-executor", hp: 1800, count: 2 }, boss: { id: "bronze-gatekeeper", name: "청동 문지기", icon: "🚪", hp: 31000, damage: 80, defense: 17, base: "clock-shield" } },
+  { floor: 42, zone: z9, monsters: ["clock-rat", "bronze-moth", "sand-spirit"], spawnRate: 2.35, maxAlive: 40, elite: { id: "garden-executor", hp: 1880, every: 22 }, boss: { id: "clock-bird", name: "정원의 시계새", icon: "🐦", hp: 29000, damage: 82, defense: 17, base: "clock-rat" } },
+  { floor: 43, zone: z9, monsters: ["clock-rat", "bronze-moth", "sand-spirit", "clock-shield"], spawnRate: 2.5, maxAlive: 41, elite: { id: "garden-executor", hp: 1960, every: 22 }, boss: { id: "hourglass-alchemist", name: "모래시계 연금술사", icon: "⌛", hp: 30500, damage: 84, defense: 17, base: "clock-rat" } },
+  { floor: 44, zone: z9, monsters: ["clock-rat", "bronze-moth", "sand-spirit", "clock-shield"], spawnRate: 2.6, maxAlive: 41, elite: { id: "garden-executor", hp: 2050, every: 22 }, boss: { id: "clockwork-knight", name: "거대 태엽기사", icon: "🤖", hp: 36500, damage: 86, defense: 18, base: "clock-shield" } },
+  { floor: 45, zone: z9, monsters: ["clock-rat", "bronze-moth", "sand-spirit", "clock-shield"], spawnRate: 2.7, maxAlive: 41, elite: { id: "garden-executor", hp: 2140, every: 22 }, boss: { id: "garden-keeper", name: "시간 정원의 관리자", icon: "🕰️", hp: 39000, damage: 90, defense: 18, base: "garden-executor" } },
 ];
-/** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부, 31~35 천공 유적, 36~40 공허 왕좌 */
-export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
-export const zoneOf = (floor: number): Zone => floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : floor <= 30 ? "core" : floor <= 35 ? "sky" : "void";
+/** 층 구역(지형·색): 1~5 들판, 6~10 수로, 11~15 단풍, 16~20 서리, 21~25 고대 숲, 26~30 탑의 심장부, 31~35 천공 유적, 36~40 공허 왕좌, 41~45 시계 정원 */
+export type Zone = "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void" | "clock";
+export const zoneOf = (floor: number): Zone => floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : floor <= 30 ? "core" : floor <= 35 ? "sky" : floor <= 40 ? "void" : "clock";
 /** 난이도 구간(3.0절): 1~20 쉬움, 21~50 보통, 51~ 어려움 */
 export const tierOf = (floor: number): "easy" | "normal" | "hard" => floor <= 20 ? "easy" : floor <= 50 ? "normal" : "hard";
 export const TIER_NAME = { easy: "쉬움", normal: "보통", hard: "어려움" } as const;
@@ -343,6 +359,8 @@ export const RAID_ITEMS: Record<string, { name: string; icon: string }> = {
   // 31~40층(RAID_FLOOR_40_EXPANSION_AUDIT 3.2절)
   "sky-iron": { name: "천공철", icon: "🔩" }, "cloud-crystal": { name: "구름 결정", icon: "☁️" }, "storm-core": { name: "폭풍의 핵", icon: "🌀" },
   "star-ash": { name: "별의 재", icon: "✨" }, "void-crystal": { name: "공허 결정", icon: "🟣" }, "throne-fragment": { name: "왕좌 파편", icon: "🔱" }, "star-crown": { name: "별의 왕관", icon: "👑" },
+  // 41~45층(RAID_FLOOR_50_IMPLEMENTATION_PLAN 6절)
+  "clock-brass": { name: "시계 황동", icon: "⚙️" }, "time-glass": { name: "시간 유리", icon: "⏳" }, "garden-heart": { name: "정원의 심장", icon: "💚" },
 };
 /** [id, 최소, 최대, 확률(없으면 1)] */
 export type Drop = [string, number, number, number?];
@@ -389,18 +407,25 @@ export const FLOOR_REWARDS: Record<number, { firstGold: number; first: Drop[]; r
   38: { firstGold: 5500, first: [["void-crystal", 2, 2]], repeat: [["star-ash", 2, 4], ["void-crystal", 1, 2, 0.7]], stabilizer: 0.05 },
   39: { firstGold: 6000, first: [["star-ash", 3, 3], ["throne-fragment", 1, 1]], repeat: [["star-ash", 2, 4], ["void-crystal", 1, 2, 0.7], ["throne-fragment", 1, 1, 0.3]], stabilizer: 0.06 },
   40: { firstGold: 20000, first: [["star-ash", 5, 5], ["void-crystal", 3, 3], ["star-crown", 1, 1]], repeat: [["star-ash", 3, 5], ["void-crystal", 2, 3], ["star-crown", 1, 1, 0.4]], stabilizer: 0.1 },
+  // 41~45층 시작값(RAID_FLOOR_50_IMPLEMENTATION_PLAN 2·6절): 36~40층 골격을 따른다. 정원의 심장은 45층 반복 보상으로만(첫 승리는 +23, 반복 보상으로 +24 개방)
+  41: { firstGold: 6500, first: [["clock-brass", 3, 3]], repeat: [["clock-brass", 2, 3]], stabilizer: 0.03 },
+  42: { firstGold: 7000, first: [["clock-brass", 4, 4]], repeat: [["clock-brass", 2, 4]], stabilizer: 0.04 },
+  43: { firstGold: 7600, first: [["clock-brass", 3, 3], ["time-glass", 1, 1]], repeat: [["clock-brass", 2, 4], ["time-glass", 1, 2, 0.6]], stabilizer: 0.04 },
+  44: { firstGold: 8200, first: [["time-glass", 2, 2]], repeat: [["clock-brass", 2, 4], ["time-glass", 1, 2, 0.7]], stabilizer: 0.05 },
+  45: { firstGold: 24000, first: [["clock-brass", 5, 5], ["time-glass", 3, 3]], repeat: [["clock-brass", 3, 5], ["time-glass", 2, 3], ["garden-heart", 1, 1, 0.4]], stabilizer: 0.1 },
 };
 /**
  * 보스 재료 불운 방지(RAID_FLOOR_30_EXPANSION_AUDIT 7.3): 반복 클리어에서 이 재료를 misses번 연속 못 받으면 다음 반복 클리어에 확정.
  * 받으면(확률·확정) 0으로. 재료별로 따로 센다. 25층(수호자의 씨앗)은 층 구현 때 추가한다.
  */
-export const BOSS_DROP_PITY: Record<number, { id: string; misses: number }> = { 15: { id: "crimson-antler", misses: 3 }, 20: { id: "ironbear-core", misses: 3 }, 25: { id: "guardian-seed", misses: 3 }, 35: { id: "storm-core", misses: 3 }, 39: { id: "throne-fragment", misses: 3 }, 40: { id: "star-crown", misses: 3 } };
+export const BOSS_DROP_PITY: Record<number, { id: string; misses: number }> = { 15: { id: "crimson-antler", misses: 3 }, 20: { id: "ironbear-core", misses: 3 }, 25: { id: "guardian-seed", misses: 3 }, 35: { id: "storm-core", misses: 3 }, 39: { id: "throne-fragment", misses: 3 }, 40: { id: "star-crown", misses: 3 }, 45: { id: "garden-heart", misses: 3 } };
 /** 일반 재료 연속 미획득 천장(RAID_FLOOR_40_EXPANSION_AUDIT 3.3절): 확률 재료를 3번 연속 못 받으면 다음 반복 클리어에 확정. 횟수는 재료별로 층을 넘어 이어진다. */
 export const MAT_DROP_PITY: Record<number, { id: string; misses: number }[]> = Object.fromEntries([
   ...[33, 34].map(f => [f, [{ id: "cloud-crystal", misses: 3 }]]),
   ...[37, 38, 39].map(f => [f, [{ id: "void-crystal", misses: 3 }]]),
+  ...[43, 44].map(f => [f, [{ id: "time-glass", misses: 3 }]]),
 ]);
-export const zoneCommon = (floor: number) => ({ field: "pollen-clump", canal: "canal-moss", maple: "maple-fragment", frost: "frost-ore", ancient: "ancient-bark", core: "dark-alloy", sky: "sky-iron", void: "star-ash" })[zoneOf(floor)];
+export const zoneCommon = (floor: number) => ({ field: "pollen-clump", canal: "canal-moss", maple: "maple-fragment", frost: "frost-ore", ancient: "ancient-bark", core: "dark-alloy", sky: "sky-iron", void: "star-ash", clock: "clock-brass" })[zoneOf(floor)];
 
 // ---------- 생활 재료(27절) ----------
 export const LIFE_MATS: Record<string, { name: string; icon: string; recipe: string }> = {
@@ -441,6 +466,9 @@ export const ENHANCE: EnhanceStep[] = [
   { to: 20, chance: 0.09, drop: 0.07, gold: 390000, need: { "sky-iron": 4, "cloud-crystal": 2 }, open: { gold: 230000, need: { "storm-core": 2 } } },
   { to: 21, chance: 0.08, drop: 0.06, gold: 450000, need: { "star-ash": 3, "void-crystal": 1 }, open: { gold: 280000, need: { "star-ash": 5, "void-crystal": 2 } } },
   { to: 22, chance: 0.07, drop: 0.07, gold: 520000, need: { "star-ash": 4, "void-crystal": 2 }, open: { gold: 340000, need: { "throne-fragment": 1 } } },
+  // 41~45층(RAID_FLOOR_50_IMPLEMENTATION_PLAN 2·7절, 숨김 시작표): +22에 한 번 닿으면 +22 아래로 내려가지 않는다(forge.applyEnhance). 20만 회 측정은 계획 문서 10절
+  { to: 23, chance: 0.085, drop: 0.05, gold: 450000, need: { "clock-brass": 3, "time-glass": 1 }, open: { gold: 300000, need: { "clock-brass": 5, "time-glass": 3 } } },
+  { to: 24, chance: 0.08, drop: 0.06, gold: 490000, need: { "clock-brass": 4, "time-glass": 2 }, open: { gold: 340000, need: { "garden-heart": 1 } } },
 ];
 /**
  * 강화 실패 누적 보정·천장(IMPLEMENTATION_GAP_AUDIT 10.2): +11~+15만. 무기별·목표 단계별 실패 횟수로
@@ -461,6 +489,8 @@ export const ENHANCE_PITY: Record<number, { start: number; step: number; max: nu
   20: { start: 11, step: 0.014, max: 0.12, ceiling: 24 },
   21: { start: 12, step: 0.013, max: 0.12, ceiling: 25 },
   22: { start: 13, step: 0.012, max: 0.12, ceiling: 27 },
+  23: { start: 11, step: 0.013, max: 0.12, ceiling: 24 },
+  24: { start: 12, step: 0.012, max: 0.12, ceiling: 25 },
 };
 /** 11층 이상 재료(11~20층은 탑 상자에서, 21층 이상은 아직 이름만). */
 export const UPPER_ITEMS: Record<string, { name: string; icon: string }> = {
@@ -473,7 +503,7 @@ export const EVOLUTION_CHANGE = { gold: 30000, need: { "artisan-core": 3 } as Re
 
 // ---------- 방어구(26절) ----------
 export type ArmorSlot = "head" | "body" | "legs";
-export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8; prerequisite?: string; gold: number; need: Record<string, number>;
+export type ArmorDef = { id: string; slot: ArmorSlot; name: string; icon: string; tier: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9; prerequisite?: string; gold: number; need: Record<string, number>;
   /** freezeResist: 빙판·빙결 둔화 감소, hazardCut: 바닥(장판·감전) 피해 감소 */
   stats: { hp?: number; defense?: number; crit?: number; absorb?: number; xpGain?: number; speed?: number; dashCd?: number; startShield?: number; freezeResist?: number; hazardCut?: number; bossDamage?: number; projectileCut?: number; windResist?: number; darkSight?: number }; text: string };
 export const ARMORS: ArmorDef[] = [
@@ -504,6 +534,10 @@ export const ARMORS: ArmorDef[] = [
   { id: "star-hood", prerequisite: "sky-hood", slot: "head", name: "성좌 수호자 투구", icon: "🌟", tier: 8, gold: 46000, need: { "star-ash": 6, "void-crystal": 2 }, stats: { crit: 0.21, xpGain: 0.11, bossDamage: 0.09 }, text: "치명타 +21% · 경험치 +11% · 보스 피해 +9%" },
   { id: "star-vest", prerequisite: "sky-vest", slot: "body", name: "성좌 수호자 갑옷", icon: "🌌", tier: 8, gold: 58000, need: { "star-ash": 8, "void-crystal": 3 }, stats: { hp: 130, defense: 16, startShield: 45, projectileCut: 0.14 }, text: "최대 체력 +130 · 방어력 +16 · 시작 보호막 45 · 투사체 피해 −14%" },
   { id: "star-boots", prerequisite: "sky-boots", slot: "legs", name: "성좌 수호자 장화", icon: "✨", tier: 8, gold: 46000, need: { "star-ash": 6, "void-crystal": 2 }, stats: { speed: 0.24, dashCd: 0.35, hazardCut: 0.4, darkSight: 50 }, text: "이동속도 +24% · 회피 재사용 −35% · 바닥 피해 −40% · 암전 시야 +50px" },
+  // 9단계 시계 정원 수호자(41~45층, RAID_FLOOR_50_IMPLEMENTATION_PLAN 6.1절 시작표): 같은 부위 8단계 보유 필요(소모 안 함), 시계 황동·시간 유리만 요구
+  { id: "clock-hood", prerequisite: "star-hood", slot: "head", name: "시계 정원 투구", icon: "🕰️", tier: 9, gold: 72000, need: { "clock-brass": 8, "time-glass": 3 }, stats: { crit: 0.23, xpGain: 0.12, bossDamage: 0.11 }, text: "치명타 +23% · 경험치 +12% · 보스 피해 +11%" },
+  { id: "clock-vest", prerequisite: "star-vest", slot: "body", name: "시계 정원 갑옷", icon: "⚙️", tier: 9, gold: 90000, need: { "clock-brass": 11, "time-glass": 4 }, stats: { hp: 150, defense: 18, startShield: 55, projectileCut: 0.16 }, text: "최대 체력 +150 · 방어력 +18 · 시작 보호막 55 · 투사체 피해 −16%" },
+  { id: "clock-boots", prerequisite: "star-boots", slot: "legs", name: "시계 정원 장화", icon: "⏳", tier: 9, gold: 72000, need: { "clock-brass": 8, "time-glass": 3 }, stats: { speed: 0.26, dashCd: 0.38, hazardCut: 0.45 }, text: "이동속도 +26% · 회피 재사용 −38% · 바닥 피해 −45%" },
   { id: "reinforced-boots", prerequisite: "leather-boots", slot: "legs", name: "강화 가죽 장화", icon: "🥾", tier: 2, gold: 5000, need: { rabbitfur: 10, foxfur: 6, antler: 4, "field-essence": 2 }, stats: { speed: 0.14, dashCd: 0.2 }, text: "이동속도 +14% · 회피 재사용 −20% · 밀려남 −25%" },
 ];
 export const SLOT_NAME: Record<ArmorSlot, string> = { head: "머리", body: "몸통", legs: "다리" };

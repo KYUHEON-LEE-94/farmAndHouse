@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { DISHES, DISH_GRADES, KITCHEN_ENABLED } from "../kitchen";
 import { TEST_MODE } from "../testMode";
-import { armorTierLimit, zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, RAID_DATA_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY, MONSTERS, SPECIAL_MASTERY } from "./data";
+import { armorTierLimit, enhanceLimit, zoneOf, tierOf, TIER_NAME, RAID_BALANCE_VERSION, ALL_RAID_ITEMS, ARMORS, BATTLE_PETS, DUPLICATE_SHARDS, ENHANCE, EVOLUTIONS, EVOLUTION_CHANGE, FLOORS, TRAINING_FLOOR, TRAINING_SECONDS, FOOD_EFFECTS, LIFE_MATS, MAX_HEAL_FOODS, PET_EXCHANGE, PET_GACHA, PET_LEVELS, PET_TIER_RATE, RAID_ITEMS, RAID_MAX_FLOOR, RAID_DATA_FLOOR, SLOT_NAME, gearOf, weaponStats, type ArmorSlot, type Evolution, type RaidSave, ENHANCE_PITY, MONSTERS, SPECIAL_MASTERY } from "./data";
 import type { FoodSlot, RaidResult } from "./engine";
 import { canPay, nextStep, realDropChance, pityChance } from "./forge";
 import RaidGame from "./RaidGame";
@@ -299,7 +299,7 @@ export function BattlePetRoster({ raid, forge }: { raid: RaidSave; forge: ForgeA
 // ---------- 대장간 ----------
 function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; forge: ForgeActions; onTrain: (evolution: Evolution) => void; onOpenWorkshop: () => void }) {
   const [useStab, setUseStab] = useState(false), [picking, setPicking] = useState(false);
-  const weaponId = raid.equipped.weapon, wDef = weaponDef(weaponId), w = raid.weapons[weaponId] ?? { enhancement: 0, evolution: null, unlockedEnhancements: [] }, step = nextStep(w.enhancement);
+  const weaponId = raid.equipped.weapon, wDef = weaponDef(weaponId), w = raid.weapons[weaponId] ?? { enhancement: 0, evolution: null, unlockedEnhancements: [] }, step = nextStep(w.enhancement, enhanceLimit(TEST_MODE ? RAID_DATA_FLOOR : RAID_MAX_FLOOR));
   const needsOpen = !!step?.open && !w.unlockedEnhancements.includes(step.to);
   const needEvolution = w.enhancement >= 10 && !w.evolution;
   const cost = step ? (needsOpen ? step.open! : { gold: step.gold, need: step.need }) : null;
@@ -318,7 +318,7 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
         <span>간격<b>{stats.interval}초</b>{next && !needEvolution && step!.to <= 10 && <i>→ {next.interval}초</i>}</span>
       </div>
       {needEvolution ? <div className="raid-evolve-banner"><span className="raid-evolve-burst">✨</span><div><b>+10 강화 달성!</b><small>{wDef.icon} {wDef.name}을(를) 전투 무기로 진화시킬 수 있어요 (첫 선택 무료)</small></div><button onClick={() => setPicking(true)}>⚔️ 전투 무기로 진화</button></div>
-        : !step ? <p className="raid-max">최대 강화(+{ENHANCE[ENHANCE.length - 1].to})에 도달했어요!</p>
+        : !step ? <p className="raid-max">최대 강화(+{enhanceLimit(TEST_MODE ? RAID_DATA_FLOOR : RAID_MAX_FLOOR)})에 도달했어요!</p>
         : <>
           <div className="raid-odds">
             <span>목표<b>+{step.to}</b></span><span>성공<b className="ok">{pct(pity.chance)}</b>{pity.bonus > 0 && <i className="raid-pity-bonus">기본 {pct(pity.base)} + 보정 {pct(pity.bonus)}</i>}</span>
@@ -359,7 +359,7 @@ function ForgeView({ raid, forge, onTrain, onOpenWorkshop }: { raid: RaidSave; f
     </div>
 
     <details className="raid-table"><summary>강화표 전체 보기</summary><table><thead><tr><th>목표</th><th>성공</th><th>하락</th><th>천장</th><th>골드</th><th>재료</th></tr></thead><tbody>
-      {ENHANCE.map(e => <tr key={e.to} className={e.to === w.enhancement + 1 ? "now" : e.to <= w.enhancement ? "done" : ""}><td>+{e.to}</td><td>{pct(e.chance)}</td><td>{pct(e.drop)}</td><td>{ENHANCE_PITY[e.to] ? `${ENHANCE_PITY[e.to].ceiling}번째` : "-"}</td><td>{e.gold.toLocaleString()}</td><td>{Object.entries(e.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")}{e.open ? ` · 개방: ${Object.entries(e.open.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")} + ${e.open.gold.toLocaleString()}원` : ""}</td></tr>)}
+      {ENHANCE.filter(e => e.to <= enhanceLimit(TEST_MODE ? RAID_DATA_FLOOR : RAID_MAX_FLOOR)).map(e => <tr key={e.to} className={e.to === w.enhancement + 1 ? "now" : e.to <= w.enhancement ? "done" : ""}><td>+{e.to}</td><td>{pct(e.chance)}</td><td>{pct(e.drop)}</td><td>{ENHANCE_PITY[e.to] ? `${ENHANCE_PITY[e.to].ceiling}번째` : "-"}</td><td>{e.gold.toLocaleString()}</td><td>{Object.entries(e.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")}{e.open ? ` · 개방: ${Object.entries(e.open.need).map(([id, n]) => `${nameOf(id)} ${n}`).join(", ")} + ${e.open.gold.toLocaleString()}원` : ""}</td></tr>)}
     </tbody></table></details>
   </div>;
 }

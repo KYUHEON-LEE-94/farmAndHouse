@@ -10,7 +10,7 @@ import { SPECIALS } from "./weapons";
 import { hazard, hazardDone, stepHazard, type Hazard } from "./bossKit";
 import { AUX_WEAPONS, rollChoices, type AuxId } from "./awakenings";
 import { AUX_POWER, FODDER_HP, MOB_SHOT_DAMAGE, MOB_SHOT_INTERVAL, floorBand, mobLift, type RaidRunLog } from "./data";
-import { FLOW_CELL, START, WORLD_H, WORLD_W, blockedAt, blockers, buildFlow, clearLine, flowNext, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, platformOn, type Flow, type Terrain, fieldLike } from "./terrain";
+import { FLOW_CELL, START, WORLD_H, WORLD_W, blockedAt, blockers, buildFlow, clearLine, flowNext, inMud, makeTerrain, pushOut, routeTarget, segmentHits, slowAt, windAt, platformOn, type Flow, type Rect, type Terrain, fieldLike, CLOCK_FLOOR, SAND_POOL, clockCellRect, clockGateState, pickClockCells } from "./terrain";
 
 export type Input = { up: boolean; down: boolean; left: boolean; right: boolean; aimX: number; aimY: number; attack: boolean; dash: boolean; food: [boolean, boolean, boolean];
   /** 우클릭 특수 공격(누른 순간 한 번) */
@@ -30,6 +30,8 @@ export type Monster = {
   gap?: number; armorUntil?: number;
   /** 스크립트 보스(21층~): 대본 id, 현재 단계, 직전 패턴, 단계 전환 무적 끝 */
   script?: string; phase?: number; lastPattern?: string; invulnUntil?: number; clone?: boolean;
+  /** 41층~ 엄격 단계 정책: 다음 단계 판정을 허용하는 시각(전환 종료 + 1초) */
+  phaseReadyAt?: number;
   /** 정면 방패 방향(라디안, 정면 피해 −70%), 1회성 패턴 사용 여부 */
   shieldFacing?: number; overloadDone?: boolean;
   /** 행동 타이머·상태 */
@@ -117,7 +119,8 @@ export type RaidState = {
   /** 판 기록: 보스 등장 순간 체력 비율, 회피 횟수, 입력 방식 */
   waveEndHp: number | null; dodges: number; input: "pc" | "mobile";
   /** 53절 카드 진행 상태 */
-  ext: { /** 36~40층 공허 왕좌: 순간 암전 끝·다음 시작, 공허 균열 다음 시각, 전장 수축(현재·목표, 0~0.25) */ blackoutUntil?: number; blackoutAt?: number; riftAt?: number; shrink?: number; shrinkTo?: number; /** 32층 질풍의 대붕 횡풍: 이 시각까지 (gustX, gustY) 방향으로 밀림 */ gustUntil?: number; gustX?: number; gustY?: number; /** 플레이어 이동 속도 추정(탑의 그림자 예측 추적) */ pvx?: number; pvy?: number; plx?: number; ply?: number; /** 같은 층 직전 최고 실패 기록(3.4.3 비교 표식) */ prevBest?: { waveTime: number; bossHpRatio: number }; prevBeat?: boolean; dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
+  ext: { /** 42층~ 시계 바닥: 이번 칸·직전 칸·예고 시작 시각·이번 활성에서 이미 맞았는지 */ clockCells?: number[]; clockPrev?: number[]; clockStart?: number; clockHit?: boolean; /** 43층~ 모래 웅덩이 다음 주기 시작 */ sandAt?: number;
+    /** 36~40층 공허 왕좌: 순간 암전 끝·다음 시작, 공허 균열 다음 시각, 전장 수축(현재·목표, 0~0.25) */ blackoutUntil?: number; blackoutAt?: number; riftAt?: number; shrink?: number; shrinkTo?: number; /** 32층 질풍의 대붕 횡풍: 이 시각까지 (gustX, gustY) 방향으로 밀림 */ gustUntil?: number; gustX?: number; gustY?: number; /** 플레이어 이동 속도 추정(탑의 그림자 예측 추적) */ pvx?: number; pvy?: number; plx?: number; ply?: number; /** 같은 층 직전 최고 실패 기록(3.4.3 비교 표식) */ prevBest?: { waveTime: number; bossHpRatio: number }; prevBeat?: boolean; dischargeAt?: number; rootUntil?: number; pullUntil?: number; pullX?: number; pullY?: number; tempo: number; tempoUntil: number; focusUid: number; focusN: number; regenAt: number; secondWind: boolean; thornAt: number; petBondAt: number; petGuard: boolean;
     specialHitAt: number; castId: number; firstHitCast: number; perfectUntil: number; dashBoostUntil: number; cut: number[]; wasDashing: boolean };
   kills: number; damageTaken: Record<string, number>; uid: number; prevDash: boolean; prevFood: [boolean, boolean, boolean]; bossHpAtEnd: number;
 };
@@ -236,7 +239,7 @@ const ATTACK_SPEED_MUL = 0.85;
 const DAMAGE_MUL_CAP = 3;
 /** 방어 1당 계수(방어 4 ≈ 24%, 8 ≈ 39%, 15 ≈ 55% 감소) */
 const DEFENSE_K = 8;
-const HAZARD_SOURCES = ["꽃가루 장판", "감전", "전도성 웅덩이", "낙엽 회오리", "빙판", "핵 방전"];
+const HAZARD_SOURCES = ["꽃가루 장판", "감전", "전도성 웅덩이", "낙엽 회오리", "빙판", "핵 방전", "시계 바닥"];
 /** 피해를 실제로 받았으면 true(회피·무적이면 false). */
 function hurtPlayer(s: RaidState, raw: number, source = "기타", fromBoss = false): boolean {
   const p = s.player;
@@ -299,7 +302,7 @@ function hitMonster(s: RaidState, m: Monster, base: number, ang: number, knock: 
   // 정면 방패(29층 암흑 갑주 거신): 플레이어가 방패 쪽(±60°)에 있으면 피해 −70%
   if (m.shieldFacing !== undefined && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), m.shieldFacing) < 1.05) base *= 0.3;
   // 암흑 갑주(26~30층 일반): 정면(±60°) 피해 −50%. 공격 준비·돌진 중에는 방패가 내려간다
-  else if (frontGuardUp(s, m)) base *= m.def.id === "ruin-guardian" || m.def.id === "throne-guard" ? RUIN_GUARD_FRONT : DARK_ARMOR_FRONT;
+  else if (frontGuardUp(s, m)) base *= m.def.id === "ruin-guardian" || m.def.id === "throne-guard" || m.def.id === "clock-shield" ? RUIN_GUARD_FRONT : DARK_ARMOR_FRONT;
   if ((m.invulnUntil ?? 0) > s.t) { if (s.t - (m.flash > 0 ? 0 : -1) > 0) s.pops.push({ x: m.x, y: m.y - m.r - 10, text: "무적", t: 0.3, kind: "info" }); return; }
   const src = hitSource;
   // 보조무기: 주무기 강화·치명타 없이 고정 피해(62.1)
@@ -728,14 +731,14 @@ const preparing = (m: Monster) => m.state === "tele" || m.state === "dash";
 export function guardBonus(m: Monster) {
   if (m.def.kind !== "crab" || m.boss) return 0;
   if (m.def.id === "dark-armor") return preparing(m) ? -Math.min(5, Math.max(0, m.defense)) : 3;
-  if (m.def.id === "guardian-tree" || m.def.id === "ruin-guardian") return preparing(m) || m.state === "stun" ? 0 : 3;
+  if (m.def.id === "guardian-tree" || m.def.id === "ruin-guardian" || m.def.id === "clock-shield") return preparing(m) || m.state === "stun" ? 0 : 3;
   return m.state !== "dash" ? 3 : 0;
 }
 /** 암흑 갑주 정면 방패가 지금 플레이어 쪽을 막고 있는가 */
 export function frontGuardUp(s: RaidState, m: Monster) {
   // 왕좌 근위병: 방패 방향(m.t3)이 몸 방향과 따로 천천히 돈다. 측면·후면은 방패가 없다.
   if (m.def.id === "throne-guard" && !m.boss) return !preparing(m) && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), m.t3) < FRONT_ARC;
-  return (m.def.id === "dark-armor" || (m.def.id === "ruin-guardian" && m.state !== "stun")) && !m.boss && !preparing(m) && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), Math.atan2(m.dir.y, m.dir.x)) < FRONT_ARC;
+  return (m.def.id === "dark-armor" || ((m.def.id === "ruin-guardian" || m.def.id === "clock-shield") && m.state !== "stun")) && !m.boss && !preparing(m) && angDiff(Math.atan2(s.player.y - m.y, s.player.x - m.x), Math.atan2(m.dir.y, m.dir.x)) < FRONT_ARC;
 }
 
 /** 플레이어 속도 추정(프레임 간 위치 차, 부드럽게) */
@@ -763,11 +766,49 @@ function afterDash(s: RaidState, m: Monster) {
     else if (m.t4 === 2) { m.t4 = 0; m.state = "stun"; m.stateT = 1; zoneAt(s, { kind: "pollen", x: m.x, y: m.y, r: 48, t: 2.2, tele: 0, damage: Math.max(1, Math.round(m.damage * 0.25)), every: 0.5, slow: 0.2, label: "균열", mob: true }); }
   }
   if (m.def.id === "heart-warden" && m.shots === 1) { m.shots = 0; startCharge(m, p.x, p.y, 0.45, 240); }
+  if (m.def.id === "garden-executor") { // 돌진이 끝난 자리에서 십자 충격파(큰 공격, 1.2초 예고). 대각선 방향이 탈출로
+    m.state = "stun"; m.stateT = CLOCK_MOB.crossTele;
+    for (const a of [0, Math.PI / 2]) addHazard(s, hazard({ kind: "beam", x: m.x - Math.cos(a) * 260, y: m.y - Math.sin(a) * 260, angle: a, len: 520, width: 44, tele: CLOCK_MOB.crossTele, life: 0.15, damage: Math.round(m.damage * 0.85), label: "십자 충격파", owner: m.uid, mob: true }));
+  }
 }
+/** 41~45층 시계 정원 일반 몬스터 수치(RAID_FLOOR_50_IMPLEMENTATION_PLAN 3절): 들쥐 방향 예고 0.6초, 정령 바닥 예고 1.2초, 집행자 돌진·십자 1.2초 */
+export const CLOCK_MOB = { ratTele: 0.6, mothSpread: 0.32, mothSpeed: 100, spiritTele: 1.2, spiritR: 62, shieldTele: 1.0, chargeTele: 1.2, crossTele: 1.2 };
+/** 적 투사체를 막는 사각형: 벽 + 시계 정원의 닫힌 태엽 문(엄폐물). 다른 구역은 벽만(기존 그대로) */
+const shotBlockers = (t: Terrain): Rect[] => (t.zone === "clock" ? [...t.walls, ...t.gates.filter(g => g.closed).map(g => g.rect)] : t.walls);
 /** 고유 행동이 있는 몬스터면 처리하고 true. 소환물 예외: 분신은 그대로 추적, 회복 묘목(피해 0)은 움직이지 않는다. */
 function updateTrait(s: RaidState, m: Monster, dt: number, far: number, slow: number): boolean {
   const p = s.player;
   switch (m.def.id) {
+    // ---------- 41~45층 시계 정원(RAID_FLOOR_50_IMPLEMENTATION_PLAN 3절) ----------
+    case "clock-rat": // 추적하다 가까워지면 0.6초 방향 예고(직선) 뒤 짧게 달려든다. 옆으로 비키면 피한다
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0 && far < 200) { m.timer = 3; startCharge(m, p.x, p.y, CLOCK_MOB.ratTele, 180); }
+      return true;
+    case "bronze-moth": { // 거리를 두고 느린 탄 3발 부채꼴(탄 사이 통로). 원거리 상한 포함
+      if (far > 260) moveToward(m, p.x, p.y, m.speed, dt, slow);
+      else if (far < 160) { aimAt(m, p.x, p.y); m.x = clamp(m.x - m.dir.x * m.speed * 0.7 * dt, 20, WORLD_W - 20); m.y = clamp(m.y - m.dir.y * m.speed * 0.7 * dt, 20, WORLD_H - 20); }
+      else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; }
+      if (m.timer <= 0.6 && m.timer > 0) m.flash = Math.max(m.flash, 0.05);
+      if (m.timer <= 0) { m.timer = 2.6 * MOB_SHOT_INTERVAL; if (far < 400 && !segmentHits(shotBlockers(s.terrain), m.x, m.y, p.x, p.y)) shoot(s, m, [-CLOCK_MOB.mothSpread, 0, CLOCK_MOB.mothSpread], CLOCK_MOB.mothSpeed); }
+      return true;
+    }
+    case "sand-spirit": { // 예고한 자리(발사 순간의 플레이어 위치, 이후 추적 없음)에 1.2초 뒤 지연 폭발. 원거리 상한 포함
+      if (far > 240) moveToward(m, p.x, p.y, m.speed, dt, slow); else { aimAt(m, p.x, p.y); const side = m.uid % 2 ? 1 : -1; m.x += -m.dir.y * side * m.speed * 0.3 * dt; m.y += m.dir.x * side * m.speed * 0.3 * dt; }
+      if (m.timer <= 0) {
+        m.timer = 2.8 * MOB_SHOT_INTERVAL;
+        if (far < 380) zoneAt(s, { kind: "pbomb", x: clamp(p.x, 20, WORLD_W - 20), y: clamp(p.y, 20, WORLD_H - 20), r: CLOCK_MOB.spiritR, t: 0.2, tele: CLOCK_MOB.spiritTele, damage: Math.max(1, Math.round(m.damage * MOB_SHOT_DAMAGE)), every: 0, slow: 0, label: "모래 폭발", mob: true });
+      }
+      return true;
+    }
+    case "clock-shield": // 정면 방패(−35%)로 다가오다 3.5초마다 멈춰 1초 예고 태엽 강타. 준비(멈춤) 동안 방패·추가 방어 해제
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0 && far < 200) { m.timer = 3.5; m.state = "stun"; m.stateT = CLOCK_MOB.shieldTele; zoneAt(s, { kind: "bolt", x: m.x, y: m.y, r: 95, t: 0.15, tele: CLOCK_MOB.shieldTele, damage: Math.round(m.damage * 0.9), every: 0, slow: 0, label: "태엽 강타", mob: true }); }
+      return true;
+    case "garden-executor": // 정예: 1.2초 예고 직선 돌진 → 멈춰 1.2초 예고 십자 충격파(afterDash)
+      if (m.state === "stun") return true;
+      moveToward(m, p.x, p.y, m.speed, dt, slow);
+      if (m.timer <= 0) { m.timer = 5; startCharge(m, p.x, p.y, CLOCK_MOB.chargeTele, 300); }
+      return true;
     // ---------- 36~40층 공허 왕좌 ----------
     case "star-wraith": { // 추적 + 4초마다 짧은 순간이동(도착 위치 0.6초 예고)
       if (m.clone) return false;
@@ -996,7 +1037,9 @@ function updateCatfish(s: RaidState, m: Monster, dt: number) {
 export type BossPattern = (s: RaidState, m: Monster) => number;
 /** 단계: 체력 비율 at 이하에서 사용. gap은 패턴 사이 공백, combo는 한 번에 묶는 최대 패턴 수 */
 export type BossPhase = { at: number; patterns: string[]; gap: number; combo: number };
-export type BossScript = { phases: BossPhase[]; patterns: Record<string, BossPattern>; speed?: number; /** 단계 전환 무적(초). 31층부터 0.8초(RAID_FLOOR_40_EXPANSION_AUDIT 7.3), 없으면 1초 */ phaseInvuln?: number; /** 매 프레임(방패 회전·과부하 등) */ tick?: (s: RaidState, m: Monster, dt: number) => void };
+export type BossScript = { phases: BossPhase[]; patterns: Record<string, BossPattern>; speed?: number; /** 단계 전환 무적(초). 31층부터 0.8초(RAID_FLOOR_40_EXPANSION_AUDIT 7.3), 없으면 1초 */ phaseInvuln?: number;
+  /** 41~50층 단계 정책(RAID_FLOOR_50_IMPLEMENTATION_PLAN 4절): 한 프레임에 한 단계씩, 전환 무적 0.8초 동안 기존 적 투사체·장판·위험·보스 지연 행동 제거, 무적 뒤 첫 공격까지 1.2초, 다음 단계는 전환 종료 1초 뒤부터, 연계 안에서도 같은 패턴 연속 금지 */
+  strict?: boolean; /** 매 프레임(방패 회전·과부하 등) */ tick?: (s: RaidState, m: Monster, dt: number) => void };
 export const BOSS_SCRIPTS: Record<string, BossScript> = {};
 /** 연계 사이 공백(초) */
 export const COMBO_GAP = 0.3;
@@ -1004,7 +1047,8 @@ export const COMBO_GAP = 0.3;
 /** 구간 표준 장비 기준 "최대 체력의 몇 %" 피해를 보스 원피해로 바꾼다(방어 비율식 적용 전 값). */
 export function bossPct(s: RaidState, pct: number) {
   // 구간 표준 장비 체력·방어: 21~25 설산 방벽, 26~30 고대 수호자, 31~35 심장부 정복자, 36~ 천공 파수꾼
-  const f = s.floor.floor, std = f <= 25 ? { hp: 160, def: 9 } : f <= 30 ? { hp: 175, def: 11 } : f <= 35 ? { hp: 190, def: 14 } : { hp: 210, def: 15 };
+  // 41~45 성좌 수호자(체력 230·방어 16)
+  const f = s.floor.floor, std = f <= 25 ? { hp: 160, def: 9 } : f <= 30 ? { hp: 175, def: 11 } : f <= 35 ? { hp: 190, def: 14 } : f <= 40 ? { hp: 210, def: 15 } : { hp: 230, def: 16 };
   return Math.round(pct * std.hp * (100 + std.def * DEFENSE_K) / 100);
 }
 /** 방사 탄막: n발을 offset부터 고르게(보스 탄은 원피해 그대로) */
@@ -1019,6 +1063,7 @@ function updateScriptedBoss(s: RaidState, m: Monster, dt: number) {
   sc.tick?.(s, m, dt);
   const ratio = m.hp / m.maxHp;
   let ph = 0; sc.phases.forEach((phase, i) => { if (ratio <= phase.at) ph = i; });
+  if (sc.strict) return runStrictBoss(s, m, sc, ph, dt);
   if (ph !== (m.phase ?? 0)) {
     // 단계 전환: 1초 무적 연출, 진행 중 위험은 그대로 두고 다음 패턴까지 1.2초
     m.phase = ph; m.invulnUntil = s.t + (sc.phaseInvuln ?? 1); m.gap = 1.2; s.shake = Math.max(s.shake, 6);
@@ -1036,6 +1081,42 @@ function updateScriptedBoss(s: RaidState, m: Monster, dt: number) {
     if (i === 0) at = sc.patterns[id](s, m);
     else { const start = at + COMBO_GAP; later(s, start, () => { if (m.hp > 0) sc.patterns[id](s, m); }); at = start + 1.2; }
   }
+  if (n > 1) s.pops.push({ x: m.x, y: m.y - m.r - 18, text: `${n}연계!`, t: 0.8, kind: "info" });
+  m.gap = at + phase.gap;
+}
+
+/** 41~50층 단계 전환 무적(초)·무적 뒤 첫 공격까지(초)·다음 단계 판정 유예(초) */
+export const STRICT_PHASE = { invuln: 0.8, firstAttack: 1.2, nextAfter: 1, comboTail: 4.8 };
+/** 단계 전환 때 지우는 것: 적 투사체, 위험(광선·고리·추적), 적 장판, 보스 지연 행동. 플레이어 공격·지형은 그대로 */
+export function clearBossThreats(s: RaidState) {
+  s.projectiles = s.projectiles.filter(pr => pr.mine);
+  s.hazards = [];
+  s.zones = s.zones.filter(z => z.mine || z.src === "aux" || z.kind === "net" || z.kind === "frost" || z.kind === "spray");
+  s.actions = s.actions.filter(a => a.tag !== "boss");
+}
+/** 새로 생긴 지연 행동에 보스 표식(단계 전환 때 지울 수 있게) */
+const tagBossActions = (s: RaidState, from: number) => { for (let i = from; i < s.actions.length; i++) s.actions[i].tag ??= "boss"; };
+function runStrictBoss(s: RaidState, m: Monster, sc: BossScript, want: number, dt: number) {
+  const p = s.player, cur = m.phase ?? 0;
+  if (want > cur && s.t >= (m.phaseReadyAt ?? 0)) {
+    // 한 번에 한 단계만. 진행 중 공격은 모두 지우고 0.8초 무적 → 1.2초 뒤 첫 공격
+    m.phase = cur + 1; m.invulnUntil = s.t + STRICT_PHASE.invuln; m.phaseReadyAt = m.invulnUntil + STRICT_PHASE.nextAfter; m.gap = STRICT_PHASE.invuln + STRICT_PHASE.firstAttack;
+    if (m.state !== "move") { m.state = "move"; m.tele = null; }
+    clearBossThreats(s); s.shake = Math.max(s.shake, 6);
+    s.pops.push({ x: m.x, y: m.y - m.r - 30, text: `⚠ ${m.phase + 1}단계!`, t: 1.4, kind: "info" });
+  }
+  moveToward(m, p.x, p.y, m.speed * (sc.speed ?? 1), dt, 1);
+  m.gap = (m.gap ?? 1.5) - dt;
+  if (m.gap > 0) return;
+  const phase = sc.phases[m.phase ?? 0], n = Math.max(1, Math.min(phase.combo, 1 + Math.floor(rnd() * phase.combo))), a0 = s.actions.length;
+  let at = 0;
+  for (let i = 0; i < n; i++) {
+    const pool = phase.patterns.filter(id => id !== m.lastPattern), id = pool[Math.floor(rnd() * pool.length)] ?? phase.patterns[0];
+    m.lastPattern = id;
+    if (i === 0) at = sc.patterns[id](s, m);
+    else { const start = at + COMBO_GAP; later(s, start, () => { if (m.hp > 0) sc.patterns[id](s, m); }); at = start + STRICT_PHASE.comboTail; } // 연계 뒤 패턴 길이는 미리 모르므로 41층~ 패턴 최대 길이로 잡는다(겹침 방지)
+  }
+  tagBossActions(s, a0);
   if (n > 1) s.pops.push({ x: m.x, y: m.y - m.r - 18, text: `${n}연계!`, t: 0.8, kind: "info" });
   m.gap = at + phase.gap;
 }
@@ -1409,6 +1490,31 @@ function updateVoid(s: RaidState) {
   }
 }
 
+// ---------- 41~45층 시계 정원 지형(RAID_FLOOR_50_IMPLEMENTATION_PLAN 5절) ----------
+/** 태엽 문(41~)·시계 바닥(42~)·모래 웅덩이(43~). 보스에게 최대 체력 비례 피해를 주는 지형은 없다. */
+function updateClock(s: RaidState) {
+  const T = s.terrain, p = s.player, f = s.floor.floor, e = s.ext;
+  const gate = clockGateState(s.t);
+  for (const g of T.gates) { g.warn = gate.warn; g.closed = gate.closed; }
+  if (f >= 42) {
+    if (e.clockStart === undefined) e.clockStart = CLOCK_FLOOR.start;
+    if (s.t >= e.clockStart + CLOCK_FLOOR.tele + CLOCK_FLOOR.active && e.clockCells) { e.clockPrev = e.clockCells; e.clockCells = undefined; e.clockStart += CLOCK_FLOOR.every; }
+    if (s.t >= e.clockStart && !e.clockCells) { e.clockCells = pickClockCells(e.clockPrev ?? [], rnd); e.clockHit = false; }
+    const age = s.t - e.clockStart;
+    if (e.clockCells && !e.clockHit && age >= CLOCK_FLOOR.tele && age < CLOCK_FLOOR.tele + CLOCK_FLOOR.active && e.clockCells.some(i => { const r = clockCellRect(i); return p.x >= r.x && p.x < r.x + r.w; })) {
+      if (hurtPlayer(s, Math.max(1, Math.round(p.maxHp * CLOCK_FLOOR.pct)), "시계 바닥")) e.clockHit = true;
+    }
+  }
+  if (f >= 43 && T.sand) {
+    if (e.sandAt === undefined) e.sandAt = SAND_POOL.start;
+    if (s.t >= e.sandAt) { // 새 주기: 플레이어 근처 2곳(막힌 곳 제외)에 웅덩이
+      e.sandAt += SAND_POOL.period; T.sand = [];
+      for (let i = 0; i < 30 && T.sand.length < SAND_POOL.count; i++) { const at = nearPlayer(s, 700); if (!blockedAt(T, at.x, at.y, 20) && T.sand.every(o => dist(o.x, o.y, at.x, at.y) > SAND_POOL.r * 2)) T.sand.push({ ...at, r: SAND_POOL.r }); }
+    }
+    T.sandOn = s.t - (e.sandAt - SAND_POOL.period) < SAND_POOL.on;
+  }
+}
+
 // ---------- 36~40층 보스 대본(RAID_FLOOR_40_EXPANSION_AUDIT 7.3) ----------
 /** 반월 베기: 보스 앞쪽 반원으로 퍼지는 고리(뒤쪽은 안전) */
 const crescent = (s: RaidState, x: number, y: number, angle: number, pct: number, label = "반월 베기") =>
@@ -1498,6 +1604,125 @@ BOSS_SCRIPTS["void-king"] = { // 40층 공허의 왕(최종)
     { at: 0.7, patterns: ["throneBeam", "orbs", "track", "cut", "spinOrbs"], gap: 0.55, combo: 2 },
     // 35%: 전장 수축 후 3연계
     { at: 0.35, patterns: ["throneBeam", "orbs", "track", "cut", "spinOrbs"], gap: 0.45, combo: 3 },
+  ],
+};
+
+// ---------- 41~45층 시계 정원 보스 대본(RAID_FLOOR_50_IMPLEMENTATION_PLAN 4절) ----------
+// 큰 공격(최대 체력 10% 이상) 예고 1.2초 이상, 작은 공격 0.6초 이상. 41~44층 HP 55%에서 2단계, 45층 70%·35%에서 3단계(strict 실행기).
+// 피해는 41~45층 표준 장비(성좌 수호자: 체력 230·방어 16) 기준 비율. 연계 안의 각 공격도 따로 새 예고를 띄운다.
+/** 부채꼴 내려찍기: 보스 앞쪽 부채꼴(약 126°)로 퍼지는 고리, 나머지(뒤쪽)는 안전 */
+const fanSlam = (s: RaidState, m: Monster, angle: number, pct: number, label = "부채꼴 내려찍기") =>
+  addHazard(s, hazard({ kind: "ring", x: m.x, y: m.y, r0: 30, r1: 300, band: 60, tele: BIG_TELE, life: 0.8, damage: bossPct(s, pct), label, gapAt: angle + Math.PI, gapArc: Math.PI * 1.3 }));
+/** 약점 노출(받는 피해 +20%)을 after초 뒤에 */
+const exposeLater = (s: RaidState, m: Monster, after: number, sec: number) => later(s, after, () => { if (m.hp > 0) exposeBear(s, m, sec); });
+/** 작은 방사탄(0.6초 경고 뒤) */
+function warnRadial(s: RaidState, m: Monster, n: number, speed: number, pct: number, warn = "⚙") {
+  s.pops.push({ x: m.x, y: m.y - m.r - 18, text: warn, t: 0.6, kind: "info" });
+  later(s, 0.6, () => { if (m.hp > 0) radial(s, m, n, rnd() * 6, speed, bossPct(s, pct)); });
+}
+/** 방패 해제: 3초 동안 방패 판정 없음 + 받는 피해 +20% */
+function dropShield(s: RaidState, m: Monster) { if (m.hp <= 0) return; m.armorUntil = s.t + 3; exposeBear(s, m, 3); s.pops.push({ x: m.x, y: m.y - m.r - 30, text: "🛡️ 방패 해제!", t: 1.2, kind: "info" }); }
+BOSS_SCRIPTS["bronze-gatekeeper"] = { // 41층 청동 문지기: 부채꼴 내려찍기 → 뒤쪽 빈틈(2.5초 약점)
+  speed: 0.65, phaseInvuln: STRICT_PHASE.invuln, strict: true,
+  patterns: {
+    slam: (s, m) => { fanSlam(s, m, aimP(s, m), 0.13); exposeLater(s, m, BIG_TELE, 2.5); return BIG_TELE + 1.0; },
+    gears: (s, m) => { fanShot(s, m, 5, 0.9, 220, 0.07, "⚙"); return 1.3; },
+    charge: (s, m) => { if (m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 520); return BIG_TELE + 0.9; },
+    // 55%: 내려찍기 2회(두 번째는 새로 조준해 다시 예고), 톱니 방사탄
+    slamTwice: (s, m) => { fanSlam(s, m, aimP(s, m), 0.13); later(s, BIG_TELE + 0.5, () => { if (m.hp > 0) { fanSlam(s, m, aimP(s, m), 0.13); exposeLater(s, m, BIG_TELE, 2.5); } }); return (BIG_TELE + 0.5) + BIG_TELE + 1.0; },
+    cogRing: (s, m) => { warnRadial(s, m, 10, 170, 0.07); return 1.4; },
+  },
+  phases: [
+    { at: 1, patterns: ["slam", "gears", "charge"], gap: 0.8, combo: 1 },
+    { at: 0.55, patterns: ["slam", "slamTwice", "gears", "charge", "cogRing"], gap: 0.65, combo: 2 },
+  ],
+};
+BOSS_SCRIPTS["clock-bird"] = { // 42층 정원의 시계새: 두 착지 지점을 순서대로 예고 → 급강하
+  speed: 0.75, phaseInvuln: STRICT_PHASE.invuln, strict: true,
+  patterns: {
+    dive: (s, m) => {
+      // 첫 착지점은 지금 자리, 둘째는 0.7초 뒤 자리. 각각 1.2초 예고(번호 표시) 뒤 내려앉는다
+      for (let k = 0; k < 2; k++) later(s, 0.7 * k, () => {
+        if (m.hp <= 0) return;
+        const x = clamp(s.player.x, 60, WORLD_W - 60), y = clamp(s.player.y, 60, WORLD_H - 60);
+        trackAt(s, x, y, 85, BIG_TELE, 0, 0, 0.12, k ? "급강하 ②" : "급강하 ①");
+        later(s, BIG_TELE, () => { if (m.hp > 0) { m.x = x; m.y = y; } });
+      });
+      return 0.7 + BIG_TELE + 0.6;
+    },
+    feathers: (s, m) => { fanShot(s, m, 7, 1.1, 200, 0.07, "🪶"); return 1.3; },
+    tickRing: (s, m) => { ringAt(s, m.x, m.y, 30, 380, 30, BIG_TELE, 1.3, 0.11, "시계 고리", 0.9); return BIG_TELE + 1.0; },
+    // 55%: 급강하 뒤 둘째 착지점에서 깃털 방사(0.6초 경고)
+    diveFeathers: (s, m) => { BOSS_SCRIPTS["clock-bird"].patterns.dive(s, m); later(s, 0.7 + BIG_TELE + 0.1, () => { if (m.hp > 0) warnRadial(s, m, 8, 180, 0.07, "🪶"); }); return 0.7 + BIG_TELE + 1.4; },
+  },
+  phases: [
+    { at: 1, patterns: ["dive", "feathers", "tickRing"], gap: 0.8, combo: 1 },
+    { at: 0.55, patterns: ["dive", "feathers", "tickRing", "diveFeathers"], gap: 0.65, combo: 2 },
+  ],
+};
+BOSS_SCRIPTS["hourglass-alchemist"] = { // 43층 모래시계 연금술사: 지연 폭발 3곳, 마지막 위치는 늦게 확정
+  speed: 0.48, phaseInvuln: STRICT_PHASE.invuln, strict: true,
+  patterns: {
+    bombs: s => {
+      for (let i = 0; i < 2; i++) { const at = nearPlayer(s, 240); trackAt(s, at.x, at.y, 70, 1.4, 0, 0, 0.12, `지연 폭발 ${i + 1}`); }
+      // 셋째는 0.7초 동안 플레이어를 따라오다 멈추고, 멈춘 뒤에도 1.2초 예고가 남는다
+      trackAt(s, s.player.x, s.player.y, 70, 0.7 + BIG_TELE, 0.7, 150, 0.12, "지연 폭발 3");
+      return 0.7 + BIG_TELE + 0.6;
+    },
+    flask: s => { for (let i = 0; i < 3; i++) leafZone(s, nearPlayer(s, 320), "모래 구름"); return 1.0; },
+    potion: (s, m) => { fanShot(s, m, 5, 0.9, 230, 0.07, "🧪"); return 1.3; },
+    // 55%: 지연 폭발 + 모래 구름
+    bombsFlask: (s, m) => { BOSS_SCRIPTS["hourglass-alchemist"].patterns.flask(s, m); BOSS_SCRIPTS["hourglass-alchemist"].patterns.bombs(s, m); return 0.7 + BIG_TELE + 0.9; },
+  },
+  phases: [
+    { at: 1, patterns: ["bombs", "flask", "potion"], gap: 0.8, combo: 1 },
+    { at: 0.55, patterns: ["bombs", "flask", "potion", "bombsFlask"], gap: 0.65, combo: 2 },
+  ],
+};
+BOSS_SCRIPTS["clockwork-knight"] = { // 44층 거대 태엽기사: 전면 방패(−70%) → 돌진 → 방패 해제(3초, 받는 피해 +20%)
+  speed: 0.6, phaseInvuln: STRICT_PHASE.invuln, strict: true,
+  /** armorUntil: 방패를 내려놓은 시각까지(이때는 방패 판정 없음) */
+  tick: (s, m, dt) => {
+    if ((m.armorUntil ?? 0) > s.t) { m.shieldFacing = undefined; return; }
+    const want = aimP(s, m), cur = m.shieldFacing ?? want; let d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur)); const rate = (m.phase ?? 0) >= 1 ? 0.9 : 0.6; d = Math.max(-rate * dt, Math.min(rate * dt, d)); m.shieldFacing = cur + d;
+  },
+  patterns: {
+    charge: (s, m) => { if (m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 600); later(s, BIG_TELE + 0.7, () => dropShield(s, m)); return BIG_TELE + 0.9; },
+    sweep: (s, m) => { const a = aimP(s, m); for (const off of [-0.45, 0, 0.45]) beamFrom(s, m.x, m.y, a + off, 420, 32, BIG_TELE, 0.11, "태엽 검기"); return BIG_TELE + 0.5; },
+    cogs: (s, m) => { warnRadial(s, m, 8, 170, 0.07); return 1.3; },
+    // 55%: 돌진 2회(두 번째도 새로 예고) 뒤 방패 해제
+    chargeTwice: (s, m) => {
+      if (m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 600);
+      later(s, BIG_TELE + 0.7, () => { if (m.hp > 0 && m.state === "move") startCharge(m, s.player.x, s.player.y, BIG_TELE, 600); });
+      later(s, (BIG_TELE + 0.7) * 2, () => dropShield(s, m));
+      return (BIG_TELE + 0.7) * 2 + 0.3;
+    },
+  },
+  phases: [
+    { at: 1, patterns: ["charge", "sweep", "cogs"], gap: 0.8, combo: 1 },
+    { at: 0.55, patterns: ["charge", "sweep", "cogs", "chargeTwice"], gap: 0.65, combo: 2 },
+  ],
+};
+BOSS_SCRIPTS["garden-keeper"] = { // 45층 시간 정원의 관리자(구간 보스): 바닥 구역 순차 작동과 충격파 교대
+  speed: 0.6, phaseInvuln: STRICT_PHASE.invuln, strict: true,
+  patterns: {
+    // 플레이어를 가로지르는 줄 위 4구역이 0.4초 간격으로 차례로 작동(번호 순서, 각 1.2초 이상 예고)
+    floors: s => {
+      const a = rnd() * Math.PI, px = s.player.x, py = s.player.y;
+      [-240, -80, 80, 240].forEach((off, i) => trackAt(s, clamp(px + Math.cos(a) * off, 40, WORLD_W - 40), clamp(py + Math.sin(a) * off, 40, WORLD_H - 40), 80, BIG_TELE + 0.4 * i, 0, 0, 0.12, `정원 바닥 ${i + 1}`));
+      return BIG_TELE + 1.2 + 0.4;
+    },
+    shock: (s, m) => { ringAt(s, m.x, m.y, 30, 420, 34, BIG_TELE, 1.3, 0.12, "시간 충격파", 0.9); return BIG_TELE + 1.0; },
+    hands: s => { const a = rnd() * Math.PI; beamCross(s, s.player.x, s.player.y, a, 900, 40, 1.3, 0.13, "시계 바늘"); beamCross(s, s.player.x, s.player.y, a + Math.PI / 2.4, 900, 40, 1.3, 0.13, "시계 바늘"); return 1.8; },
+    sparks: (s, m) => { warnRadial(s, m, 12, 150, 0.07, "✦"); return 1.4; },
+    // 70%~: 바닥 → 충격파 교대(충격파는 바닥이 끝난 뒤 새로 예고)
+    floorShock: (s, m) => { BOSS_SCRIPTS["garden-keeper"].patterns.floors(s, m); later(s, BIG_TELE + 1.4, () => { if (m.hp > 0) ringAt(s, m.x, m.y, 30, 420, 34, BIG_TELE, 1.3, 0.12, "시간 충격파", 0.9); }); return BIG_TELE + 1.4 + BIG_TELE + 1.0; },
+  },
+  phases: [
+    { at: 1, patterns: ["floors", "shock", "sparks"], gap: 0.8, combo: 1 },
+    { at: 0.7, patterns: ["floors", "shock", "sparks", "hands", "floorShock"], gap: 0.65, combo: 2 },
+    // 35%: 연계 최대 2(3연계는 50층 마지막 단계만)
+    { at: 0.35, patterns: ["floors", "shock", "sparks", "hands", "floorShock"], gap: 0.5, combo: 2 },
   ],
 };
 
@@ -1631,6 +1856,7 @@ function updateWorld(s: RaidState, dt: number) {
   }
   // 심장부 핵 방전 지대(6.2절): 6초마다 1초 예고 뒤 2초간 초당 8 피해, 동시에 최대 2곳(보스전 중 포함)
   if (T.zone === "void") updateVoid(s);
+  if (T.zone === "clock") updateClock(s);
   if (T.zone === "core" && s.t >= (s.ext.dischargeAt ?? 8)) {
     s.ext.dischargeAt = s.t + 6;
     if (s.zones.filter(z => z.label === "핵 방전").length < 2) { const at = nearPlayer(s, 380); zoneAt(s, { kind: "shock", ...at, r: 70, t: 2, tele: 1, damage: 8, every: 1, slow: 0, label: "핵 방전" }); }
@@ -1702,7 +1928,7 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   // 지속 회복 음식(약초 고기찜): 초당 체력 회복
   for (const b of s.buffs) if (b.kind === "regen" && b.until > s.t && s.player.hp > 0) s.player.hp = Math.min(s.player.maxHp, s.player.hp + b.value * dt);
   // 예약된 특수 공격 타격
-  if (s.actions.length) { const due = s.actions.filter(x => x.at <= s.t); s.actions = s.actions.filter(x => x.at > s.t); for (const x of due) withSource(x.src, x.run); }
+  if (s.actions.length) { const due = s.actions.filter(x => x.at <= s.t); s.actions = s.actions.filter(x => x.at > s.t); for (const x of due) { const n0 = s.actions.length; withSource(x.src, x.run); if (x.tag === "boss") tagBossActions(s, n0); } }
 
   // 공격: 누르고 있으면 간격마다 휘두른다. 시작 0.12초 뒤 판정.
   p.swingCd = Math.max(0, p.swingCd - dt);
@@ -1774,13 +2000,14 @@ export function stepRaid(s: RaidState, dt: number, input: Input) {
   }
   updateAux(s);
 
-  // 투사체
+  // 투사체(시계 정원은 닫힌 태엽 문도 막는다)
+  const shotWalls = shotBlockers(s.terrain);
   for (const pr of s.projectiles) {
     hitSource = pr.src ?? "basic";
     if (pr.homing !== undefined) { const tg = s.monsters.find(m => m.uid === pr.homing && m.hp > 0); if (tg) { const sp0 = Math.hypot(pr.vx, pr.vy) || 1, a = Math.atan2(tg.y - pr.y, tg.x - pr.x); pr.vx = Math.cos(a) * sp0; pr.vy = Math.sin(a) * sp0; } }
     const w = windAt(s.terrain, pr.x, pr.y), sp = Math.hypot(pr.vx, pr.vy) || 1, along = w ? (pr.vx * w.dx + pr.vy * w.dy) / sp : 0, k = along > 0.5 ? 1.2 : along < -0.5 ? 0.85 : 1;
     const nx = pr.x + pr.vx * dt * k, ny = pr.y + pr.vy * dt * k;
-    if (segmentHits(s.terrain.walls, pr.x, pr.y, nx, ny)) { if (pr.mine && pr.siege) blastSpecial(s, pr.x, pr.y, pr.explode ?? 115, pr.damage / 2.2 * 1.4, 90); pr.life = 0; continue; }
+    if (segmentHits(shotWalls, pr.x, pr.y, nx, ny)) { if (pr.mine && pr.siege) blastSpecial(s, pr.x, pr.y, pr.explode ?? 115, pr.damage / 2.2 * 1.4, 90); pr.life = 0; continue; }
     pr.x = nx; pr.y = ny; pr.life -= dt;
     if (pr.mine) {
       for (const m of s.monsters) {

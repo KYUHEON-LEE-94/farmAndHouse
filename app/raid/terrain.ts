@@ -8,9 +8,11 @@ export const SAFE_RADIUS = 180;
 
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Flower = { x: number; y: number; hits: number; dmg: number; exploded: boolean; golden?: boolean };
-export type Gate = { rect: Rect; closed: boolean; next: number; moving: boolean };
+export type Gate = { rect: Rect; closed: boolean; next: number; moving: boolean; /** 시계 정원 태엽 문: 곧 닫힘(예고 1.5초) */ warn?: boolean };
 export type Terrain = {
-  seed: number; zone: "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void";
+  seed: number; zone: "field" | "canal" | "maple" | "frost" | "ancient" | "core" | "sky" | "void" | "clock";
+  /** 시계 정원 모래 웅덩이(43층~): 켜진 동안 플레이어·일반 적 이동 −22%, 자체 피해 없음(엔진이 자리·켜짐을 갱신) */
+  sand?: { x: number; y: number; r: number }[]; sandOn?: boolean;
   /** 고대 숲 이끼 길(플레이어 이동 +8%), 심장부 가속 지대(모두 +12%), 수문·균열벽 전환 주기(초) */
   moss?: Rect[]; boost?: Rect[]; gatePeriod?: number;
   /** 공허 왕좌 별빛 발판(틈을 건너는 다리): 4초 켜짐·4초 꺼짐, 꺼진 발판은 지나갈 수 없다(엔진이 platformOff를 갱신) */
@@ -27,7 +29,7 @@ const inside = (r: Rect, x: number, y: number, pad = 0) => x > r.x - pad && x < 
 const nearStart = (r: Rect) => { const cx = Math.max(r.x, Math.min(START.x, r.x + r.w)), cy = Math.max(r.y, Math.min(START.y, r.y + r.h)); return Math.hypot(cx - START.x, cy - START.y) < SAFE_RADIUS; };
 
 export function makeTerrain(floor: number, seed: number): Terrain {
-  const r = rng(seed * 7919 + floor * 104729), canal = floor > 5 && floor <= 10, zone: Terrain["zone"] = floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : floor <= 30 ? "core" : floor <= 35 ? "sky" : "void";
+  const r = rng(seed * 7919 + floor * 104729), canal = floor > 5 && floor <= 10, zone: Terrain["zone"] = floor <= 5 ? "field" : floor <= 10 ? "canal" : floor <= 15 ? "maple" : floor <= 20 ? "frost" : floor <= 25 ? "ancient" : floor <= 30 ? "core" : floor <= 35 ? "sky" : floor <= 40 ? "void" : "clock";
   const t: Terrain = { seed, zone, walls: [], grass: [], mud: [], wind: [], flowers: [], deep: [], bridges: [], shallow: [], puddles: [], gates: [], chance: null };
   const template = Math.floor(r() * 3);
   const place = (list: Rect[], make: () => Rect, n: number, avoid: Rect[][] = []) => {
@@ -71,6 +73,18 @@ export function makeTerrain(floor: number, seed: number): Terrain {
     for (const pl of [...t.platforms].sort((p, q) => p.x - q.x)) { pieces.push({ x: from, y: ry, w: pl.x - from, h: rh }); from = pl.x + pl.w; }
     pieces.push({ x: from, y: ry, w: WORLD_W - from, h: rh }); t.deep = pieces; t.platformOff = t.platforms.map(() => false);
     place(t.walls, () => { const w = 50 + r() * 40, h = 60 + r() * 50; return { x: r() * WORLD_W, y: r() * WORLD_H, w, h }; }, 4 + Math.min(2, floor - 36), [t.deep, t.platforms]);
+  } else if (zone === "clock") {
+    // 시계 정원(41~45층, RAID_FLOOR_50_IMPLEMENTATION_PLAN 5절): 청동 기둥 + 태엽 문 3개(전장 너비 18% 길이, 주변 140px 이상 비워 항상 돌아갈 길)
+    place(t.walls, () => { const w = 50 + r() * 40, h = 50 + r() * 40; return { x: r() * WORLD_W, y: r() * WORLD_H, w, h }; }, 4 + Math.min(2, floor - 41), [t.walls]);
+    const len = Math.round(WORLD_W * CLOCK_GATE.widthFrac), gap = CLOCK_GATE.bypass, gates: Rect[] = [];
+    for (let tries = 0; gates.length < 3 && tries < 200; tries++) {
+      const horiz = r() < 0.5, rect = horiz ? { x: r() * WORLD_W, y: r() * WORLD_H, w: len, h: 24 } : { x: r() * WORLD_W, y: r() * WORLD_H, w: 24, h: len };
+      if (nearStart(rect) || rect.x < gap || rect.y < gap || rect.x + rect.w > WORLD_W - gap || rect.y + rect.h > WORLD_H - gap) continue;
+      if ([...t.walls, ...gates].some(o => !(rect.x + rect.w + gap <= o.x || o.x + o.w + gap <= rect.x || rect.y + rect.h + gap <= o.y || o.y + o.h + gap <= rect.y))) continue;
+      gates.push(rect);
+    }
+    t.gates = gates.map(rect => ({ rect, closed: false, next: 0, moving: false, warn: false }));
+    if (floor >= 43) { t.sand = []; t.sandOn = false; }
   } else if (zone === "maple") {
     // 단풍 미궁(11~15층): 덤불 울타리 미로 + 낙엽 더미(적 감속) + 단풍 덤불(모두 감속). 층이 오를수록 울타리가 늘어난다.
     place(t.walls, () => { const horiz = r() < 0.5, len = 150 + r() * 120; return horiz ? { x: r() * WORLD_W, y: r() * WORLD_H, w: len, h: 24 } : { x: r() * WORLD_W, y: r() * WORLD_H, w: 24, h: len }; }, 5 + (floor - 11), [t.walls]);
@@ -125,6 +139,26 @@ export function blockers(t: Terrain): Rect[] { return [...t.walls, ...t.deep, ..
 export const PLATFORM_PERIOD = 8, PLATFORM_ON = 4, PLATFORM_STEP = 2;
 export const platformOn = (i: number, t: number) => ((t + i * PLATFORM_STEP) % PLATFORM_PERIOD) < PLATFORM_ON;
 
+// ---------- 41~45층 시계 정원 지형(RAID_FLOOR_50_IMPLEMENTATION_PLAN 5절) ----------
+/** 태엽 문(41층~): 9초마다 1.5초 예고 뒤 3초 닫힘(첫 예고는 start초). 길이는 전장 너비 18%, 주변 우회 폭 최소 140px. 닫힌 문은 이동·적 투사체를 막는다. */
+export const CLOCK_GATE = { period: 9, tele: 1.5, closed: 3, start: 6, widthFrac: 0.18, bypass: 140 };
+/** 지금 태엽 문 상태: 예고 중(warn)·닫힘(closed) */
+export function clockGateState(t: number) {
+  const k = t - CLOCK_GATE.start; if (k < 0) return { warn: false, closed: false };
+  const ph = k % CLOCK_GATE.period; return { warn: ph < CLOCK_GATE.tele, closed: ph >= CLOCK_GATE.tele && ph < CLOCK_GATE.tele + CLOCK_GATE.closed };
+}
+/** 시계 바닥(42층~): 12초마다 전장 가로 6등분 중 2칸을 1.2초 예고 뒤 2.5초 활성, 최대 체력 5% 피해(활성 1회당 한 번), 직전과 같은 칸 금지 */
+export const CLOCK_FLOOR = { every: 12, start: 8, tele: 1.2, active: 2.5, cols: 6, cells: 2, pct: 0.05 };
+export const clockCellRect = (i: number): Rect => ({ x: (WORLD_W / CLOCK_FLOOR.cols) * i, y: 0, w: WORLD_W / CLOCK_FLOOR.cols, h: WORLD_H });
+/** 직전 칸을 빼고 2칸 고르기(rand: 0~1) */
+export function pickClockCells(prev: number[], rand: () => number) {
+  const pool = Array.from({ length: CLOCK_FLOOR.cols }, (_, i) => i).filter(i => !prev.includes(i)), out: number[] = [];
+  while (out.length < CLOCK_FLOOR.cells && pool.length) out.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
+  return out.sort((a, b) => a - b);
+}
+/** 모래 웅덩이(43층~): 반경 90px, 14초 주기 중 8초 켜짐, 플레이어·일반 적 이동 −22%, 자체 피해 없음 */
+export const SAND_POOL = { r: 90, on: 8, period: 14, start: 4, count: 2, slow: 0.22 };
+
 /** 원을 사각형들 밖으로 밀어낸다(미끄러지듯). */
 export function pushOut(x: number, y: number, rad: number, rects: Rect[]) {
   for (const b of rects) {
@@ -153,6 +187,7 @@ export function slowAt(t: Terrain, x: number, y: number, player: boolean) {
   if (player && t.moss?.some(g => inside(g, x, y))) m *= 1.08;
   if (t.boost?.some(g => inside(g, x, y))) m *= 1.12;
   if (!player && t.mud.some(g => inside(g, x, y))) m *= 0.85;
+  if (t.sandOn && t.sand?.some(g => Math.hypot(x - g.x, y - g.y) < g.r)) m *= 1 - SAND_POOL.slow;
   return m;
 }
 export const inMud = (t: Terrain, x: number, y: number) => t.mud.some(g => inside(g, x, y));

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { hurtAvatarSrc } from "../avatar";
 import { ARENA_H, ARENA_W, AWAKENINGS, BOSS_AT, xpForLevel, PLAYER, type AwakenId, type Evolution, type FloorDef, type WeaponStats } from "./data";
-import { PLATFORM_ON, PLATFORM_PERIOD, PLATFORM_STEP, WORLD_H, WORLD_W, fieldLike, segmentHits, type Terrain } from "./terrain";
+import { CLOCK_FLOOR, CLOCK_GATE, PLATFORM_ON, PLATFORM_PERIOD, PLATFORM_STEP, WORLD_H, WORLD_W, clockCellRect, fieldLike, segmentHits, type Terrain } from "./terrain";
 import { ringRadius } from "./bossKit";
 import { SPECIALS } from "./weapons";
 import { AUX_WEAPONS, AWAKEN_META, CATEGORY_LABEL, cardTag } from "./awakenings";
@@ -283,8 +283,9 @@ function paintWorld(T: Terrain) {
   const c = document.createElement("canvas"); c.width = WORLD_W; c.height = WORLD_H;
   const g = c.getContext("2d")!, canal = T.zone === "canal", maple = T.zone === "maple", frost = T.zone === "frost", ancient = T.zone === "ancient", core = T.zone === "core";
   // 구역별 색: 풀(단풍 덤불)·진흙(낙엽 더미/빙판)·얕은 물(눈 더미)·벽(울타리/얼음 기둥)
-  const sky = T.zone === "sky", voidZ = T.zone === "void";
-  const P = sky ? { grass: "rgba(200,225,250,.45)", grassLine: "rgba(150,185,220,.5)", mud: "rgba(170,180,200,.5)", mudDot: "rgba(230,240,255,.6)", shallow: "rgba(255,255,255,.4)", wall: "#9aa3b5", wallHi: "#c3cad8", wallLine: "#6f7890" }
+  const sky = T.zone === "sky", voidZ = T.zone === "void", clockZ = T.zone === "clock";
+  const P = clockZ ? { grass: "rgba(120,140,80,.4)", grassLine: "rgba(80,100,50,.5)", mud: "rgba(170,140,90,.5)", mudDot: "rgba(220,190,120,.6)", shallow: "rgba(95,201,192,.3)", wall: "#8a6a32", wallHi: "#c99a4a", wallLine: "#4f3a18" }
+    : sky ? { grass: "rgba(200,225,250,.45)", grassLine: "rgba(150,185,220,.5)", mud: "rgba(170,180,200,.5)", mudDot: "rgba(230,240,255,.6)", shallow: "rgba(255,255,255,.4)", wall: "#9aa3b5", wallHi: "#c3cad8", wallLine: "#6f7890" }
     : voidZ ? { grass: "rgba(80,60,140,.4)", grassLine: "rgba(50,35,100,.5)", mud: "rgba(60,45,100,.5)", mudDot: "rgba(180,150,255,.5)", shallow: "rgba(120,90,200,.35)", wall: "#2e2550", wallHi: "#4a3d78", wallLine: "#1a1430" }
     : ancient ? { grass: "rgba(40,90,50,.5)", grassLine: "rgba(20,60,30,.55)", mud: "rgba(80,70,40,.5)", mudDot: "rgba(60,50,30,.5)", shallow: "rgba(150,110,170,.42)", wall: "#5a3f28", wallHi: "#7a5a38", wallLine: "#2f2014" }
     : core ? { grass: "rgba(90,60,140,.4)", grassLine: "rgba(60,40,110,.5)", mud: "rgba(70,50,110,.5)", mudDot: "rgba(150,110,220,.5)", shallow: "rgba(120,90,200,.35)", wall: "#3b2f5c", wallHi: "#5a4a86", wallLine: "#1c1530" }
@@ -293,9 +294,13 @@ function paintWorld(T: Terrain) {
     : { grass: "rgba(70,130,50,.45)", grassLine: "rgba(40,90,30,.55)", mud: "rgba(120,85,50,.55)", mudDot: "rgba(90,60,35,.5)", shallow: "rgba(110,170,210,.35)", wall: "#8a8578", wallHi: "#a8a294", wallLine: "#5e594e" };
   let seed = (T.seed % 9973) + 3; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   const base = g.createRadialGradient(WORLD_W / 2, WORLD_H / 2, 100, WORLD_W / 2, WORLD_H / 2, 1000);
-  if (sky) { base.addColorStop(0, "#d9ecfb"); base.addColorStop(1, "#8fb3d6"); } else if (voidZ) { base.addColorStop(0, "#2a2050"); base.addColorStop(1, "#0c0a1c"); } else if (ancient) { base.addColorStop(0, "#6f9a5c"); base.addColorStop(1, "#2f5236"); } else if (core) { base.addColorStop(0, "#3a3360"); base.addColorStop(1, "#16122b"); } else if (canal) { base.addColorStop(0, "#94b9ad"); base.addColorStop(1, "#5b7f78"); } else if (maple) { base.addColorStop(0, "#e3b878"); base.addColorStop(1, "#b07a43"); } else if (frost) { base.addColorStop(0, "#eef6fb"); base.addColorStop(1, "#a9c3d3"); } else { base.addColorStop(0, "#b8dc8f"); base.addColorStop(1, "#86b562"); }
+  if (clockZ) { base.addColorStop(0, "#d9c79a"); base.addColorStop(1, "#6f7654"); } else if (sky) { base.addColorStop(0, "#d9ecfb"); base.addColorStop(1, "#8fb3d6"); } else if (voidZ) { base.addColorStop(0, "#2a2050"); base.addColorStop(1, "#0c0a1c"); } else if (ancient) { base.addColorStop(0, "#6f9a5c"); base.addColorStop(1, "#2f5236"); } else if (core) { base.addColorStop(0, "#3a3360"); base.addColorStop(1, "#16122b"); } else if (canal) { base.addColorStop(0, "#94b9ad"); base.addColorStop(1, "#5b7f78"); } else if (maple) { base.addColorStop(0, "#e3b878"); base.addColorStop(1, "#b07a43"); } else if (frost) { base.addColorStop(0, "#eef6fb"); base.addColorStop(1, "#a9c3d3"); } else { base.addColorStop(0, "#b8dc8f"); base.addColorStop(1, "#86b562"); }
   g.fillStyle = base; g.fillRect(0, 0, WORLD_W, WORLD_H);
-  if (ancient) {
+  if (clockZ) {
+    // 시계 정원: 잔디 결 + 바닥에 옅은 시계 눈금(시계 바닥 6칸 경계)
+    for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(${90 + r() * 40},${110 + r() * 40},${60 + r() * 30},${0.2 + r() * 0.25})`; g.beginPath(); g.ellipse(r() * WORLD_W, r() * WORLD_H, 4 + r() * 8, 2 + r() * 4, r() * 3, 0, Math.PI * 2); g.fill(); }
+    g.strokeStyle = "rgba(90,70,30,.18)"; g.lineWidth = 2; for (let i = 1; i < CLOCK_FLOOR.cols; i++) { const x = clockCellRect(i).x; g.setLineDash([10, 14]); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, WORLD_H); g.stroke(); } g.setLineDash([]);
+  } else if (ancient) {
     for (let i = 0; i < 360; i++) { g.fillStyle = `rgba(${20 + r() * 40},${70 + r() * 60},${30 + r() * 30},${0.25 + r() * 0.3})`; g.beginPath(); g.ellipse(r() * WORLD_W, r() * WORLD_H, 5 + r() * 12, 3 + r() * 6, r() * 3, 0, Math.PI * 2); g.fill(); }
     for (const a of T.moss ?? []) { g.fillStyle = "rgba(120,190,90,.35)"; roundRect(g, a.x, a.y, a.w, a.h, 26); g.fill(); g.fillStyle = "rgba(170,230,120,.35)"; for (let i = 0; i < a.w * a.h / 900; i++) { g.beginPath(); g.arc(a.x + r() * a.w, a.y + r() * a.h, 2 + r() * 3, 0, Math.PI * 2); g.fill(); } }
   } else if (core) {
@@ -390,7 +395,27 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   ctx.drawImage(art.bg, 0, 0);
   // 수문(닫힘·곧 바뀜 예고)
   const gp = T.gatePeriod ?? 45, gateSoon = T.gates.some(g => g.moving) && gp - (s.t % gp) < 2;
+  // 시계 정원(41~): 모래 웅덩이(켜짐만, 피해 없음) → 시계 바닥(예고: 점선 테두리+번호, 활성: 붉은 채움) → 태엽 문(예고: 점선+남은 초, 닫힘: 청동 막대)
+  if (T.zone === "clock") {
+    if (T.sandOn) for (const sp of T.sand ?? []) { ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2); ctx.fillStyle = "rgba(214,184,120,.5)"; ctx.fill(); ctx.strokeStyle = "rgba(140,105,50,.7)"; ctx.lineWidth = 2; ctx.setLineDash([4, 6]); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#000"; ctx.font = `20px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("⏳", sp.x, sp.y); }
+    const cells = s.ext.clockCells, age = s.t - (s.ext.clockStart ?? 0);
+    if (cells) cells.forEach((i, k) => {
+      const b = clockCellRect(i), on = age >= CLOCK_FLOOR.tele;
+      ctx.save();
+      if (on) { ctx.fillStyle = "rgba(220,70,40,.32)"; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = "#ff6a3a"; ctx.lineWidth = 4; ctx.strokeRect(b.x + 2, b.y + 2, b.w - 4, b.h - 4); }
+      else { ctx.fillStyle = `rgba(255,170,60,${0.08 + 0.18 * (age / CLOCK_FLOOR.tele)})`; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = `rgba(255,150,40,${0.5 + 0.5 * Math.sin(clock * 12)})`; ctx.lineWidth = 3; ctx.setLineDash([12, 8]); ctx.strokeRect(b.x + 2, b.y + 2, b.w - 4, b.h - 4); ctx.setLineDash([]); }
+      ctx.fillStyle = on ? "#fff" : "#7a3b10"; ctx.font = "900 26px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (let y = 90; y < WORLD_H; y += 260) ctx.fillText(on ? "⚠" : `${k + 1}`, b.x + b.w / 2, y);
+      ctx.restore();
+    });
+  }
+  const clockGateLeft = T.zone === "clock" ? CLOCK_GATE.tele - ((s.t - CLOCK_GATE.start) % CLOCK_GATE.period) : 0;
   for (const g of T.gates) {
+    if (T.zone === "clock") {
+      if (g.closed) { ctx.fillStyle = "#a5772e"; ctx.fillRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); ctx.strokeStyle = "#4f3a18"; ctx.lineWidth = 3; ctx.strokeRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); ctx.fillStyle = "#000"; ctx.font = `16px ${EMOJI_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("⚙️", g.rect.x + g.rect.w / 2, g.rect.y + g.rect.h / 2); }
+      else { ctx.strokeStyle = g.warn ? `rgba(255,200,60,${0.5 + 0.5 * Math.sin(clock * 12)})` : "rgba(120,90,40,.45)"; ctx.lineWidth = g.warn ? 3 : 2; ctx.setLineDash([8, 6]); ctx.strokeRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); ctx.setLineDash([]); if (g.warn) { ctx.fillStyle = "#c0601a"; ctx.font = "900 18px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(`⚙ ${Math.max(0.1, clockGateLeft).toFixed(1)}`, g.rect.x + g.rect.w / 2, g.rect.y + g.rect.h / 2); } }
+      continue;
+    }
     if (g.closed) { ctx.fillStyle = "#6b4a2a"; ctx.fillRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); ctx.strokeStyle = "#3a2614"; ctx.lineWidth = 3; ctx.strokeRect(g.rect.x, g.rect.y, g.rect.w, g.rect.h); }
     if (gateSoon) { ctx.strokeStyle = `rgba(255,200,60,${0.5 + 0.5 * Math.sin(clock * 12)})`; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.strokeRect(g.rect.x - 4, g.rect.y - 4, g.rect.w + 8, g.rect.h + 8); ctx.setLineDash([]); }
   }
@@ -400,7 +425,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   if (T.chance && !T.chance.used) {
     const ch = T.chance, glow = 0.5 + 0.5 * Math.sin(clock * 4);
     ctx.beginPath(); ctx.arc(ch.x, ch.y, ch.r + 6 + glow * 4, 0, Math.PI * 2); ctx.fillStyle = fieldLike(T) ? `rgba(255,216,74,${0.18 + glow * 0.15})` : T.zone === "frost" ? `rgba(255,170,90,${0.2 + glow * 0.12})` : `rgba(150,230,255,${0.2 + glow * 0.12})`; ctx.fill();
-    ctx.fillStyle = "#000"; ctx.font = `${fieldLike(T) ? 30 : 34}px ${EMOJI_FONT}`; ctx.fillText({ field: "🌻", maple: "🍁", canal: "⛲", frost: "🔥", ancient: "🌺", core: "💎", sky: "☁️", void: "🌟" }[T.zone], ch.x, ch.y);
+    ctx.fillStyle = "#000"; ctx.font = `${fieldLike(T) ? 30 : 34}px ${EMOJI_FONT}`; ctx.fillText({ field: "🌻", maple: "🍁", canal: "⛲", frost: "🔥", ancient: "🌺", core: "💎", sky: "☁️", void: "🌟", clock: "⏰" }[T.zone], ch.x, ch.y);
   }
   // 공허 왕좌: 별빛 발판(켜짐은 빛나는 발판, 꺼지기 1초 전 점멸, 꺼짐은 옅은 점선 = 지나갈 수 없음)
   if (T.platforms) T.platforms.forEach((b, i) => {
@@ -640,7 +665,7 @@ function draw(ctx: CanvasRenderingContext2D, s: RaidState, art: Art, clock: numb
   { const mw = 168, mh = 96, mx0 = W - mw - 12, my0 = 16, k = mw / WORLD_W;
     panel(ctx, mx0 - 4, my0 - 4, mw + 8, mh + 8);
     ctx.save(); roundRect(ctx, mx0, my0, mw, mh, 6); ctx.clip();
-    ctx.fillStyle = { canal: "rgba(140,180,170,.35)", field: "rgba(150,200,120,.3)", maple: "rgba(220,150,80,.35)", frost: "rgba(210,230,245,.4)", ancient: "rgba(70,120,70,.4)", core: "rgba(90,70,150,.45)", sky: "rgba(170,200,235,.45)", void: "rgba(40,30,70,.5)" }[T.zone]; ctx.fillRect(mx0, my0, mw, mh);
+    ctx.fillStyle = { canal: "rgba(140,180,170,.35)", field: "rgba(150,200,120,.3)", maple: "rgba(220,150,80,.35)", frost: "rgba(210,230,245,.4)", ancient: "rgba(70,120,70,.4)", core: "rgba(90,70,150,.45)", sky: "rgba(170,200,235,.45)", void: "rgba(40,30,70,.5)", clock: "rgba(200,180,120,.45)" }[T.zone]; ctx.fillRect(mx0, my0, mw, mh);
     ctx.fillStyle = "rgba(50,110,170,.9)"; for (const a of T.deep) ctx.fillRect(mx0 + a.x * k, my0 + a.y * k, a.w * k, a.h * k);
     ctx.fillStyle = "#ccc"; for (const a of T.walls) ctx.fillRect(mx0 + a.x * k, my0 + a.y * k, Math.max(2, a.w * k), Math.max(2, a.h * k));
     ctx.fillStyle = "#6b4a2a"; for (const gt of T.gates) if (gt.closed) ctx.fillRect(mx0 + gt.rect.x * k, my0 + gt.rect.y * k, gt.rect.w * k, Math.max(2, gt.rect.h * k));

@@ -107,8 +107,10 @@ export function raidWeaponStats(weaponId: string, enhancement: number, evolution
   if (evo && enhancement > 15) {
     // +16~+18(RAID_FLOOR_30_EXPANSION_AUDIT 7.2): +15 수치에서 단계당 피해 ×1.08, 사거리·반경·폭·투사체 속도 ×1.02, 간격 ×0.985
     // +19~+22(RAID_FLOOR_40_EXPANSION_AUDIT 5절): +18 수치에서 단계당 피해 ×1.06, 사거리·반경·폭·투사체 속도 ×1.01, 간격 ×0.99
-    const n = Math.min(3, enhancement - 15), m = Math.max(0, enhancement - 18), g = (v: number | undefined, k: number, j: number) => (v === undefined ? v : Math.round(v * Math.pow(k, n) * Math.pow(j, m)));
-    return { ...st, damage: Math.round(st.damage * Math.pow(1.08, n) * Math.pow(1.06, m) * 10) / 10, range: g(st.range, 1.02, 1.01)!, radius: g(st.radius, 1.02, 1.01), width: g(st.width, 1.02, 1.01), speed: g(st.speed, 1.02, 1.01), interval: m ? Math.round(Math.round(st.interval * Math.pow(0.985, n) * 100) / 100 * Math.pow(0.99, m) * 1000) / 1000 : Math.round(st.interval * Math.pow(0.985, n) * 100) / 100, icon: w.icon, art: evo.id };
+    // +23~+26(RAID_FLOOR_50_IMPLEMENTATION_PLAN 2절): +22 수치에서 단계당 피해 ×1.05, 간격 ×0.99. 사거리·반경·폭·투사체 속도는 +22 값에서 멈춘다
+    const n = Math.min(3, enhancement - 15), m = Math.min(4, Math.max(0, enhancement - 18)), q = Math.max(0, enhancement - 22), g = (v: number | undefined, k: number, j: number) => (v === undefined ? v : Math.round(v * Math.pow(k, n) * Math.pow(j, m)));
+    const damage = Math.round(st.damage * Math.pow(1.08, n) * Math.pow(1.06, m) * 10) / 10, interval = m ? Math.round(Math.round(st.interval * Math.pow(0.985, n) * 100) / 100 * Math.pow(0.99, m) * 1000) / 1000 : Math.round(st.interval * Math.pow(0.985, n) * 100) / 100;
+    return { ...st, damage: q ? Math.round(damage * Math.pow(1.05, q) * 10) / 10 : damage, range: g(st.range, 1.02, 1.01)!, radius: g(st.radius, 1.02, 1.01), width: g(st.width, 1.02, 1.01), speed: g(st.speed, 1.02, 1.01), interval: q ? Math.round(interval * Math.pow(0.99, q) * 1000) / 1000 : interval, icon: w.icon, art: evo.id };
   }
   return { ...st, icon: w.icon, art: evo && enhancement >= 10 ? evo.id : w.id };
 }

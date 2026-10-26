@@ -20,6 +20,11 @@ const SKY = { [DARK]: "#3b6ea8", [LEATHER]: "#8fc0e8", [METAL]: "#f2f6ff", [FUR]
 for (const slot of ["hood", "vest", "boots"]) ART[`sky-${slot}`] = tint(ART[`reinforced-${slot}`], SKY);
 const STAR = { [DARK]: "#2b1f5c", [LEATHER]: "#7b62d6", [METAL]: "#ffe58a", [FUR]: "#e9e1ff" };
 for (const slot of ["hood", "vest", "boots"]) ART[`star-${slot}`] = tint(ART[`reinforced-${slot}`], STAR);
+// 9단계 시계 정원 수호자(RAID_FLOOR_50_IMPLEMENTATION_PLAN 6.1절): 청동 몸체 + 청록 유리, 부위마다 작은 청동 톱니
+const CLOCK = { [DARK]: "#6b4a1f", [LEATHER]: "#b8862f", [METAL]: "#5fc9c0", [FUR]: "#f4e4b4" };
+const cog = (x: number, y: number) => line(`M${x} ${y - 7}V${y - 5}M${x} ${y + 5}V${y + 7}M${x - 7} ${y}H${x - 5}M${x + 5} ${y}H${x + 7}M${x - 5} ${y - 5}L${x - 3.6} ${y - 3.6}M${x + 3.6} ${y + 3.6}L${x + 5} ${y + 5}M${x + 5} ${y - 5}L${x + 3.6} ${y - 3.6}M${x - 3.6} ${y + 3.6}L${x - 5} ${y + 5}`, "#8a5a1c", 2.5) + circle(x, y, 4.5, "#d9a441", INK, 1.5) + circle(x, y, 1.6, "#5fc9c0", INK, 0.8);
+const COG_AT: Record<string, [number, number]> = { hood: [32, 30], vest: [32, 38], boots: [24, 22] };
+for (const slot of ["hood", "vest", "boots"]) ART[`clock-${slot}`] = tint(ART[`reinforced-${slot}`], CLOCK) + cog(...COG_AT[slot]);
 for (const slot of ["hood", "vest", "boots"]) { ART[`maple-${slot}`] = tint(ART[`reinforced-${slot}`], MAPLE); ART[`frost-${slot}`] = tint(ART[`reinforced-${slot}`], FROST); }
 
 export function armorSvg(id: string) { return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${ART[id] ?? ART["leather-hood"]}</svg>`; }

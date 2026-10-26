@@ -12,7 +12,9 @@ export type ShareCardData = {
   weapon: string; armor: string[]; pet: string | null; version: number; at: number;
 };
 
-const ZONE_BG: Record<string, [string, string]> = { field: ["#5d8c3e", "#a7cf73"], canal: ["#2f5f6e", "#6aa0a8"], maple: ["#8a3a1c", "#dc8a43"], frost: ["#3f6a86", "#a6c9dc"], ancient: ["#3d5a2a", "#8fae5c"], core: ["#2a1f3d", "#7a4a8c"], sky: ["#3c6e9c", "#bcd8ef"], void: ["#1a1430", "#4b3b7a"] };
+const ZONE_BG: Record<string, [string, string]> = { field: ["#5d8c3e", "#a7cf73"], canal: ["#2f5f6e", "#6aa0a8"], maple: ["#8a3a1c", "#dc8a43"], frost: ["#3f6a86", "#a6c9dc"], ancient: ["#3d5a2a", "#8fae5c"], core: ["#2a1f3d", "#7a4a8c"], sky: ["#3c6e9c", "#bcd8ef"], void: ["#1a1430", "#4b3b7a"], clock: ["#D9C79A", "#6F7654"] };
+/** 밝은 배경 구역(시계 정원)은 흰 글자 대비(WCAG AA)를 위해 어두운 막을 한 겹 덮는다(RAID_FLOOR_50_IMPLEMENTATION_PLAN 6.2절) */
+const ZONE_SCRIM: Record<string, string> = { clock: "rgba(30,24,10,.42)" };
 const EMOJI = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const FONT = '"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
 
@@ -23,8 +25,9 @@ export function shareText(d: ShareCardData) {
 
 export function drawShareCard(d: ShareCardData): HTMLCanvasElement {
   const W = 1200, H = 630, c = document.createElement("canvas"); c.width = W; c.height = H;
-  const g = c.getContext("2d")!, [c0, c1] = ZONE_BG[zoneOf(Math.max(1, d.run?.floor ?? d.highest))];
+  const zone = zoneOf(Math.max(1, d.run?.floor ?? d.highest)), g = c.getContext("2d")!, [c0, c1] = ZONE_BG[zone];
   const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, c0); bg.addColorStop(1, c1); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  if (ZONE_SCRIM[zone]) { g.fillStyle = ZONE_SCRIM[zone]; g.fillRect(0, 0, W, H); }
   // 탑 실루엣
   g.fillStyle = "rgba(0,0,0,.14)"; for (let i = 0; i < 6; i++) { const w = 90 + i * 26; g.fillRect(1010 - w / 2, 150 + i * 66, w, 60); } // 위가 좁은 탑
   g.fillStyle = "rgba(255,255,255,.1)"; g.beginPath(); g.arc(1040, 120, 180, 0, Math.PI * 2); g.fill();
