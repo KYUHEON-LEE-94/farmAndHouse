@@ -1423,6 +1423,8 @@ button { color:inherit; }
 .lunch-go-explore{margin-left:8px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:#fff;font:700 11px "Gowun Dodum";cursor:pointer}
 /* 마을 복구(5.6절) */
 .village-panel{max-width:1440px;margin:0 auto 16px}
+.village-locked p{margin:8px 0}
+.village-locked .ghost-button{margin-top:6px}
 .village-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;margin-top:10px}
 .village-map{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px;border-radius:18px;background:linear-gradient(160deg,#cfe3b4,#b8d39a);align-content:start}
 .village-map.decorated{background:linear-gradient(160deg,#f3d9e4,#cfe3b4 40%,#b8d39a)}

@@ -1514,8 +1514,11 @@ export default function Home() {
     setExploration(state => settleExploration({}, { ...state, checkpoint: undefined }, result).exploration);
     if (result.bait > 0) setBaits(stock => ({ ...stock, worm: (stock.worm ?? 0) + result.bait }));
     const total = Object.values(result.bag).reduce((sum, n) => sum + n, 0);
-    setNotice(total > 0 ? `🧭 탐험에서 채집물 ${total}개를 가져와 통합 창고에 넣었어요.` : "🧭 빈손으로 돌아왔어요. 다음엔 반짝이는 곳을 노려 봐요!");
-    playCoinSound([660, 880]);
+    const message = total > 0 ? `🧭 탐험에서 채집물 ${total}개를 가져와 통합 창고에 넣었어요.` : "🧭 빈손으로 돌아왔어요. 다음엔 반짝이는 곳을 노려 봐요!";
+    // 이번 탐험으로 마을 조건(3회)을 처음 채우면 바로 알려 준다
+    const opensVillage = VILLAGE_ENABLED && !villageOpen && villageUnlockMet(settleExploration({}, { ...exploration, checkpoint: undefined }, result).exploration);
+    setNotice(opensVillage ? `🏘️ 마을이 열렸어요! 집·마을 → 마을에서 무너진 마을을 복구해 보세요. ${message}` : message);
+    playCoinSound(opensVillage ? [660, 880, 1100] : [660, 880]);
   }
   /** 채집물 판매: 고정 저가, 잠금은 팔지 않는다(7.1절). */
   function sellForage(id: string, count: number) {
@@ -2541,7 +2544,7 @@ export default function Home() {
         ...(RAID_ENABLED ? [{ id: "raid", label: "🗼 토벌탑 (베타)", group: "battle" } as const] : []),
         { id: "equipment", label: "🎒 장비", group: "battle" },
         { id: "home", label: "🏡 나의 집", group: "home" },
-        ...(VILLAGE_ENABLED && villageOpen ? [{ id: "village", label: "🏘️ 마을", group: "home", badge: completable(village, money).length ? "🔨" : undefined } as const] : []),
+        ...(VILLAGE_ENABLED ? [villageOpen ? { id: "village", label: "🏘️ 마을", group: "home", badge: completable(village, money).length ? "🔨" : undefined } as const : { id: "village", label: "🔒 마을", group: "home" } as const] : []),
         { id: "pets", label: "🐾 펫", group: "home" },
         { id: "gacha", label: "🛍️ 상점", group: "home" },
         { id: "casino", label: "🎲 도박장", group: "home" },
@@ -2900,7 +2903,13 @@ export default function Home() {
 
       {tab === "explore" && EXPLORE_ENABLED && <ExplorePanel exploration={exploration} season={season} guideLevel={village.facilityLevels["guide-office"] ?? 0}
         avatar={avatar} onStart={lunchCooking.enterRun} onCheckpoint={saveExploreCheckpoint} onFinish={finishExploration} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }} />}
-      {tab === "village" && VILLAGE_ENABLED && <VillagePanel village={village} inventory={inventory} money={money} options={lunchOptions}
+      {tab === "village" && VILLAGE_ENABLED && !villageOpen && <section className="panel village-panel village-locked">
+        <div className="panel-heading"><div><span className="eyebrow">VILLAGE · 잠김</span><h3>🔒 마을 복구</h3></div></div>
+        <p>채집 탐험을 <b>3번</b> 마치면 무너진 마을을 복구할 수 있어요. (지금 {Math.min(3, exploration.totalRuns)}/3회)</p>
+        <p className="hint">{explorationOpen ? "🧭 생활 → 탐험에서 새싹 숲길 탐험을 시작해 보세요." : "🧭 탐험은 텃밭 12칸을 갖거나 물고기를 한 마리 잡으면 열려요."}</p>
+        {explorationOpen && EXPLORE_ENABLED && <button className="ghost-button small" onClick={() => switchTab("explore")}>🧭 탐험하러 가기</button>}
+      </section>}
+      {tab === "village" && VILLAGE_ENABLED && villageOpen && <VillagePanel village={village} inventory={inventory} money={money} options={lunchOptions}
         onDeliver={deliverVillage} onCancel={cancelVillage} onComplete={completeVillage} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }} />}
       {tab === "book" && <div className="book-kind" role="tablist" aria-label="도감 종류">{([["fish", "🐟 물고기 도감"], ["crop", "🌱 작물 도감"]] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={bookKind === id} className={bookKind === id ? "on" : ""} onClick={() => setBookKind(id)}>{label}</button>)}</div>}
       {tab === "book" && bookKind === "crop" && (() => {
