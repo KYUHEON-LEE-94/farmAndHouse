@@ -1,7 +1,7 @@
 /**
  * 탐험 저장 상태(LIFE_CONTENT_EXPANSION_SPEC 6.2절). 저장 버전 5는 그대로 두고, 필드가 없으면 기본값으로 채운다.
  */
-import { REGIONS } from "./data";
+import { REGIONS, type ExploreDaily } from "./data";
 
 /**
  * 진행 중인 판 전체 상태(2026-10-21 이어 하기). 재접속하면 같은 지도·체력·위치·남은 시간으로 이어 한다.
@@ -43,6 +43,8 @@ export type ExplorationState = {
   equippedTool: string | null;
   discoveredFinds: Record<string, number>;
   checkpoint?: ExplorationCheckpoint;
+  /** 하루 단위 비계절 입장 기록(생활 3단계) */
+  daily?: ExploreDaily;
 };
 
 export const EMPTY_EXPLORATION: ExplorationState = { unlocked: false, totalRuns: 0, rareMissesByRegion: {}, ownedTools: [], equippedTool: null, discoveredFinds: {} };
@@ -93,6 +95,7 @@ export function restoreExploration(raw: unknown): ExplorationState {
     equippedTool: typeof r.equippedTool === "string" && tools.includes(r.equippedTool) ? r.equippedTool : null,
     discoveredFinds: counts(r.discoveredFinds),
     checkpoint: restoreCheckpoint(r.checkpoint),
+    ...(r.daily && typeof r.daily === "object" && typeof r.daily.date === "string" ? { daily: { date: r.daily.date, guidePick: typeof r.daily.guidePick === "string" && REGIONS.some(region => region.id === r.daily!.guidePick) ? r.daily.guidePick : null, mineRuns: Math.max(0, Math.floor(Number(r.daily.mineRuns) || 0)) } } : {}),
   };
 }
 

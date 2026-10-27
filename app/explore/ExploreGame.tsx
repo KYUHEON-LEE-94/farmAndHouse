@@ -34,6 +34,8 @@ type Props = {
 const WORLD_LOOK: Record<string, { top: string; bottom: string; mini: string; path: string; big: string[]; small: string[] }> = {
   봄: { top: "#a9d18e", bottom: "#8fbf72", mini: "#9fca84", path: "rgba(196,166,112,.55)", big: ["🌳", "🌳", "🌲"], small: ["🌸", "🌱"] },
   여름: { top: "#9fd0a4", bottom: "#6fb59a", mini: "#86c3a2", path: "rgba(170,150,96,.5)", big: ["🌴", "🌿", "🌾"], small: ["🪷", "🌾", "🌼"] },
+  가을: { top: "#d9b77a", bottom: "#c08e55", mini: "#cfa56c", path: "rgba(120,80,40,.45)", big: ["🍁", "🌳", "🪨"], small: ["🍂", "🍄", "🌰"] },
+  겨울: { top: "#dde8ef", bottom: "#b9cad8", mini: "#c9d8e4", path: "rgba(140,160,180,.45)", big: ["🌲", "🪨", "⛄"], small: ["❄️", "✨", "🪵"] },
 };
 const lookOf = (regionId: string) => WORLD_LOOK[regionItems(regionId).region.season] ?? WORLD_LOOK.봄;
 
@@ -53,9 +55,10 @@ function paintWorld(run: RunState) {
   for (let i = 0; i < 60; i++) { const x = rnd() * WORLD_W, y = rnd() * WORLD_H; if (!clear(x, y)) continue; ctx.fillStyle = "#000"; ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText(look.small[Math.floor(rnd() * look.small.length)], x, y); }
   // 진흙(봄) · 물웅덩이(여름)
   for (const h of run.hazards) if (h.kind === "mud") {
-    const puddle = h.skin === "puddle";
-    ctx.fillStyle = puddle ? "rgba(70,140,190,.5)" : "rgba(110,78,44,.55)"; ctx.beginPath(); ctx.ellipse(h.x, h.y, h.r, h.r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = puddle ? "rgba(220,245,255,.35)" : "rgba(80,55,30,.35)"; ctx.beginPath(); ctx.ellipse(h.x - h.r * 0.2, h.y - h.r * 0.1, h.r * 0.45, h.r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    const look = h.skin === "puddle" ? ["rgba(70,140,190,.5)", "rgba(220,245,255,.35)"] : h.skin === "thorn" ? ["rgba(90,110,50,.55)", "rgba(60,80,30,.4)"] : h.skin === "ice" ? ["rgba(200,230,250,.75)", "rgba(255,255,255,.6)"] : ["rgba(110,78,44,.55)", "rgba(80,55,30,.35)"];
+    ctx.fillStyle = look[0]; ctx.beginPath(); ctx.ellipse(h.x, h.y, h.r, h.r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = look[1]; ctx.beginPath(); ctx.ellipse(h.x - h.r * 0.2, h.y - h.r * 0.1, h.r * 0.45, h.r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    if (h.skin === "thorn") { ctx.fillStyle = "#000"; ctx.font = `18px ${EMOJI_FONT}`; for (let k = 0; k < 5; k++) { const a = k * 1.26; ctx.fillText("🌿", h.x + Math.cos(a) * h.r * 0.55, h.y + Math.sin(a) * h.r * 0.4); } }
   }
   // 귀환 지점
   ctx.fillStyle = "#000"; ctx.font = `40px ${EMOJI_FONT}`; ctx.fillText("🏕️", START.x, START.y - 40);
@@ -131,7 +134,13 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
       }
       for (const h of s.hazards) if (h.kind === "spores") {
         // 독버섯: 예고는 보라 점선 고리가 차오르고, 구름일 때는 보라 안개
-        const ph = sporePhase(h, s.t);
+        const ph = sporePhase(h, s.t), fall = h.skin === "rock" || h.skin === "icicle";
+        if (fall) {
+          // 낙석·고드름: 그림자 원이 차오른 뒤 떨어진다. 평소에는 아무것도 없다
+          if (ph?.kind === "tele") { ctx.fillStyle = `rgba(40,30,20,${0.12 + ph.k * 0.3})`; ctx.beginPath(); ctx.arc(h.x, h.y, h.r * (0.4 + ph.k * 0.6), 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = h.skin === "rock" ? "#a0522d" : "#3a7cc0"; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "#000"; ctx.font = `${16 + ph.k * 14}px ${EMOJI_FONT}`; ctx.fillText(h.skin === "rock" ? "🪨" : "🧊", h.x, h.y - 60 * (1 - ph.k)); }
+          else if (ph?.kind === "cloud") { ctx.fillStyle = h.skin === "rock" ? "rgba(140,100,60,.4)" : "rgba(170,210,240,.5)"; ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "#000"; ctx.font = `32px ${EMOJI_FONT}`; ctx.fillText(h.skin === "rock" ? "🪨" : "🧊", h.x, h.y); }
+          continue;
+        }
         if (ph?.kind === "tele") { ctx.strokeStyle = `rgba(150,80,190,${0.35 + ph.k * 0.5})`; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = `rgba(160,90,200,${0.08 + ph.k * 0.14})`; ctx.beginPath(); ctx.arc(h.x, h.y, h.r * ph.k, 0, Math.PI * 2); ctx.fill(); }
         else if (ph?.kind === "cloud") { ctx.fillStyle = "rgba(150,80,190,.38)"; ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "#000"; ctx.font = `18px ${EMOJI_FONT}`; ctx.fillText("💨", h.x + 30, h.y - 26); }
         ctx.fillStyle = "#000"; ctx.font = `30px ${EMOJI_FONT}`; ctx.fillText("🍄", h.x, h.y);
@@ -151,7 +160,7 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
           ctx.font = "900 18px sans-serif"; ctx.fillStyle = "#e2557f"; ctx.fillText("!!", h.x, h.y - 32);
         }
         ctx.save(); ctx.translate(h.x, h.y); if (h.dx < 0 || (h.mode === "roam" && h.wx < h.x)) ctx.scale(-1, 1);
-        ctx.fillStyle = "#000"; ctx.font = `${h.mode === "charge" ? 36 : 32}px ${EMOJI_FONT}`; ctx.fillText(h.skin === "snake" ? "🐍" : "🐗", 0, 0); ctx.restore();
+        ctx.fillStyle = "#000"; ctx.font = `${h.mode === "charge" ? 36 : 32}px ${EMOJI_FONT}`; ctx.fillText(h.skin === "snake" ? "🐍" : h.skin === "wolf" ? "🐺" : "🐗", 0, 0); ctx.restore();
         if (h.mode === "rest") { ctx.font = `14px ${EMOJI_FONT}`; ctx.fillText("💤", h.x + 18, h.y - 20); }
       }
       const ev = s.event;
@@ -184,8 +193,8 @@ export default function ExploreGame({ run, showResourcesOnMinimap, avatar, onChe
       mctx.setTransform(dpr * MINI_W / WORLD_W, 0, 0, dpr * MINI_H / WORLD_H, 0, 0);
       mctx.fillStyle = lookOf(s.regionId).mini; mctx.fillRect(0, 0, WORLD_W, WORLD_H);
       for (const h of s.hazards) {
-        if (h.kind === "mud") { mctx.fillStyle = h.skin === "puddle" ? "#4a8cc0" : "#7a5530"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
-        else if (h.kind === "spores") { mctx.fillStyle = sporePhase(h, s.t) ? "#9a4fc0" : "rgba(150,80,190,.45)"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
+        if (h.kind === "mud") { mctx.fillStyle = h.skin === "puddle" ? "#4a8cc0" : h.skin === "thorn" ? "#5a6e32" : h.skin === "ice" ? "#e8f4fc" : "#7a5530"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
+        else if (h.kind === "spores") { mctx.fillStyle = h.skin ? (sporePhase(h, s.t) ? "#c0502a" : "rgba(0,0,0,0)") : sporePhase(h, s.t) ? "#9a4fc0" : "rgba(150,80,190,.45)"; mctx.beginPath(); mctx.arc(h.x, h.y, h.r, 0, Math.PI * 2); mctx.fill(); }
         else if (h.kind === "bees") { mctx.fillStyle = "rgba(230,160,30,.45)"; mctx.beginPath(); mctx.arc(h.cx, h.cy, h.orbit, 0, Math.PI * 2); mctx.fill(); mctx.fillStyle = h.mode === "chase" ? "#e2557f" : "#e6a01e"; mctx.beginPath(); mctx.arc(h.x, h.y, 30, 0, Math.PI * 2); mctx.fill(); }
         else { mctx.fillStyle = h.mode === "aim" || h.mode === "charge" ? "#e2557f" : "#8a5a3a"; mctx.beginPath(); mctx.arc(h.x, h.y, 34, 0, Math.PI * 2); mctx.fill(); }
       }

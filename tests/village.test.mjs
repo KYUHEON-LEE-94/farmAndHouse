@@ -101,3 +101,15 @@ test('생활 2단계 선착장 비용(5.3절 예산): 여름 채집물·낚시·
   assert.ok(kinds.size <= 3);
   assert.equal(V.isOpenFacility('pier'), false);
 });
+
+test('생활 3단계 광차 정거장 비용(5.3절 예산): 가을·겨울 채집물과 농사, 플래그 전에는 복구 불가', () => {
+  const budget = [[8000, 15000, 20, 35, 0, 0], [35000, 70000, 60, 100, 1, 2], [120000, 250000, 140, 220, 3, 5]];
+  const okSeason = new Set(V.FORAGE.filter(f => f.season === '가을' || f.season === '겨울').map(f => f.id)), kinds = new Set();
+  V.STAGE3_COSTS['mine-station'].forEach((cost, i) => {
+    const [glo, ghi, clo, chi, rlo, rhi] = budget[i];
+    const rare = cost.needs.filter(n => n.id === 'starlight-ice').reduce((s, n) => s + n.count, 0), common = cost.needs.reduce((s, n) => s + n.count, 0) - rare;
+    assert.ok(cost.gold >= glo && cost.gold <= ghi); assert.ok(common >= clo && common <= chi, `${i} ${common}`); assert.ok(rare >= rlo && rare <= rhi);
+    for (const n of cost.needs) { kinds.add(n.category); if (n.category === 'forage') assert.ok(okSeason.has(n.id), n.id); }
+  });
+  assert.ok(kinds.size <= 3); assert.equal(V.isOpenFacility('mine-station'), false);
+});

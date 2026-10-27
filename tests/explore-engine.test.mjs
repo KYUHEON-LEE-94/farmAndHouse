@@ -266,3 +266,17 @@ test('여름 햇빛 습지: 여름 재료·독버섯 5·물뱀 2·물웅덩이 4
   t.t = cloudAt + 0.05; t.player.x = sp2.x; t.player.y = sp2.y; t.player.dodgeUntil = t.t + 1; E.step(t, E.NO_INPUT, 0.01); assert.equal(t.hp, E.MAX_HP);
   assert.equal(E.herbOf('sun-marsh').id, 'fragrant-herb'); assert.equal(E.herbOf('sprout-trail').id, 'young-herb');
 });
+
+test('4계절 공개 규칙: 현재 계절 + 안내소 하루 1곳 + 광차 비겨울 서리 동굴 2회, 휴식 시간에는 모두', () => {
+  const all = E.REGIONS.map(r => ({ ...r, released: true })), ids = list => list.map(r => r.id).sort();
+  assert.deepEqual(ids(E.openRegions('봄', [], all)), ['sprout-trail']);
+  assert.equal(E.openRegions('휴식', [], all).length, 4);
+  const d = E.dailyOf(undefined, '2026-10-27');
+  assert.deepEqual(E.extraOpenRegions('봄', d, 1, 0), []);
+  assert.deepEqual(E.extraOpenRegions('봄', { ...d, guidePick: 'maple-valley' }, 2, 1), ['maple-valley', 'frost-cave']);
+  assert.deepEqual(E.extraOpenRegions('봄', { ...d, mineRuns: 2 }, 0, 1), []);
+  assert.deepEqual(E.extraOpenRegions('겨울', d, 0, 3), []);
+  assert.deepEqual(E.dailyOf({ date: '2026-10-26', guidePick: 'sun-marsh', mineRuns: 2 }, '2026-10-27'), { date: '2026-10-27', guidePick: null, mineRuns: 0 });
+  // 공개 지역이 4곳 미만이면 계절과 무관하게 열린다
+  assert.equal(E.openRegions('겨울', [], E.REGIONS.map((r, i) => ({ ...r, released: i < 2 }))).length, 2);
+});

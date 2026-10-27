@@ -55,8 +55,8 @@ export type ExploreRegion = { id: string; name: string; icon: string; season: Se
 export const REGIONS: ExploreRegion[] = [
   { id: "sprout-trail", name: "새싹 숲길", icon: "🌳", season: "봄", released: true },
   { id: "sun-marsh", name: "햇빛 습지", icon: "🌾", season: "여름", released: LIFE2_ENABLED },
-  { id: "maple-valley", name: "단풍 골짜기", icon: "🍂", season: "가을", released: false },
-  { id: "frost-cave", name: "서리 동굴", icon: "🕳️", season: "겨울", released: false },
+  { id: "maple-valley", name: "단풍 골짜기", icon: "🍂", season: "가을", released: LIFE3_ENABLED },
+  { id: "frost-cave", name: "서리 동굴", icon: "🕳️", season: "겨울", released: LIFE3_ENABLED },
 ];
 
 /**
@@ -66,9 +66,25 @@ export const REGIONS: ExploreRegion[] = [
  */
 export function openRegions(season: Season | "휴식", extraOpen: string[] = [], regions = REGIONS): ExploreRegion[] {
   const released = regions.filter(region => region.released);
-  if (released.length < 4) return released;
+  // 공개 지역이 4곳 미만이거나 농장 휴식 시간(2026-10-27 결정)에는 공개 지역 모두 입장
+  if (released.length < 4 || season === "휴식") return released;
   return released.filter(region => region.season === season || extraOpen.includes(region.id));
 }
+
+/** 하루 단위 비계절 입장 기록(안내소 2단계 하루 1곳 · 광차 정거장 1단계 비겨울 서리 동굴 2회). date는 로컬 날짜 YYYY-MM-DD */
+export type ExploreDaily = { date: string; guidePick: string | null; mineRuns: number };
+export const MINE_DAILY_RUNS = 2;
+export const todayKey = (now = new Date()) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+export const dailyOf = (daily: ExploreDaily | undefined, today = todayKey()): ExploreDaily => (daily && daily.date === today ? daily : { date: today, guidePick: null, mineRuns: 0 });
+/** 시설로 열리는 비계절 지역(4계절 공개 뒤에만 의미가 있다) */
+export function extraOpenRegions(season: Season | "휴식", daily: ExploreDaily, guideLevel: number, mineLevel: number): string[] {
+  const open: string[] = [];
+  if (guideLevel >= 2 && daily.guidePick) open.push(daily.guidePick);
+  if (mineLevel >= 1 && season !== "겨울" && daily.mineRuns < MINE_DAILY_RUNS) open.push("frost-cave");
+  return open;
+}
+/** 4계절 공개 뒤(정식 규칙)인지 */
+export const fourSeasonsOpen = (regions = REGIONS) => regions.filter(region => region.released).length >= 4;
 
 /** 현재 계절 지역이면 자원 등장량 +20%(계절 정체성 보너스). */
 export const inSeasonBonus = (region: ExploreRegion, season: Season | "휴식") => region.season === season;

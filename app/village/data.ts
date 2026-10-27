@@ -1,6 +1,6 @@
 /** 마을 시설 정의·단계별 비용·외형(LIFE_CONTENT_EXPANSION_SPEC 5.2·5.2.1·5.3·5.5절). */
 import { TEST_MODE } from "../testMode";
-import { LIFE2_ENABLED } from "../explore/data";
+import { LIFE2_ENABLED, LIFE3_ENABLED } from "../explore/data";
 
 /** 마을 기능 공개 여부. 운영 공개 승인 뒤 true로 바꾼다. 로컬 테스트 모드에서는 항상 보인다. */
 export const VILLAGE_RELEASED = true; // 2026-10-21 운영 공개(사용자 요청)
@@ -69,6 +69,15 @@ export const STAGE2_COSTS: Record<string, StageCost[]> = {
   ],
 };
 if (LIFE2_ENABLED) Object.assign(STAGE_COSTS, STAGE2_COSTS);
+/** 생활 콘텐츠 3단계 시설(가을·겨울 지역과 함께 공개). 광차 정거장: 가을·겨울 채집 + 농사(5.3절 예산 안). */
+export const STAGE3_COSTS: Record<string, StageCost[]> = {
+  "mine-station": [
+    { gold: 12_000, needs: [{ category: "forage", id: "iron-scrap", count: 12 }, { category: "forage", id: "winter-herb", count: 8 }, { category: "crop", id: "radish", count: 8 }] },
+    { gold: 55_000, needs: [{ category: "forage", id: "iron-scrap", count: 30 }, { category: "forage", id: "ice-crystal", count: 25 }, { category: "forage", id: "maple-sap", count: 20 }, { category: "forage", id: "starlight-ice", count: 1 }] },
+    { gold: 180_000, needs: [{ category: "forage", id: "iron-scrap", count: 60 }, { category: "forage", id: "ice-crystal", count: 50 }, { category: "forage", id: "forest-nut", count: 40 }, { category: "crop", id: "radish", count: 30 }, { category: "forage", id: "starlight-ice", count: 4 }] },
+  ],
+};
+if (LIFE3_ENABLED) Object.assign(STAGE_COSTS, STAGE3_COSTS);
 
 /** 지금 복구할 수 있는(데이터가 있는) 시설. 나머지는 지도에 "준비 중"으로만 보인다. */
 export const isOpenFacility = (id: string) => Boolean(STAGE_COSTS[id]);

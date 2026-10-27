@@ -15,6 +15,10 @@ export type ExploreTool = {
   bag?: number;
   /** 움직이면서 채집(채집 범위 안에서) */
   moveGather?: boolean;
+  /** 위험 경직 시간 감소 */
+  stunCut?: number;
+  /** 약초·꽃 1개 더 얻을 확률 */
+  herb?: number;
   gold: number;
   /** 채집물 요구 */
   forage: { id: string; count: number }[];
@@ -28,12 +32,17 @@ export const EXPLORE_TOOLS: ExploreTool[] = [
   // 얻기 어려운 장비(2026-10-27 요청): 봄·여름 희귀 발견물 각 3개(천장 포함 최소 여러 판) + 큰 골드
   { id: "breeze-net", name: "바람결 채집망", icon: "🪁", note: "움직이면서 채집(범위 안에서는 끊기지 않음)", moveGather: true, gold: 30000, forage: [{ id: "four-leaf-flower", count: 3 }, { id: "blue-firefly", count: 3 }, { id: "flower-nectar", count: 10 }], crops: 30, stage: 2 },
   { id: "sturdy-basket", name: "튼튼한 바구니", icon: "🧺", note: "가방 +4칸", bag: 4, gold: 5000, forage: [{ id: "thick-reed", count: 8 }], crops: 10, stage: 2 },
+  // 생활 3단계: 문서의 농업 섬유 1 → 농산물 5, 무두질 가죽 2 → 농산물 10(사냥 재료와 엮지 않는다)
+  { id: "herb-sickle", name: "약초 낫", icon: "🌙", note: "약초·꽃 채집 시 20% 확률로 1개 더", herb: 0.2, gold: 6000, forage: [{ id: "iron-scrap", count: 6 }], crops: 5, stage: 3 },
+  { id: "trail-boots", name: "탐험 장화", icon: "🥾", note: "위험에 맞았을 때 멈추는 시간 −35%", stunCut: 0.35, gold: 6000, forage: [{ id: "maple-sap", count: 4 }], crops: 10, stage: 3 },
 ];
 
 export const toolInfo = (id: string | null | undefined) => EXPLORE_TOOLS.find(tool => tool.id === id);
 export const availableTools = () => EXPLORE_TOOLS.filter(tool => (tool.stage === 2 ? LIFE2_ENABLED : LIFE3_ENABLED));
 /** 장착한 장비의 효과(없으면 0) */
-export const toolBonus = (id: string | null | undefined) => { const tool = toolInfo(id); return { bag: tool?.bag ?? 0, gather: tool?.gather ?? 0, move: tool?.moveGather === true }; };
+export const toolBonus = (id: string | null | undefined) => { const tool = toolInfo(id); return { bag: tool?.bag ?? 0, gather: tool?.gather ?? 0, move: tool?.moveGather === true, stun: tool?.stunCut ?? 0, herb: tool?.herb ?? 0 }; };
+/** 엔진에 넘길 장비 효과 */
+export const gearOpts = (id: string | null | undefined) => { const b = toolBonus(id); return { bagBonus: b.bag, gatherBonus: b.gather, moveGather: b.move, stunCut: b.stun, herbBonus: b.herb }; };
 
 /** 제작에 쓸 묶음 계획: 채집물은 공용 소비 순서, 농산물은 황금 제외·낮은 품질·싼 작물부터. */
 export function toolPlan(inventory: Inventory, tool: ExploreTool, opts: ConsumeOptions) {

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSync } from 'esbuild';
 const root = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const out = buildSync({ stdin: { contents: `export * from "./app/explore/tools"; export * from "./app/explore/engine";`, resolveDir: root, loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent' });
+const out = buildSync({ stdin: { contents: `export * from "./app/explore/tools"; export * from "./app/explore/engine"; export { PLAYER_SPEED, STUN_SECONDS } from "./app/explore/engine";`, resolveDir: root, loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent' });
 const T = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 
 test('장비 제작 계획: 채집물 + 아무 농산물(황금·잠금 제외, 낮은 품질·싼 작물부터)', () => {
@@ -18,7 +18,7 @@ test('장비 제작 계획: 채집물 + 아무 농산물(황금·잠금 제외, 
 });
 
 test('장착 효과: 바구니 가방 +4, 장갑은 일반 자원만 −20%', () => {
-  assert.deepEqual(T.toolBonus('sturdy-basket'), { bag: 4, gather: 0, move: false });
+  assert.deepEqual(T.toolBonus('sturdy-basket'), { bag: 4, gather: 0, move: false, stun: 0, herb: 0 });
   const s = T.createRun({ seed: 3, runId: 'g', startedAt: 0, regionId: 'sprout-trail', inSeason: false, ...{ bagBonus: 4, gatherBonus: 0.2 } });
   assert.equal(s.bagCap, T.BAG_BASE + 4);
   s.phase = 'play';
@@ -35,4 +35,22 @@ test('채집 중 움직이면 취소, 바람결 채집망은 범위 안에서 �
   const a = mk(false); assert.ok(a.gather); T.step(a, { ...T.NO_INPUT, mx: 1 }, 0.01); assert.equal(a.gather, null);
   const b = mk(true); T.step(b, { ...T.NO_INPUT, mx: 1 }, 0.01); assert.ok(b.gather);
   assert.equal(T.toolBonus('breeze-net').move, true);
+});
+
+test('생활 3단계: 가을 낙석·가시덤불·멧돼지, 겨울 고드름·빙판·늑대, 빙판 관성, 장화 경직 −35%, 약초 낫', () => {
+  const fall = T.generateMap(4, { regionId: 'maple-valley', inSeason: false }), win = T.generateMap(4, { regionId: 'frost-cave', inSeason: false });
+  assert.ok(fall.hazards.filter(h => h.kind === 'spores').every(h => h.skin === 'rock') && fall.hazards.some(h => h.kind === 'spores'));
+  assert.ok(fall.hazards.filter(h => h.kind === 'mud').every(h => h.skin === 'thorn'));
+  assert.ok(win.hazards.filter(h => h.kind === 'mud').every(h => h.skin === 'ice') && win.hazards.filter(h => h.kind === 'boar').every(h => h.skin === 'wolf'));
+  assert.equal(fall.hazards.filter(h => h.kind === 'bees').length + win.hazards.filter(h => h.kind === 'bees').length, 0);
+  // 빙판 위에서는 속도가 서서히 붙는다
+  const s = T.createRun({ seed: 4, runId: 'i', startedAt: 0, regionId: 'frost-cave', inSeason: false }); s.phase = 'play';
+  for (const h of s.hazards) if (h.kind === 'boar') { h.x = h.hx = h.wx = 30; h.y = h.hy = h.wy = 30; }
+  const ice = s.hazards.find(h => h.kind === 'mud'); s.player.x = ice.x; s.player.y = ice.y; s.t = 0.01;
+  T.step(s, { ...T.NO_INPUT, mx: 1 }, 0.05); assert.ok(s.player.vx > 0 && s.player.vx < T.PLAYER_SPEED * 0.3, `${s.player.vx}`);
+  // 장화: 경직 1.5초 × 0.65
+  const b = T.createRun({ seed: 4, runId: 'b', startedAt: 0, regionId: 'sprout-trail', inSeason: false, stunCut: 0.35 }); b.phase = 'play';
+  const bee = b.hazards.find(h => h.kind === 'bees'); b.player.x = bee.x; b.player.y = bee.y; T.step(b, T.NO_INPUT, 0.001);
+  assert.ok(Math.abs((b.player.stunUntil - b.t) - T.STUN_SECONDS * 0.65) < 0.01);
+  assert.deepEqual(T.gearOpts('herb-sickle'), { bagBonus: 0, gatherBonus: 0, moveGather: false, stunCut: 0, herbBonus: 0.2 });
 });

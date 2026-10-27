@@ -3172,7 +3172,8 @@ export default function Home() {
 
       {tab === "explore" && EXPLORE_ENABLED && <ExplorePanel exploration={exploration} season={season} guideLevel={village.facilityLevels["guide-office"] ?? 0}
         avatar={avatar} onStart={lunchCooking.enterRun} onCheckpoint={saveExploreCheckpoint} onFinish={finishExploration} onOpenStorage={() => { setShowMissions(false); setShowStorage(true); }}
-        tools={LIFE2_ENABLED ? { inventory, money, options: lunchOptions, onCraft: craftExploreTool, onEquip: equipExploreTool } : undefined} />}
+        tools={LIFE2_ENABLED ? { inventory, money, options: lunchOptions, onCraft: craftExploreTool, onEquip: equipExploreTool } : undefined}
+        mineLevel={village.facilityLevels["mine-station"] ?? 0} onDaily={daily => setExploration(state => ({ ...state, daily }))} />}
       {tab === "village" && VILLAGE_ENABLED && !villageOpen && <section className="panel village-panel village-locked">
         <div className="panel-heading"><div><span className="eyebrow">VILLAGE · 잠김</span><h3>🔒 마을 복구</h3></div></div>
         <p>채집 탐험을 <b>3번</b> 마치면 무너진 마을을 복구할 수 있어요. (지금 {Math.min(3, exploration.totalRuns)}/3회)</p>
