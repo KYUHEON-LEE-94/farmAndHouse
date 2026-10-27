@@ -18,7 +18,7 @@ test('장비 제작 계획: 채집물 + 아무 농산물(황금·잠금 제외, 
 });
 
 test('장착 효과: 바구니 가방 +4, 장갑은 일반 자원만 −20%', () => {
-  assert.deepEqual(T.toolBonus('sturdy-basket'), { bag: 4, gather: 0 });
+  assert.deepEqual(T.toolBonus('sturdy-basket'), { bag: 4, gather: 0, move: false });
   const s = T.createRun({ seed: 3, runId: 'g', startedAt: 0, regionId: 'sprout-trail', inSeason: false, ...{ bagBonus: 4, gatherBonus: 0.2 } });
   assert.equal(s.bagCap, T.BAG_BASE + 4);
   s.phase = 'play';
@@ -26,4 +26,13 @@ test('장착 효과: 바구니 가방 +4, 장갑은 일반 자원만 −20%', ()
   for (const h of s.hazards) if (h.kind !== 'mud') { h.x = h.cx = 20; h.y = h.cy = 20; }
   T.step(s, { ...T.NO_INPUT, gather: true, gatherTarget: small.id }, 0.001);
   assert.ok(Math.abs(s.gather.need - T.GATHER_SMALL * 0.8) < 1e-9);
+});
+
+test('채집 중 움직이면 취소, 바람결 채집망은 범위 안에서 계속 캔다', () => {
+  const mk = moveGather => { const s = T.createRun({ seed: 5, runId: 'm', startedAt: 0, regionId: 'sprout-trail', inSeason: false, moveGather }); s.phase = 'play';
+    for (const h of s.hazards) if (h.kind !== 'mud') { h.x = h.cx = 20; h.y = h.cy = 20; }
+    const node = s.nodes.find(n => n.size === 'small'); s.player.x = node.x; s.player.y = node.y; T.step(s, { ...T.NO_INPUT, gather: true, gatherTarget: node.id }, 0.01); return s; };
+  const a = mk(false); assert.ok(a.gather); T.step(a, { ...T.NO_INPUT, mx: 1 }, 0.01); assert.equal(a.gather, null);
+  const b = mk(true); T.step(b, { ...T.NO_INPUT, mx: 1 }, 0.01); assert.ok(b.gather);
+  assert.equal(T.toolBonus('breeze-net').move, true);
 });

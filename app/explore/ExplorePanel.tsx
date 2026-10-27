@@ -38,7 +38,7 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
   const [regionId, setRegionId] = useState(regions[0]?.id ?? REGIONS[0].id);
   // 진행 중이던 판이 있으면(창 닫기·새로고침) 같은 판을 이어 한다
   const saved = exploration.checkpoint?.snap ? exploration.checkpoint : null;
-  const [run, setRun] = useState<RunState | null>(() => (saved?.snap ? resumeRun({ ...saved, snap: saved.snap }, gear.bag, gear.gather) : null));
+  const [run, setRun] = useState<RunState | null>(() => (saved?.snap ? resumeRun({ ...saved, snap: saved.snap }, gear.bag, gear.gather, gear.move) : null));
   const [result, setResult] = useState<RunResult | null>(null);
   /** 안내소 2단계 집중 탐색 재료(5.2.1절). 선택하지 않으면 기본 분포 */
   const [focusItem, setFocusItem] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
   const start = () => {
     const seed = Math.floor(Math.random() * 2 ** 31), now = Date.now();
     setResult(null);
-    setRun(createRun({ seed, runId: `${now.toString(36)}-${seed.toString(36)}`, startedAt: now, lunch: onStart?.() ?? null, bagBonus: gear.bag, gatherBonus: gear.gather, regionId: region.id, inSeason: inSeasonBonus(region, season), guideLevel, focusItem: guideLevel >= 2 && itemsOf(region).some(item => item.id === focusItem && !item.rare) ? focusItem : null, rareMisses: exploration.rareMissesByRegion[region.id] ?? 0 }));
+    setRun(createRun({ seed, runId: `${now.toString(36)}-${seed.toString(36)}`, startedAt: now, lunch: onStart?.() ?? null, bagBonus: gear.bag, gatherBonus: gear.gather, moveGather: gear.move, regionId: region.id, inSeason: inSeasonBonus(region, season), guideLevel, focusItem: guideLevel >= 2 && itemsOf(region).some(item => item.id === focusItem && !item.rare) ? focusItem : null, rareMisses: exploration.rareMissesByRegion[region.id] ?? 0 }));
   };
   const finish = (next: RunResult) => { onFinish(next); setResult(next); setRun(null); };
 
@@ -60,7 +60,7 @@ export default function ExplorePanel({ exploration, season, guideLevel, onStart,
   const misses = exploration.rareMissesByRegion[region.id] ?? 0;
   if (saved?.snap) return <section className="panel explore-panel">
     <div className="explore-result"><b>🔄 진행 중인 탐험이 있어요</b><p>남은 시간 {Math.ceil(saved.snap.timeLeft)}초 · 체력 {saved.snap.hp} · 가방 {Object.values(saved.bag).reduce((a, b) => a + b, 0)}개. 같은 자리에서 이어 해요.</p>
-      <div className="explore-result-actions"><button className="save-button" onClick={() => setRun(resumeRun({ ...saved, snap: saved.snap! }, gear.bag, gear.gather))}>▶ 이어 하기</button></div></div>
+      <div className="explore-result-actions"><button className="save-button" onClick={() => setRun(resumeRun({ ...saved, snap: saved.snap! }, gear.bag, gear.gather, gear.move))}>▶ 이어 하기</button></div></div>
   </section>;
   return <section className="panel explore-panel">
     <div className="panel-heading"><div><span className="eyebrow">FORAGING · {RUN_SECONDS}초</span><h3>채집·탐험</h3></div><span className="plot-count">누적 {exploration.totalRuns}회</span></div>

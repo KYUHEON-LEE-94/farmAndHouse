@@ -1358,7 +1358,7 @@ button { color:inherit; }
 .explore-brief{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#fbf6ea;margin-bottom:10px}
 .explore-brief div{display:grid;grid-template-columns:86px 1fr;gap:2px 8px;align-items:baseline}
 .explore-brief span{font:700 11px "Gowun Dodum";color:#8a7a5a}.explore-brief b{font-size:13px}.explore-brief small{grid-column:2;font-size:11px;color:#a0702a}
-.explore-start{width:100%;padding:13px}
+.explore-start{width:100%;padding:13px}.explore-start+.hint{margin-top:8px}
 .explore-result{border:1px solid #e3d3a8;background:#fff8e6;border-radius:14px;padding:12px 14px;margin:8px 0 4px;display:grid;gap:6px}
 .explore-result ul{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
 .explore-result li{display:flex;align-items:center;gap:4px;padding:5px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:13px}
