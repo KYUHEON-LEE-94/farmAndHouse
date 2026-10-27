@@ -38,6 +38,8 @@ import { DISHES, DISH_GRADES, KITCHEN_ENABLED, dishEffectText, gradeChances, rol
 import { applyTake, reservedToItemKeys, categoryLocks, replaceCategoryLocks, restoreItemLocks, type ItemLocks } from "./stock";
 import { EXPLORE_ENABLED, FORAGE, LIFE2_ENABLED, forageKey } from "./explore/data";
 import { toolInfo, toolPlan } from "./explore/tools";
+import GreenhouseCard from "./village/GreenhouseCard";
+import { EMPTY_GREENHOUSE, greenhouseSeconds, isReady as greenhouseReady, offSeasonCrops, slotsOf } from "./village/greenhouse";
 import ExplorePanel from "./explore/ExplorePanel";
 import { nextRareMisses, type RunResult } from "./explore/engine";
 import { EMPTY_EXPLORATION, explorationUnlockMet, restoreExploration, villageUnlockMet, type ExplorationCheckpoint, type ExplorationState } from "./explore/types";
@@ -1582,6 +1584,29 @@ export default function Home() {
     setExploration(state => ({ ...state, equippedTool: id && state.ownedTools.includes(id) ? id : null }));
     const tool = toolInfo(id); setNotice(tool ? `${tool.icon} ${josa(tool.name, "을를")} 장착했어요. (${tool.note})` : "🎒 탐험 장비를 해제했어요.");
   }
+  /** 온실(생활 2단계): 작물 고르기·심기·수확. 수확물은 보통 품질로 창고에 넣고, 창고가 꽉 차면 바로 판다. */
+  function pickGreenhouse(index: number, cropId: string) {
+    setVillage(v => { const gh = v.greenhouse ?? EMPTY_GREENHOUSE, picks = [...gh.picks]; picks[index] = cropId; return { ...v, greenhouse: { ...gh, picks: picks.filter(Boolean) } }; });
+  }
+  function plantGreenhouse(slot: number, cropId: string) {
+    const crop = CROPS.find(c => c.id === cropId), gh = village.greenhouse ?? EMPTY_GREENHOUSE;
+    if (!crop || slot >= slotsOf(village.facilityLevels.greenhouse ?? 0) || gh.slots[slot]) return;
+    const price = seedPrice(crop);
+    if (money < price) return setNotice(`🌱 ${crop.name} 씨앗은 ${price.toLocaleString()}원이에요.`);
+    setMoney(value => value - price);
+    setVillage(v => { const g = v.greenhouse ?? EMPTY_GREENHOUSE, slots = [...g.slots]; slots[slot] = { cropId, plantedAt: Date.now(), growSeconds: greenhouseSeconds(crop) }; return { ...v, greenhouse: { ...g, slots } }; });
+    playPlop(); setNotice(`🌱 온실에 ${josa(crop.name, "을를")} 심었어요. (${formatClock(greenhouseSeconds(crop))} 뒤 수확)`);
+  }
+  function harvestGreenhouse(slot: number) {
+    const gh = village.greenhouse ?? EMPTY_GREENHOUSE, planted = gh.slots[slot], crop = planted ? CROPS.find(c => c.id === planted.cropId) : undefined;
+    if (!planted || !crop || !greenhouseReady(planted, Date.now())) return;
+    setVillage(v => { const g = v.greenhouse ?? EMPTY_GREENHOUSE, slots = [...g.slots]; slots[slot] = null; return { ...v, greenhouse: { ...g, slots } }; });
+    setCropLog(log => { const old = log[crop.id] ?? { n: 0, best: 0, golden: 0, top: 0 }; return { ...log, [crop.id]: { ...old, n: old.n + 1 } }; });
+    const room = storageCap - Object.values(produce).reduce((sum, n) => sum + n, 0);
+    if (harvestMode === "store" && room > 0) { setProduce(stock => { const key = produceKey(crop.id, 0, false); return { ...stock, [key]: (stock[key] ?? 0) + 1 }; }); playPlop(); return setNotice(`📦 온실 ${crop.icon} ${josa(crop.name, "을를")} 창고에 넣었어요.`); }
+    const price = salePrice(crop); setMoney(value => value + price); playCoinSound([660, 880]);
+    setNotice(`💰 온실 ${crop.icon} ${josa(crop.name, "을를")} ${price.toLocaleString()}원에 팔았어요.`);
+  }
   /** 채집물 판매: 고정 저가, 잠금은 팔지 않는다(7.1절). */
   function sellForage(id: string, count: number) {
     const item = FORAGE.find(entry => entry.id === id);
@@ -2809,6 +2834,7 @@ export default function Home() {
               <span className="field-meter"><i style={{ width: `${(ownedPlots / MAX_PLOTS) * 100}%` }} /></span>
               <button onClick={expandField} disabled={ownedPlots >= MAX_PLOTS}>{ownedPlots >= MAX_PLOTS ? "최대 확장 완료" : `🪙 ${fieldPrice(ownedPlots).toLocaleString()}원`}</button>
             </div>
+            {LIFE2_ENABLED && (village.facilityLevels.greenhouse ?? 0) >= 1 && <GreenhouseCard level={village.facilityLevels.greenhouse ?? 0} state={village.greenhouse ?? EMPTY_GREENHOUSE} choices={offSeasonCrops(season)} now={nowMs} seedPrice={seedPrice} seconds={greenhouseSeconds} onPick={pickGreenhouse} onPlant={plantGreenhouse} onHarvest={harvestGreenhouse} />}
             <details className="farm2-shop"><summary>🧰 도구 상점 <small>심기·수확·물·거름</small></summary>{toolShopBox}</details>
             <button className="farm2-workshop" onClick={() => switchTab("workshop")}>🏭 공방 <small>{workshop.jobs.length}/{workshop.slots}</small>{doneJobs > 0 && <i className="tab-dot">{doneJobs}</i>}</button>
           </aside>

@@ -56,6 +56,12 @@ export const STAGE_COSTS: Record<string, StageCost[]> = {
  * 2단계 플래그가 꺼져 있으면 STAGE_COSTS에 넣지 않아 지도에서 '준비 중'으로 남는다.
  */
 export const STAGE2_COSTS: Record<string, StageCost[]> = {
+  // 온실: 농사 + 여름 채집(2026-10-27 결정: 1단계부터 재배칸 1칸)
+  greenhouse: [
+    { gold: 10_000, needs: [{ category: "crop", id: "tomato", count: 12 }, { category: "forage", id: "thick-reed", count: 10 }, { category: "forage", id: "fragrant-herb", count: 6 }] },
+    { gold: 50_000, needs: [{ category: "crop", id: "tomato", count: 25 }, { category: "forage", id: "thick-reed", count: 25 }, { category: "forage", id: "flower-nectar", count: 20 }, { category: "forage", id: "blue-firefly", count: 1 }] },
+    { gold: 170_000, needs: [{ category: "crop", id: "tomato", count: 50 }, { category: "crop", id: "corn", count: 40 }, { category: "forage", id: "thick-reed", count: 50 }, { category: "forage", id: "fragrant-herb", count: 40 }, { category: "forage", id: "blue-firefly", count: 4 }] },
+  ],
   pier: [
     { gold: 12_000, needs: [{ category: "fish", id: "any", count: 12 }, { category: "forage", id: "thick-reed", count: 10 }, { category: "crop", id: "corn", count: 8 }] },
     { gold: 55_000, needs: [{ category: "fish", id: "any", count: 30 }, { category: "forage", id: "thick-reed", count: 25 }, { category: "forage", id: "flower-nectar", count: 20 }, { category: "forage", id: "blue-firefly", count: 1 }] },
@@ -71,7 +77,7 @@ export const stageCost = (id: string, level: number): StageCost | null => STAGE_
 /** 단계별 효과 설명(5.2·5.2.1절). index = 완공 단계 - 1 */
 export const STAGE_EFFECTS: Record<string, [string, string, string]> = {
   "guide-office": ["탐험 미니맵에 아직 캐지 않은 일반 자원 위치 표시", "입장 전 일반 재료 1종 집중 탐색(자원 30% 교체) · 4계절 공개 후 비계절 지역 선택", "판마다 일반 자원 1곳을 큰 자원(2개)으로 교체"],
-  greenhouse: ["현재 계절 외 씨앗 2종 구매", "비계절 재배칸 2칸", "비계절 재배칸 4칸"],
+  greenhouse: ["비계절 작물 2종 · 온실 재배칸 1칸", "온실 재배칸 2칸", "온실 재배칸 4칸"],
   pier: ["낚시 결과에 어종 누적 포획 수 표시", "미끼 프리셋 2개", "전설 도감 힌트"],
   "craft-street": ["도시락 즐겨찾기 · 부족 재료 탐험 바로가기", "같은 도시락 최대 3개 일괄 조리", "일괄 조리 최대 5개 + 생활 가공 대기열 개선"],
   "mine-station": ["비겨울 계절에 서리 동굴 하루 2회", "탐험 장비 프리셋 2개", "희귀 샛길 확률 +5%p"],
