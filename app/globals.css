@@ -1671,9 +1671,6 @@ button { color:inherit; }
 .farm2-sel-crops,.farm2-sel-stats{margin:0;padding:0;list-style:none;display:grid;gap:6px}
 .farm2-sel-crops li,.farm2-sel-stats li{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#3b2a18}
 .farm2-sel-stats{padding-top:8px;border-top:1px dashed rgba(122,84,40,.35)}.farm2-sel-stats b{color:#2f5a36}
-.farm2-water-all{padding:12px;border-radius:12px;border:2px solid #24452c;background:linear-gradient(180deg,#3f6b45,#2c5133);color:#fff;font:700 15px "Gowun Batang";cursor:pointer}
-.farm2-water-all:disabled{opacity:.5;cursor:not-allowed}
-.farm2-fert-pick{padding:10px;border-radius:12px;border:2px solid #c99b52;background:linear-gradient(180deg,#fbe7c2,#f1d3a0);font-weight:700;color:#5b3a18;cursor:pointer}
 .farm2-clear{padding:9px;border-radius:12px;border:1px solid rgba(122,84,40,.3);background:#fffaf0;color:#5b4630;cursor:pointer}
 .farm2-expand h4{margin:0;font:700 16px "Gowun Batang";color:#3b2a18}
 .farm2-expand>div{display:flex;align-items:center;gap:10px}.farm2-expand p{margin:0;font-size:12px;color:#5b4630}

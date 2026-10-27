@@ -1126,22 +1126,6 @@ export default function Home() {
     setNotice(`${can.icon} ${josa(can.name, "을를")} 샀어요! 물을 가득 채워 드렸어요. (${can.note})`);
   }
 
-  /** 선택 구획 전체 물주기: 목마른 칸에만 주고, 물뿌리개 범위(칸 수)마다 물 1을 쓴다. */
-  function waterArea(cells: number[]) {
-    const time = Date.now();
-    const targets = cells.filter(i => { const plot = plots[i], crop = plot ? CROPS.find(c => c.id === plot.cropId) : undefined;
-      return plot && crop && seasonPeriod(plot.plantedAt, startHour, endHour) === currentPeriod && plotStatus(plot, crop, time, bugPenalty).thirsty; });
-    if (!targets.length) return setNotice("💧 선택한 구획에 목마른 작물이 없어요.");
-    const cost = Math.ceil(targets.length / (currentCan.w * currentCan.h));
-    if (canWater - pendingPours.current < cost) return setNotice(`🚿 물이 모자라요. 이 구획엔 물 ${cost}이 필요해요(남은 ${Math.max(0, canWater)}). 🚰 우물(4)에서 채워 주세요.`);
-    targets.forEach(i => justWatered.current.set(i, time));
-    pendingPours.current += cost; setCanWater(value => Math.max(0, value - cost));
-    setPlots(current => current.map((item, i) => (targets.includes(i) && item ? { ...item, water: [...(item.water ?? []), time] } : item)));
-    setWaterFx(items => [...items, ...targets.map(i => ({ id: time + i, plotIndex: i }))]);
-    window.setTimeout(() => setWaterFx(items => items.filter(item => item.id < time || item.id > time + plotCount)), 900);
-    playSplash();
-    setNotice(`💧 선택 구획 ${targets.length}칸에 물을 줬어요. (물 ${cost} 사용 · 남은 ${Math.max(0, canWater - cost)}/${canMax})`);
-  }
   function refillCan() {
     if (canWater >= canMax) return setNotice("🚿 물뿌리개는 이미 가득 차 있어요.");
     setCanWater(canMax); setTool("water"); playSplash();
@@ -2835,10 +2819,8 @@ export default function Home() {
                   <li><span>💧 물 필요</span><b>{selInfo.thirsty}칸</b></li>
                   <li><span>🪙 예상 수확 가치</span><b>약 {selInfo.value.toLocaleString()}원</b></li>
                 </ul>
-                <button className="farm2-water-all" onClick={() => waterArea(fieldSel.cells)} disabled={!selInfo.thirsty}>💧 전체 물주기</button>
-                <button className="farm2-fert-pick" onClick={() => setFertMenu(true)}>{heldFert.icon} 비료 선택</button>
                 <button className="farm2-clear" onClick={() => { selKeyRef.current = ""; setFieldSel({ cells: [], label: "" }); }}>✕ 구획 해제</button>
-              </> : <p className="hint">밭 위에 마우스를 올리면 지금 도구 범위가 선택 구획이 돼요. 여기서 물·성장도·예상 가치를 확인하고 한 번에 물을 줄 수 있어요.</p>}
+              </> : <p className="hint">밭 위에 마우스를 올리면 지금 도구 범위가 선택 구획이 돼요. 여기서 물·성장도·예상 가치를 확인할 수 있어요.</p>}
             </div>
             <div className="farm2-expand">
               <h4>다음 밭 확장 · {ownedPlots} → {Math.min(MAX_PLOTS, ownedPlots + 2)}칸</h4>
