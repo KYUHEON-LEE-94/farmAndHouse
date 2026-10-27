@@ -1812,3 +1812,72 @@ button { color:inherit; }
 /* 통합 창고·미션 창 */
 .storage-modal:not(.missions-modal){background:linear-gradient(rgba(255,250,240,.9),rgba(255,250,240,.94)),url("/images/ui/backgrounds/storage.webp") center/cover no-repeat}
 .missions-modal{background:linear-gradient(rgba(255,250,240,.88),rgba(255,250,240,.93)),url("/images/ui/backgrounds/missions.webp") center/cover no-repeat}
+/* ---------- 공방 개편(2026-10-27 시안 배치): 나무 액자·종이 카드·초록 버튼. 공통 토큰 --wood·--paper2·--leaf ---------- */
+.ws3{--wood:#8a5f36;--wood-d:#5e3d20;--wood-l:#c99b60;--paper2:#fbf3e2;--paper3:#f3e2bf;--leaf:#3f6b45;--leaf-d:#2c5133;--ink2:#3b2a18;display:grid;grid-template-columns:minmax(250px,300px) minmax(0,1fr) minmax(240px,290px);gap:14px;align-items:start}
+.item-art{display:inline-grid;place-items:center;flex:none;background:center/contain no-repeat;line-height:1}
+.item-art.emoji{filter:drop-shadow(0 3px 2px rgba(60,35,10,.25))}
+.ws3-list,.ws3-detail,.ws3-profit,.ws3-bench{border-radius:18px;background:linear-gradient(180deg,var(--paper2),var(--paper3));border:3px solid var(--wood-l);box-shadow:inset 0 0 0 2px #fff6e0,0 6px 16px rgba(80,50,20,.16)}
+.ws3-list{display:grid;gap:10px;padding:14px;align-content:start}
+.ws3-title{display:flex;align-items:center;gap:8px}.ws3-title h3{margin:0;font:700 26px "Gowun Batang";color:var(--ink2)}.ws3-title span{font-size:28px}
+.ws3-title.small h4{margin:0;font:700 19px "Gowun Batang";color:var(--ink2)}.ws3-title.small span{font-size:22px}
+.ws3-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+.ws3-tabs button{padding:8px 6px;border-radius:10px;border:1px solid rgba(122,84,40,.3);background:#fffaf0;font-weight:700;font-size:12px;color:#5b4630;cursor:pointer}
+.ws3-tabs button.on{background:linear-gradient(180deg,var(--leaf),var(--leaf-d));border-color:var(--leaf-d);color:#fff}
+.ws3-search{display:flex;gap:6px;align-items:center}.ws3-search input[type=search]{flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid rgba(122,84,40,.3);background:#fff;font:inherit;font-size:13px}
+.ws3-search label{display:flex;align-items:center;gap:3px;font-size:12px;white-space:nowrap;color:#5b4630}
+.ws3-cards{display:grid;gap:8px;max-height:640px;overflow:auto;padding:2px}
+.ws3-card{display:grid;grid-template-columns:62px 1fr;gap:10px;align-items:center;padding:9px;border-radius:14px;border:1px solid rgba(122,84,40,.2);background:#fffaf0;text-align:left;cursor:pointer;opacity:.78}
+.ws3-card.ready{opacity:1}.ws3-card:hover{border-color:#9bbf6a}
+.ws3-card.on{opacity:1;border:2px solid #7bb04a;background:#f7fbe9;box-shadow:0 0 0 3px rgba(123,176,74,.2)}
+.ws3-card-art{width:62px;height:62px;border-radius:12px;background-color:#f3e6cc}
+.ws3-card-body{display:grid;gap:3px;min-width:0}.ws3-card-body b{display:flex;align-items:center;gap:6px;font:700 15px "Gowun Batang";color:var(--ink2)}
+.ws3-card-body small{font-size:11px;color:#7d6a52;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws3-badge{font:700 10px "Gowun Dodum";font-style:normal;padding:1px 7px;border-radius:999px;background:#e3f0d6;color:#2f5a36;border:1px solid #9bbf6a}
+.ws3-card-meta,.ws3-head-meta{display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#5b4630}.ws3-card-meta em,.ws3-head-meta em{font-style:normal;font-weight:700}
+.ws3-card-inputs{display:flex;flex-wrap:wrap;gap:4px}.ws3-card-inputs i{font-style:normal;font-size:11px;padding:1px 6px;border-radius:999px;background:#f6e2d6;color:#8a3a20}.ws3-card-inputs i.ok{background:#e3f0d6;color:#2f5a36}
+.ws3-detail{display:grid;gap:14px;padding:16px;min-width:0;background:linear-gradient(180deg,rgba(251,243,226,.94),rgba(243,226,191,.94)),url("/images/ui/backgrounds/workshop.webp") center/cover}
+.ws3-head{display:flex;gap:14px;align-items:center}.ws3-head-art{width:84px;height:84px;border-radius:16px;background-color:#fffaf0;box-shadow:inset 0 0 0 1px rgba(122,84,40,.2)}
+.ws3-head h4{margin:0 0 4px;font:700 24px "Gowun Batang";color:var(--ink2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ws3-head p{margin:0 0 4px;font-size:13px;color:#6f5a40}
+.ws3-kind{font:700 11px "Gowun Dodum";font-style:normal;padding:2px 9px;border-radius:999px;background:#e3f0d6;color:#2f5a36;border:1px solid #9bbf6a}.ws3-kind.special{background:#fff1c9;border-color:#e0a832;color:#7a4a00}.ws3-kind.mix{background:#e6eef8;border-color:#8fb0d6;color:#2a4a7a}
+.ws3-flow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(190px,240px);gap:12px;align-items:center}
+.ws3-inputs{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.ws3-slot-wrap{display:flex;align-items:center;gap:6px}.ws3-plus{font-style:normal;font-size:20px;font-weight:800;color:var(--wood)}
+.ws3-slot{display:grid;justify-items:center;gap:3px;min-width:96px;padding:10px 8px 8px;border-radius:12px;border:3px solid var(--wood);background:linear-gradient(180deg,#a87645,#8a5f36);box-shadow:inset 0 0 0 2px var(--wood-l)}
+.ws3-slot b{display:block;width:100%;padding:2px 4px;border-radius:6px;background:#fffaf0;text-align:center;font-size:12px;color:var(--ink2)}
+.ws3-slot small{display:block;width:100%;padding:2px 4px;border-radius:6px;background:#fffaf0;text-align:center;font:800 13px "Gowun Dodum";color:#2f5a36}
+.ws3-slot.lack small{color:#b04a2a}.ws3-slot.wide{min-width:200px;align-content:center}
+.ws3-arrow{font-style:normal;font-size:30px;color:var(--wood)}
+.ws3-output{display:grid;justify-items:center;gap:8px;padding:12px;border-radius:16px;background:radial-gradient(circle at 50% 35%,#fff7da,#fbeec8 60%,#f3e2bf);border:2px solid var(--wood-l)}
+.ws3-out-art{width:96px;height:96px}.ws3-output>b{font:700 15px "Gowun Batang";color:var(--ink2);text-align:center}
+.ws3-qty{display:flex;align-items:center;gap:4px}.ws3-qty button{width:32px;height:32px;border-radius:8px;border:1px solid rgba(122,84,40,.35);background:#fff;font-weight:800;cursor:pointer}.ws3-qty button.max{width:auto;padding:0 10px;font-size:12px}
+.ws3-qty span{min-width:46px;padding:5px 0;border-radius:8px;background:#fff;border:1px solid rgba(122,84,40,.35);text-align:center;font-weight:800}.ws3-qty button:disabled{opacity:.4;cursor:default}
+.ws3-start{width:100%;padding:13px 10px;border-radius:14px;border:2px solid #24452c;background:linear-gradient(180deg,var(--leaf),var(--leaf-d));color:#fff;font:700 18px "Gowun Batang";cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 4px 10px rgba(30,60,35,.25)}
+.ws3-start:disabled{opacity:.5;cursor:not-allowed}
+.ws3-pick{display:grid;gap:6px}.ws3-pick small{color:#7d6a52;font-size:11px}
+.ws3-pick-toggle{justify-self:start;padding:7px 12px;border-radius:999px;border:1px solid rgba(122,84,40,.35);background:#fffaf0;font-weight:700;font-size:12px;cursor:pointer}
+.ws3-problem{margin:0;padding:8px 12px;border-radius:10px;background:#fbefe6;color:#8a4a20;font-size:13px}
+.ws3-profit{display:grid;gap:10px;padding:14px}
+.ws3-profit ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.ws3-profit li{display:flex;justify-content:space-between;gap:8px;padding-bottom:7px;border-bottom:1px dashed rgba(122,84,40,.25);font-size:13px;color:#5b4630}.ws3-profit li b{color:var(--ink2);font-size:15px}.ws3-profit li.good b{color:#2f7a3a}
+.ws3-callout{display:grid;justify-items:center;padding:12px;border-radius:14px;background:linear-gradient(180deg,#eef7e6,#dcefd0);border:2px solid #9bcf6a;color:#2f5a36;font-weight:700}.ws3-callout b{font:800 26px "Gowun Batang";color:#2f7a3a}.ws3-callout small{font-weight:400;font-size:11px}
+.ws3-bench{grid-column:1/-1;display:grid;gap:12px;padding:14px;background:linear-gradient(180deg,#9a6a3c,#7a5230);border-color:#5e3d20}
+.ws3-bench-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.ws3-bench-head h4{margin:0;font:700 19px "Gowun Batang";color:#fff6e0}.ws3-bench-head h4 small{font:400 13px "Gowun Dodum";color:#f3e2bf}
+.ws3-running{margin-left:auto;padding:5px 12px;border-radius:999px;background:rgba(255,246,224,.15);color:#fff6e0;font-size:13px;font-weight:700}
+.ws3-collect,.ws3-fill{padding:9px 14px;border-radius:12px;font-weight:700;cursor:pointer}.ws3-collect{border:2px solid #24452c;background:linear-gradient(180deg,var(--leaf),var(--leaf-d));color:#fff}.ws3-fill{border:2px solid var(--wood-l);background:#fffaf0;color:var(--ink2)}
+.ws3-collect:disabled,.ws3-fill:disabled{opacity:.5;cursor:not-allowed}
+.ws3-slots{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.ws3-bench-slot{position:relative;display:grid;justify-items:center;align-content:end;gap:4px;min-height:150px;padding:62px 8px 10px;border-radius:14px;border:2px solid var(--wood-l);background:#fdf3df no-repeat center 8px/auto 64px;box-shadow:inset 0 -4px 0 rgba(94,61,32,.25)}
+.ws3-bench-slot b{font-size:12px;color:var(--ink2);text-align:center}.ws3-bench-slot small{font-size:11px;color:#6f5a40}
+.ws3-bench-slot button{padding:5px 10px;border-radius:9px;border:1px solid #24452c;background:linear-gradient(180deg,var(--leaf),var(--leaf-d));color:#fff;font-weight:700;font-size:12px;cursor:pointer}
+.ws3-bench-slot.empty{background-color:#efe4cf;filter:saturate(.6)}.ws3-bench-slot.empty button{background:#fffaf0;color:var(--ink2);border-color:var(--wood-l)}
+.ws3-bench-slot.done{border-color:#f0c040;box-shadow:0 0 0 2px #f0c040,0 0 18px rgba(240,192,64,.6);animation:readyPulse 1.2s infinite}
+.ws3-bench-slot.add{cursor:pointer;border-style:dashed;align-content:center;padding:10px;background:#fffaf0;font:inherit}.ws3-bench-slot.add span{font-size:28px;color:var(--wood)}
+.ws3-no{position:absolute;left:8px;top:8px;font:800 11px "Gowun Dodum";font-style:normal;padding:1px 7px;border-radius:6px;background:var(--wood-d);color:#fff}
+.ws3-ring{position:absolute;right:8px;top:8px;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:conic-gradient(#6fbf4f var(--k,0deg),rgba(94,61,32,.2) 0)}
+.ws3-ring>.item-art{width:32px!important;height:32px!important;border-radius:50%;background-color:#fffaf0}
+.ws3-strip{display:flex;gap:8px;overflow-x:auto;padding:8px 10px;border-radius:12px;background:rgba(255,246,224,.12)}
+.ws3-strip span{display:grid;justify-items:center;gap:2px;min-width:52px;color:#fff6e0;font-size:11px}.ws3-strip span.done{color:#ffe27a;font-weight:800}
+.ws3-strip .item-art{border-radius:50%;background-color:#fffaf0;border:2px solid var(--wood-l)}
+.ws3-goods{grid-column:1/-1}.ws3-goods .goods-item>.item-art{width:30px;height:30px}
+@media(max-width:1200px){.ws3{grid-template-columns:minmax(230px,280px) minmax(0,1fr)}.ws3-profit{grid-column:2}.ws3-slots{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:860px){.ws3{grid-template-columns:1fr}.ws3-profit{grid-column:auto}.ws3-detail{order:-1}.ws3-flow{grid-template-columns:1fr}.ws3-arrow{transform:rotate(90deg);justify-self:center}.ws3-cards{max-height:340px}.ws3-slots{grid-template-columns:repeat(2,minmax(0,1fr))}.ws3-running{margin-left:0}}
