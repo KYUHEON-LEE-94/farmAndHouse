@@ -1806,6 +1806,9 @@ button { color:inherit; }
 .app.screen-fish{background:linear-gradient(rgba(247,242,232,.42),rgba(247,242,232,.72) 55%,rgba(247,242,232,.9)),url("/images/ui/backgrounds/fishing.webp") center top/cover no-repeat,var(--paper)}
 .app.screen-farm{background:linear-gradient(rgba(247,242,232,.42),rgba(247,242,232,.72) 55%,rgba(247,242,232,.9)),url("/images/ui/backgrounds/farm.webp") center top/cover no-repeat,var(--paper)}
 .app[class*="screen-"] .panel{backdrop-filter:blur(2px)}
+.app[class*="screen-"] .main-menu .tab-groups button:not(.active){background:rgba(255,253,245,.88);border-color:rgba(74,63,45,.2);box-shadow:0 3px 12px rgba(45,35,20,.08);backdrop-filter:blur(8px)}
+.app[class*="screen-"] .main-menu .tab-row{background:rgba(255,253,245,.82);border:1px solid rgba(74,63,45,.14);box-shadow:0 3px 12px rgba(45,35,20,.08);backdrop-filter:blur(8px)}
+.app[class*="screen-"] .main-menu .tab-row button:not(.active){color:#4a4e45;text-shadow:0 1px rgba(255,255,255,.8)}
 /* 통합 창고·미션 창 */
 .storage-modal:not(.missions-modal){background:linear-gradient(rgba(255,250,240,.9),rgba(255,250,240,.94)),url("/images/ui/backgrounds/storage.webp") center/cover no-repeat}
 .missions-modal{background:linear-gradient(rgba(255,250,240,.88),rgba(255,250,240,.93)),url("/images/ui/backgrounds/missions.webp") center/cover no-repeat}

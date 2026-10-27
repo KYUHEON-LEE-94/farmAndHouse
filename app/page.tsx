@@ -319,7 +319,8 @@ function starterItems(room: Room): PlacedItem[] {
 const formatClock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.max(0, seconds % 60)).padStart(2, "0")}`;
 
 export default function Home() {
-  const [now, setNow] = useState(new Date());
+  // SSR과 브라우저의 첫 렌더가 같은 시각을 사용해야 실시간 카운트다운이 hydration을 깨지 않는다.
+  const [now, setNow] = useState(() => new Date(2000, 0, 1, 9, 0, 0));
   const [tab, setTab] = useState<"farm" | "fish" | "hunt" | "book" | "home" | "pets" | "casino" | "gacha" | "equipment" | "raid" | "workshop" | "explore" | "village">("farm");
   const [bookSeason, setBookSeason] = useState<Season | "special" | null>(null);
   const [bet, setBet] = useState(100);
@@ -586,6 +587,7 @@ export default function Home() {
       } catch { /* start fresh */ }
     }
     try { const stored = localStorage.getItem(AVATAR_STORAGE_KEY); if (stored) setAvatar(JSON.parse(stored)); } catch { /* keep default */ }
+    setNow(new Date());
     setLoaded(true);
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => { clearInterval(timer); window.clearTimeout(fishTimer.current); };
@@ -2703,7 +2705,7 @@ export default function Home() {
         <div className="brand"><button className="avatar-button" onClick={() => setShowAvatar(true)} aria-label="내 아바타 바꾸기">{avatarImg}</button><div><h1>월루농가</h1><p>월급은 루팡, 농사는 진심</p></div></div>
         <div className="status-cluster">
           <div key={tab === "casino" && casinoFx ? casinoFx.id : "money"} className={`status-card money ${tab === "casino" && casinoFx ? (casinoFx.kind === "push" ? "" : casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "money-gain" : "money-loss") : ""}`}><span>💰 보유 자금</span><strong>{money.toLocaleString()}원</strong>{tab === "casino" && casinoFx && casinoFx.kind !== "push" && <em className="money-fly">{casinoFx.kind === "win" || casinoFx.kind === "jackpot" ? "+" : "-"}{casinoFx.amount.toLocaleString()}원</em>}</div>
-          <div className="status-card clock" title="5분마다 작물 시세가 바뀌어요"><span>🕰 {timeLabel} · 📈 시세 {formatClock(marketSecondsLeft)}</span><strong>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
+          <div className="status-card clock" title="5분마다 작물 시세가 바뀌어요"><span suppressHydrationWarning>🕰 {timeLabel} · 📈 시세 {formatClock(marketSecondsLeft)}</span><strong suppressHydrationWarning>{isWorkTime ? `${SEASON_ICON[season]} 지금은 ${season}` : "🌙 농장 휴식"}</strong></div>
           <button className={`status-card top-action compact mission-action ${showMissions ? "on" : ""} ${readyOrders ? "ready" : ""}`} onClick={() => { setShowStorage(false); setShowMissions(open => !open); }} aria-label={`미션 ${doneToday.length}/${orders.length} (M)`} title="공용 미션 (M)"><span>📜<em className="ta-label"> 미션</em> <kbd>M</kbd></span><strong>{doneToday.length}/{orders.length}</strong>{readyOrders > 0 && <i className="tab-dot" aria-label={`완료 가능 ${readyOrders}건`}>{readyOrders}</i>}</button>
           <button className={`status-card top-action compact storage-action ${showStorage ? "on" : ""}`} onClick={() => { setShowMissions(false); setShowStorage(open => !open); }} aria-label={`통합 창고 ${storageUsed}/${storageCap} (E)`} title="통합 창고 (E)"><span>📦<em className="ta-label"> 창고</em> <kbd>E</kbd></span><strong>{storageUsed}/{storageCap}</strong></button>
           <button className="icon-button boss-button" onClick={() => setBossMode(true)} aria-label="보스 키: 업무 화면으로 위장 (ESC)" title="보스 키 (ESC)">🙈<small>ESC</small></button>
