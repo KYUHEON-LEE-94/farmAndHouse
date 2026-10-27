@@ -2697,7 +2697,7 @@ export default function Home() {
   const pct = (v: number) => `${(v * 100) >= 10 ? Math.round(v * 100) : (v * 100).toFixed(1)}%`;
 
   return (
-    <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4} ${tab === "farm" && !FARM_V2_ENABLED ? "has-dock" : ""}`}>
+    <main className={`app season-${seasonIndex >= 0 ? seasonIndex : 4} screen-${tab} ${tab === "farm" && !FARM_V2_ENABLED ? "has-dock" : ""}`}>
       <header className="topbar">
         {TEST_MODE && <span className="test-badge" title="로컬 개발 서버 전용: 숨긴 기능 공개 · 상점 아이템 모두 사용 · 계정 자동 저장 꺼짐">🧪 테스트 모드</span>}
         <div className="brand"><button className="avatar-button" onClick={() => setShowAvatar(true)} aria-label="내 아바타 바꾸기">{avatarImg}</button><div><h1>월루농가</h1><p>월급은 루팡, 농사는 진심</p></div></div>

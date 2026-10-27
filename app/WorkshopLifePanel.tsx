@@ -11,6 +11,9 @@ type Props = {
   onStart: (batches: ProcBatch[]) => void; onCollect: (index: number) => void; onSell: (key: string, n: number) => void; onBuySlot: () => void;
 };
 const KIND_LABEL = { free: "🫙 자유 가공", mix: "📦 혼합 가공", special: "⭐ 특선 레시피" } as const;
+/** 작업 슬롯 설비 그림(UI_IMAGE_ASSET_GUIDE 3절): 항아리=절임·김치, 건조대=말랭이, 구리 냄비=주스·잼, 압착기=혼합 상자·도시락 */
+const EQUIPMENT: Record<string, string> = { pickle: "fermentation-jar", garlicpickle: "fermentation-jar", kkakdugi: "fermentation-jar", kimjang: "fermentation-jar", dried: "drying-rack", juice: "copper-pot", applejuice: "copper-pot", jam: "copper-pot", jamset: "copper-pot", fruitjam: "copper-pot", veggiebox: "artisan-press", farmbox: "artisan-press", salad: "artisan-press" };
+const equipmentStyle = (recipeId: string) => EQUIPMENT[recipeId] ? { backgroundImage: `url("/images/workshop/${EQUIPMENT[recipeId]}.webp")` } : undefined;
 const stockKey = (s: { cropId: string; quality: number; golden: boolean }) => `${s.cropId}|${s.quality}|${s.golden ? 1 : 0}`;
 
 export default function WorkshopLifePanel({ workshop, nowMs, stock, goods, slotPrice, maxSlots, formatClock, onStart, onCollect, onSell, onBuySlot }: Props) {
@@ -46,9 +49,9 @@ export default function WorkshopLifePanel({ workshop, nowMs, stock, goods, slotP
     <div className="panel-heading"><div><span className="eyebrow">WORKSHOP · 절임 항아리</span><h3>가공 공방</h3></div><span className="plot-count">항아리 {workshop.jobs.length}/{workshop.slots}</span></div>
     <p className="hint">어느 계절 작물이든 가공할 수 있어요. 재료 가치는 <b>시장 기준가</b>(시세·포화 무관)로 계산하고, 담글 때 완성품 값이 확정돼요. 잠금·주문 예약분·황금 작물은 쓰지 않아요.</p>
     <div className="jar-row">{Array.from({ length: workshop.slots }).map((_, i) => { const job = workshop.jobs[i], info = job && jobInfo(job);
-      if (!job || !info) return <div key={i} className="jar empty"><span>🏺</span><small>비어 있어요</small></div>;
+      if (!job || !info) return <div key={i} className="jar empty has-equip" style={equipmentStyle("pickle")}><span>🏺</span><small>비어 있어요</small></div>;
       const left = Math.max(0, Math.ceil((job.doneAt - nowMs) / 1000)), totalSec = info.minutes * 60, done = left <= 0, price = job.price ?? goodsInfo(info.key).price;
-      return <div key={i} className={`jar ${done ? "done" : ""}`}><span>{info.icon}</span><b>{info.name}</b><small>{price.toLocaleString()}원</small>{done ? <button onClick={() => onCollect(i)}>꺼내기 ✨</button> : <><span className="jar-bar"><i style={{ width: `${(1 - left / totalSec) * 100}%` }} /></span><small>{formatClock(left)} 남음</small></>}</div>; })}
+      return <div key={i} className={`jar ${done ? "done" : ""} ${EQUIPMENT[job.recipeId] ? "has-equip" : ""}`} style={equipmentStyle(job.recipeId)}><span>{info.icon}</span><b>{info.name}</b><small>{price.toLocaleString()}원</small>{done ? <button onClick={() => onCollect(i)}>꺼내기 ✨</button> : <><span className="jar-bar"><i style={{ width: `${(1 - left / totalSec) * 100}%` }} /></span><small>{formatClock(left)} 남음</small></>}</div>; })}
       {workshop.slots < maxSlots && <button className="jar add" onClick={onBuySlot}><span>＋</span><small>항아리 추가<br />{slotPrice.toLocaleString()}원</small></button>}</div>
 
     <div className="proc-tabs shop-tabs" role="tablist">{([["ready", `✅ 지금 만들 수 있음 ${PROC_RECIPES.filter(r => counts[r.id] > 0).length}`], ["free", KIND_LABEL.free], ["mix", KIND_LABEL.mix], ["special", KIND_LABEL.special]] as const).map(([id, label]) =>
